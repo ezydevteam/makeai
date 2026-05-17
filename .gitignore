@@ -1,0 +1,65 @@
+# Node.js & NPM
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-clean.log
+pnpm-debug.log
+.lerna
+
+# Laravel & PHP
+/vendor/
+.env
+.env.backup
+.env.production
+/bootstrap/cache/*
+/public/hot
+/public/storage
+/storage/*.key
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/app/public/*
+
+# PHP / IDE Helpers
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# PHPUnit & Testing
+.phpunit.result.cache
+.phpunit.cache/
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# AI Agent Specific Files & Exclusions (Local Environment Only)
+AGENT.md
+CLAUDE.md
+.agent-mem/
+.agent/
+.agents/
+.cursor
+.windsurfrules
+.cursorrules
+.clineRules
+.gemini/
+.cline/
+.brainsync/
+caveman/
+
+
+# Docs
+AI_SaaS_Master_Prompt.md
+saas_architecture_overview.md
+

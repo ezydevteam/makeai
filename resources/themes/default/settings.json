@@ -1,0 +1,16 @@
+{
+    "name": "Default Theme",
+    "slug": "default",
+    "version": "1.0.0",
+    "author": "MakeAI",
+    "description": "The default MakeAI dark theme with glassmorphism design",
+    "requires_license": 1,
+    "thumbnail": "thumbnail.png",
+    "settings": [
+        { "key": "primary_color", "type": "color", "default": "#6366f1", "label": "Primary color" },
+        { "key": "accent_color", "type": "color", "default": "#a855f7", "label": "Accent color" },
+        { "key": "sidebar_collapsed", "type": "boolean", "default": false, "label": "Collapse sidebar by default" },
+        { "key": "enable_glassmorphism", "type": "boolean", "default": true, "label": "Enable glassmorphism effects" },
+        { "key": "border_radius", "type": "select", "default": "rounded", "label": "Border radius style", "options": ["sharp", "soft", "rounded", "pill"] }
+    ]
+}
