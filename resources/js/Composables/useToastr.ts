@@ -25,11 +25,23 @@ export function useToastr() {
         // Create toast element
         const toast = document.createElement('div')
         toast.className = `toast-notification toast-${type}`
-        toast.innerHTML = `
-            ${title ? `<div class="toast-title">${title}</div>` : ''}
-            <div class="toast-message">${message}</div>
-            <button class="toast-close">&times;</button>
-        `
+        if (title) {
+            const titleElement = document.createElement('div')
+            titleElement.className = 'toast-title'
+            titleElement.textContent = title
+            toast.appendChild(titleElement)
+        }
+
+        const messageElement = document.createElement('div')
+        messageElement.className = 'toast-message'
+        messageElement.textContent = message
+        toast.appendChild(messageElement)
+
+        const closeButton = document.createElement('button')
+        closeButton.className = 'toast-close'
+        closeButton.type = 'button'
+        closeButton.textContent = 'x'
+        toast.appendChild(closeButton)
 
         // Get or create container
         let container = document.getElementById('toast-container')
@@ -42,7 +54,7 @@ export function useToastr() {
         container.appendChild(toast)
 
         // Close button
-        toast.querySelector('.toast-close')?.addEventListener('click', () => {
+        closeButton.addEventListener('click', () => {
             toast.classList.add('toast-hiding')
             setTimeout(() => toast.remove(), 300)
         })

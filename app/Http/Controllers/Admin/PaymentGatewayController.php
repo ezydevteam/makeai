@@ -1,0 +1,120 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\PaymentGatewayRequest;
+use App\Models\PaymentGateway;
+use App\Support\CountryCatalog;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class PaymentGatewayController extends Controller
+{
+    public function index(): Response
+    {
+        abort_unless(isProAvailable(), 404);
+        abort_unless(auth('admin')->user()?->hasPermission('payments.view'), 403);
+
+        $definitions = config('payment-gateways', []);
+        $gateways = PaymentGateway::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(function (PaymentGateway $gateway) use ($definitions) {
+                $definition = $definitions[$gateway->slug] ?? ['fields' => []];
+                $webhookPath = $definition['webhook_path'] ?? null;
+
+                return [
+                    'id' => $gateway->id,
+                    'slug' => $gateway->slug,
+                    'name' => translate($gateway->name),
+                    'description' => $gateway->description ? translate($gateway->description) : null,
+                    'is_enabled' => $gateway->is_enabled,
+                    'is_test_mode' => $gateway->is_test_mode,
+                    'processing_fee_type' => $gateway->processing_fee_type,
+                    'processing_fee_value' => $gateway->processing_fee_value,
+                    'processing_fee_currency' => $gateway->processing_fee_currency,
+                    'sort_order' => $gateway->sort_order,
+                    'fields' => collect($definition['fields'] ?? [])
+                        ->map(fn (array $field) => [
+                            ...$field,
+                            'label' => translate($field['label']),
+                        ])
+                        ->all(),
+                    'webhook_url' => $webhookPath ? rtrim(request()->getSchemeAndHttpHost(), '/').$webhookPath : null,
+                    'credentials' => $gateway->publicCredentials($definition['fields'] ?? []),
+                ];
+            });
+
+        return Inertia::render('Admin/Payments/Gateways', [
+            'gateways' => $gateways,
+            'currencies' => CountryCatalog::currencies(),
+        ]);
+    }
+
+    public function update(PaymentGatewayRequest $request, PaymentGateway $gateway): RedirectResponse
+    {
+        abort_unless(isProAvailable(), 404);
+        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
+
+        $data = $request->validated();
+        $credentials = $gateway->credentials ?: [];
+
+        foreach ($data['credentials'] ?? [] as $key => $value) {
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $credentials[$key] = PaymentGateway::encryptCredentials([$key => $value])[$key];
+        }
+
+        $gateway->update([
+            'is_enabled' => $data['is_enabled'] ?? false,
+            'is_test_mode' => $data['is_test_mode'] ?? true,
+            'processing_fee_type' => $data['processing_fee_type'],
+            'processing_fee_value' => $data['processing_fee_type'] === 'none' ? 0 : $data['processing_fee_value'],
+            'processing_fee_currency' => $data['processing_fee_currency'],
+            'credentials' => $credentials,
+            'settings' => $data['settings'] ?? [],
+        ]);
+
+        $this->syncLegacySettings($gateway);
+
+        return back()->with('success', translate(':gateway settings updated.', ['gateway' => $gateway->name]));
+    }
+
+    public function sort(Request $request): RedirectResponse
+    {
+        abort_unless(isProAvailable(), 404);
+        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
+
+        $data = $request->validate([
+            'gateways' => ['required', 'array'],
+            'gateways.*' => ['required', 'integer', 'exists:payment_gateways,id'],
+        ]);
+
+        foreach ($data['gateways'] as $index => $gatewayId) {
+            PaymentGateway::whereKey($gatewayId)->update(['sort_order' => $index + 1]);
+        }
+
+        return back()->with('success', translate('Payment gateway order updated.'));
+    }
+
+    private function syncLegacySettings(PaymentGateway $gateway): void
+    {
+        if ($gateway->slug !== 'stripe') {
+            return;
+        }
+
+        foreach (['secret_key', 'publishable_key', 'webhook_secret'] as $key) {
+            $value = $gateway->getCredential($key);
+
+            if ($value) {
+                settings_set('stripe_'.$key, $value, 'encrypted', 'payment');
+            }
+        }
+    }
+}

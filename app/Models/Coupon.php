@@ -11,7 +11,7 @@ class Coupon extends Model
 {
     protected $fillable = [
         'code', 'type', 'value', 'max_discount', 'max_uses',
-        'used_count', 'is_recurring', 'plan_id',
+        'used_count', 'is_recurring', 'plan_id', 'user_limit', 'show_in_header',
         'starts_at', 'expires_at', 'is_active',
     ];
 
@@ -22,6 +22,7 @@ class Coupon extends Model
             'max_discount' => 'decimal:2',
             'is_recurring' => 'boolean',
             'is_active' => 'boolean',
+            'show_in_header' => 'boolean',
             'starts_at' => 'datetime',
             'expires_at' => 'datetime',
         ];
@@ -51,6 +52,18 @@ class Coupon extends Model
         }
 
         return true;
+    }
+
+    public function isEligibleForUser(User $user): bool
+    {
+        return match ($this->user_limit) {
+            'active' => $user->is_active,
+            'inactive' => ! $user->is_active,
+            'free' => ! $user->isPro(),
+            'pro' => $user->isPro(),
+            'recent_30_days' => $user->created_at?->greaterThanOrEqualTo(now()->subDays(30)) ?? false,
+            default => true,
+        };
     }
 
     /**

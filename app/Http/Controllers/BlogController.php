@@ -1,0 +1,175 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\BlogCategory;
+use App\Models\BlogPost;
+use App\Models\BlogTag;
+use App\Services\BlogService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Response as ResponseFacade;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class BlogController extends Controller
+{
+    public function __construct(private readonly BlogService $blog) {}
+
+    public function index(Request $request): Response
+    {
+        $posts = $this->filteredPosts($request)->paginate($this->postsPerPage())->withQueryString();
+
+        return Inertia::render('Blog/Index', [
+            'posts' => $posts,
+            'categories' => $this->sidebarCategories(),
+            'tags' => $this->sidebarTags(),
+            'filters' => $request->only(['search', 'sort']),
+            'heading' => translate('Blog'),
+            'description' => translate('Latest articles, guides, and product updates.'),
+            'meta' => $this->meta(translate('Blog'), translate('Latest articles, guides, and product updates.')),
+        ]);
+    }
+
+    public function category(Request $request, string $slug): Response
+    {
+        $category = BlogCategory::active()->where('slug', $slug)->firstOrFail();
+        $posts = $this->filteredPosts($request)
+            ->whereHas('categories', fn ($query) => $query->where('blog_categories.id', $category->id))
+            ->paginate($this->postsPerPage())
+            ->withQueryString();
+
+        return Inertia::render('Blog/Index', [
+            'posts' => $posts,
+            'categories' => $this->sidebarCategories(),
+            'tags' => $this->sidebarTags(),
+            'filters' => $request->only(['search', 'sort']),
+            'activeCategory' => $category,
+            'heading' => $category->name,
+            'description' => $category->description,
+            'meta' => $this->meta($category->meta_title ?: $category->name, $category->meta_description ?: $category->description),
+        ]);
+    }
+
+    public function tag(Request $request, string $slug): Response
+    {
+        $tag = BlogTag::where('slug', $slug)->firstOrFail();
+        $posts = $this->filteredPosts($request)
+            ->whereHas('tags', fn ($query) => $query->where('blog_tags.id', $tag->id))
+            ->paginate($this->postsPerPage())
+            ->withQueryString();
+
+        return Inertia::render('Blog/Index', [
+            'posts' => $posts,
+            'categories' => $this->sidebarCategories(),
+            'tags' => $this->sidebarTags(),
+            'filters' => $request->only(['search', 'sort']),
+            'activeTag' => $tag,
+            'heading' => $tag->name,
+            'description' => $tag->description,
+            'meta' => $this->meta($tag->meta_title ?: $tag->name, $tag->meta_description ?: $tag->description),
+        ]);
+    }
+
+    public function show(Request $request, string $slug): Response
+    {
+        $post = $this->blog->publishedQuery()
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        $this->blog->trackView($post, $request->user()?->id, $request->ip());
+
+        return Inertia::render('Blog/Show', [
+            'post' => $post,
+            'relatedPosts' => $post->show_related_posts ? $this->blog->relatedPosts($post) : [],
+            'schema' => $this->schema($post),
+            'meta' => $this->meta(
+                $post->meta_title ?: $post->title,
+                $post->meta_description ?: $post->excerpt,
+                $post->no_index
+            ),
+        ]);
+    }
+
+    public function rss()
+    {
+        $posts = $this->blog->publishedQuery()
+            ->latest('published_at')
+            ->limit(max((int) settings('blog_rss_posts_count', 20), 1))
+            ->get();
+
+        $xml = view('rss.blog', [
+            'posts' => $posts,
+            'title' => settings('app_name', 'App').' '.translate('Blog'),
+            'description' => translate('Latest blog posts'),
+            'updated' => optional($posts->first()?->published_at)->toRfc2822String() ?: now()->toRfc2822String(),
+        ])->render();
+
+        return ResponseFacade::make($xml, 200, ['Content-Type' => 'application/rss+xml; charset=UTF-8']);
+    }
+
+    private function filteredPosts(Request $request)
+    {
+        return $this->blog->publishedQuery()
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim($request->string('search')->toString());
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                        ->orWhere('excerpt', 'like', "%{$search}%")
+                        ->orWhere('content', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->string('sort')->toString() === 'popular', fn ($query) => $query->orderByDesc('views_count'))
+            ->when($request->string('sort')->toString() === 'commented', fn ($query) => $query->orderByDesc('comments_count'))
+            ->when(! in_array($request->string('sort')->toString(), ['popular', 'commented'], true), fn ($query) => $query->orderByDesc('is_sticky')->latest('published_at'));
+    }
+
+    private function postsPerPage(): int
+    {
+        return max((int) settings('blog_posts_per_page', 9), 1);
+    }
+
+    private function sidebarCategories()
+    {
+        return BlogCategory::active()
+            ->where('posts_count', '>', 0)
+            ->orderBy('sort_order')
+            ->get(['id', 'name', 'slug', 'color', 'posts_count']);
+    }
+
+    private function sidebarTags()
+    {
+        return BlogTag::where('posts_count', '>', 0)
+            ->orderByDesc('posts_count')
+            ->limit(30)
+            ->get(['id', 'name', 'slug', 'posts_count']);
+    }
+
+    private function meta(string $title, ?string $description, bool $noIndex = false): array
+    {
+        return [
+            'title' => $title,
+            'description' => $description ?: '',
+            'no_index' => $noIndex,
+            'rss' => route('blog.rss'),
+        ];
+    }
+
+    private function schema(BlogPost $post): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => $post->schema_type,
+            'headline' => $post->title,
+            'description' => $post->meta_description ?: $post->excerpt,
+            'image' => $post->og_image ?: $post->featured_image,
+            'datePublished' => optional($post->published_at)->toAtomString(),
+            'dateModified' => Carbon::parse($post->updated_at)->toAtomString(),
+            'author' => [
+                '@type' => 'Person',
+                'name' => $post->author?->name,
+            ],
+            'mainEntityOfPage' => route('blog.show', $post->slug),
+        ];
+    }
+}

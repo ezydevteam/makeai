@@ -2,11 +2,21 @@
 import { useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
+const props = defineProps<{
+    settings?: {
+        enabled: boolean
+        subject_mode: 'text' | 'dropdown'
+        subject_options: string[]
+        success_message: string
+    } | null
+}>();
+
 const form = useForm({
     name: '',
     email: '',
     subject: '',
     message: '',
+    website: '',
 });
 
 const isSubmitted = ref(false);
@@ -25,7 +35,13 @@ const submit = () => {
 
 <template>
     <div class="bg-gray-50 p-8 md:p-12 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50">
-        <form v-if="!isSubmitted" @submit.prevent="submit" class="space-y-6">
+        <div v-if="settings && !settings.enabled" class="text-center py-12">
+            <h3 class="text-2xl font-black text-gray-900 mb-2">Contact form unavailable</h3>
+            <p class="text-gray-500 font-medium">Please try again later.</p>
+        </div>
+
+        <form v-else-if="!isSubmitted" @submit.prevent="submit" class="space-y-6">
+            <input v-model="form.website" type="text" class="hidden" tabindex="-1" autocomplete="off">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label for="name" class="block text-sm font-black text-gray-900 uppercase tracking-widest mb-2">Full Name</label>
@@ -57,7 +73,18 @@ const submit = () => {
 
             <div>
                 <label for="subject" class="block text-sm font-black text-gray-900 uppercase tracking-widest mb-2">Subject</label>
+                <select
+                    v-if="settings?.subject_mode === 'dropdown' && settings.subject_options.length"
+                    v-model="form.subject"
+                    id="subject"
+                    class="w-full bg-white border-2 border-gray-100 rounded-2xl px-6 py-4 text-sm focus:border-primary-500 focus:ring-0 transition-all outline-none"
+                    :class="{'border-red-500': form.errors.subject}"
+                >
+                    <option value="">Select a subject</option>
+                    <option v-for="subject in settings.subject_options" :key="subject" :value="subject">{{ subject }}</option>
+                </select>
                 <input 
+                    v-else
                     v-model="form.subject" 
                     type="text" 
                     id="subject" 
@@ -98,7 +125,7 @@ const submit = () => {
                 </svg>
             </div>
             <h3 class="text-2xl font-black text-gray-900 mb-2">Message Sent!</h3>
-            <p class="text-gray-500 font-medium">Thank you for reaching out. We'll get back to you shortly.</p>
+            <p class="text-gray-500 font-medium">{{ settings?.success_message || "Thank you for reaching out. We'll get back to you shortly." }}</p>
             <button @click="isSubmitted = false" class="mt-8 text-sm font-black text-primary-600 uppercase tracking-widest hover:text-primary-500">Send another message</button>
         </div>
     </div>

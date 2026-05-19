@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\MailLog;
 use App\Models\MailTemplate;
-use App\Models\Setting;
 use Illuminate\Support\Facades\Mail;
 
 class MailService
@@ -16,7 +15,7 @@ class MailService
     public function send(string $slug, string $to, array $data = [], bool $queue = true): void
     {
         if ($queue) {
-            SendTemplatedEmail::dispatch($slug, $to, $data);
+            SendTemplatedEmail::dispatch($slug, $to, $data)->onQueue('emails');
 
             return;
         }
@@ -35,8 +34,12 @@ class MailService
             return;
         }
 
+        if ($template->requires_pro && ! isProAvailable()) {
+            return;
+        }
+
         $rendered = $template->render($data);
-        $layout = Setting::getValue('mail_layout', '{content}');
+        $layout = settings('mail_layout', '{content}');
         $htmlContent = str_replace('{content}', $rendered['content'], $layout);
 
         try {
@@ -69,12 +72,33 @@ class MailService
     {
         $template = MailTemplate::where('slug', $slug)->first();
         if (! $template) {
-            return 'Template not found';
+            return translate('Template not found');
+        }
+
+        if ($template->requires_pro && ! isProAvailable()) {
+            return translate('Template not available for this license.');
         }
 
         $rendered = $template->render($data);
-        $layout = Setting::getValue('mail_layout', '{content}');
+        $layout = settings('mail_layout', '{content}');
 
         return str_replace('{content}', $rendered['content'], $layout);
+    }
+
+    public function getVariables(): array
+    {
+        return [
+            'site_name',
+            'site_url',
+            'site_logo_url',
+            'support_email',
+            'current_year',
+            'unsubscribe_url',
+            'user_name',
+            'user_email',
+            'otp_code',
+            'plan_name',
+            'credits',
+        ];
     }
 }

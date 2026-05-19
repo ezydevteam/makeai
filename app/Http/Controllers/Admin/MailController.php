@@ -3,55 +3,61 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\MailSettingsRequest;
+use App\Http\Requests\Admin\MailTestRequest;
 use App\Mail\TestMail;
 use App\Models\Setting;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 
 class MailController extends Controller
 {
+    private const SECRET_KEYS = [
+        'mail_password',
+        'mailgun_secret',
+        'ses_secret',
+        'postmark_token',
+        'sendgrid_api_key',
+    ];
+
     public function index()
     {
+        $settings = Setting::getGroup('mail');
+        $configuredSecrets = [];
+
+        foreach (self::SECRET_KEYS as $key) {
+            $configuredSecrets[$key] = filled($settings[$key] ?? null);
+            unset($settings[$key]);
+        }
+
         return Inertia::render('Admin/Mail/Index', [
-            'settings' => Setting::getGroup('mail'),
+            'settings' => $settings,
+            'configuredSecrets' => $configuredSecrets,
         ]);
     }
 
-    public function update(Request $request)
+    public function update(MailSettingsRequest $request)
     {
-        $validated = $request->validate([
-            'mail_driver' => 'required|string|in:smtp,mailgun,ses,postmark,sendgrid,log,array',
-            'mail_host' => 'nullable|string',
-            'mail_port' => 'nullable|integer',
-            'mail_username' => 'nullable|string',
-            'mail_password' => 'nullable|string',
-            'mail_encryption' => 'nullable|string|in:tls,ssl,null',
-            'mail_from_address' => 'required|email',
-            'mail_from_name' => 'required|string',
-            'mailgun_domain' => 'nullable|string',
-            'mailgun_secret' => 'nullable|string',
-            'mailgun_endpoint' => 'nullable|string',
-            'ses_key' => 'nullable|string',
-            'ses_secret' => 'nullable|string',
-            'ses_region' => 'nullable|string',
-        ]);
+        foreach ($request->validated() as $key => $value) {
+            if (in_array($key, self::SECRET_KEYS, true) && blank($value)) {
+                continue;
+            }
 
-        Setting::updateGroup('mail', $validated);
+            $type = in_array($key, self::SECRET_KEYS, true) ? 'encrypted' : 'string';
+            settings_set($key, $value, $type, 'mail');
+        }
 
-        return back()->with('success', 'Mail settings updated successfully.');
+        return back()->with('success', translate('Mail settings updated successfully.'));
     }
 
-    public function test(Request $request)
+    public function test(MailTestRequest $request)
     {
-        $request->validate(['email' => 'required|email']);
-
         try {
-            Mail::to($request->email)->send(new TestMail);
+            Mail::to($request->validated('email'))->send(new TestMail);
 
-            return back()->with('success', 'Test email sent successfully!');
+            return back()->with('success', translate('Test email sent successfully.'));
         } catch (\Exception $e) {
-            return back()->with('error', 'Failed to send test email: '.$e->getMessage());
+            return back()->with('error', translate('Failed to send test email: :message', ['message' => $e->getMessage()]));
         }
     }
 }

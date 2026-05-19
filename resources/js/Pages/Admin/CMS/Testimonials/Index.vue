@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { useToastr } from '@/Composables/useToastr'
+import { useTranslate } from '@/Composables/useTranslate'
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
 
@@ -20,16 +22,51 @@ interface Testimonial {
 }
 
 const props = defineProps<{ testimonials: Testimonial[] }>()
+const toast = useToastr()
+const { t } = useTranslate()
 
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
 const importInput = ref<HTMLInputElement | null>(null)
+const avatarPreview = ref<string | null>(null)
+const showAiForm = ref(false)
+const aiGenerating = ref(false)
+const aiForm = ref({
+    company_type: 'AI SaaS platform',
+    tone: 'professional and authentic',
+    prompt: '',
+    count: 5,
+})
 
-const blank = (): Omit<Testimonial, 'id'> => ({
+const toneOptions = [
+    { value: 'professional and authentic', label: 'Professional' },
+    { value: 'friendly and conversational', label: 'Friendly' },
+    { value: 'confident and results-focused', label: 'Results-focused' },
+    { value: 'warm and trustworthy', label: 'Warm' },
+    { value: 'premium and polished', label: 'Premium' },
+    { value: 'casual startup voice', label: 'Casual startup' },
+]
+
+interface TestimonialForm {
+    name: string
+    role: string
+    company: string
+    avatar: string
+    avatar_file: File | null
+    content: string
+    rating: number
+    is_active: boolean
+    is_featured: boolean
+    sort_order: number
+    source: Testimonial['source']
+}
+
+const blank = (): TestimonialForm => ({
     name: '',
     role: '',
     company: '',
     avatar: '',
+    avatar_file: null,
     content: '',
     rating: 5,
     is_active: true,
@@ -43,6 +80,7 @@ const form = useForm(blank())
 const openCreate = () => {
     form.reset()
     Object.assign(form, blank())
+    avatarPreview.value = null
     editingId.value = null
     showForm.value = true
 }
@@ -52,12 +90,14 @@ const openEdit = (t: Testimonial) => {
     form.role = t.role ?? ''
     form.company = t.company ?? ''
     form.avatar = t.avatar ?? ''
+    form.avatar_file = null
     form.content = t.content
     form.rating = t.rating
     form.is_active = t.is_active
     form.is_featured = t.is_featured
     form.sort_order = t.sort_order
     form.source = t.source
+    avatarPreview.value = resolveAvatar(t.avatar)
     editingId.value = t.id
     showForm.value = true
 }
@@ -65,17 +105,19 @@ const openEdit = (t: Testimonial) => {
 const submit = () => {
     if (editingId.value) {
         form.post(route('admin.testimonials.update', { testimonial: editingId.value }), {
+            forceFormData: true,
             onSuccess: () => { showForm.value = false },
         })
     } else {
         form.post(route('admin.testimonials.store'), {
+            forceFormData: true,
             onSuccess: () => { showForm.value = false },
         })
     }
 }
 
 const remove = (id: number) => {
-    if (!confirm('Delete this testimonial?')) return
+    if (!confirm(t('Delete this testimonial?'))) return
     router.delete(route('admin.testimonials.delete', { testimonial: id }), { preserveScroll: true })
 }
 
@@ -95,6 +137,46 @@ const handleImport = (e: Event) => {
     const fd = new FormData()
     fd.append('csv', file)
     router.post(route('admin.testimonials.import'), fd, { preserveScroll: true })
+}
+
+const handleAvatarChange = (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null
+    form.avatar_file = file
+    avatarPreview.value = file ? URL.createObjectURL(file) : resolveAvatar(form.avatar)
+}
+
+const resolveAvatar = (avatar: string | null): string => {
+    if (!avatar) return ''
+    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('/')) return avatar
+
+    return `/storage/${avatar}`
+}
+
+const generateTestimonials = async () => {
+    if (aiGenerating.value) return
+    aiGenerating.value = true
+
+    try {
+        const response = await fetch(route('admin.testimonials.generate'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '',
+            },
+            body: JSON.stringify(aiForm.value),
+        })
+        const payload = await response.json()
+        if (!response.ok || !payload.success) throw new Error(payload.message || t('AI generation failed.'))
+
+        toast.success(payload.message || t('Testimonials generated.'))
+        showAiForm.value = false
+        router.reload({ only: ['testimonials'] })
+    } catch (error) {
+        toast.error(error instanceof Error ? error.message : t('AI generation failed.'))
+    } finally {
+        aiGenerating.value = false
+    }
 }
 
 const stars = (n: number) => Array.from({ length: 5 }, (_, i) => i < n)
@@ -125,6 +207,9 @@ const sourceColor: Record<string, string> = {
                     <input ref="importInput" type="file" accept=".csv,.txt" class="hidden" @change="handleImport">
                     <button @click="importFile" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-all shadow-sm">
                         Import CSV
+                    </button>
+                    <button @click="showAiForm = true" type="button" class="px-4 py-2.5 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl text-sm font-bold hover:bg-violet-100 transition-all shadow-sm">
+                        ✨ AI Generate
                     </button>
                     <button @click="openCreate" type="button" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20">
                         + Add Testimonial
@@ -183,7 +268,7 @@ const sourceColor: Record<string, string> = {
                     <!-- Author -->
                     <div class="flex items-center gap-3 mt-auto">
                         <div v-if="t.avatar" class="w-9 h-9 rounded-full bg-gray-100 dark:bg-surface-800 overflow-hidden shrink-0">
-                            <img :src="t.avatar" :alt="t.name" class="w-full h-full object-cover">
+                            <img :src="resolveAvatar(t.avatar)" :alt="t.name" class="w-full h-full object-cover">
                         </div>
                         <div v-else class="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-black text-sm shrink-0">
                             {{ t.name.charAt(0) }}
@@ -238,8 +323,18 @@ const sourceColor: Record<string, string> = {
                             <input v-model="form.company" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Avatar URL</label>
-                            <input v-model="form.avatar" type="text" placeholder="https://…" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Avatar</label>
+                            <div class="flex items-center gap-3">
+                                <div class="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-primary-50 text-primary-700 flex items-center justify-center font-black">
+                                    <img v-if="avatarPreview" :src="avatarPreview" class="h-full w-full object-cover">
+                                    <span v-else>{{ form.name ? form.name.charAt(0) : 'U' }}</span>
+                                </div>
+                                <label class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 transition-colors hover:border-primary-300 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300">
+                                    <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange">
+                                    Upload photo
+                                </label>
+                            </div>
+                            <p v-if="form.errors.avatar_file" class="text-xs text-danger-500 mt-1">{{ form.errors.avatar_file }}</p>
                         </div>
                     </div>
 
@@ -285,6 +380,42 @@ const sourceColor: Record<string, string> = {
                     <button @click="showForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">Cancel</button>
                     <button @click="submit" :disabled="form.processing" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
                         {{ form.processing ? 'Saving…' : editingId ? 'Save Changes' : 'Add Testimonial' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Generate Modal -->
+        <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                <div class="p-6 border-b border-gray-100 dark:border-surface-800 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">✨ AI Generate Testimonials</h3>
+                    <button @click="showAiForm = false" type="button" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm">Close</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Company type
+                        <input v-model="aiForm.company_type" type="text" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </label>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Tone
+                        <select v-model="aiForm.tone" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                            <option v-for="option in toneOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+                        </select>
+                    </label>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Prompt <span class="text-gray-400 normal-case">(optional)</span>
+                        <textarea v-model="aiForm.prompt" rows="3" class="mt-2 w-full resize-none bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Mention target audience, product benefits, wording to avoid..."></textarea>
+                    </label>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Count
+                        <input v-model.number="aiForm.count" type="number" min="1" max="10" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </label>
+                </div>
+                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
+                    <button @click="showAiForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">Cancel</button>
+                    <button @click="generateTestimonials" :disabled="aiGenerating" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all disabled:opacity-50">
+                        {{ aiGenerating ? 'Generating...' : 'Generate' }}
                     </button>
                 </div>
             </div>

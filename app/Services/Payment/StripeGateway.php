@@ -2,6 +2,7 @@
 
 namespace App\Services\Payment;
 
+use App\Models\PaymentGateway;
 use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -15,9 +16,14 @@ class StripeGateway implements PaymentGatewayInterface
 {
     private string $secretKey;
 
+    private bool $enabled;
+
     public function __construct()
     {
-        $this->secretKey = settings('stripe_secret_key', '');
+        $gateway = PaymentGateway::where('slug', 'stripe')->first();
+
+        $this->enabled = (bool) ($gateway?->is_enabled ?? settings('stripe_enabled', false));
+        $this->secretKey = $gateway?->getCredential('secret_key') ?: settings('stripe_secret_key', '');
     }
 
     public function getName(): string
@@ -27,7 +33,7 @@ class StripeGateway implements PaymentGatewayInterface
 
     public function isConfigured(): bool
     {
-        return ! empty($this->secretKey);
+        return $this->enabled && ! empty($this->secretKey);
     }
 
     public function createSubscription(Plan $plan, User $user, array $paymentData): SubscriptionResult

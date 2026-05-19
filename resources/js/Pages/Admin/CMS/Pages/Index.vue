@@ -5,7 +5,13 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 defineOptions({ layout: AdminLayout });
 
 defineProps<{
-    pages: any[]
+    pages: {
+        data: any[]
+        links?: Array<{ url: string | null; label: string; active: boolean }>
+        from?: number | null
+        to?: number | null
+        total?: number
+    }
 }>();
 
 const deletePage = (id: number) => {
@@ -21,6 +27,10 @@ const getStatusClass = (status: string) => {
         default: return 'bg-gray-50 text-gray-500';
     }
 };
+
+const paginationLabel = (label: string) => label
+    .replace('&laquo;', '‹')
+    .replace('&raquo;', '›');
 </script>
 
 <template>
@@ -48,7 +58,7 @@ const getStatusClass = (status: string) => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
-                    <tr v-for="page in pages" :key="page.id" class="hover:bg-gray-50/50 transition-colors">
+                    <tr v-for="page in pages.data" :key="page.id" class="hover:bg-gray-50/50 transition-colors">
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <div v-if="page.is_system" class="w-6 h-6 bg-indigo-50 rounded-lg flex items-center justify-center" title="System Page">
@@ -84,8 +94,33 @@ const getStatusClass = (status: string) => {
                             </div>
                         </td>
                     </tr>
+                    <tr v-if="pages.data.length === 0">
+                        <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-400">
+                            No pages found.
+                        </td>
+                    </tr>
                 </tbody>
             </table>
+        </div>
+        <div v-if="pages.links && pages.links.length > 3" class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-xs font-bold uppercase tracking-widest text-gray-400">
+                Showing {{ pages.from ?? 0 }}-{{ pages.to ?? 0 }} of {{ pages.total ?? 0 }}
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+                <Link
+                    v-for="(link, index) in pages.links"
+                    :key="`${link.label}-${index}`"
+                    :href="link.url || '#'"
+                    preserve-scroll
+                    :class="[
+                        link.active ? 'bg-primary-600 text-white shadow-primary-600/20' : 'bg-white text-gray-500 hover:text-primary-600',
+                        !link.url ? 'pointer-events-none opacity-40' : ''
+                    ]"
+                    class="min-w-9 rounded-xl border border-gray-100 px-3 py-2 text-center text-xs font-bold shadow-sm transition-all"
+                >
+                    {{ paginationLabel(link.label) }}
+                </Link>
+            </div>
         </div>
     </div>
 </template>

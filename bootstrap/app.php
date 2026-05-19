@@ -4,6 +4,7 @@ use App\Http\Middleware\AdminAuth;
 use App\Http\Middleware\AdminPermission;
 use App\Http\Middleware\CheckCredits;
 use App\Http\Middleware\DemoMode;
+use App\Http\Middleware\DetectPricingCountry;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\LocaleMiddleware;
 use Illuminate\Foundation\Application;
@@ -21,7 +22,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             DemoMode::class,
             LocaleMiddleware::class,
+            DetectPricingCountry::class,
             HandleInertiaRequests::class,
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/*',
         ]);
 
         $middleware->alias([

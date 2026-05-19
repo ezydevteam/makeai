@@ -167,6 +167,13 @@ const getFaqsSlice = (section: HomepageSection): Faq[] => {
     return props.faqs.slice(0, max)
 }
 
+const resolveMediaUrl = (path?: string | null): string => {
+    if (!path) return ''
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/')) return path
+
+    return `/storage/${path}`
+}
+
 const asString = (value: SectionConfigValue | undefined, fallback = ''): string => typeof value === 'string' || typeof value === 'number' ? String(value) : fallback
 const asBoolean = (value: SectionConfigValue | undefined, fallback = false): boolean => typeof value === 'boolean' ? value : fallback
 const asItems = (value: SectionConfigValue | undefined): SectionItem[] => Array.isArray(value) && value.every((item) => typeof item !== 'string') ? value : []
@@ -331,7 +338,7 @@ onUnmounted(() => {
                             <!-- Author -->
                             <div class="flex items-center gap-3 pt-4 border-t border-gray-100 dark:border-surface-700">
                                 <div v-if="t.avatar" class="w-10 h-10 rounded-full overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0">
-                                    <img :src="t.avatar" :alt="t.name" class="w-full h-full object-cover">
+                                    <img :src="resolveMediaUrl(t.avatar)" :alt="t.name" class="w-full h-full object-cover">
                                 </div>
                                 <div v-else class="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 dark:text-primary-400 font-black text-sm shrink-0">
                                     {{ t.name.charAt(0) }}
@@ -380,7 +387,7 @@ onUnmounted(() => {
                                 </svg>
                             </button>
                             <div v-show="openFaqId === faq.id" class="px-6 pb-5">
-                                <p class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed">{{ faq.answer }}</p>
+                                <div class="text-gray-600 dark:text-gray-400 text-sm leading-relaxed" v-html="faq.answer"></div>
                             </div>
                         </div>
                     </div>

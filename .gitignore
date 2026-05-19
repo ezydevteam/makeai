@@ -61,5 +61,8 @@ caveman/
 
 # Docs
 AI_SaaS_Master_Prompt.md
-saas_architecture_overview.md
+saas_architecture_overview.svg
 
+
+# Auto-generated agent rules (personalized per developer)
+.brainsync/agent-rules.md

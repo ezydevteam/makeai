@@ -3,45 +3,73 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\NewsletterCampaignRequest;
+use App\Http\Requests\Admin\NewsletterSettingsRequest;
+use App\Jobs\SendNewsletterCampaign;
 use App\Models\NewsletterCampaign;
 use App\Models\NewsletterSubscriber;
 use App\Models\Setting;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
+use App\Models\User;
 use Inertia\Inertia;
 
 class NewsletterController extends Controller
 {
+    private const SECRET_KEYS = [
+        'mailchimp_api_key',
+    ];
+
     /**
      * List subscribers and campaigns.
      */
     public function index()
     {
+        $settings = Setting::getGroup('newsletter');
+        $configuredSecrets = [];
+
+        foreach (self::SECRET_KEYS as $key) {
+            $configuredSecrets[$key] = filled($settings[$key] ?? null);
+            unset($settings[$key]);
+        }
+
         return Inertia::render('Admin/Community/Newsletter', [
             'subscribers' => NewsletterSubscriber::orderBy('created_at', 'desc')->paginate(20),
-            'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->get(),
+            'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->paginate(10),
             'stats' => [
                 'total' => NewsletterSubscriber::count(),
                 'active' => NewsletterSubscriber::where('status', 'subscribed')->count(),
                 'unsubscribed' => NewsletterSubscriber::where('status', 'unsubscribed')->count(),
+                'users_all' => User::where('email_marketing', true)->count(),
+                'users_active' => User::where('email_marketing', true)->where('last_login_at', '>=', now()->subDays(30))->count(),
+                'users_inactive' => User::where('email_marketing', true)->where(function ($query) {
+                    $query->whereNull('last_login_at')->orWhere('last_login_at', '<', now()->subDays(30));
+                })->count(),
+                'users_pro' => isProAvailable()
+                    ? User::where('email_marketing', true)->whereIn('subscription_status', ['active', 'trialing'])->count()
+                    : 0,
+                'users_free' => User::where('email_marketing', true)->where(function ($query) {
+                    $query->whereNull('subscription_status')->orWhereNotIn('subscription_status', ['active', 'trialing']);
+                })->count(),
             ],
-            'settings' => Setting::getGroup('newsletter'),
+            'settings' => $settings,
+            'configuredSecrets' => $configuredSecrets,
         ]);
     }
 
     /**
      * Create a new campaign.
      */
-    public function storeCampaign(Request $request)
+    public function storeCampaign(NewsletterCampaignRequest $request)
     {
-        $request->validate([
-            'subject' => 'required|string|max:255',
-            'content' => 'required|string',
-        ]);
+        $data = $request->validated();
+        $data['content'] = $this->sanitizeHtml($data['content']);
 
-        NewsletterCampaign::create($request->all());
+        if ($data['audience'] === 'users_pro' && ! isProAvailable()) {
+            return back()->with('error', translate('Pro audience is only available when subscriptions are enabled.'));
+        }
 
-        return back()->with('success', 'Campaign draft saved.');
+        NewsletterCampaign::create($data);
+
+        return back()->with('success', translate('Campaign draft saved.'));
     }
 
     /**
@@ -49,22 +77,30 @@ class NewsletterController extends Controller
      */
     public function sendCampaign(NewsletterCampaign $campaign)
     {
-        if ($campaign->status === 'sent') {
-            return back()->with('error', 'Campaign already sent.');
+        if (in_array($campaign->status, ['sending', 'sent'], true)) {
+            return back()->with('error', translate('Campaign is already queued or sent.'));
         }
 
-        $subscribers = NewsletterSubscriber::where('status', 'subscribed')->get();
-        $campaign->update(['status' => 'sending', 'recipient_count' => $subscribers->count()]);
-
-        // In a real app, we would use a Job/Queue here.
-        // For now, we'll demonstrate the logic.
-        foreach ($subscribers as $subscriber) {
-            // Mail::to($subscriber->email)->queue(new \App\Mail\NewsletterMail($campaign, $subscriber));
+        if ($campaign->audience === 'users_pro' && ! isProAvailable()) {
+            return back()->with('error', translate('Pro audience is only available when subscriptions are enabled.'));
         }
 
-        $campaign->update(['status' => 'sent', 'sent_at' => now()]);
+        $recipientCount = SendNewsletterCampaign::recipientCountFor($campaign->audience);
 
-        return back()->with('success', 'Campaign sent to '.$subscribers->count().' subscribers.');
+        if ($recipientCount === 0) {
+            return back()->with('warning', translate('No active subscribers found.'));
+        }
+
+        $campaign->update([
+            'status' => 'sending',
+            'recipient_count' => $recipientCount,
+            'sent_count' => 0,
+            'failed_count' => 0,
+        ]);
+
+        SendNewsletterCampaign::dispatch($campaign->id)->onQueue('emails');
+
+        return back()->with('success', translate('Campaign sending has been queued for :count subscribers.', ['count' => $recipientCount]));
     }
 
     /**
@@ -74,38 +110,32 @@ class NewsletterController extends Controller
     {
         $subscriber->delete();
 
-        return back()->with('success', 'Subscriber removed.');
+        return back()->with('success', translate('Subscriber removed.'));
     }
 
     /**
      * Save newsletter settings.
      */
-    public function saveSettings(Request $request)
+    public function saveSettings(NewsletterSettingsRequest $request)
     {
-        $validated = $request->validate([
-            'newsletter_driver' => 'nullable|in:internal,mailchimp,both',
-            'mailchimp_api_key' => 'nullable|string',
-            'mailchimp_server_prefix' => 'nullable|string',
-            'mailchimp_list_id' => 'nullable|string',
-            'mailchimp_double_optin' => 'nullable|boolean',
-            'mailchimp_tags' => 'nullable|string',
+        foreach ($request->validated() as $key => $value) {
+            if (in_array($key, self::SECRET_KEYS, true) && blank($value)) {
+                continue;
+            }
 
-            'newsletter_enable_popup' => 'nullable|boolean',
-            'newsletter_popup_trigger' => 'nullable|in:exit_intent,time_delay,scroll_depth,page_views,first_visit',
-            'newsletter_popup_trigger_value' => 'nullable|string',
-            'newsletter_popup_title' => 'nullable|string',
-            'newsletter_popup_description' => 'nullable|string',
-            'newsletter_popup_placeholder' => 'nullable|string',
-            'newsletter_popup_submit_text' => 'nullable|string',
-            'newsletter_popup_success_message' => 'nullable|string',
-            'newsletter_popup_bg_color' => 'nullable|string',
-            'newsletter_popup_show_mobile' => 'nullable|boolean',
-            'newsletter_popup_cookie_duration' => 'nullable|integer',
-            'newsletter_popup_hide_for_logged_in' => 'nullable|boolean',
-        ]);
+            $type = in_array($key, self::SECRET_KEYS, true) ? 'encrypted' : (is_bool($value) ? 'boolean' : 'string');
+            settings_set($key, $value, $type, 'newsletter');
+        }
 
-        Setting::updateGroup('newsletter', $validated);
+        return back()->with('success', translate('Newsletter settings updated successfully.'));
+    }
 
-        return back()->with('success', 'Newsletter settings updated successfully.');
+    private function sanitizeHtml(string $html): string
+    {
+        $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html) ?? '';
+        $html = preg_replace('/\son\w+=("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
+        $html = preg_replace('/javascript:/i', '', $html) ?? '';
+
+        return strip_tags($html, '<p><br><strong><b><em><i><u><s><ul><ol><li><blockquote><h1><h2><h3><h4><h5><a><img><table><thead><tbody><tr><th><td><pre><code><hr>');
     }
 }

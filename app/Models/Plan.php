@@ -8,7 +8,9 @@ use Illuminate\Support\Str;
 class Plan extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'description', 'price_monthly', 'price_yearly', 'price_lifetime',
+        'name', 'slug', 'description', 'bottom_info_text', 'price_monthly', 'price_yearly', 'price_lifetime', 'currency_code',
+        'original_price_monthly', 'original_price_yearly', 'original_price_lifetime', 'vat_percentage',
+        'trial_all_countries',
         'credits', 'features', 'ai_models', 'max_tokens_per_request',
         'daily_token_limit', 'max_images_per_day', 'max_chats',
         'is_featured', 'is_active', 'is_free', 'trial_days', 'sort_order',
@@ -22,12 +24,17 @@ class Plan extends Model
             'price_monthly' => 'decimal:2',
             'price_yearly' => 'decimal:2',
             'price_lifetime' => 'decimal:2',
+            'original_price_monthly' => 'decimal:2',
+            'original_price_yearly' => 'decimal:2',
+            'original_price_lifetime' => 'decimal:2',
+            'vat_percentage' => 'decimal:2',
             'credits' => 'decimal:2',
             'features' => 'array',
             'ai_models' => 'array',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'is_free' => 'boolean',
+            'trial_all_countries' => 'boolean',
         ];
     }
 
@@ -43,6 +50,11 @@ class Plan extends Model
     public function subscriptions()
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    public function countryPrices()
+    {
+        return $this->hasMany(PlanCountryPrice::class);
     }
 
     public function scopeActive($query)

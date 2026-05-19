@@ -21,7 +21,10 @@ class DatabaseSeeder extends Seeder
             AiToolCategorySeeder::class,
             AiTemplateSeeder::class,
             PlanSeeder::class,
+            PaymentGatewaySeeder::class,
             PageSeeder::class,
+            MailTemplateSeeder::class,
+            SupportSeeder::class,
         ]);
     }
 }

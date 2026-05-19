@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
 
 defineOptions({ layout: AdminLayout });
 
-defineProps<{
+const props = defineProps<{
+    filters: {
+        search?: string,
+        status?: string
+    },
     logs: {
         data: Array<{
             id: number,
@@ -19,6 +23,22 @@ defineProps<{
         links: Array<any>
     }
 }>();
+
+const filterForm = useForm({
+    search: props.filters.search || '',
+    status: props.filters.status || '',
+});
+
+const applyFilters = () => {
+    router.get(route('admin.mail.logs.index'), {
+        search: filterForm.search,
+        status: filterForm.status,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    });
+};
 </script>
 
 <template>
@@ -29,6 +49,19 @@ defineProps<{
             <p class="text-sm text-gray-500 mt-1">Monitor all outgoing communications and troubleshoot delivery issues.</p>
         </div>
 
+        <form @submit.prevent="applyFilters" class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-6 grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-4">
+            <input v-model="filterForm.search" type="search" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" placeholder="Search recipient, subject, or template">
+            <select v-model="filterForm.status" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                <option value="">All statuses</option>
+                <option value="sent">Sent</option>
+                <option value="failed">Failed</option>
+                <option value="bounced">Bounced</option>
+            </select>
+            <button type="submit" class="bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-primary-600/20">
+                Filter
+            </button>
+        </form>
+
         <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
             <table class="w-full text-left border-collapse">
                 <thead>
@@ -38,6 +71,7 @@ defineProps<{
                         <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Template</th>
                         <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
                         <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Sent At</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
@@ -67,6 +101,16 @@ defineProps<{
                         </td>
                         <td class="px-6 py-4 text-right text-[10px] text-gray-400 font-mono">
                             {{ new Date(log.sent_at).toLocaleString() }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <Link v-if="log.template_slug" :href="route('admin.mail.logs.resend', log.id)" method="post" as="button" preserve-scroll class="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-600 transition-all shadow-md shadow-gray-900/10">
+                                Resend
+                            </Link>
+                        </td>
+                    </tr>
+                    <tr v-if="logs.data.length === 0">
+                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-400">
+                            No mail logs found.
                         </td>
                     </tr>
                 </tbody>

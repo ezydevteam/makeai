@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('is_system')->default(true);
             $table->boolean('requires_pro')->default(false);
             $table->enum('category', ['auth', 'account', 'subscription', 'newsletter', 'custom']);
-            $table->foreignId('last_edited_by')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('last_edited_by')->nullable()->constrained('admins')->onDelete('set null');
             $table->timestamps();
         });
     }

@@ -2,14 +2,17 @@
 import { ref } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import Pagination from '@/Components/Pagination.vue';
+import RichEditor from '@/Components/RichEditor.vue';
 
 defineOptions({ layout: AdminLayout });
 
 const props = defineProps<{
     subscribers: any,
-    campaigns: Array<any>,
+    campaigns: any,
     stats: any,
-    settings: any
+    settings: any,
+    configuredSecrets: Record<string, boolean>
 }>();
 
 const activeTab = ref('subscribers');
@@ -17,8 +20,20 @@ const activeTab = ref('subscribers');
 const showCampaignModal = ref(false);
 const campaignForm = useForm({
     subject: '',
+    audience: 'subscribers',
     content: ''
 });
+
+const audienceOptions = [
+    { value: 'subscribers', label: 'Newsletter subscribers', countKey: 'active' },
+    { value: 'users_all', label: 'All opted-in users', countKey: 'users_all' },
+    { value: 'users_active', label: 'Active users', countKey: 'users_active' },
+    { value: 'users_inactive', label: 'Inactive users', countKey: 'users_inactive' },
+    { value: 'users_pro', label: 'Pro users', countKey: 'users_pro' },
+    { value: 'users_free', label: 'Free users', countKey: 'users_free' },
+];
+
+const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || 'Newsletter subscribers';
 
 const submitCampaign = () => {
     campaignForm.post(route('admin.newsletter.campaign.store'), {
@@ -43,7 +58,7 @@ const deleteSubscriber = (id: number) => {
 
 const settingsForm = useForm({
     newsletter_driver: props.settings.newsletter_driver || 'internal',
-    mailchimp_api_key: props.settings.mailchimp_api_key || '',
+    mailchimp_api_key: '',
     mailchimp_server_prefix: props.settings.mailchimp_server_prefix || '',
     mailchimp_list_id: props.settings.mailchimp_list_id || '',
     mailchimp_double_optin: props.settings.mailchimp_double_optin ?? false,
@@ -156,23 +171,34 @@ const saveSettings = () => {
 
         <div v-if="activeTab === 'campaigns'">
             <div class="space-y-4">
-                <div v-for="camp in campaigns" :key="camp.id" class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm group">
+                <div v-for="camp in campaigns.data" :key="camp.id" class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm group">
                     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
+                        <div class="min-w-0">
                             <div class="flex items-center gap-3 mb-2">
                                 <h4 class="text-base font-bold text-gray-900">{{ camp.subject }}</h4>
-                                <span :class="camp.status === 'sent' ? 'bg-success-50 text-success-600' : 'bg-warning-50 text-warning-600'" class="px-2 py-0.5 text-[10px] font-bold rounded-md">
+                                <span :class="{
+                                    'bg-success-50 text-success-600': camp.status === 'sent',
+                                    'bg-blue-50 text-blue-600': camp.status === 'sending',
+                                    'bg-warning-50 text-warning-600': camp.status === 'draft'
+                                }" class="px-2 py-0.5 text-[10px] font-bold rounded-md">
                                     {{ camp.status.toUpperCase() }}
                                 </span>
                             </div>
-                            <p class="text-xs text-gray-500">Created: {{ new Date(camp.created_at).toLocaleDateString() }} <span v-if="camp.sent_at">• Sent: {{ new Date(camp.sent_at).toLocaleDateString() }}</span> • {{ camp.recipient_count }} recipients</p>
+                            <p class="text-xs text-gray-500">Created: {{ new Date(camp.created_at).toLocaleDateString() }} <span v-if="camp.sent_at">• Sent: {{ new Date(camp.sent_at).toLocaleDateString() }}</span> • {{ audienceLabel(camp.audience) }} • {{ camp.recipient_count }} recipients • {{ camp.sent_count || 0 }} sent • {{ camp.failed_count || 0 }} failed</p>
                         </div>
                         <button v-if="camp.status === 'draft'" @click="sendCampaign(camp.id)" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-xs font-bold hover:bg-primary-500 transition-all">
-                            SEND TO SUBSCRIBERS
+                            QUEUE SEND
                         </button>
+                        <span v-else-if="camp.status === 'sending'" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
+                            SENDING IN QUEUE
+                        </span>
                     </div>
                 </div>
+                <div v-if="campaigns.data.length === 0" class="p-10 bg-white rounded-2xl border border-gray-100 shadow-sm text-center text-sm text-gray-400">
+                    No campaigns found.
+                </div>
             </div>
+            <Pagination class="mt-6" :links="campaigns.links" />
         </div>
 
         <div v-if="activeTab === 'settings'">
@@ -191,7 +217,7 @@ const saveSettings = () => {
                     <div v-if="settingsForm.newsletter_driver !== 'internal'" class="space-y-6 p-5 bg-gray-50 rounded-xl border border-gray-100">
                         <div>
                             <label class="block text-sm font-bold text-gray-900 mb-1">Mailchimp API Key</label>
-                            <input v-model="settingsForm.mailchimp_api_key" type="password" placeholder="e.g. 1234567890abcdef-us21" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
+                            <input v-model="settingsForm.mailchimp_api_key" type="password" :placeholder="configuredSecrets.mailchimp_api_key ? 'Stored securely - leave blank to keep' : 'e.g. 1234567890abcdef-us21'" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
                         </div>
                         
                         <div class="grid grid-cols-2 gap-4">
@@ -321,8 +347,18 @@ const saveSettings = () => {
                         <input v-model="campaignForm.subject" type="text" placeholder="Weekly AI Updates" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Content (HTML)</label>
-                        <textarea v-model="campaignForm.content" rows="10" placeholder="<h1>Hello</h1><p>Check out our latest templates...</p>" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none font-mono" required></textarea>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Audience</label>
+                        <select v-model="campaignForm.audience" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
+                            <option v-for="option in audienceOptions" :key="option.value" :value="option.value" :disabled="option.value === 'users_pro' && !$page.props.isProAvailable">
+                                {{ option.label }} ({{ stats[option.countKey] ?? 0 }})
+                            </option>
+                        </select>
+                        <p class="text-[10px] text-gray-400 mt-2">User audiences only include active, non-banned users with email marketing enabled.</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Content</label>
+                        <RichEditor v-model="campaignForm.content" variant="minimal" />
+                        <p class="text-[10px] text-gray-400 mt-2">Available variables: {user_name}, {user_email}, {unsubscribe_url}, {site_name}, {site_url}</p>
                     </div>
                     <div class="pt-4">
                         <button type="submit" :disabled="campaignForm.processing" class="w-full py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">

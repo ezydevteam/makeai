@@ -2,6 +2,9 @@
 import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import RichEditor from '@/Components/RichEditor.vue'
+import { useToastr } from '@/Composables/useToastr'
+import { useTranslate } from '@/Composables/useTranslate'
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
 
@@ -9,11 +12,21 @@ interface FaqCategory { id: number; name: string; slug: string; sort_order: numb
 interface Faq { id: number; question: string; answer: string; category_id: number | null; is_active: boolean; sort_order: number }
 
 const props = defineProps<{ categories: FaqCategory[]; uncategorized: Faq[] }>()
+const toast = useToastr()
+const { t } = useTranslate()
 
 // ── FAQ form ────────────────────────────────────────────────────────────────
 const showFaqForm = ref(false)
 const editingFaqId = ref<number | null>(null)
 const faqForm = useForm({ question: '', answer: '', category_id: null as number | null, is_active: true, sort_order: 0 })
+const showAiForm = ref(false)
+const aiGenerating = ref(false)
+const aiForm = ref({
+    topic: 'AI SaaS platform',
+    prompt: '',
+    count: 10,
+    category_id: null as number | null,
+})
 
 const openCreateFaq = (categoryId?: number) => {
     faqForm.reset()
@@ -45,7 +58,7 @@ const submitFaq = () => {
 }
 
 const removeFaq = (id: number) => {
-    if (!confirm('Delete this FAQ?')) return
+    if (!confirm(t('Delete this FAQ?'))) return
     router.delete(route('admin.faqs.delete', { faq: id }), { preserveScroll: true })
 }
 
@@ -68,7 +81,7 @@ const submitCat = () => {
 }
 
 const removeCat = (id: number) => {
-    if (!confirm('Delete category? FAQs inside will become uncategorized.')) return
+    if (!confirm(t('Delete category? FAQs inside will become uncategorized.'))) return
     router.delete(route('admin.faq-categories.delete', { category: id }), { preserveScroll: true })
 }
 
@@ -83,6 +96,33 @@ const handleImport = (e: Event) => {
     fd.append('csv', file)
     if (importCategoryId.value) fd.append('category_id', String(importCategoryId.value))
     router.post(route('admin.faqs.import'), fd, { preserveScroll: true })
+}
+
+const generateFaqs = async () => {
+    if (aiGenerating.value) return
+    aiGenerating.value = true
+
+    try {
+        const response = await fetch(route('admin.faqs.generate'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '',
+            },
+            body: JSON.stringify(aiForm.value),
+        })
+        const payload = await response.json()
+        if (!response.ok || !payload.success) throw new Error(payload.message || t('AI generation failed.'))
+
+        toast.success(payload.message || t('FAQs generated.'))
+        showAiForm.value = false
+        router.reload({ only: ['categories', 'uncategorized'] })
+    } catch (error) {
+        toast.error(error instanceof Error ? error.message : t('AI generation failed.'))
+    } finally {
+        aiGenerating.value = false
+    }
 }
 
 const totalFaqs = props.categories.reduce((s, c) => s + c.faqs.length, 0) + props.uncategorized.length
@@ -105,6 +145,7 @@ const totalFaqs = props.categories.reduce((s, c) => s + c.faqs.length, 0) + prop
                 <div class="flex items-center gap-3">
                     <input ref="importInput" type="file" accept=".csv,.txt" class="hidden" @change="handleImport">
                     <button @click="importInput?.click()" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm">Import CSV</button>
+                    <button @click="showAiForm = true" type="button" class="px-4 py-2.5 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl text-sm font-bold hover:bg-violet-100 transition-all shadow-sm">✨ AI Generate</button>
                     <button @click="openCreateCat" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 transition-all shadow-sm">+ Category</button>
                     <button @click="openCreateFaq()" type="button" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20">+ Add FAQ</button>
                 </div>
@@ -157,7 +198,7 @@ const totalFaqs = props.categories.reduce((s, c) => s + c.faqs.length, 0) + prop
                         <div v-for="faq in cat.faqs" :key="faq.id" class="px-6 py-4 flex items-start gap-4" :class="!faq.is_active ? 'opacity-50' : ''">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ faq.question }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ faq.answer }}</p>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2" v-html="faq.answer"></div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
                                 <button @click="toggleFaqActive(faq.id)" type="button" :class="faq.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'" class="relative inline-flex h-5 w-9 rounded-full transition-colors">
@@ -183,7 +224,7 @@ const totalFaqs = props.categories.reduce((s, c) => s + c.faqs.length, 0) + prop
                         <div v-for="faq in uncategorized" :key="faq.id" class="px-6 py-4 flex items-start gap-4" :class="!faq.is_active ? 'opacity-50' : ''">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ faq.question }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{{ faq.answer }}</p>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2" v-html="faq.answer"></div>
                             </div>
                             <div class="flex items-center gap-2 shrink-0">
                                 <button @click="toggleFaqActive(faq.id)" type="button" :class="faq.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'" class="relative inline-flex h-5 w-9 rounded-full transition-colors">
@@ -217,7 +258,7 @@ const totalFaqs = props.categories.reduce((s, c) => s + c.faqs.length, 0) + prop
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Answer *</label>
-                        <textarea v-model="faqForm.answer" rows="5" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+                        <RichEditor v-model="faqForm.answer" variant="minimal" />
                         <p v-if="faqForm.errors.answer" class="text-xs text-danger-500 mt-1">{{ faqForm.errors.answer }}</p>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
@@ -269,6 +310,43 @@ const totalFaqs = props.categories.reduce((s, c) => s + c.faqs.length, 0) + prop
                     <button @click="showCatForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
                     <button @click="submitCat" :disabled="catForm.processing" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all disabled:opacity-50">
                         {{ catForm.processing ? 'Saving…' : editingCatId ? 'Save' : 'Create' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Generate Modal -->
+        <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+                <div class="p-6 border-b border-gray-100 dark:border-surface-800 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">✨ AI Generate FAQs</h3>
+                    <button @click="showAiForm = false" type="button" class="text-gray-400 hover:text-gray-700 text-sm">Close</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Topic or product
+                        <input v-model="aiForm.topic" type="text" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </label>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Count
+                        <input v-model.number="aiForm.count" type="number" min="5" max="20" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </label>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Prompt <span class="text-gray-400 normal-case">(optional)</span>
+                        <textarea v-model="aiForm.prompt" rows="3" class="mt-2 w-full resize-none bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Mention buyer concerns, answer style, topics to include or avoid..."></textarea>
+                    </label>
+                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                        Category
+                        <select v-model="aiForm.category_id" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                            <option :value="null">— Uncategorized —</option>
+                            <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
+                    <button @click="showAiForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">Cancel</button>
+                    <button @click="generateFaqs" :disabled="aiGenerating" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all disabled:opacity-50">
+                        {{ aiGenerating ? 'Generating...' : 'Generate' }}
                     </button>
                 </div>
             </div>

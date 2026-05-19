@@ -3,8 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\FaqCategoryRequest;
+use App\Http\Requests\Admin\FaqGenerateRequest;
+use App\Http\Requests\Admin\FaqImportRequest;
+use App\Http\Requests\Admin\FaqRequest;
 use App\Models\Faq;
 use App\Models\FaqCategory;
+use App\Models\User;
+use App\Services\AI\AiService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -14,6 +21,8 @@ class FaqController extends Controller
 {
     public function index(): Response
     {
+        $this->authorizeFaqs();
+
         $categories = FaqCategory::with(['faqs' => fn ($q) => $q->orderBy('sort_order')])
             ->orderBy('sort_order')
             ->get();
@@ -30,12 +39,9 @@ class FaqController extends Controller
 
     // ── FAQ Categories ─────────────────────────────────────────────────────
 
-    public function storeCategory(Request $request)
+    public function storeCategory(FaqCategoryRequest $request)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'sort_order' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         FaqCategory::create([
             'name' => $validated['name'],
@@ -43,74 +49,63 @@ class FaqController extends Controller
             'sort_order' => $validated['sort_order'],
         ]);
 
-        return back()->with('success', 'Category created.');
+        return back()->with('success', translate('Category created.'));
     }
 
-    public function updateCategory(Request $request, FaqCategory $category)
+    public function updateCategory(FaqCategoryRequest $request, FaqCategory $category)
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'sort_order' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $request->validated();
 
         $category->update([
             'name' => $validated['name'],
             'sort_order' => $validated['sort_order'],
         ]);
 
-        return back()->with('success', 'Category updated.');
+        return back()->with('success', translate('Category updated.'));
     }
 
     public function destroyCategory(FaqCategory $category)
     {
+        $this->authorizeFaqs();
         // Unassign FAQs before deleting category
         Faq::where('category_id', $category->id)->update(['category_id' => null]);
         $category->delete();
 
-        return back()->with('success', 'Category deleted. FAQs moved to uncategorized.');
+        return back()->with('success', translate('Category deleted. FAQs moved to uncategorized.'));
     }
 
     // ── FAQs ───────────────────────────────────────────────────────────────
 
-    public function store(Request $request)
+    public function store(FaqRequest $request)
     {
-        $validated = $request->validate([
-            'question' => ['required', 'string', 'max:500'],
-            'answer' => ['required', 'string'],
-            'category_id' => ['nullable', 'integer', 'exists:faq_categories,id'],
-            'is_active' => ['required', 'boolean'],
-            'sort_order' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $this->normalizeFaqPayload($request->validated());
 
         Faq::create($validated);
 
-        return back()->with('success', 'FAQ created successfully.');
+        return back()->with('success', translate('FAQ created successfully.'));
     }
 
-    public function update(Request $request, Faq $faq)
+    public function update(FaqRequest $request, Faq $faq)
     {
-        $validated = $request->validate([
-            'question' => ['required', 'string', 'max:500'],
-            'answer' => ['required', 'string'],
-            'category_id' => ['nullable', 'integer', 'exists:faq_categories,id'],
-            'is_active' => ['required', 'boolean'],
-            'sort_order' => ['required', 'integer', 'min:0'],
-        ]);
+        $validated = $this->normalizeFaqPayload($request->validated());
 
         $faq->update($validated);
 
-        return back()->with('success', 'FAQ updated successfully.');
+        return back()->with('success', translate('FAQ updated successfully.'));
     }
 
     public function destroy(Faq $faq)
     {
+        $this->authorizeFaqs();
         $faq->delete();
 
-        return back()->with('success', 'FAQ deleted.');
+        return back()->with('success', translate('FAQ deleted.'));
     }
 
     public function bulkSort(Request $request)
     {
+        $this->authorizeFaqs();
+
         $validated = $request->validate([
             'order' => ['required', 'array'],
             'order.*' => ['required', 'integer', 'exists:faqs,id'],
@@ -120,23 +115,19 @@ class FaqController extends Controller
             Faq::where('id', $id)->update(['sort_order' => $position]);
         }
 
-        return back()->with('success', 'FAQ order saved.');
+        return back()->with('success', translate('FAQ order saved.'));
     }
 
     public function toggleActive(Faq $faq)
     {
+        $this->authorizeFaqs();
         $faq->update(['is_active' => ! $faq->is_active]);
 
         return back();
     }
 
-    public function import(Request $request)
+    public function import(FaqImportRequest $request)
     {
-        $request->validate([
-            'csv' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
-            'category_id' => ['nullable', 'integer', 'exists:faq_categories,id'],
-        ]);
-
         $file = $request->file('csv');
         $rows = array_map('str_getcsv', file($file->getPathname()));
         $header = array_map('strtolower', array_map('trim', array_shift($rows)));
@@ -149,7 +140,7 @@ class FaqController extends Controller
             $data = array_combine($header, $row);
             Faq::create([
                 'question' => $data['question'] ?? $data['q'] ?? 'Untitled',
-                'answer' => $data['answer'] ?? $data['a'] ?? '',
+                'answer' => $this->sanitizeAnswer($data['answer'] ?? $data['a'] ?? ''),
                 'category_id' => $request->category_id,
                 'is_active' => true,
                 'sort_order' => 0,
@@ -157,6 +148,96 @@ class FaqController extends Controller
             $imported++;
         }
 
-        return back()->with('success', "Imported {$imported} FAQ(s) from CSV.");
+        return back()->with('success', translate('Imported :count FAQ(s) from CSV.', ['count' => $imported]));
+    }
+
+    public function generate(FaqGenerateRequest $request, AiService $aiService): JsonResponse
+    {
+        $user = User::query()->first();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'code' => 'AI_USER_MISSING',
+                'message' => translate('No user account is available to process AI requests.'),
+            ], 422);
+        }
+
+        $validated = $request->validated();
+        $extraPrompt = trim((string) ($validated['prompt'] ?? ''));
+        $prompt = "Generate {$validated['count']} helpful FAQ entries for this topic/product: {$validated['topic']}. Return valid JSON array only. Each item must have question and answer. Answers should be concise and may include simple HTML tags like p, strong, em, ul, ol, li, and a.";
+
+        if ($extraPrompt !== '') {
+            $prompt .= "\n\nAdditional admin instructions:\n{$extraPrompt}";
+        }
+
+        $result = $aiService->complete(
+            $user,
+            $prompt,
+            'You generate FAQ entries for a SaaS CMS. Return JSON only.',
+            settings('default_ai_provider', 'openai'),
+            settings('default_ai_model', 'gpt-4o-mini'),
+            ['max_tokens' => 1600, 'temperature' => 0.45]
+        );
+
+        $items = collect($this->decodeAiJsonArray((string) ($result['content'] ?? '')))
+            ->filter(fn ($item) => is_array($item))
+            ->take((int) $validated['count'])
+            ->map(function (array $item, int $index) use ($validated) {
+                return [
+                    'question' => Str::limit(trim(strip_tags((string) ($item['question'] ?? ''))), 500, ''),
+                    'answer' => $this->sanitizeAnswer((string) ($item['answer'] ?? '')),
+                    'category_id' => $validated['category_id'] ?? null,
+                    'is_active' => true,
+                    'sort_order' => Faq::max('sort_order') + $index + 1,
+                ];
+            })
+            ->filter(fn ($item) => $item['question'] !== '' && $item['answer'] !== '')
+            ->values();
+
+        $items->each(fn ($item) => Faq::create($item));
+
+        return response()->json([
+            'success' => true,
+            'message' => translate('Generated :count FAQ(s).', ['count' => $items->count()]),
+        ]);
+    }
+
+    private function authorizeFaqs(): void
+    {
+        if (! auth('admin')->user()?->hasPermission('content.faq')) {
+            abort(403);
+        }
+    }
+
+    private function normalizeFaqPayload(array $data): array
+    {
+        $data['answer'] = $this->sanitizeAnswer($data['answer']);
+
+        return $data;
+    }
+
+    private function sanitizeAnswer(string $answer): string
+    {
+        $answer = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $answer) ?? '';
+        $answer = preg_replace('/\son\w+=("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $answer) ?? '';
+        $answer = preg_replace('/javascript:/i', '', $answer) ?? '';
+
+        return strip_tags($answer, '<p><br><strong><b><em><i><u><ul><ol><li><a>');
+    }
+
+    private function decodeAiJsonArray(string $content): array
+    {
+        $decoded = json_decode($content, true);
+
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        if (preg_match('/(\[.*\])/s', $content, $matches)) {
+            $decoded = json_decode($matches[1], true);
+        }
+
+        return is_array($decoded) ? $decoded : [];
     }
 }

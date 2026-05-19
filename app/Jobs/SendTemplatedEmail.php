@@ -21,7 +21,9 @@ class SendTemplatedEmail implements ShouldQueue
         protected string $slug,
         protected string $to,
         protected array $data = []
-    ) {}
+    ) {
+        $this->onQueue('emails');
+    }
 
     public function handle(MailService $mailService): void
     {

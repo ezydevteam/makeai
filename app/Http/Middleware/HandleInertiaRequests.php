@@ -4,9 +4,11 @@ namespace App\Http\Middleware;
 
 use App\Models\AiTemplate;
 use App\Models\Announcement;
+use App\Models\Coupon;
 use App\Models\Language;
 use App\Models\Menu;
 use App\Models\Setting;
+use App\Support\CountryCatalog;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -83,6 +85,8 @@ class HandleInertiaRequests extends Middleware
 
                     return true;
                 })->values(),
+
+            'headerCoupon' => fn () => $this->getHeaderCoupon($request),
 
             'newsletterSettings' => fn () => Setting::getGroup('newsletter'),
 
@@ -169,6 +173,20 @@ class HandleInertiaRequests extends Middleware
             return ['user' => null];
         }
 
+        $user->loadMissing('plan');
+        $plan = $user->plan;
+        $features = [
+            'plan_slug' => $plan?->slug,
+            'plan_name' => $plan?->name,
+            'features' => $plan?->features ?: [],
+            'ai_models' => $plan?->ai_models ?: [],
+            'max_tokens_per_request' => $plan?->max_tokens_per_request,
+            'daily_token_limit' => $plan?->daily_token_limit,
+            'max_images_per_day' => $plan?->max_images_per_day,
+            'max_chats' => $plan?->max_chats,
+        ];
+        $request->session()->put('subscription_features', $features);
+
         return [
             'user' => [
                 'id' => $user->id,
@@ -179,11 +197,56 @@ class HandleInertiaRequests extends Middleware
                 'credits' => (float) $user->credits,
                 'plan_id' => $user->plan_id,
                 'subscription_status' => $user->subscription_status,
+                'subscription_ends_at' => $user->subscription_ends_at?->toISOString(),
+                'trial_ends_at' => $user->trial_ends_at?->toISOString(),
+                'subscription_features' => $features,
                 'referral_code' => $user->referral_code,
                 'theme_preference' => $user->theme_preference,
                 'isImpersonating' => $request->session()->has('admin_impersonator_id'),
             ],
         ];
+    }
+
+    private function getHeaderCoupon(Request $request): ?array
+    {
+        if (! isProAvailable()) {
+            return null;
+        }
+
+        $coupon = Coupon::query()
+            ->where('show_in_header', true)
+            ->first();
+
+        if (! $coupon || ! $coupon->isValid()) {
+            return null;
+        }
+
+        $user = $request->user();
+        if ($user && ! $coupon->isEligibleForUser($user)) {
+            return null;
+        }
+
+        if (! $user && ! in_array($coupon->user_limit, ['all', 'free'], true)) {
+            return null;
+        }
+
+        return [
+            'code' => $coupon->code,
+            'type' => $coupon->type,
+            'value' => (float) $coupon->value,
+            'discount_label' => $this->formatHeaderCouponDiscount($coupon),
+            'expires_at' => $coupon->expires_at?->toISOString(),
+            'pricing_url' => route('pricing'),
+        ];
+    }
+
+    private function formatHeaderCouponDiscount(Coupon $coupon): string
+    {
+        if ($coupon->type === 'percent') {
+            return rtrim(rtrim(number_format((float) $coupon->value, 2, '.', ''), '0'), '.').'%';
+        }
+
+        return CountryCatalog::formatMoney((float) $coupon->value, settings('pricing_currency_code', 'USD'));
     }
 
     /**

@@ -7,6 +7,7 @@
  */
 
 use App\Models\Currency;
+use App\Support\CountryCatalog;
 use App\Models\Language;
 use App\Models\Setting;
 use App\Models\Translation;
@@ -135,10 +136,10 @@ if (! function_exists('format_currency')) {
     {
         try {
             if ($currency) {
-                $curr = Currency::where('code', $currency)->first();
-            } else {
-                $curr = Currency::getDefault();
+                return CountryCatalog::formatMoney($amount, $currency);
             }
+
+            $curr = Currency::getDefault();
 
             if (! $curr) {
                 return '$'.number_format($amount, 2);

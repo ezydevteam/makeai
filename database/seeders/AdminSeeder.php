@@ -120,6 +120,8 @@ class AdminSeeder extends Seeder
             // Support
             ['slug' => 'support.tickets', 'name' => 'Manage Tickets', 'group' => 'support'],
             ['slug' => 'support.respond', 'name' => 'Respond to Tickets', 'group' => 'support'],
+            ['slug' => 'support.departments', 'name' => 'Manage Support Departments', 'group' => 'support'],
+            ['slug' => 'support.canned', 'name' => 'Manage Canned Responses', 'group' => 'support'],
         ];
 
         foreach ($permissions as $perm) {
@@ -149,6 +151,7 @@ class AdminSeeder extends Seeder
             'payments.view', 'payments.gateways',
             'translations.view', 'translations.edit',
             'reports.revenue', 'reports.usage', 'reports.export',
+            'support.tickets', 'support.respond', 'support.departments', 'support.canned',
         ]);
 
         // Support — limited access
@@ -156,6 +159,7 @@ class AdminSeeder extends Seeder
             'dashboard.view',
             'users.view', 'users.edit',
             'support.tickets', 'support.respond',
+            'support.departments', 'support.canned',
         ]);
 
         // Content Manager

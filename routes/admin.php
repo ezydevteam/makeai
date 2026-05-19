@@ -9,22 +9,33 @@ use App\Http\Controllers\Admin\AiTemplateController;
 use App\Http\Controllers\Admin\AiToolCategoryController;
 use App\Http\Controllers\Admin\AiUsageLogController;
 use App\Http\Controllers\Admin\AppearanceController;
+use App\Http\Controllers\Admin\BlogCategoryController;
+use App\Http\Controllers\Admin\BlogPostController;
+use App\Http\Controllers\Admin\BlogSettingsController;
+use App\Http\Controllers\Admin\BlogTagController;
 use App\Http\Controllers\Admin\CMS\AnnouncementController;
-use App\Http\Controllers\Admin\CurrencyController;
+use App\Http\Controllers\Admin\ContactMessageController;
+use App\Http\Controllers\Admin\ContactSettingsController;
+use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\FaqController;
 use App\Http\Controllers\Admin\FooterBuilderController;
 use App\Http\Controllers\Admin\HeaderBuilderController;
 use App\Http\Controllers\Admin\HomepageBuilderController;
 use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\MailController;
-use App\Http\Controllers\Admin\MailLayoutController;
 use App\Http\Controllers\Admin\MailLogController;
 use App\Http\Controllers\Admin\MailTemplateController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\NewsletterController;
 use App\Http\Controllers\Admin\PageController;
+use App\Http\Controllers\Admin\PaymentGatewayController;
+use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SidebarBuilderController;
+use App\Http\Controllers\Admin\Support\CannedResponseController as SupportCannedResponseController;
+use App\Http\Controllers\Admin\Support\DepartmentController as SupportDepartmentController;
+use App\Http\Controllers\Admin\Support\SettingsController as SupportSettingsController;
+use App\Http\Controllers\Admin\Support\TicketController as SupportTicketController;
 use App\Http\Controllers\Admin\SystemController;
 use App\Http\Controllers\Admin\TestimonialController;
 use App\Http\Controllers\Admin\ThemeAddonController;
@@ -109,12 +120,19 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('localization/translations/{translation}/ai', [TranslationController::class, 'aiTranslate'])->name('admin.translations.ai');
     Route::post('localization/translations/{language}/ai-all', [TranslationController::class, 'aiTranslateAll'])->name('admin.translations.ai_all');
 
-    Route::get('localization/currencies', [CurrencyController::class, 'index'])->name('admin.currencies.index');
-    Route::post('localization/currencies', [CurrencyController::class, 'store'])->name('admin.currencies.store');
-    Route::post('localization/currencies/{currency}', [CurrencyController::class, 'update'])->name('admin.currencies.update');
-    Route::post('localization/currencies/{currency}/default', [CurrencyController::class, 'setDefault'])->name('admin.currencies.default');
-    Route::post('localization/currencies/sync', [CurrencyController::class, 'syncRates'])->name('admin.currencies.sync');
-    Route::delete('localization/currencies/{currency}', [CurrencyController::class, 'destroy'])->name('admin.currencies.delete');
+    // Country-specific subscription pricing replaces exchange-rate currency management.
+    Route::get('plans', [PlanController::class, 'index'])->name('admin.plans.index');
+    Route::post('plans/settings', [PlanController::class, 'updateSettings'])->name('admin.plans.settings');
+    Route::post('plans/{plan}', [PlanController::class, 'update'])->name('admin.plans.update');
+
+    Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
+    Route::post('payment-gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
+    Route::post('payment-gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
+    Route::get('coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
+    Route::post('coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
+    Route::post('coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
+    Route::post('coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
+    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
 
     // Community
     Route::get('community/newsletter', [NewsletterController::class, 'index'])->name('admin.newsletter.index');
@@ -126,10 +144,36 @@ Route::middleware('admin.auth')->group(function () {
     // CMS: Pages
     Route::get('cms/pages', [PageController::class, 'index'])->name('admin.pages.index');
     Route::get('cms/pages/create', [PageController::class, 'create'])->name('admin.pages.create');
+    Route::post('cms/pages/ai-assist', [PageController::class, 'aiAssist'])->name('admin.pages.ai-assist');
     Route::post('cms/pages', [PageController::class, 'store'])->name('admin.pages.store');
     Route::get('cms/pages/{page}/edit', [PageController::class, 'edit'])->name('admin.pages.edit');
     Route::post('cms/pages/{page}', [PageController::class, 'update'])->name('admin.pages.update');
     Route::delete('cms/pages/{page}', [PageController::class, 'destroy'])->name('admin.pages.delete');
+
+    Route::get('cms/contact/messages/export', [ContactMessageController::class, 'export'])->name('admin.contact.messages.export');
+    Route::get('cms/contact/messages', [ContactMessageController::class, 'index'])->name('admin.contact.messages.index');
+    Route::post('cms/contact/messages/{message}/read', [ContactMessageController::class, 'markRead'])->name('admin.contact.messages.read');
+    Route::post('cms/contact/messages/{message}/reply', [ContactMessageController::class, 'reply'])->name('admin.contact.messages.reply');
+    Route::delete('cms/contact/messages/{message}', [ContactMessageController::class, 'destroy'])->name('admin.contact.messages.delete');
+    Route::get('cms/contact/settings', [ContactSettingsController::class, 'edit'])->name('admin.contact.settings.edit');
+    Route::post('cms/contact/settings', [ContactSettingsController::class, 'update'])->name('admin.contact.settings.update');
+
+    // Support Ticket System (PART 24)
+    Route::prefix('support')->name('admin.support.')->group(function () {
+        Route::get('tickets', [SupportTicketController::class, 'index'])->name('tickets.index');
+        Route::get('tickets/{ticket}', [SupportTicketController::class, 'show'])->name('tickets.show');
+        Route::post('tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('tickets.reply');
+        Route::post('tickets/{ticket}/state', [SupportTicketController::class, 'updateState'])->name('tickets.state');
+        Route::post('tickets/{ticket}/suggest-reply', [SupportTicketController::class, 'suggestReply'])->name('tickets.suggest-reply');
+        Route::delete('tickets/{ticket}', [SupportTicketController::class, 'destroy'])->name('tickets.delete');
+
+        Route::resource('departments', SupportDepartmentController::class)->except(['create', 'show', 'edit']);
+        Route::resource('canned-responses', SupportCannedResponseController::class)->except(['create', 'show', 'edit'])->parameters([
+            'canned-responses' => 'response',
+        ]);
+        Route::get('settings', [SupportSettingsController::class, 'edit'])->name('settings.edit');
+        Route::post('settings', [SupportSettingsController::class, 'update'])->name('settings.update');
+    });
 
     // Appearance: Menus
     Route::get('appearance/menus', [MenuController::class, 'index'])->name('admin.menus.index');
@@ -179,29 +223,32 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('mail/test', [MailController::class, 'test'])->name('admin.mail.test');
 
     Route::get('mail/templates', [MailTemplateController::class, 'index'])->name('admin.mail.templates.index');
+    Route::get('mail/templates/create', [MailTemplateController::class, 'create'])->name('admin.mail.templates.create');
+    Route::post('mail/templates', [MailTemplateController::class, 'store'])->name('admin.mail.templates.store');
     Route::get('mail/templates/{template}/edit', [MailTemplateController::class, 'edit'])->name('admin.mail.templates.edit');
     Route::post('mail/templates/{template}', [MailTemplateController::class, 'update'])->name('admin.mail.templates.update');
-
-    Route::get('mail/layout', [MailLayoutController::class, 'index'])->name('admin.mail.layout.index');
-    Route::post('mail/layout', [MailLayoutController::class, 'update'])->name('admin.mail.layout.update');
+    Route::delete('mail/templates/{template}', [MailTemplateController::class, 'destroy'])->name('admin.mail.templates.delete');
 
     Route::get('mail/logs', [MailLogController::class, 'index'])->name('admin.mail.logs.index');
+    Route::post('mail/logs/{log}/resend', [MailLogController::class, 'resend'])->name('admin.mail.logs.resend');
 
-    // Content: Testimonials (PART 28)
+    // Content: Testimonials (PART 19)
     Route::get('content/testimonials', [TestimonialController::class, 'index'])->name('admin.testimonials.index');
     Route::post('content/testimonials', [TestimonialController::class, 'store'])->name('admin.testimonials.store');
     Route::post('content/testimonials/sort', [TestimonialController::class, 'bulkSort'])->name('admin.testimonials.sort');
     Route::post('content/testimonials/import', [TestimonialController::class, 'import'])->name('admin.testimonials.import');
+    Route::post('content/testimonials/generate', [TestimonialController::class, 'generate'])->name('admin.testimonials.generate');
     Route::post('content/testimonials/{testimonial}', [TestimonialController::class, 'update'])->name('admin.testimonials.update');
     Route::post('content/testimonials/{testimonial}/featured', [TestimonialController::class, 'toggleFeatured'])->name('admin.testimonials.featured');
     Route::post('content/testimonials/{testimonial}/active', [TestimonialController::class, 'toggleActive'])->name('admin.testimonials.active');
     Route::delete('content/testimonials/{testimonial}', [TestimonialController::class, 'destroy'])->name('admin.testimonials.delete');
 
-    // Content: FAQs (PART 28)
+    // Content: FAQs (PART 19)
     Route::get('content/faqs', [FaqController::class, 'index'])->name('admin.faqs.index');
     Route::post('content/faqs', [FaqController::class, 'store'])->name('admin.faqs.store');
     Route::post('content/faqs/sort', [FaqController::class, 'bulkSort'])->name('admin.faqs.sort');
     Route::post('content/faqs/import', [FaqController::class, 'import'])->name('admin.faqs.import');
+    Route::post('content/faqs/generate', [FaqController::class, 'generate'])->name('admin.faqs.generate');
     Route::post('content/faqs/{faq}', [FaqController::class, 'update'])->name('admin.faqs.update');
     Route::post('content/faqs/{faq}/active', [FaqController::class, 'toggleActive'])->name('admin.faqs.active');
     Route::delete('content/faqs/{faq}', [FaqController::class, 'destroy'])->name('admin.faqs.delete');
@@ -215,6 +262,24 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('content/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('admin.announcements.update');
     Route::post('content/announcements/{announcement}/active', [AnnouncementController::class, 'toggleActive'])->name('admin.announcements.active');
     Route::delete('content/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('admin.announcements.delete');
+
+    // Content: Blog (PART 16)
+    Route::prefix('content/blog')->name('admin.blog.')->group(function () {
+        Route::get('posts/export', [BlogPostController::class, 'export'])->name('posts.export');
+        Route::post('posts/bulk', [BlogPostController::class, 'bulk'])->name('posts.bulk');
+        Route::post('posts/ai-assist', [BlogPostController::class, 'aiAssist'])->name('posts.ai-assist');
+        Route::post('posts/autosave', [BlogPostController::class, 'autosave'])->name('posts.autosave');
+        Route::post('posts/{post}/autosave', [BlogPostController::class, 'autosave'])->name('posts.autosave.update');
+        Route::post('posts/{post}/duplicate', [BlogPostController::class, 'duplicate'])->name('posts.duplicate');
+        Route::resource('posts', BlogPostController::class)->except(['show']);
+
+        Route::delete('tags/unused', [BlogTagController::class, 'deleteUnused'])->name('tags.unused.delete');
+        Route::resource('categories', BlogCategoryController::class)->except(['create', 'show', 'edit']);
+        Route::resource('tags', BlogTagController::class)->except(['create', 'show', 'edit']);
+
+        Route::get('settings', [BlogSettingsController::class, 'edit'])->name('settings.edit');
+        Route::post('settings', [BlogSettingsController::class, 'update'])->name('settings.update');
+    });
 
     // AI Tools Management
     Route::prefix('ai')->name('admin.ai.')->group(function () {

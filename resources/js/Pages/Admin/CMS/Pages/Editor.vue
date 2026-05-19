@@ -3,6 +3,8 @@ import { Head, useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import RichEditor from '@/Components/RichEditor.vue';
 import { ref } from 'vue';
+import { useToastr } from '@/Composables/useToastr';
+import { useTranslate } from '@/Composables/useTranslate';
 
 defineOptions({ layout: AdminLayout });
 
@@ -10,6 +12,24 @@ const props = defineProps<{
     page: any;
     parents: any[];
 }>();
+
+interface RichEditorExpose {
+    getSelectedText: () => string;
+    replaceSelection: (html: string) => void;
+    insertAtCursor: (html: string) => void;
+}
+
+interface AiAssistAction {
+    key: string;
+    label: string;
+    description: string;
+}
+
+const { t } = useTranslate();
+const toast = useToastr();
+const editorRef = ref<RichEditorExpose | null>(null);
+const slugTouched = ref(Boolean(props.page?.slug));
+const aiLoading = ref<string | null>(null);
 
 const form = useForm({
     title: props.page?.title ?? '',
@@ -22,7 +42,7 @@ const form = useForm({
     template: props.page?.template ?? 'default',
     status: props.page?.status ?? 'published',
     published_at: props.page?.published_at ? new Date(props.page.published_at).toISOString().slice(0, 16) : null,
-    password: props.page?.password ?? '',
+    password: '',
     parent_id: props.page?.parent_id ?? null,
     sort_order: props.page?.sort_order ?? 0,
     show_title: props.page?.show_title ?? true,
@@ -37,6 +57,111 @@ const form = useForm({
 
 const featuredPreview = ref(props.page?.featured_image ? `/storage/${props.page.featured_image}` : null);
 const ogPreview = ref(props.page?.og_image ? `/storage/${props.page.og_image}` : null);
+
+const pageAiAssistActions: AiAssistAction[] = [
+    {
+        key: 'generate_title',
+        label: t('Generate title'),
+        description: t('Create a page title from the current content.'),
+    },
+    {
+        key: 'generate_content',
+        label: t('Generate content'),
+        description: t('Write or continue page body content.'),
+    },
+    {
+        key: 'generate_excerpt',
+        label: t('Generate excerpt'),
+        description: t('Create a short page summary.'),
+    },
+    {
+        key: 'generate_seo',
+        label: t('Generate SEO'),
+        description: t('Fill meta title, description, and keywords.'),
+    },
+    {
+        key: 'improve_selection',
+        label: t('Improve selection'),
+        description: t('Rewrite selected text for clarity.'),
+    },
+];
+
+const selectionAiActions = [
+    'improve_selection',
+    'shorten_selection',
+    'expand_selection',
+    'rephrase_selection',
+    'translate_selection',
+    'change_tone',
+    'summarize_selection',
+    'fix_grammar',
+];
+
+const makeSlug = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+const syncSlug = () => {
+    if (slugTouched.value) return;
+    form.slug = makeSlug(form.title);
+};
+
+const markSlugTouched = () => {
+    slugTouched.value = true;
+    form.slug = makeSlug(form.slug);
+};
+
+const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? '';
+
+const runAiAssist = async (action: string) => {
+    if (aiLoading.value) return;
+
+    aiLoading.value = action;
+    const selectedText = editorRef.value?.getSelectedText() ?? '';
+
+    try {
+        const response = await fetch(route('admin.pages.ai-assist'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({
+                action,
+                title: form.title,
+                content: form.content,
+                selected_text: selectedText,
+            }),
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.message || t('AI assist failed.'));
+        }
+
+        if (action === 'generate_title') {
+            form.title = payload.data.content;
+            syncSlug();
+        } else if (action === 'generate_content') {
+            editorRef.value?.insertAtCursor(payload.data.content);
+        } else if (action === 'generate_excerpt') {
+            form.excerpt = payload.data.content;
+        } else if (action === 'generate_seo') {
+            form.meta_title = payload.data.meta_title;
+            form.meta_description = payload.data.meta_description;
+            form.meta_keywords = payload.data.meta_keywords;
+        } else if (selectionAiActions.includes(action)) {
+            editorRef.value?.replaceSelection(payload.data.content);
+        } else if (action === 'continue_writing') {
+            editorRef.value?.insertAtCursor(payload.data.content);
+        }
+
+        toast.success(t('AI assist applied.'));
+    } catch (error) {
+        toast.error(error instanceof Error ? error.message : t('AI assist failed.'));
+    } finally {
+        aiLoading.value = null;
+    }
+};
 
 const handleFeaturedChange = (e: Event) => {
     const file = (e.target as HTMLInputElement).files?.[0];
@@ -98,16 +223,26 @@ const submit = () => {
             <div class="lg:col-span-3 space-y-6">
                 <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
                     <div>
-                        <input v-model="form.title" type="text" placeholder="Page Title" class="w-full text-4xl font-black border-none focus:ring-0 p-0 placeholder:text-gray-100">
+                        <input v-model="form.title" @input="syncSlug" type="text" placeholder="Page Title" class="w-full text-4xl font-black border-none focus:ring-0 p-0 placeholder:text-gray-100">
                         <div class="flex items-center gap-2 mt-4 text-xs font-bold text-gray-400">
                             <span class="uppercase tracking-widest">Slug:</span>
                             <span class="text-gray-900 lowercase">{{ $page.props.app?.url }}/</span>
-                            <input v-model="form.slug" type="text" placeholder="page-slug" class="border-none bg-gray-50 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-primary-500 min-w-[200px]">
+                            <input v-model="form.slug" @input="markSlugTouched" type="text" placeholder="page-slug" class="border-none bg-gray-50 rounded-lg px-2 py-1 text-xs focus:ring-1 focus:ring-primary-500 min-w-[200px]">
                         </div>
                     </div>
 
                     <div>
-                        <RichEditor v-model="form.content" height="500px" />
+                        <RichEditor
+                            ref="editorRef"
+                            v-model="form.content"
+                            variant="full"
+                            ai-assist
+                            :ai-assist-actions="pageAiAssistActions"
+                            :ai-assist-loading-key="aiLoading"
+                            :ai-assist-label="t('AI Assist')"
+                            :ai-assist-loading-label="t('Working...')"
+                            @ai-assist="runAiAssist"
+                        />
                     </div>
 
                     <div>
@@ -131,6 +266,19 @@ const submit = () => {
                         <div>
                             <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Meta Keywords</label>
                             <input v-model="form.meta_keywords" type="text" placeholder="keyword1, keyword2..." class="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Open Graph Image</label>
+                            <div class="flex items-center gap-4">
+                                <div class="h-20 w-32 overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 flex items-center justify-center">
+                                    <img v-if="ogPreview" :src="ogPreview" class="h-full w-full object-cover">
+                                    <svg v-else class="w-7 h-7 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                </div>
+                                <label class="cursor-pointer rounded-xl border border-gray-100 bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-600 transition-colors hover:text-primary-600">
+                                    <input type="file" class="hidden" @change="handleOgChange" accept="image/*">
+                                    Upload image
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -161,6 +309,25 @@ const submit = () => {
                         <div>
                             <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Display Order</label>
                             <input v-model="form.sort_order" type="number" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-500">
+                        </div>
+                        <div v-if="form.status === 'scheduled'">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Publish At</label>
+                            <input v-model="form.published_at" type="datetime-local" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-500">
+                            <p v-if="form.errors.published_at" class="mt-2 text-xs font-bold text-danger-600">{{ form.errors.published_at }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Password Protection</label>
+                            <input v-model="form.password" type="password" :placeholder="page?.has_password ? 'Leave blank to keep current password' : 'Optional page password'" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-500">
+                            <p v-if="page?.has_password" class="mt-2 text-[10px] font-bold uppercase tracking-widest text-primary-600">Password enabled</p>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Container Width</label>
+                            <select v-model="form.container_width" class="w-full bg-gray-50 border-none rounded-xl px-4 py-2.5 text-xs focus:ring-2 focus:ring-primary-500">
+                                <option value="default">Default</option>
+                                <option value="narrow">Narrow</option>
+                                <option value="wide">Wide</option>
+                                <option value="full">Full</option>
+                            </select>
                         </div>
                     </div>
                 </div>

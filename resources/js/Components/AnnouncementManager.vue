@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import { useTranslate } from '@/Composables/useTranslate'
 
 interface Announcement {
     id: number
@@ -18,8 +19,33 @@ interface Announcement {
     show_frequency: 'always' | 'session' | 'once'
 }
 
+interface HeaderCoupon {
+    code: string
+    type: 'percent' | 'fixed'
+    value: number
+    discount_label: string
+    expires_at: string | null
+    pricing_url: string
+}
+
 const page = usePage()
+const { t } = useTranslate()
+const now = ref(Date.now())
+let nowTimer: number | null = null
 const allAnnouncements = computed(() => (page.props.announcements as Announcement[]) || [])
+const headerCoupon = computed(() => page.props.headerCoupon as HeaderCoupon | null)
+const headerCouponVisible = computed(() => {
+    if (!headerCoupon.value) return false
+    if (!headerCoupon.value.expires_at) return true
+
+    return new Date(headerCoupon.value.expires_at).getTime() > now.value
+})
+const headerCouponEndingDate = computed(() => {
+    if (!headerCoupon.value?.expires_at) return null
+
+    return new Intl.DateTimeFormat(String(page.props.locale || undefined), { dateStyle: 'medium' })
+        .format(new Date(headerCoupon.value.expires_at))
+})
 
 const activeTopbars = ref<Announcement[]>([])
 const activePopups = ref<Announcement[]>([])
@@ -65,6 +91,10 @@ const triggerPopup = (a: Announcement) => {
 }
 
 onMounted(() => {
+    nowTimer = window.setInterval(() => {
+        now.value = Date.now()
+    }, 60000)
+
     // Process Topbars
     activeTopbars.value = allAnnouncements.value
         .filter(a => a.type === 'topbar' && shouldShow(a))
@@ -103,9 +133,28 @@ onMounted(() => {
         }
     }
 })
+
+onUnmounted(() => {
+    if (nowTimer) {
+        window.clearInterval(nowTimer)
+    }
+})
 </script>
 
 <template>
+    <div v-if="headerCouponVisible && headerCoupon" class="relative z-50 bg-primary-600 px-4 py-2 text-white shadow-sm">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-sm font-semibold">
+            <span>{{ t(':discount off with coupon', { discount: headerCoupon.discount_label }) }}</span>
+            <code class="rounded-md bg-white/15 px-2 py-0.5 font-mono text-xs tracking-wide">{{ headerCoupon.code }}</code>
+            <span v-if="headerCouponEndingDate" class="text-xs font-medium text-white/85">
+                {{ t('Ends :date', { date: headerCouponEndingDate }) }}
+            </span>
+            <a :href="headerCoupon.pricing_url" class="rounded-full bg-white px-3 py-1 text-xs font-bold text-primary-700 transition hover:bg-primary-50">
+                {{ t('Choose plan') }}
+            </a>
+        </div>
+    </div>
+
     <!-- Topbar Banners -->
     <div v-if="activeTopbars.length > 0" class="flex flex-col z-50 relative">
         <div 

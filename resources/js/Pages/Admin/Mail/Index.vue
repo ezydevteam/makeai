@@ -6,6 +6,7 @@ defineOptions({ layout: AdminLayout });
 
 const props = defineProps<{
     settings: Record<string, any>
+    configuredSecrets: Record<string, boolean>
 }>();
 
 const form = useForm({
@@ -13,16 +14,18 @@ const form = useForm({
     mail_host: props.settings.mail_host || '',
     mail_port: props.settings.mail_port || 587,
     mail_username: props.settings.mail_username || '',
-    mail_password: props.settings.mail_password || '',
+    mail_password: '',
     mail_encryption: props.settings.mail_encryption || 'tls',
     mail_from_address: props.settings.mail_from_address || '',
     mail_from_name: props.settings.mail_from_name || '',
     mailgun_domain: props.settings.mailgun_domain || '',
-    mailgun_secret: props.settings.mailgun_secret || '',
+    mailgun_secret: '',
     mailgun_endpoint: props.settings.mailgun_endpoint || 'api.mailgun.net',
     ses_key: props.settings.ses_key || '',
-    ses_secret: props.settings.ses_secret || '',
+    ses_secret: '',
     ses_region: props.settings.ses_region || 'us-east-1',
+    postmark_token: '',
+    sendgrid_api_key: '',
 });
 
 const submit = () => {
@@ -96,7 +99,7 @@ const sendTest = () => {
                             </div>
                             <div>
                                 <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Password</label>
-                                <input v-model="form.mail_password" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                                <input v-model="form.mail_password" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.mail_password ? 'Stored securely - leave blank to keep' : ''">
                             </div>
                         </div>
                     </div>
@@ -118,7 +121,7 @@ const sendTest = () => {
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Key</label>
-                                <input v-model="form.mailgun_secret" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                                <input v-model="form.mailgun_secret" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.mailgun_secret ? 'Stored securely - leave blank to keep' : ''">
                             </div>
                         </div>
                     </div>
@@ -137,8 +140,26 @@ const sendTest = () => {
                             </div>
                             <div class="md:col-span-2">
                                 <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Secret Access Key</label>
-                                <input v-model="form.ses_secret" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                                <input v-model="form.ses_secret" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.ses_secret ? 'Stored securely - leave blank to keep' : ''">
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Postmark Fields -->
+                    <div v-if="form.mail_driver === 'postmark'" class="pt-6 border-t border-gray-50 space-y-6">
+                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">Postmark API</h3>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Server Token</label>
+                            <input v-model="form.postmark_token" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.postmark_token ? 'Stored securely - leave blank to keep' : ''">
+                        </div>
+                    </div>
+
+                    <!-- SendGrid Fields -->
+                    <div v-if="form.mail_driver === 'sendgrid'" class="pt-6 border-t border-gray-50 space-y-6">
+                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">SendGrid API</h3>
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">API Key</label>
+                            <input v-model="form.sendgrid_api_key" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.sendgrid_api_key ? 'Stored securely - leave blank to keep' : ''">
                         </div>
                     </div>
 

@@ -44,6 +44,15 @@ class FoundationSeeder extends Seeder
             ['key' => 'license_type', 'value' => '1', 'type' => 'integer', 'group' => 'license'],
             ['key' => 'license_verified', 'value' => '0', 'type' => 'boolean', 'group' => 'license'],
             ['key' => 'subscriptions_enabled', 'value' => '0', 'type' => 'boolean', 'group' => 'license'],
+            ['key' => 'default_pricing_country', 'value' => 'US', 'type' => 'string', 'group' => 'pricing'],
+            ['key' => 'pricing_trusted_proxy_ips', 'value' => '', 'type' => 'string', 'group' => 'pricing'],
+            ['key' => 'pricing_show_monthly', 'value' => '1', 'type' => 'boolean', 'group' => 'pricing'],
+            ['key' => 'pricing_show_yearly', 'value' => '1', 'type' => 'boolean', 'group' => 'pricing'],
+            ['key' => 'pricing_show_lifetime', 'value' => '1', 'type' => 'boolean', 'group' => 'pricing'],
+            ['key' => 'pricing_currency_code', 'value' => 'USD', 'type' => 'string', 'group' => 'pricing'],
+            ['key' => 'pricing_trial_button_text', 'value' => 'Start Trial', 'type' => 'string', 'group' => 'pricing'],
+            ['key' => 'pricing_featured_label_text', 'value' => 'Recommended', 'type' => 'string', 'group' => 'pricing'],
+            ['key' => 'pricing_checkout_button_text', 'value' => 'Choose Plan', 'type' => 'string', 'group' => 'pricing'],
 
             // Mail
             ['key' => 'mail_from_name', 'value' => 'MakeAI', 'type' => 'string', 'group' => 'mail'],

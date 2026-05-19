@@ -12,7 +12,8 @@ defineProps<{
         subject: string,
         category: string,
         is_active: boolean,
-        is_system: boolean
+        is_system: boolean,
+        requires_pro: boolean
     }>
 }>();
 </script>
@@ -25,6 +26,9 @@ defineProps<{
                 <h1 class="text-2xl font-bold text-gray-900">Mail Templates</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage system notifications and custom email communications.</p>
             </div>
+            <Link :href="route('admin.mail.templates.create')" class="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white px-5 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-primary-600/20">
+                New Template
+            </Link>
         </div>
 
         <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
@@ -42,7 +46,12 @@ defineProps<{
                     <tr v-for="t in templates" :key="t.id" class="hover:bg-gray-50/50 transition-colors group">
                         <td class="px-6 py-4">
                             <div class="font-bold text-gray-900">{{ t.name }}</div>
-                            <div class="text-[10px] font-mono text-gray-400">{{ t.slug }}</div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <div class="text-[10px] font-mono text-gray-400">{{ t.slug }}</div>
+                                <span :class="t.is_system ? 'bg-blue-50 text-blue-600' : 'bg-violet-50 text-violet-600'" class="px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-lg">
+                                    {{ t.is_system ? 'System' : 'Custom' }}
+                                </span>
+                            </div>
                         </td>
                         <td class="px-6 py-4">
                             <span class="px-2 py-1 bg-gray-100 text-gray-600 text-[10px] font-black uppercase tracking-widest rounded-lg">
@@ -61,6 +70,14 @@ defineProps<{
                             <Link :href="route('admin.mail.templates.edit', t.id)" class="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-600 transition-all shadow-md shadow-gray-900/10">
                                 Edit Template
                             </Link>
+                            <Link v-if="!t.is_system" :href="route('admin.mail.templates.delete', t.id)" method="delete" as="button" preserve-scroll class="ml-2 inline-flex items-center gap-2 px-3 py-1.5 bg-danger-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-danger-600 transition-all shadow-md shadow-danger-500/10">
+                                Delete
+                            </Link>
+                        </td>
+                    </tr>
+                    <tr v-if="templates.length === 0">
+                        <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-400">
+                            No mail templates found.
                         </td>
                     </tr>
                 </tbody>

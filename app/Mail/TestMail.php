@@ -27,14 +27,14 @@ class TestMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Test Email from '.config('app.name'),
+            subject: translate('Test Email from :app', ['app' => settings('app_name', config('app.name'))]),
         );
     }
 
     public function content(): Content
     {
         return new Content(
-            htmlString: '<h1>It Works!</h1><p>This is a test email from your MakeAI platform. Your mail configuration is correct.</p>',
+            htmlString: '<h1>'.e(translate('It Works!')).'</h1><p>'.e(translate('This is a test email from your :app platform. Your mail configuration is correct.', ['app' => settings('app_name', config('app.name'))])).'</p>',
         );
     }
 

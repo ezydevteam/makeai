@@ -2,9 +2,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePage, Link, router } from '@inertiajs/vue3'
 import { useTheme } from '@/Composables/useTheme'
+import { useFlashToasts } from '@/Composables/useToastr'
 
 const { isDark, toggleDark } = useTheme()
 const page = usePage()
+useFlashToasts()
 const sidebarOpen = ref(true)
 const profileOpen = ref(false)
 const aiMenuOpen = ref(false)
@@ -16,6 +18,7 @@ if (isAiSection.value) aiMenuOpen.value = true
 const admin = computed(() => (page.props.admin as any)?.user)
 const isSuperAdmin = computed(() => (page.props.admin as any)?.isSuperAdmin ?? false)
 const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
 const can = (perm: string) => {
     if (isSuperAdmin.value) return true
@@ -119,15 +122,19 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                 </div>
 
                 <!-- Plans -->
-                <Link v-if="can('plans.view')" :href="route('admin.dashboard')" class="nav-item text-gray-600 hover:text-gray-900 hover:bg-gray-50">
+                <Link v-if="isProAvailable && can('plans.view')" :href="route('admin.plans.index')" :class="[isActive('admin.plans.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg>
                     <span v-show="sidebarOpen">Plans & Pricing</span>
                 </Link>
 
                 <!-- Payments -->
-                <Link v-if="can('payments.view')" :href="route('admin.dashboard')" class="nav-item text-gray-600 hover:text-gray-900 hover:bg-gray-50">
+                <Link v-if="isProAvailable && can('payments.view')" :href="route('admin.payment-gateways.index')" :class="[isActive('admin.payment-gateways.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" /></svg>
                     <span v-show="sidebarOpen">Payments</span>
+                </Link>
+                <Link v-if="isProAvailable && can('payments.gateways')" :href="route('admin.coupons.index')" :class="[isActive('admin.coupons.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
+                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.169.659 1.591l8.182 8.182a2.25 2.25 0 003.182 0l4.318-4.318a2.25 2.25 0 000-3.182L11.159 3.659A2.25 2.25 0 009.568 3z" /><path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" /></svg>
+                    <span v-show="sidebarOpen">Coupons</span>
                 </Link>
 
                 <!-- Content -->
@@ -135,6 +142,18 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                 <Link v-if="can('content.pages')" :href="route('admin.pages.index')" :class="[isActive('admin.pages.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
                     <span v-show="sidebarOpen">Pages</span>
+                </Link>
+                <Link v-if="can('content.blog')" :href="route('admin.blog.posts.index')" :class="[isActive('admin.blog.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
+                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.25c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" /></svg>
+                    <span v-show="sidebarOpen">Blog</span>
+                </Link>
+                <Link v-if="can('content.pages')" :href="route('admin.contact.messages.index')" :class="[isActive('admin.contact.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
+                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0l-7.5-4.615A2.25 2.25 0 012.25 6.993V6.75" /></svg>
+                    <span v-show="sidebarOpen">Messages</span>
+                </Link>
+                <Link v-if="can('support.tickets')" :href="route('admin.support.tickets.index')" :class="[isActive('admin.support.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
+                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
+                    <span v-show="sidebarOpen">Support</span>
                 </Link>
 
                 <div class="my-3 border-t border-gray-100"></div>
@@ -172,11 +191,6 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                     <span v-show="sidebarOpen">Languages</span>
                 </Link>
 
-                <Link v-if="can('settings.manage')" :href="route('admin.currencies.index')" :class="[isActive('admin.currencies.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
-                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 10.182 12 9 12 9c-1.243 0-2.5-.568-2.5-1.5 0-.932 1.257-1.5 2.5-1.5 1.243 0 2.5.568 2.5 1.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <span v-show="sidebarOpen">Currencies</span>
-                </Link>
-
                 <!-- Community -->
                 <Link v-if="can('users.manage')" :href="route('admin.newsletter.index')" :class="[isActive('admin.newsletter.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
@@ -189,13 +203,13 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                 </div>
 
                 <!-- Testimonials -->
-                <Link v-if="can('content.pages')" :href="route('admin.testimonials.index')" :class="[isActive('admin.testimonials.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
+                <Link v-if="can('content.testimonials')" :href="route('admin.testimonials.index')" :class="[isActive('admin.testimonials.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                     <span v-show="sidebarOpen">Testimonials</span>
                 </Link>
 
                 <!-- FAQs -->
-                <Link v-if="can('content.pages')" :href="route('admin.faqs.index')" :class="[isActive('admin.faqs.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
+                <Link v-if="can('content.faq')" :href="route('admin.faqs.index')" :class="[isActive('admin.faqs.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <span v-show="sidebarOpen">FAQs</span>
                 </Link>
@@ -239,11 +253,6 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                 <Link v-if="can('settings.manage')" :href="route('admin.mail.templates.index')" :class="[isActive('admin.mail.templates.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
                     <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 01-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 001.183 1.981l6.478 3.488m8.839 2.51l-4.66-2.51m0 0l-1.023-.55a2.25 2.25 0 00-2.134 0l-1.022.55m0 0l-4.661 2.51m16.5 1.615a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V8.844a2.25 2.25 0 011.183-1.981l7.5-4.039a2.25 2.25 0 012.134 0l7.5 4.039a2.25 2.25 0 011.183 1.981V19.5z" /></svg>
                     <span v-show="sidebarOpen">Mail Templates</span>
-                </Link>
-
-                <Link v-if="can('settings.manage')" :href="route('admin.mail.layout.index')" :class="[isActive('admin.mail.layout.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
-                    <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.03 1.62c.452-.833.987-1.616 1.598-2.332m3.431 0a15.981 15.981 0 003.703-3.682m-1.104 1.17a15.996 15.996 0 003.11-3.662m-.973 1.056c.441-.717.812-1.466 1.11-2.248m-4.07 1.49l-.685-.135a.75.75 0 01-.512-.41L15.19 3.42a.75.75 0 00-1.446 0l-.832 2.59a.75.75 0 01-.512.41l-.685.135a.75.75 0 000 1.47l.685.135a.75.75 0 01.512.41l.832 2.59a.75.75 0 001.446 0l.832-2.59a.75.75 0 01.512-.41l.685-.135a.75.75 0 000-1.47zM11 21a1 1 0 100-2 1 1 0 000 2z" /></svg>
-                    <span v-show="sidebarOpen">Email Layout</span>
                 </Link>
 
                 <Link v-if="can('settings.manage')" :href="route('admin.mail.logs.index')" :class="[isActive('admin.mail.logs.*') ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-surface-800']" class="nav-item">
