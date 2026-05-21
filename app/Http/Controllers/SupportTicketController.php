@@ -9,6 +9,7 @@ use App\Models\Admin;
 use App\Models\SupportDepartment;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Services\InAppNotificationService;
 use App\Services\SupportTicketService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -44,6 +45,19 @@ class SupportTicketController extends Controller
             $request->validated(),
             $request->file('attachments', [])
         );
+
+        $ticket->loadMissing(['department.assignedRole', 'user']);
+        app(InAppNotificationService::class)->notifyAdmins([
+            'title' => translate('New support ticket'),
+            'message' => translate(':subject from :user', [
+                'subject' => $ticket->subject,
+                'user' => $ticket->user?->name ?? $request->user()->name,
+            ]),
+            'level' => $ticket->priority === 'urgent' ? 'warning' : 'info',
+            'category' => 'support',
+            'action_url' => route('admin.support.tickets.show', $ticket),
+            'action_label' => translate('View ticket'),
+        ], $ticket->department?->assignedRole?->slug);
 
         return redirect()->route('support.tickets.show', $ticket)->with('success', translate('Support ticket created.'));
     }

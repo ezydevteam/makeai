@@ -67,6 +67,21 @@ class FoundationSeeder extends Seeder
             // Appearance
             ['key' => 'primary_color', 'value' => '#6366f1', 'type' => 'string', 'group' => 'appearance'],
             ['key' => 'admin_font', 'value' => 'Inter', 'type' => 'string', 'group' => 'appearance'],
+
+            // Social sharing
+            ['key' => 'social_share_networks', 'value' => json_encode(['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'pinterest', 'reddit', 'email', 'copy']), 'type' => 'json', 'group' => 'social'],
+            ['key' => 'social_share_blog_style', 'value' => 'icon-label', 'type' => 'string', 'group' => 'social'],
+            ['key' => 'social_share_show_counts', 'value' => '0', 'type' => 'boolean', 'group' => 'social'],
+            ['key' => 'social_follow_display_mode', 'value' => 'counts', 'type' => 'string', 'group' => 'social'],
+            ['key' => 'social_follow_refresh_hours', 'value' => '24', 'type' => 'integer', 'group' => 'social'],
+
+            // Comments
+            ['key' => 'comments_enabled', 'value' => '1', 'type' => 'boolean', 'group' => 'comments'],
+            ['key' => 'comments_auto_approve_users', 'value' => '1', 'type' => 'boolean', 'group' => 'comments'],
+            ['key' => 'comments_allow_guests', 'value' => '0', 'type' => 'boolean', 'group' => 'comments'],
+            ['key' => 'comments_require_approval', 'value' => '0', 'type' => 'boolean', 'group' => 'comments'],
+            ['key' => 'comments_notify_admin', 'value' => '0', 'type' => 'boolean', 'group' => 'comments'],
+            ['key' => 'comments_poll_seconds', 'value' => '60', 'type' => 'integer', 'group' => 'comments'],
         ];
 
         foreach ($settings as $setting) {
@@ -97,10 +112,10 @@ class FoundationSeeder extends Seeder
     private function seedLanguages(): void
     {
         $languages = [
-            ['code' => 'en', 'name' => 'English', 'flag' => '🇺🇸', 'is_rtl' => false, 'is_default' => true, 'is_active' => true],
-            ['code' => 'bn', 'name' => 'বাংলা', 'flag' => '🇧🇩', 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
-            ['code' => 'ar', 'name' => 'العربية', 'flag' => '🇸🇦', 'is_rtl' => true, 'is_default' => false, 'is_active' => true],
-            ['code' => 'es', 'name' => 'Español', 'flag' => '🇪🇸', 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
+            ['code' => 'en', 'name' => 'English', 'flag' => null, 'is_rtl' => false, 'is_default' => true, 'is_active' => true],
+            ['code' => 'bn', 'name' => 'বাংলা', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
+            ['code' => 'ar', 'name' => 'العربية', 'flag' => null, 'is_rtl' => true, 'is_default' => false, 'is_active' => true],
+            ['code' => 'es', 'name' => 'Español', 'flag' => null, 'is_rtl' => false, 'is_default' => false, 'is_active' => true],
         ];
 
         foreach ($languages as $language) {

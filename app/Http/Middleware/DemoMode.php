@@ -25,10 +25,10 @@ class DemoMode
 
             if ($isDestructive && ! $isAllowed) {
                 if ($request->expectsJson()) {
-                    return response()->json(['message' => 'Destructive actions are disabled in demo mode.'], 403);
+                    return response()->json(['message' => translate('Destructive actions are disabled in demo mode.')], 403);
                 }
 
-                return back()->with('error', 'Destructive actions are disabled in demo mode.');
+                return back()->with('error', translate('Destructive actions are disabled in demo mode.'));
             }
         }
 

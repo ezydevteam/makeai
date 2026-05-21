@@ -31,7 +31,7 @@ const saveSettings = () => {
 </script>
 
 <template>
-    <Head title="AI Management — Admin" />
+    <Head :title="$t('AI Management — Admin')" />
     <div class="max-w-6xl mx-auto px-6 py-8">
         <div class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900">AI Management</h1>

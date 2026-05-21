@@ -133,7 +133,8 @@ class BlogService
     {
         $count = max((int) settings('blog_related_posts_count', 3), 1);
 
-        return Cache::remember("blog:related:{$post->id}:{$count}", now()->addDay(), function () use ($post, $count) {
+        $cacheKey = "blog:related:v2:{$post->id}:{$count}";
+        $relatedIds = Cache::remember($cacheKey, now()->addDay(), function () use ($post, $count) {
             $tagIds = $post->tags->pluck('id');
             $categoryIds = $post->categories->pluck('id');
 
@@ -147,7 +148,7 @@ class BlogService
                 ->get();
 
             if ($related->count() >= $count) {
-                return $related;
+                return $related->pluck('id')->values()->all();
             }
 
             $fallback = $this->publishedQuery()
@@ -161,7 +162,7 @@ class BlogService
             $related = $related->concat($fallback);
 
             if ($related->count() >= $count) {
-                return $related->values();
+                return $related->pluck('id')->values()->all();
             }
 
             return $related->concat(
@@ -171,8 +172,20 @@ class BlogService
                     ->latest('published_at')
                     ->limit($count - $related->count())
                     ->get()
-            )->values();
+            )->pluck('id')->values()->all();
         });
+
+        if (! is_array($relatedIds)) {
+            Cache::forget($cacheKey);
+
+            return collect();
+        }
+
+        return $this->publishedQuery()
+            ->whereIn('id', $relatedIds)
+            ->get()
+            ->sortBy(fn (BlogPost $relatedPost) => array_search($relatedPost->id, $relatedIds, true))
+            ->values();
     }
 
     public function refreshCounters(): void
@@ -193,5 +206,6 @@ class BlogService
     public function forgetRelatedCache(BlogPost $post): void
     {
         Cache::forget("blog:related:{$post->id}:".max((int) settings('blog_related_posts_count', 3), 1));
+        Cache::forget("blog:related:v2:{$post->id}:".max((int) settings('blog_related_posts_count', 3), 1));
     }
 }

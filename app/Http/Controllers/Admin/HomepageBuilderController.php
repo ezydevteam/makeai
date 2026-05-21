@@ -69,7 +69,7 @@ class HomepageBuilderController extends Controller
 
         Setting::setValue('homepage_config', $validated, 'json', 'appearance');
 
-        return back()->with('success', 'Homepage configuration saved successfully.');
+        return back()->with('success', translate('Homepage configuration saved successfully.'));
     }
 
     private function getDefaults(): array

@@ -2,6 +2,7 @@
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import { computed, ref, watch } from 'vue'
 import Layout from '@/Layouts/AppLayout.vue'
+import { useNumberFormat } from '@/Composables/useNumberFormat'
 
 type BillingCycle = 'monthly' | 'yearly' | 'lifetime'
 
@@ -69,6 +70,7 @@ const props = defineProps<{
 }>()
 
 const page = usePage()
+const { formatCurrency } = useNumberFormat()
 const billing = ref<BillingCycle>('monthly')
 
 const billingLabels: Record<BillingCycle, string> = {
@@ -96,17 +98,6 @@ watch(billingCycles, (cycles) => {
 const activeCycle = (plan: Plan): ResolvedCycle => plan.pricing[billing.value]
 
 const activeCycleLabel = computed(() => billingLabels[billing.value])
-
-const formatMoney = (amount: number, currency: string) => {
-    try {
-        return new Intl.NumberFormat(undefined, {
-            style: 'currency',
-            currency,
-        }).format(amount)
-    } catch {
-        return `${currency} ${amount.toFixed(2)}`
-    }
-}
 
 const displayPrice = (plan: Plan) => {
     const cycle = activeCycle(plan)
@@ -145,21 +136,21 @@ const savingsText = (plan: Plan) => {
     if (billing.value === 'yearly' && monthly > 0 && yearly > 0) {
         const savings = monthly * 12 - yearly
 
-        return savings > 0 ? `Save ${formatMoney(savings, currency)}` : ''
+        return savings > 0 ? `Save ${formatCurrency(savings, currency)}` : ''
     }
 
     if (billing.value === 'lifetime' && lifetime > 0) {
         const originalLifetime = plan.pricing.lifetime.original_amount ?? 0
 
         if (originalLifetime > lifetime) {
-            return `Save ${formatMoney(originalLifetime - lifetime, currency)}`
+            return `Save ${formatCurrency(originalLifetime - lifetime, currency)}`
         }
 
         const yearlySavings = yearly > lifetime ? yearly - lifetime : 0
         const monthlySavings = monthly > 0 && monthly * 12 > lifetime ? monthly * 12 - lifetime : 0
         const savings = Math.max(yearlySavings, monthlySavings)
 
-        return savings > 0 ? `Save ${formatMoney(savings, currency)}` : ''
+        return savings > 0 ? `Save ${formatCurrency(savings, currency)}` : ''
     }
 
     return ''

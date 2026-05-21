@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\ContactMessageMail;
 use App\Models\ContactMessage;
+use App\Services\InAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -48,6 +49,7 @@ class ContactController extends Controller
                 ]));
 
                 $this->queueNotification($message);
+                $this->queueInAppNotification($message);
                 $this->queueAutoReply($message);
             },
             3600 // 1 hour
@@ -83,6 +85,21 @@ class ContactController extends Controller
             $message->email,
             $message->name
         ));
+    }
+
+    private function queueInAppNotification(ContactMessage $message): void
+    {
+        app(InAppNotificationService::class)->notifyAdmins([
+            'title' => translate('New contact message'),
+            'message' => translate(':subject from :email', [
+                'subject' => $message->subject ?: translate('No subject'),
+                'email' => $message->email,
+            ]),
+            'level' => 'info',
+            'category' => 'contact',
+            'action_url' => route('admin.contact.messages.index'),
+            'action_label' => translate('Open inbox'),
+        ]);
     }
 
     private function queueAutoReply(ContactMessage $message): void

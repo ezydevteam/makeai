@@ -1,18 +1,24 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ (isset($page['props']['isRtl']) && $page['props']['isRtl']) ? 'rtl' : 'ltr' }}">
+@php
+    $isRtl = in_array(data_get($page, 'props.locale.is_rtl'), [true, 1, '1'], true);
+@endphp
+<html lang="{{ str_replace('_', '-', data_get($page, 'props.locale.code', app()->getLocale())) }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="{{ $isRtl ? 'rtl' : '' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="description" content="MakeAI — One platform. Every AI tool.">
+    <meta name="description" content="{{ translate(':app — One platform. Every AI tool.', ['app' => settings('app_name')]) }}">
 
-    <title inertia>{{ config('app.name', 'MakeAI') }}</title>
+    <title inertia>{{ settings('app_name') }}</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800|plus-jakarta-sans:400,500,600,700,800" rel="stylesheet" />
 
     @routes
+    @if(settings('ads_auto_ads_enabled', false) && settings('adsense_publisher_id'))
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ settings('adsense_publisher_id') }}" crossorigin="anonymous"></script>
+    @endif
     @vite(['resources/js/app.ts', "resources/js/Pages/{$page['component']}.vue"])
     @inertiaHead
 </head>

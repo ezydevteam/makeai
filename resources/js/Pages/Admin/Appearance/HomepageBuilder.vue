@@ -305,7 +305,7 @@ const normalizePhrases = () => {
 </script>
 
 <template>
-    <Head title="Homepage Builder — Admin" />
+    <Head :title="$t('Homepage Builder — Admin')" />
 
     <AdminLayout>
         <div class="max-w-7xl mx-auto px-6 py-8">
@@ -535,16 +535,16 @@ const normalizePhrases = () => {
                 <div class="p-6 overflow-y-auto space-y-6">
                     <div class="space-y-4">
                         <h4 class="text-xs font-black uppercase tracking-widest text-gray-500">SEO</h4>
-                        <input v-model="form.settings.seo.meta_title" type="text" placeholder="Meta title" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        <textarea v-model="form.settings.seo.meta_description" rows="3" placeholder="Meta description" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white"></textarea>
-                        <input v-model="form.settings.seo.og_image" type="text" placeholder="OG image URL" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                        <input v-model="form.settings.seo.meta_title" type="text" :placeholder="$t('Meta title')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                        <textarea v-model="form.settings.seo.meta_description" rows="3" :placeholder="$t('Meta description')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white"></textarea>
+                        <input v-model="form.settings.seo.og_image" type="text" :placeholder="$t('OG image URL')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-surface-800">
                             <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Preloader</span>
                             <input v-model="form.settings.preloader.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
                         </label>
-                        <input v-model="form.settings.preloader.animation_url" type="text" placeholder="Lottie/GIF URL" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                        <input v-model="form.settings.preloader.animation_url" type="text" :placeholder="$t('Lottie/GIF URL')" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
                         <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-surface-800">
                             <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Scroll to top</span>
                             <input v-model="form.settings.scroll_to_top.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
@@ -562,10 +562,10 @@ const normalizePhrases = () => {
                             <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Cookie consent banner</span>
                             <input v-model="form.settings.cookie_consent.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
                         </label>
-                        <input v-model="form.settings.cookie_consent.message" type="text" placeholder="Cookie message" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                        <input v-model="form.settings.cookie_consent.message" type="text" :placeholder="$t('Cookie message')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input v-model="form.settings.cookie_consent.accept_text" type="text" placeholder="Accept button text" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                            <input v-model="form.settings.cookie_consent.policy_url" type="text" placeholder="Cookie policy URL" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                            <input v-model="form.settings.cookie_consent.accept_text" type="text" :placeholder="$t('Accept button text')" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
+                            <input v-model="form.settings.cookie_consent.policy_url" type="text" :placeholder="$t('Cookie policy URL')" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
                         </div>
                     </div>
                     <div>

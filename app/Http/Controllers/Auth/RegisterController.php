@@ -3,32 +3,36 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
+use App\Services\AffiliateService;
+use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 
 class RegisterController extends Controller
 {
-    public function showRegistrationForm()
+    public function showRegistrationForm(Request $request, AffiliateService $affiliate)
     {
+        if ($request->filled('ref')) {
+            $affiliate->captureVisit($request, (string) $request->query('ref'));
+        }
+
         return Inertia::render('Auth/Register');
     }
 
-    public function register(Request $request)
+    public function register(RegisterRequest $request, AffiliateService $affiliate)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
-            'password' => ['required', 'confirmed', Password::min(8)],
-        ]);
-
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
         ]);
+
+        $affiliate->attachReferralToUser($request, $user);
+
+        app(NotificationEventService::class)->newUserRegistered($user);
 
         Auth::login($user);
 

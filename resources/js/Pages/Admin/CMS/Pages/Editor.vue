@@ -223,7 +223,7 @@ const submit = () => {
             <div class="lg:col-span-3 space-y-6">
                 <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
                     <div>
-                        <input v-model="form.title" @input="syncSlug" type="text" placeholder="Page Title" class="w-full text-4xl font-black border-none focus:ring-0 p-0 placeholder:text-gray-100">
+                        <input v-model="form.title" @input="syncSlug" type="text" :placeholder="$t('Page Title')" class="w-full text-4xl font-black border-none focus:ring-0 p-0 placeholder:text-gray-100">
                         <div class="flex items-center gap-2 mt-4 text-xs font-bold text-gray-400">
                             <span class="uppercase tracking-widest">Slug:</span>
                             <span class="text-gray-900 lowercase">{{ $page.props.app?.url }}/</span>

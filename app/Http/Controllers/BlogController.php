@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Models\BlogTag;
+use App\Models\Comment;
 use App\Services\BlogService;
+use App\Services\SocialService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Response as ResponseFacade;
@@ -14,7 +16,10 @@ use Inertia\Response;
 
 class BlogController extends Controller
 {
-    public function __construct(private readonly BlogService $blog) {}
+    public function __construct(
+        private readonly BlogService $blog,
+        private readonly SocialService $social,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -75,13 +80,27 @@ class BlogController extends Controller
     {
         $post = $this->blog->publishedQuery()
             ->where('slug', $slug)
+            ->withCount('favorites')
             ->firstOrFail();
+
+        $post->setAttribute('is_favorited', $request->user()
+            ? $post->favorites()->where('user_id', $request->user()->id)->exists()
+            : false);
 
         $this->blog->trackView($post, $request->user()?->id, $request->ip());
 
         return Inertia::render('Blog/Show', [
             'post' => $post,
             'relatedPosts' => $post->show_related_posts ? $this->blog->relatedPosts($post) : [],
+            'share' => $post->show_share_buttons
+                ? $this->social->sharePayload(route('blog.show', $post->slug), $post->title, $post->og_image ?: $post->featured_image)
+                : null,
+            'comments' => $this->commentsPayload($post, $request),
+            'commentSettings' => [
+                'enabled' => (bool) settings('comments_enabled', true) && (bool) $post->allow_comments,
+                'allow_guests' => (bool) settings('comments_allow_guests', false),
+                'poll_seconds' => (int) settings('comments_poll_seconds', 60),
+            ],
             'schema' => $this->schema($post),
             'meta' => $this->meta(
                 $post->meta_title ?: $post->title,
@@ -143,6 +162,71 @@ class BlogController extends Controller
             ->orderByDesc('posts_count')
             ->limit(30)
             ->get(['id', 'name', 'slug', 'posts_count']);
+    }
+
+    private function commentsPayload(BlogPost $post, Request $request): array
+    {
+        $comments = $post->comments()
+            ->approved()
+            ->whereNull('parent_id')
+            ->with([
+                'user:id,name,avatar',
+                'likes:id,comment_id,user_id,ip_hash',
+                'replies' => fn ($query) => $query->approved()->with(['user:id,name,avatar', 'likes:id,comment_id,user_id,ip_hash']),
+            ])
+            ->withCount('reports')
+            ->oldest()
+            ->paginate(10, ['*'], 'comments_page')
+            ->through(fn (Comment $comment) => $this->commentPayload($comment, $request))
+            ->withQueryString();
+
+        return [
+            'data' => $comments->items(),
+            'links' => $comments->linkCollection(),
+            'meta' => [
+                'current_page' => $comments->currentPage(),
+                'last_page' => $comments->lastPage(),
+                'total' => $comments->total(),
+            ],
+        ];
+    }
+
+    private function commentPayload(Comment $comment, Request $request): array
+    {
+        $user = $request->user();
+
+        return [
+            'id' => $comment->id,
+            'content' => $comment->content,
+            'created_at' => $comment->created_at?->toISOString(),
+            'likes_count' => (int) $comment->likes_count,
+            'liked' => $this->commentLikedByViewer($comment, $request),
+            'can_edit' => $comment->canBeEditedBy($user),
+            'can_delete' => $comment->user_id !== null && $comment->user_id === $user?->id,
+            'reports_count' => $comment->reports_count ?? 0,
+            'user' => $comment->user ? [
+                'name' => $comment->user->name,
+                'avatar' => $comment->user->avatar,
+            ] : null,
+            'guest_name' => $comment->guest_name,
+            'replies' => $comment->replies
+                ->map(fn (Comment $reply) => $this->commentPayload($reply, $request))
+                ->values()
+                ->all(),
+        ];
+    }
+
+    private function commentLikedByViewer(Comment $comment, Request $request): bool
+    {
+        $user = $request->user();
+
+        return $comment->likes->contains(function ($like) use ($user, $request) {
+            if ($user) {
+                return $like->user_id === $user->id;
+            }
+
+            return $like->ip_hash === hash('sha256', $request->ip().'|'.config('app.key'));
+        });
     }
 
     private function meta(string $title, ?string $description, bool $noIndex = false): array

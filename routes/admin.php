@@ -3,6 +3,8 @@
 use App\Http\Controllers\Admin\AdController;
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminTwoFactorController;
+use App\Http\Controllers\Admin\AffiliateController;
 use App\Http\Controllers\Admin\AiAccessController;
 use App\Http\Controllers\Admin\AiManagementController;
 use App\Http\Controllers\Admin\AiTemplateController;
@@ -14,11 +16,13 @@ use App\Http\Controllers\Admin\BlogPostController;
 use App\Http\Controllers\Admin\BlogSettingsController;
 use App\Http\Controllers\Admin\BlogTagController;
 use App\Http\Controllers\Admin\CMS\AnnouncementController;
+use App\Http\Controllers\Admin\CommentModerationController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use App\Http\Controllers\Admin\ContactSettingsController;
 use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\FaqController;
 use App\Http\Controllers\Admin\FooterBuilderController;
+use App\Http\Controllers\Admin\GeneralSettingsController;
 use App\Http\Controllers\Admin\HeaderBuilderController;
 use App\Http\Controllers\Admin\HomepageBuilderController;
 use App\Http\Controllers\Admin\LanguageController;
@@ -27,11 +31,13 @@ use App\Http\Controllers\Admin\MailLogController;
 use App\Http\Controllers\Admin\MailTemplateController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\NewsletterController;
+use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Admin\PageController;
 use App\Http\Controllers\Admin\PaymentGatewayController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SidebarBuilderController;
+use App\Http\Controllers\Admin\SocialSettingsController;
 use App\Http\Controllers\Admin\Support\CannedResponseController as SupportCannedResponseController;
 use App\Http\Controllers\Admin\Support\DepartmentController as SupportDepartmentController;
 use App\Http\Controllers\Admin\Support\SettingsController as SupportSettingsController;
@@ -57,11 +63,17 @@ use Inertia\Inertia;
 // ─── Guest (unauthenticated) ────────────────────────
 Route::middleware('guest:admin')->group(function () {
     Route::get('login', [AdminLoginController::class, 'showLoginForm'])->name('admin.login');
-    Route::post('login', [AdminLoginController::class, 'login'])->name('admin.login.attempt');
+    Route::post('login', [AdminLoginController::class, 'login'])->middleware('throttle:admin-login')->name('admin.login.attempt');
+
+    Route::get('forgot-password', [AdminLoginController::class, 'showForgotPasswordForm'])->name('admin.password.request');
+    Route::post('forgot-password', [AdminLoginController::class, 'sendPasswordResetOtp'])->middleware('throttle:admin-password-email')->name('admin.password.email');
+    Route::get('reset-password', [AdminLoginController::class, 'showResetPasswordForm'])->name('admin.password.reset');
+    Route::post('reset-password/verify', [AdminLoginController::class, 'verifyPasswordResetOtp'])->middleware('throttle:admin-password-reset')->name('admin.password.verify');
+    Route::post('reset-password', [AdminLoginController::class, 'resetPassword'])->middleware('throttle:admin-password-reset')->name('admin.password.update');
 
     // 2FA
     Route::get('2fa', [AdminLoginController::class, 'show2fa'])->name('admin.2fa.show');
-    Route::post('2fa', [AdminLoginController::class, 'verify2fa'])->name('admin.2fa.verify');
+    Route::post('2fa', [AdminLoginController::class, 'verify2fa'])->middleware('throttle:admin-2fa')->name('admin.2fa.verify');
 });
 
 // ─── Authenticated ──────────────────────────────────
@@ -92,6 +104,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('users/bulk', [UserManagementController::class, 'bulkAction'])->name('admin.users.bulk');
     Route::get('users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
     Route::post('users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
+    Route::post('users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
     Route::post('users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
     Route::post('users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
 
@@ -100,6 +113,11 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('admins', [AdminController::class, 'store'])->name('admin.admins.store');
     Route::post('admins/{admin}', [AdminController::class, 'update'])->name('admin.admins.update');
     Route::delete('admins/{admin}', [AdminController::class, 'destroy'])->name('admin.admins.delete');
+
+    Route::get('security/two-factor', [AdminTwoFactorController::class, 'show'])->name('admin.security.2fa.show');
+    Route::post('security/two-factor', [AdminTwoFactorController::class, 'enable'])->middleware('throttle:admin-2fa')->name('admin.security.2fa.enable');
+    Route::post('security/two-factor/disable', [AdminTwoFactorController::class, 'disable'])->middleware('throttle:admin-2fa')->name('admin.security.2fa.disable');
+    Route::post('security/two-factor/recovery-codes', [AdminTwoFactorController::class, 'regenerateRecoveryCodes'])->middleware('throttle:admin-2fa')->name('admin.security.2fa.recovery-codes');
 
     Route::get('roles', [RoleController::class, 'index'])->name('admin.roles.index');
     Route::get('roles/create', [RoleController::class, 'create'])->name('admin.roles.create');
@@ -116,6 +134,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::delete('localization/languages/{language}', [LanguageController::class, 'destroy'])->name('admin.languages.delete');
 
     Route::get('localization/translations/{language}', [TranslationController::class, 'index'])->name('admin.translations.index');
+    Route::post('localization/translations/{language}/bulk', [TranslationController::class, 'bulkUpdate'])->name('admin.translations.bulk_update');
     Route::post('localization/translations/{translation}', [TranslationController::class, 'update'])->name('admin.translations.update');
     Route::post('localization/translations/{translation}/ai', [TranslationController::class, 'aiTranslate'])->name('admin.translations.ai');
     Route::post('localization/translations/{language}/ai-all', [TranslationController::class, 'aiTranslateAll'])->name('admin.translations.ai_all');
@@ -133,6 +152,12 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
     Route::post('coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
     Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
+
+    Route::get('reports/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
+    Route::post('reports/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
+    Route::post('reports/affiliate/commissions/{commission}/approve', [AffiliateController::class, 'approveCommission'])->name('admin.affiliate.commissions.approve');
+    Route::post('reports/affiliate/commissions/{commission}/reject', [AffiliateController::class, 'rejectCommission'])->name('admin.affiliate.commissions.reject');
+    Route::post('reports/affiliate/payouts/{payout}', [AffiliateController::class, 'processPayout'])->name('admin.affiliate.payouts.process');
 
     // Community
     Route::get('community/newsletter', [NewsletterController::class, 'index'])->name('admin.newsletter.index');
@@ -178,6 +203,8 @@ Route::middleware('admin.auth')->group(function () {
     // Appearance: Menus
     Route::get('appearance/menus', [MenuController::class, 'index'])->name('admin.menus.index');
     Route::post('appearance/menus', [MenuController::class, 'store'])->name('admin.menus.store');
+    Route::post('appearance/menus/{menu}', [MenuController::class, 'update'])->name('admin.menus.update');
+    Route::post('appearance/menus/{menu}/items/reorder', [MenuController::class, 'reorderItems'])->name('admin.menus.items.reorder');
     Route::post('appearance/menus/{menu}/item', [MenuController::class, 'addItem'])->name('admin.menus.item.store');
     Route::post('appearance/menus/item/{item}', [MenuController::class, 'updateItem'])->name('admin.menus.item.update');
     Route::delete('appearance/menus/item/{item}', [MenuController::class, 'deleteItem'])->name('admin.menus.item.delete');
@@ -207,15 +234,35 @@ Route::middleware('admin.auth')->group(function () {
     Route::get('ads', [AdController::class, 'index'])->name('admin.ads.index');
     Route::get('ads/create', [AdController::class, 'create'])->name('admin.ads.create');
     Route::post('ads', [AdController::class, 'store'])->name('admin.ads.store');
+    Route::post('ads/settings', [AdController::class, 'updateSettings'])->name('admin.ads.settings');
     Route::get('ads/{ad}/edit', [AdController::class, 'edit'])->name('admin.ads.edit');
     Route::post('ads/{ad}', [AdController::class, 'update'])->name('admin.ads.update');
     Route::delete('ads/{ad}', [AdController::class, 'destroy'])->name('admin.ads.delete');
     Route::post('ads/{ad}/toggle', [AdController::class, 'toggle'])->name('admin.ads.toggle');
 
+    // Social Media
+    Route::get('marketing/social', [SocialSettingsController::class, 'edit'])->name('admin.social.settings.edit');
+    Route::post('marketing/social', [SocialSettingsController::class, 'update'])->name('admin.social.settings.update');
+
+    // General Settings
+    Route::get('settings', [GeneralSettingsController::class, 'edit'])->name('admin.settings.index');
+    Route::post('settings', [GeneralSettingsController::class, 'update'])->name('admin.settings.update');
+
     // System Tools
     Route::get('system', [SystemController::class, 'index'])->name('admin.system.index');
     Route::post('system/cache', [SystemController::class, 'clearCache'])->name('admin.system.cache.clear');
+    Route::post('system/cron/run', [SystemController::class, 'runCronTask'])->name('admin.system.cron.run');
+    Route::post('system/maintenance/settings', [SystemController::class, 'updateMaintenanceSettings'])->name('admin.system.maintenance.settings');
     Route::post('system/maintenance', [SystemController::class, 'toggleMaintenance'])->name('admin.system.maintenance.toggle');
+
+    // In-App Notifications (PART 23)
+    Route::get('notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
+    Route::get('notifications/latest', [AdminNotificationController::class, 'latest'])->name('admin.notifications.latest');
+    Route::post('notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('admin.notifications.read-all');
+    Route::post('notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
+    Route::get('notifications/settings', [AdminNotificationController::class, 'settings'])->name('admin.notifications.settings');
+    Route::post('notifications/settings', [AdminNotificationController::class, 'updateSettings'])->name('admin.notifications.settings.update');
+    Route::post('notifications/test', [AdminNotificationController::class, 'testConnection'])->name('admin.notifications.test');
 
     // Mail System
     Route::get('mail', [MailController::class, 'index'])->name('admin.mail.index');
@@ -255,6 +302,13 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('content/faq-categories', [FaqController::class, 'storeCategory'])->name('admin.faq-categories.store');
     Route::post('content/faq-categories/{category}', [FaqController::class, 'updateCategory'])->name('admin.faq-categories.update');
     Route::delete('content/faq-categories/{category}', [FaqController::class, 'destroyCategory'])->name('admin.faq-categories.delete');
+
+    // Content: Comments
+    Route::get('content/comments', [CommentModerationController::class, 'index'])->name('admin.comments.index');
+    Route::post('content/comments/settings', [CommentModerationController::class, 'updateSettings'])->name('admin.comments.settings');
+    Route::post('content/comments/{comment}/approve', [CommentModerationController::class, 'approve'])->name('admin.comments.approve');
+    Route::post('content/comments/{comment}/spam', [CommentModerationController::class, 'spam'])->name('admin.comments.spam');
+    Route::delete('content/comments/{comment}', [CommentModerationController::class, 'destroy'])->name('admin.comments.delete');
 
     // Content: Announcements (PART 29)
     Route::get('content/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements.index');

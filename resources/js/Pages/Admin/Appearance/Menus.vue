@@ -1,198 +1,641 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { computed, ref, watch } from 'vue'
+import { Head, useForm } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import IconClassSelect from '@/Components/IconClassSelect.vue'
+import MenuTreeDraggable from '@/Components/MenuTreeDraggable.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: AdminLayout })
+
+declare const route: (name: string, params?: unknown) => string
+
+type MenuItemType = 'url' | 'page' | 'route'
+type LinkTarget = '_self' | '_blank'
+type VisibilityRule = 'none' | 'guest' | 'auth' | 'pro'
+type BadgeColor = 'green' | 'blue' | 'violet' | 'amber' | 'red' | 'gray'
+
+interface PageOption {
+    id: number
+    title: string
+    slug: string
+}
+
+interface CategoryOption {
+    id: number
+    name: string
+    slug: string
+}
+
+interface RouteOption {
+    name: string
+    label: string
+}
+
+interface MenuItem {
+    id: number
+    menu_id: number
+    parent_id: number | null
+    label: string
+    type: MenuItemType
+    url: string | null
+    page_id: number | null
+    route_name: string | null
+    target: LinkTarget
+    icon: string | null
+    badge_text: string | null
+    badge_color: BadgeColor | null
+    is_active: boolean
+    requires_auth: VisibilityRule
+    mega_menu: boolean
+    mega_menu_content: string | null
+    sort_order: number
+    page?: PageOption | null
+}
+
+interface MenuItemNode extends MenuItem {
+    children: MenuItemNode[]
+}
+
+interface Menu {
+    id: number
+    name: string
+    slug: string
+    items: MenuItem[]
+}
+
+interface ReorderItem {
+    id: number
+    parent_id: number | null
+    sort_order: number
+}
 
 const props = defineProps<{
-    menus: Array<any>,
-    pages: Array<any>
-}>();
+    menus: Menu[]
+    pages: PageOption[]
+    blogCategories: CategoryOption[]
+    aiCategories: CategoryOption[]
+    routeOptions: RouteOption[]
+}>()
 
-const selectedMenu = ref<any>(props.menus[0] || null);
-const showAddMenuModal = ref(false);
-const showAddItemModal = ref(false);
+const { t } = useTranslate()
+
+const selectedMenuId = ref<number | null>(props.menus[0]?.id ?? null)
+const showMenuModal = ref(false)
+const showItemModal = ref(false)
+const editingMenuId = ref<number | null>(null)
+const editingItemId = ref<number | null>(null)
+const menuSlugTouched = ref(false)
+const deleteTarget = ref<{ type: 'menu' | 'item'; id: number; label: string } | null>(null)
+const workingTree = ref<MenuItemNode[]>([])
+const isDraggingMenuItem = ref(false)
+const deleteForm = useForm({})
+const reorderForm = useForm<{ items: ReorderItem[] }>({ items: [] })
 
 const menuForm = useForm({
     name: '',
-    slug: ''
-});
+    slug: '',
+})
 
 const itemForm = useForm({
     label: '',
-    type: 'url',
+    type: 'url' as MenuItemType,
     url: '',
-    page_id: null,
+    page_id: '',
     route_name: '',
-    target: '_self',
+    parent_id: '',
+    target: '_self' as LinkTarget,
     icon: '',
-    sort_order: 0
-});
+    badge_text: '',
+    badge_color: '' as BadgeColor | '',
+    is_active: true,
+    requires_auth: 'none' as VisibilityRule,
+    mega_menu: false,
+    mega_menu_content: '',
+    sort_order: 0,
+})
+
+const badgeColors: Array<{ value: BadgeColor; label: string; classes: string }> = [
+    { value: 'green', label: 'Green', classes: 'bg-primary-100 text-primary-700' },
+    { value: 'blue', label: 'Blue', classes: 'bg-secondary-100 text-secondary-700' },
+    { value: 'violet', label: 'Violet', classes: 'bg-violet-100 text-violet-700' },
+    { value: 'amber', label: 'Amber', classes: 'bg-amber-100 text-amber-700' },
+    { value: 'red', label: 'Red', classes: 'bg-danger-100 text-danger-700' },
+    { value: 'gray', label: 'Gray', classes: 'bg-gray-100 text-gray-600' },
+]
+
+const visibilityOptions: Array<{ value: VisibilityRule; label: string }> = [
+    { value: 'none', label: 'Everyone' },
+    { value: 'guest', label: 'Guests only' },
+    { value: 'auth', label: 'Logged-in users' },
+    { value: 'pro', label: 'Pro users' },
+]
+
+const selectedMenu = computed(() => props.menus.find((menu) => menu.id === selectedMenuId.value) ?? props.menus[0] ?? null)
+
+const buildMenuTree = (menu: Menu | null): MenuItemNode[] => {
+    if (!menu) return []
+
+    const nodes = new Map<number, MenuItemNode>()
+    menu.items.forEach((item) => nodes.set(item.id, { ...item, children: [] }))
+
+    const roots: MenuItemNode[] = []
+    nodes.forEach((node) => {
+        if (node.parent_id && nodes.has(node.parent_id)) {
+            nodes.get(node.parent_id)?.children.push(node)
+            return
+        }
+
+        roots.push(node)
+    })
+
+    const sortNodes = (items: MenuItemNode[]) => {
+        items.sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label))
+        items.forEach((item) => sortNodes(item.children))
+    }
+
+    sortNodes(roots)
+    return roots
+}
+
+const parentOptions = computed(() => {
+    if (!selectedMenu.value) return []
+
+    return selectedMenu.value.items
+        .filter((item) => item.id !== editingItemId.value)
+        .sort((a, b) => a.sort_order - b.sort_order || a.label.localeCompare(b.label))
+})
+
+watch(() => props.menus, (menus) => {
+    if (!menus.length) {
+        selectedMenuId.value = null
+        return
+    }
+
+    if (!menus.some((menu) => menu.id === selectedMenuId.value)) {
+        selectedMenuId.value = menus[0].id
+    }
+})
+
+watch(selectedMenu, (menu) => {
+    workingTree.value = buildMenuTree(menu)
+}, { immediate: true })
+
+const makeSlug = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+const resetMenuForm = () => {
+    editingMenuId.value = null
+    menuSlugTouched.value = false
+    menuForm.reset()
+    menuForm.clearErrors()
+}
+
+const resetItemForm = () => {
+    editingItemId.value = null
+    itemForm.reset()
+    itemForm.type = 'url'
+    itemForm.target = '_self'
+    itemForm.icon = ''
+    itemForm.badge_text = ''
+    itemForm.badge_color = ''
+    itemForm.is_active = true
+    itemForm.requires_auth = 'none'
+    itemForm.mega_menu = false
+    itemForm.mega_menu_content = ''
+    itemForm.sort_order = selectedMenu.value?.items.length ?? 0
+    itemForm.clearErrors()
+}
+
+const openCreateMenu = () => {
+    resetMenuForm()
+    showMenuModal.value = true
+}
+
+const openEditMenu = (menu: Menu) => {
+    editingMenuId.value = menu.id
+    menuSlugTouched.value = true
+    menuForm.name = menu.name
+    menuForm.slug = menu.slug
+    showMenuModal.value = true
+}
+
+const syncMenuSlug = () => {
+    if (menuSlugTouched.value) return
+    menuForm.slug = makeSlug(menuForm.name)
+}
+
+const markMenuSlugTouched = () => {
+    menuSlugTouched.value = true
+    menuForm.slug = makeSlug(menuForm.slug)
+}
 
 const submitMenu = () => {
-    menuForm.post(route('admin.menus.store'), {
+    const options = {
+        preserveScroll: true,
         onSuccess: () => {
-            showAddMenuModal.value = false;
-            menuForm.reset();
-        }
-    });
-};
+            showMenuModal.value = false
+            resetMenuForm()
+        },
+    }
 
-const addItem = () => {
+    if (editingMenuId.value) {
+        menuForm.post(route('admin.menus.update', editingMenuId.value), options)
+        return
+    }
+
+    menuForm.post(route('admin.menus.store'), options)
+}
+
+const openCreateItem = () => {
+    resetItemForm()
+    showItemModal.value = true
+}
+
+const openEditItem = (item: MenuItem) => {
+    editingItemId.value = item.id
+    itemForm.label = item.label
+    itemForm.type = item.type
+    itemForm.url = item.url ?? ''
+    itemForm.page_id = item.page_id ? String(item.page_id) : ''
+    itemForm.route_name = item.route_name ?? ''
+    itemForm.parent_id = item.parent_id ? String(item.parent_id) : ''
+    itemForm.target = item.target
+    itemForm.icon = item.icon ?? ''
+    itemForm.badge_text = item.badge_text ?? ''
+    itemForm.badge_color = item.badge_color ?? ''
+    itemForm.is_active = item.is_active
+    itemForm.requires_auth = item.requires_auth
+    itemForm.mega_menu = item.mega_menu
+    itemForm.mega_menu_content = item.mega_menu_content ?? ''
+    itemForm.sort_order = item.sort_order
+    showItemModal.value = true
+}
+
+const submitItem = () => {
+    if (!selectedMenu.value) return
+
+    const options = {
+        preserveScroll: true,
+        onSuccess: () => {
+            showItemModal.value = false
+            resetItemForm()
+        },
+    }
+
+    if (editingItemId.value) {
+        itemForm.post(route('admin.menus.item.update', editingItemId.value), options)
+        return
+    }
+
+    itemForm.post(route('admin.menus.item.store', selectedMenu.value.id), options)
+}
+
+const addCategoryShortcut = (category: CategoryOption, source: 'blog' | 'ai') => {
+    if (!selectedMenu.value) return
+
+    itemForm.label = category.name
+    itemForm.type = 'url'
+    itemForm.url = source === 'blog'
+        ? route('blog.category', category.slug)
+        : route('ai.tools.category', category.slug)
+    itemForm.page_id = ''
+    itemForm.route_name = ''
+    itemForm.parent_id = ''
+    itemForm.target = '_self'
+    itemForm.icon = source === 'blog' ? 'ti ti-news' : 'ti ti-sparkles'
+    itemForm.badge_text = ''
+    itemForm.badge_color = ''
+    itemForm.is_active = true
+    itemForm.requires_auth = 'none'
+    itemForm.mega_menu = false
+    itemForm.mega_menu_content = ''
+    itemForm.sort_order = selectedMenu.value.items.length
     itemForm.post(route('admin.menus.item.store', selectedMenu.value.id), {
+        preserveScroll: true,
+        onSuccess: resetItemForm,
+    })
+}
+
+const requestDeleteMenu = (menu: Menu) => {
+    deleteTarget.value = { type: 'menu', id: menu.id, label: menu.name }
+}
+
+const requestDeleteItem = (item: MenuItem) => {
+    deleteTarget.value = { type: 'item', id: item.id, label: item.label }
+}
+
+const confirmDelete = () => {
+    if (!deleteTarget.value) return
+
+    const target = deleteTarget.value
+    const url = target.type === 'menu'
+        ? route('admin.menus.delete', target.id)
+        : route('admin.menus.item.delete', target.id)
+
+    deleteForm.delete(url, {
+        preserveScroll: true,
         onSuccess: () => {
-            showAddItemModal.value = false;
-            itemForm.reset();
-        }
-    });
-};
+            deleteTarget.value = null
+        },
+    })
+}
 
-const deleteItem = (id: number) => {
-    if (confirm('Remove this menu item?')) {
-        useForm({}).delete(route('admin.menus.item.delete', id));
-    }
-};
+const flattenTreeForPayload = (items: MenuItemNode[], parentId: number | null = null): ReorderItem[] => items.flatMap((item, index) => [
+    {
+        id: item.id,
+        parent_id: parentId,
+        sort_order: index,
+    },
+    ...flattenTreeForPayload(item.children, item.id),
+])
 
-const deleteMenu = (id: number) => {
-    if (confirm('Delete this entire menu?')) {
-        useForm({}).delete(route('admin.menus.delete', id));
-    }
-};
+const persistTreeOrder = () => {
+    if (!selectedMenu.value) return
+
+    reorderForm.items = flattenTreeForPayload(workingTree.value)
+    reorderForm.post(route('admin.menus.items.reorder', selectedMenu.value.id), {
+        preserveScroll: true,
+    })
+}
 </script>
 
 <template>
-    <Head title="Menu Builder — Admin" />
-    <div class="max-w-6xl mx-auto px-6 py-8">
-        <div class="flex items-center justify-between mb-8">
+    <Head :title="t('Menu Builder - Admin')" />
+
+    <div class="mx-auto max-w-7xl px-6 py-8">
+        <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">Menu Builder</h1>
-                <p class="text-sm text-gray-500 mt-1">Structure your site navigation and links.</p>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Menu Builder') }}</h1>
+                <p class="mt-1 text-sm text-gray-500">{{ t('Structure public navigation menus for headers, footers, mobile drawers, and sidebars.') }}</p>
             </div>
-            <button @click="showAddMenuModal = true" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/20">
-                NEW MENU
+            <button type="button" class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-500" @click="openCreateMenu">
+                {{ t('New Menu') }}
             </button>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <!-- Menus List -->
-            <div class="space-y-4">
-                <h3 class="text-xs font-black text-gray-400 uppercase tracking-widest px-2">Navigation Menus</h3>
-                <div class="space-y-1">
-                    <button v-for="menu in menus" :key="menu.id" @click="selectedMenu = menu" :class="selectedMenu?.id === menu.id ? 'bg-primary-50 text-primary-700 border-primary-100' : 'bg-white text-gray-600 border-transparent hover:bg-gray-50'" class="w-full text-left px-4 py-3 rounded-xl border transition-all flex items-center justify-between group">
-                        <span class="font-bold text-sm">{{ menu.name }}</span>
-                        <svg v-if="selectedMenu?.id === menu.id" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+            <aside class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <h2 class="px-2 text-xs font-bold uppercase tracking-wide text-gray-400">{{ t('Navigation Menus') }}</h2>
+                <div v-if="menus.length" class="mt-4 space-y-2">
+                    <button
+                        v-for="menu in menus"
+                        :key="menu.id"
+                        type="button"
+                        class="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition-all dark:border-surface-700 rtl:text-right"
+                        :class="selectedMenu?.id === menu.id ? 'border-primary-200 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-100 text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800'"
+                        @click="selectedMenuId = menu.id"
+                    >
+                        <span>
+                            <span class="block font-semibold">{{ menu.name }}</span>
+                            <span class="mt-1 block font-mono text-[11px] text-gray-400">{{ menu.slug }}</span>
+                        </span>
+                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-surface-800">
+                            {{ menu.items.length }}
+                        </span>
                     </button>
                 </div>
-            </div>
+                <div v-else class="mt-6 rounded-lg border border-dashed border-gray-200 p-5 text-center text-sm text-gray-500 dark:border-surface-700">
+                    {{ t('No menus yet.') }}
+                </div>
+            </aside>
 
-            <!-- Menu Structure -->
-            <div class="lg:col-span-3">
-                <div v-if="selectedMenu" class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-50 bg-gray-50/30 flex items-center justify-between">
+            <section class="lg:col-span-3">
+                <div v-if="selectedMenu" class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex flex-col gap-4 border-b border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-800/60 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <h3 class="font-bold text-gray-900">{{ selectedMenu.name }} Structure</h3>
-                            <p class="text-[10px] text-gray-400 font-mono tracking-widest uppercase">SLUG: {{ selectedMenu.slug }}</p>
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ selectedMenu.name }}</h2>
+                            <p class="mt-1 font-mono text-xs uppercase tracking-wide text-gray-400">{{ t('Slug') }}: {{ selectedMenu.slug }}</p>
                         </div>
-                        <div class="flex gap-2">
-                            <button @click="showAddItemModal = true" class="px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition-all">ADD LINK</button>
-                            <button @click="deleteMenu(selectedMenu.id)" class="px-4 py-2 bg-danger-50 text-danger-600 rounded-lg text-xs font-bold hover:bg-danger-100 transition-all">DELETE</button>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200" @click="openEditMenu(selectedMenu)">
+                                {{ t('Edit Menu') }}
+                            </button>
+                            <button type="button" class="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-500" @click="openCreateItem">
+                                {{ t('Add Link') }}
+                            </button>
+                            <button type="button" class="rounded-lg bg-danger-50 px-4 py-2 text-xs font-semibold text-danger-600 transition-colors hover:bg-danger-100 dark:bg-danger-900/20 dark:text-danger-300" @click="requestDeleteMenu(selectedMenu)">
+                                {{ t('Delete') }}
+                            </button>
                         </div>
                     </div>
-                    <div class="p-6">
-                        <div v-if="!selectedMenu.items?.length" class="text-center py-12">
-                            <p class="text-sm text-gray-400">This menu is empty. Start adding some links!</p>
-                        </div>
-                        <div class="space-y-2">
-                            <div v-for="item in selectedMenu.items" :key="item.id" class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100 group">
-                                <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center border border-gray-100 text-gray-400">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+
+                    <div class="grid grid-cols-1 gap-6 p-6 xl:grid-cols-3">
+                        <div class="xl:col-span-2">
+                            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Menu Structure') }}</h3>
+                                    <p class="mt-1 text-xs text-gray-500">{{ t('Drag by the handle, drop between items, or drop into a child zone to nest links.') }}</p>
                                 </div>
-                                <div class="flex-1">
-                                    <div class="text-sm font-bold text-gray-900">{{ item.label }}</div>
-                                    <div class="text-[10px] text-gray-400 uppercase font-mono tracking-tighter">{{ item.type }}: {{ item.url || item.route_name || (item.page ? '/'+item.page.slug : '#') }}</div>
-                                </div>
-                                <button @click="deleteItem(item.id)" class="text-gray-300 hover:text-danger-600 transition-colors opacity-0 group-hover:opacity-100">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
+                                <span v-if="reorderForm.processing" class="rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700">{{ t('Saving order...') }}</span>
                             </div>
+                            <MenuTreeDraggable
+                                v-model="workingTree"
+                                :dragging="isDraggingMenuItem"
+                                @edit="openEditItem"
+                                @delete="requestDeleteItem"
+                                @drag-started="isDraggingMenuItem = true"
+                                @drag-ended="isDraggingMenuItem = false"
+                                @reordered="persistTreeOrder"
+                            />
                         </div>
+
+                        <aside class="space-y-4">
+                            <section class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Quick Add Blog Categories') }}</h3>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <button v-for="category in blogCategories" :key="category.id" type="button" class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="addCategoryShortcut(category, 'blog')">
+                                        {{ category.name }}
+                                    </button>
+                                </div>
+                                <p v-if="!blogCategories.length" class="mt-3 text-sm text-gray-500">{{ t('No active blog categories found.') }}</p>
+                            </section>
+
+                            <section class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Quick Add AI Categories') }}</h3>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <button v-for="category in aiCategories" :key="category.id" type="button" class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="addCategoryShortcut(category, 'ai')">
+                                        {{ category.name }}
+                                    </button>
+                                </div>
+                                <p v-if="!aiCategories.length" class="mt-3 text-sm text-gray-500">{{ t('No active AI categories found.') }}</p>
+                            </section>
+                        </aside>
                     </div>
                 </div>
-            </div>
+
+                <div v-else class="rounded-xl border border-dashed border-gray-200 bg-white py-16 text-center shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Create your first menu') }}</h2>
+                    <p class="mt-2 text-sm text-gray-500">{{ t('Menus can be assigned later in the header, footer, mobile drawer, and sidebar builders.') }}</p>
+                    <button type="button" class="mt-5 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-500" @click="openCreateMenu">
+                        {{ t('New Menu') }}
+                    </button>
+                </div>
+            </section>
         </div>
 
-        <!-- Add Menu Modal -->
-        <div v-if="showAddMenuModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="font-bold text-gray-900">New Menu</h3>
-                    <button @click="showAddMenuModal = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                </div>
-                <form @submit.prevent="submitMenu" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Menu Name</label>
-                        <input v-model="menuForm.name" type="text" placeholder="e.g. Footer Links" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
+        <Teleport to="body">
+            <div v-if="showMenuModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showMenuModal = false">
+                <div class="w-full max-w-md overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ editingMenuId ? t('Edit Menu') : t('New Menu') }}</h2>
+                        <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showMenuModal = false">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Slug</label>
-                        <input v-model="menuForm.slug" type="text" placeholder="e.g. footer_links" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none font-mono" required />
-                    </div>
-                    <button type="submit" class="w-full py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/20">CREATE MENU</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Add Item Modal -->
-        <div v-if="showAddItemModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="font-bold text-gray-900">Add Menu Item</h3>
-                    <button @click="showAddItemModal = false" class="text-gray-400 hover:text-gray-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                </div>
-                <form @submit.prevent="addItem" class="p-6 space-y-4">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Label</label>
-                        <input v-model="itemForm.label" type="text" placeholder="e.g. About Us" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Link Type</label>
-                        <select v-model="itemForm.type" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                            <option value="url">External URL</option>
-                            <option value="page">CMS Page</option>
-                            <option value="route">System Route</option>
-                        </select>
-                    </div>
-                    <div v-if="itemForm.type === 'url'">
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">URL</label>
-                        <input v-model="itemForm.url" type="text" placeholder="https://..." class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                    </div>
-                    <div v-if="itemForm.type === 'page'">
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Select Page</label>
-                        <select v-model="itemForm.page_id" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                            <option v-for="p in pages" :key="p.id" :value="p.id">{{ p.title }}</option>
-                        </select>
-                    </div>
-                    <div v-if="itemForm.type === 'route'">
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Route Name</label>
-                        <input v-model="itemForm.route_name" type="text" placeholder="pricing" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sort Order</label>
-                            <input v-model="itemForm.sort_order" type="number" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
+                    <form class="space-y-4 p-6" @submit.prevent="submitMenu">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Menu Name') }}
+                            <input v-model="menuForm.name" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Footer Links')" required @input="syncMenuSlug">
+                            <span v-if="menuForm.errors.name" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.name }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Slug') }}
+                            <input v-model="menuForm.slug" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('footer_links')" required @input="menuSlugTouched = true" @blur="markMenuSlugTouched">
+                            <span v-if="menuForm.errors.slug" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.slug }}</span>
+                        </label>
+                        <div class="flex items-center justify-end gap-3 rounded-b-xl pt-2">
+                            <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showMenuModal = false">{{ t('Cancel') }}</button>
+                            <button type="submit" :disabled="menuForm.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-60">
+                                {{ menuForm.processing ? t('Saving...') : t('Save Menu') }}
+                            </button>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Target</label>
-                            <select v-model="itemForm.target" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                <option value="_self">Same Tab</option>
-                                <option value="_blank">New Tab</option>
+                    </form>
+                </div>
+            </div>
+        </Teleport>
+
+        <Teleport to="body">
+            <div v-if="showItemModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showItemModal = false">
+                <div class="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ editingItemId ? t('Edit Menu Item') : t('Add Menu Item') }}</h2>
+                        <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showItemModal = false">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <form class="grid max-h-[calc(92vh-72px)] grid-cols-1 gap-4 overflow-y-auto p-6 md:grid-cols-2" @submit.prevent="submitItem">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Label') }}
+                            <input v-model="itemForm.label" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('About Us')" required>
+                            <span v-if="itemForm.errors.label" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.label }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Link Type') }}
+                            <select v-model="itemForm.type" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option value="url">{{ t('Custom URL') }}</option>
+                                <option value="page">{{ t('CMS Page') }}</option>
+                                <option value="route">{{ t('Named Route') }}</option>
                             </select>
+                        </label>
+                        <label v-if="itemForm.type === 'url'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                            {{ t('URL') }}
+                            <input v-model="itemForm.url" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="'https://example.com'">
+                            <span v-if="itemForm.errors.url" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.url }}</span>
+                        </label>
+                        <label v-if="itemForm.type === 'page'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                            {{ t('Select Page') }}
+                            <select v-model="itemForm.page_id" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option value="">{{ t('Choose a page') }}</option>
+                                <option v-for="page in pages" :key="page.id" :value="String(page.id)">{{ page.title }}</option>
+                            </select>
+                            <span v-if="itemForm.errors.page_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.page_id }}</span>
+                        </label>
+                        <label v-if="itemForm.type === 'route'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                            {{ t('Named Route') }}
+                            <select v-model="itemForm.route_name" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option value="">{{ t('Choose a route') }}</option>
+                                <option v-for="option in routeOptions" :key="option.name" :value="option.name">{{ option.label }} - {{ option.name }}</option>
+                            </select>
+                            <span v-if="itemForm.errors.route_name" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.route_name }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Parent Item') }}
+                            <select v-model="itemForm.parent_id" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option value="">{{ t('Top level') }}</option>
+                                <option v-for="item in parentOptions" :key="item.id" :value="String(item.id)">{{ item.label }}</option>
+                            </select>
+                            <span v-if="itemForm.errors.parent_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.parent_id }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Target') }}
+                            <select v-model="itemForm.target" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option value="_self">{{ t('Same Tab') }}</option>
+                                <option value="_blank">{{ t('New Tab') }}</option>
+                            </select>
+                        </label>
+                        <IconClassSelect
+                            v-model="itemForm.icon"
+                            :label="t('Icon')"
+                            :placeholder="t('Choose an icon')"
+                            :error="itemForm.errors.icon"
+                        />
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Badge Text') }}
+                            <input v-model="itemForm.badge_text" type="text" maxlength="50" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('New')">
+                            <span v-if="itemForm.errors.badge_text" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_text }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Badge Color') }}
+                            <select v-model="itemForm.badge_color" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option value="">{{ t('No badge color') }}</option>
+                                <option v-for="badge in badgeColors" :key="badge.value" :value="badge.value">{{ t(badge.label) }}</option>
+                            </select>
+                            <span v-if="itemForm.errors.badge_color" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_color }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Status') }}
+                            <select v-model="itemForm.is_active" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option :value="true">{{ t('Active') }}</option>
+                                <option :value="false">{{ t('Inactive') }}</option>
+                            </select>
+                            <span v-if="itemForm.errors.is_active" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.is_active }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Visibility') }}
+                            <select v-model="itemForm.requires_auth" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <option v-for="option in visibilityOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option>
+                            </select>
+                            <span v-if="itemForm.errors.requires_auth" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.requires_auth }}</span>
+                        </label>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ t('Sort Order') }}
+                            <input v-model.number="itemForm.sort_order" type="number" min="0" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        </label>
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800 md:col-span-2">
+                            <label class="flex items-center justify-between gap-4">
+                                <span>
+                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Mega Menu') }}</span>
+                                    <span class="mt-1 block text-xs text-gray-500">{{ t('Enable a larger dropdown panel for this menu item.') }}</span>
+                                </span>
+                                <input v-model="itemForm.mega_menu" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                            </label>
+                            <label v-if="itemForm.mega_menu" class="mt-4 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Mega Menu Content') }}
+                                <textarea v-model="itemForm.mega_menu_content" rows="5" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" :placeholder="t('Optional HTML or structured content for the theme renderer.')"></textarea>
+                                <span v-if="itemForm.errors.mega_menu_content" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.mega_menu_content }}</span>
+                            </label>
                         </div>
-                    </div>
-                    <button type="submit" class="w-full py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/20">ADD TO MENU</button>
-                </form>
+                        <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-surface-800 md:col-span-2">
+                            <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showItemModal = false">{{ t('Cancel') }}</button>
+                            <button type="submit" :disabled="itemForm.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-60">
+                                {{ itemForm.processing ? t('Saving...') : t('Save Item') }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
+        </Teleport>
+
+        <ActionConfirmModal
+            :open="Boolean(deleteTarget)"
+            :title="deleteTarget?.type === 'menu' ? t('Delete menu?') : t('Delete menu item?')"
+            :message="deleteTarget?.type === 'menu' ? t('This will delete the menu and all of its links.') : t('This will remove the selected link from the menu.')"
+            :confirm-label="t('Delete')"
+            :processing-label="t('Deleting...')"
+            :processing="deleteForm.processing"
+            @cancel="deleteTarget = null"
+            @confirm="confirmDelete"
+        />
     </div>
 </template>

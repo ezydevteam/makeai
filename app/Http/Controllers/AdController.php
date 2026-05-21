@@ -2,41 +2,47 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\IncrementAdImpressions;
+use App\Jobs\TrackAdClick;
 use App\Models\Ad;
+use App\Services\AdsService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class AdController extends Controller
 {
-    public function getActive(string $placement)
+    public function __construct(private readonly AdsService $ads) {}
+
+    public function getActive(Request $request, string $zone): JsonResponse
     {
-        $ad = Ad::active()
-            ->where('placement', $placement)
-            ->inRandomOrder()
-            ->first();
+        $ad = $this->ads->activeForZone($zone, $request->user());
 
         if (! $ad) {
             return response()->json(null);
         }
 
-        return response()->json([
-            'id' => $ad->id,
-            'type' => $ad->type,
-            'content' => $ad->content,
-            'image_url' => $ad->image_path ? asset('storage/'.$ad->image_path) : null,
-            'link_url' => $ad->link_url,
-        ]);
+        return response()->json($this->ads->toFrontend($ad));
     }
 
-    public function trackView(Ad $ad)
+    public function trackView(Ad $ad): JsonResponse
     {
-        $ad->increment('views');
+        IncrementAdImpressions::dispatch($ad->id)->onQueue('low');
 
         return response()->json(['success' => true]);
     }
 
-    public function trackClick(Ad $ad)
+    public function trackClick(Ad $ad): JsonResponse
     {
-        $ad->increment('clicks');
+        TrackAdClick::dispatch($ad->id)->onQueue('low');
 
         return response()->json(['success' => true]);
+    }
+
+    public function click(Request $request, Ad $ad): RedirectResponse
+    {
+        TrackAdClick::dispatch($ad->id)->onQueue('low');
+
+        return redirect()->away($ad->link_url ?: route('home'));
     }
 }

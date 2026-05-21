@@ -20,6 +20,7 @@ interface ImportMeta {
 declare module 'vue' {
     interface ComponentCustomProperties {
         route: RouteFunction
+        $t: (key: string, replace?: Record<string, string | number>) => string
         $page: {
             props: SharedPageProps
         }

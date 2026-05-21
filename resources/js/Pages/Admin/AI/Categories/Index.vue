@@ -75,7 +75,7 @@ const destroyCategory = (category: Category) => {
 </script>
 
 <template>
-    <Head title="AI Tool Categories - Admin" />
+    <Head :title="$t('AI Tool Categories - Admin')" />
 
     <div class="max-w-6xl mx-auto space-y-6">
         <div>
@@ -87,14 +87,14 @@ const destroyCategory = (category: Category) => {
             <form class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 space-y-4" @submit.prevent="submit">
                 <h2 class="font-bold text-gray-900 dark:text-white">{{ editingId ? 'Edit Category' : 'New Category' }}</h2>
 
-                <input v-model="form.name" required placeholder="Name" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" />
+                <input v-model="form.name" required :placeholder="$t('Name')" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" />
                 <input v-model="form.slug" placeholder="slug" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" />
-                <textarea v-model="form.description" rows="3" placeholder="Description" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm"></textarea>
+                <textarea v-model="form.description" rows="3" :placeholder="$t('Description')" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm"></textarea>
                 <div class="grid grid-cols-2 gap-3">
                     <input v-model="form.icon" placeholder="ti-pencil" class="px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" />
                     <input v-model="form.color" type="color" class="h-11 w-full rounded-xl border border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800" />
                 </div>
-                <input v-model.number="form.sort_order" type="number" min="0" placeholder="Sort order" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" />
+                <input v-model.number="form.sort_order" type="number" min="0" :placeholder="$t('Sort order')" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" />
 
                 <div class="flex flex-wrap gap-4">
                     <label class="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">

@@ -34,7 +34,7 @@ const updateTheme = () => themeForm.post(route('admin.appearance.update'));
 </script>
 
 <template>
-    <Head title="Theme Settings — Admin" />
+    <Head :title="$t('Theme Settings — Admin')" />
     <div class="max-w-6xl mx-auto px-6 py-8">
         <div class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900">Appearance Settings</h1>

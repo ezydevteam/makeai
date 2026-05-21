@@ -17,6 +17,16 @@ class Comment extends Model
         'content', 'status', 'guest_name', 'guest_email', 'ip_address', 'likes_count',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'likes_count' => 'integer',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
+    }
+
     public function commentable(): MorphTo
     {
         return $this->morphTo();
@@ -34,11 +44,28 @@ class Comment extends Model
 
     public function replies(): HasMany
     {
-        return $this->hasMany(self::class, 'parent_id');
+        return $this->hasMany(self::class, 'parent_id')->oldest();
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(CommentLike::class);
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(CommentReport::class);
     }
 
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
+    }
+
+    public function canBeEditedBy(?User $user): bool
+    {
+        return $user !== null
+            && $this->user_id === $user->id
+            && $this->created_at?->greaterThanOrEqualTo(now()->subMinutes(15));
     }
 }

@@ -7,13 +7,14 @@
  */
 
 use App\Models\Currency;
-use App\Support\CountryCatalog;
 use App\Models\Language;
 use App\Models\Setting;
 use App\Models\Translation;
 use App\Models\User;
 use App\Services\AddonService;
 use App\Services\ThemeService;
+use App\Services\TranslationService;
+use App\Support\CountryCatalog;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 
@@ -84,25 +85,11 @@ if (! function_exists('translate')) {
      */
     function translate(string $text, array $replace = []): string
     {
-        // For now, get from Laravel's trans system
-        // Will be extended to use DB translations when Translation system is built
         $translated = $text;
 
-        // Try database translations if available
         try {
             $locale = app()->getLocale();
-            $cacheKey = "translations:{$locale}";
-
-            $translations = Cache::remember($cacheKey, 86400, function () use ($locale) {
-                $language = Language::where('code', $locale)->where('is_active', true)->first();
-                if (! $language) {
-                    return [];
-                }
-
-                return Translation::where('language_id', $language->id)
-                    ->pluck('value', 'key')
-                    ->toArray();
-            });
+            $translations = TranslationService::getForLocale($locale);
 
             if (isset($translations[$text])) {
                 $translated = $translations[$text];
@@ -145,7 +132,7 @@ if (! function_exists('format_currency')) {
                 return '$'.number_format($amount, 2);
             }
 
-            return $curr->symbol.number_format($amount, $curr->decimal_places);
+            return CountryCatalog::formatMoney($amount, $curr->code);
         } catch (Exception $e) {
             return '$'.number_format($amount, 2);
         }

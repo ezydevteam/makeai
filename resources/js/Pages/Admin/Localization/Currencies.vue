@@ -66,7 +66,7 @@ const deleteCurrency = (id: number) => {
 </script>
 
 <template>
-    <Head title="Currencies — Admin" />
+    <Head :title="$t('Currencies — Admin')" />
     <div class="max-w-6xl mx-auto px-6 py-8">
         <div class="flex items-center justify-between mb-8">
             <div>
@@ -136,7 +136,7 @@ const deleteCurrency = (id: number) => {
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">ISO Code</label>
-                            <input v-model="form.code" type="text" placeholder="USD" :disabled="editingCurrency" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none disabled:opacity-50" required />
+                            <input v-model="form.code" type="text" :placeholder="$t('USD')" :disabled="editingCurrency" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none disabled:opacity-50" required />
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Symbol</label>
@@ -145,7 +145,7 @@ const deleteCurrency = (id: number) => {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Name</label>
-                        <input v-model="form.name" type="text" placeholder="US Dollar" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
+                        <input v-model="form.name" type="text" :placeholder="$t('US Dollar')" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>

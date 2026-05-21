@@ -1,364 +1,730 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { computed, ref, watch } from 'vue'
+import { Head, useForm } from '@inertiajs/vue3'
+import { VueDraggable } from 'vue-draggable-plus'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { useTranslate } from '@/Composables/useTranslate'
+
+declare const route: (name: string, params?: unknown) => string
+
+type FooterBlockType = 'about_text' | 'menu_list' | 'contact_info' | 'social_icons' | 'newsletter' | 'custom_html' | 'recent_blog_posts' | 'ai_tool_categories' | 'legal_links' | 'language_switcher' | 'dark_mode' | 'trust_badges' | 'store_badges' | 'divider' | 'copyright_text' | 'payment_icons' | 'back_to_top'
+type ConfigValue = string | number | null | string[]
+type PreviewMode = 'desktop' | 'tablet' | 'mobile'
+type HeadingStyle = 'default' | 'accent' | 'minimal'
+type BottomAlignment = 'left' | 'center' | 'right' | 'between'
+
+interface FooterBlock {
+    id: string
+    type: FooterBlockType
+    enabled: boolean
+    config: Record<string, ConfigValue>
+}
+
+interface FooterColumn {
+    id: string
+    width: number
+    title: string
+    subtitle: string
+    heading_style: HeadingStyle
+    blocks: FooterBlock[]
+}
+
+interface FooterBottomBar {
+    copyright_text: string
+    menu_slug: string | null
+    show_payment_icons: boolean
+    payment_icons: string[]
+    show_back_to_top: boolean
+    layout_desktop: number
+    layout_tablet: number
+    layout_mobile: number
+    alignment_desktop: BottomAlignment
+    alignment_tablet: BottomAlignment
+    alignment_mobile: BottomAlignment
+    padding_desktop: number
+    padding_tablet: number
+    padding_mobile: number
+    border_top: boolean
+}
+
+interface FooterBottomColumn {
+    id: 'left' | 'right'
+    title: string
+    blocks: FooterBlock[]
+}
+
+interface FooterConfig {
+    layout: number
+    columns: FooterColumn[]
+    bottom_blocks: FooterBlock[]
+    bottom_columns: FooterBottomColumn[]
+    bottom_bar: FooterBottomBar
+}
+
+interface MenuOption {
+    id: number
+    name: string
+    slug: string
+}
+
+interface AiCategoryOption {
+    id: number
+    name: string
+    slug: string
+    tools_count: number
+}
+
+interface BlockPaletteItem {
+    type: FooterBlockType
+    label: string
+    description: string
+    bottomOnly?: boolean
+    config: Record<string, ConfigValue>
+}
 
 const props = defineProps<{
-    config: any;
-    menus: Array<{ id: number, name: string, slug: string }>;
-}>();
+    config: FooterConfig
+    menus: MenuOption[]
+    aiCategories: AiCategoryOption[]
+}>()
 
-const form = useForm({
-    layout: props.config.layout || 4,
-    columns: props.config.columns || [[], [], [], []],
-    bottom_bar: props.config.bottom_bar || {
-        copyright_text: '',
-        menu_slug: null,
-        show_payment_icons: true,
-        payment_icons: [],
-        show_back_to_top: true,
+const { t } = useTranslate()
+
+let blockIdSequence = 0
+const selectedColumnIndex = ref<number | null>(null)
+const selectedBottomColumnIndex = ref<number | null>(null)
+const selectedBlockIndex = ref<number | null>(null)
+const selectedZone = ref<'columns' | 'bottom'>('columns')
+const previewMode = ref<PreviewMode>('desktop')
+const bottomSettingsDevice = ref<PreviewMode>('desktop')
+const isDragging = ref(false)
+
+const createId = (type: string) => {
+    blockIdSequence += 1
+
+    return `${type}_${Date.now().toString(36)}_${blockIdSequence.toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+const defaultWidth = (layout: number) => {
+    if (layout === 1) return 100
+    if (layout === 2) return 50
+    if (layout === 3) return 33
+
+    return 25
+}
+
+const defaultBottomBar = (bottomBar?: Partial<FooterBottomBar>): FooterBottomBar => ({
+    copyright_text: bottomBar?.copyright_text ?? '',
+    menu_slug: bottomBar?.menu_slug ?? null,
+    show_payment_icons: bottomBar?.show_payment_icons ?? true,
+    payment_icons: bottomBar?.payment_icons ?? [],
+    show_back_to_top: bottomBar?.show_back_to_top ?? true,
+    layout_desktop: 2,
+    layout_tablet: 2,
+    layout_mobile: 2,
+    alignment_desktop: bottomBar?.alignment_desktop ?? 'between',
+    alignment_tablet: bottomBar?.alignment_tablet ?? 'center',
+    alignment_mobile: bottomBar?.alignment_mobile ?? 'center',
+    padding_desktop: Number(bottomBar?.padding_desktop ?? 32),
+    padding_tablet: Number(bottomBar?.padding_tablet ?? 24),
+    padding_mobile: Number(bottomBar?.padding_mobile ?? 20),
+    border_top: bottomBar?.border_top ?? true,
+})
+
+const normalizeConfig = (config: FooterConfig): FooterConfig => {
+    const cloned = JSON.parse(JSON.stringify(config)) as FooterConfig
+    cloned.layout = Math.max(1, Math.min(4, Number(cloned.layout || 4)))
+    cloned.bottom_bar = defaultBottomBar(cloned.bottom_bar)
+    cloned.bottom_blocks = cloned.bottom_blocks ?? []
+    const legacyBottomBlocks = cloned.bottom_blocks
+    const bottomColumns = cloned.bottom_columns ?? []
+    const normalizedBottomColumns: FooterBottomColumn[] = [
+        {
+            id: 'left',
+            title: t('Left Column'),
+            blocks: bottomColumns[0]?.blocks ?? legacyBottomBlocks,
+        },
+        {
+            id: 'right',
+            title: t('Right Column'),
+            blocks: bottomColumns[1]?.blocks ?? [],
+        },
+    ]
+
+    cloned.bottom_columns = normalizedBottomColumns.map((column) => ({
+        ...column,
+        blocks: (column.blocks ?? []).map((block) => ({
+            ...block,
+            enabled: block.enabled ?? true,
+            config: block.config ?? {},
+        })),
+    }))
+    cloned.columns = (cloned.columns ?? []).slice(0, cloned.layout).map((column, index) => ({
+        id: column.id || `footer_column_${index + 1}`,
+        width: Number(column.width || defaultWidth(cloned.layout)),
+        title: column.title ?? '',
+        subtitle: column.subtitle ?? '',
+        heading_style: column.heading_style ?? 'default',
+        blocks: (column.blocks ?? []).map((block) => ({
+            ...block,
+            enabled: block.enabled ?? true,
+            config: block.config ?? {},
+        })),
+    }))
+
+    while (cloned.columns.length < cloned.layout) {
+        cloned.columns.push({
+            id: `footer_column_${cloned.columns.length + 1}`,
+            width: defaultWidth(cloned.layout),
+            title: '',
+            subtitle: '',
+            heading_style: 'default',
+            blocks: [],
+        })
     }
-});
 
-// Watch layout changes to ensure we have enough columns in the array
-watch(() => form.layout, (newVal) => {
-    while (form.columns.length < newVal) {
-        form.columns.push([]);
+    return cloned
+}
+
+const form = useForm<FooterConfig>(normalizeConfig(props.config))
+
+const availableBlocks: BlockPaletteItem[] = [
+    { type: 'about_text', label: 'About Text', description: 'Logo, alt text, and short brand description.', config: { logo: null, alt: '', description: '' } },
+    { type: 'menu_list', label: 'Menu List', description: 'Render links from a saved menu.', config: { title: t('Quick Links'), menu_slug: '' } },
+    { type: 'contact_info', label: 'Contact Info', description: 'Address, phone, and email rows with icons.', config: { title: t('Contact Us'), address: '', phone: '', email: '' } },
+    { type: 'social_icons', label: 'Social Icons', description: 'Show configured social follow buttons.', config: { title: t('Follow Us'), display_mode: 'icons' } },
+    { type: 'newsletter', label: 'Newsletter Form', description: 'Embed the public newsletter subscription form.', config: { title: t('Subscribe'), description: t('Get the latest updates.') } },
+    { type: 'custom_html', label: 'Custom HTML', description: 'Sanitized trusted footer markup.', config: { title: '', content: '' } },
+    { type: 'recent_blog_posts', label: 'Recent Blog Posts', description: 'Show latest published posts.', config: { title: t('Latest Posts'), count: 3 } },
+    { type: 'ai_tool_categories', label: 'AI Tool Categories', description: 'List active AI tool categories.', config: { title: t('AI Tools'), count: 6 } },
+    { type: 'legal_links', label: 'Legal Links', description: 'Privacy, terms, refund, and contact links.', config: { title: t('Legal'), links: ['privacy', 'terms', 'refund', 'contact'] } },
+    { type: 'language_switcher', label: 'Language Switcher', description: 'Locale selector slot.', config: { title: '' } },
+    { type: 'dark_mode', label: 'Dark Mode Toggle', description: 'Theme toggle slot.', config: { title: '' } },
+    { type: 'trust_badges', label: 'Trust Badges', description: 'Payment security or guarantee text.', config: { title: t('Secure Checkout'), text: t('Secure payments powered by trusted providers.') } },
+    { type: 'store_badges', label: 'Store Badges', description: 'External CTA buttons or app store badges.', config: { title: t('Get the App'), links: [] } },
+    { type: 'divider', label: 'Divider / Spacer', description: 'Visual divider or spacing block.', config: { spacing: 24 } },
+    { type: 'copyright_text', label: 'Copyright Text', description: 'Copyright text with {year} support.', bottomOnly: true, config: { text: form.bottom_bar.copyright_text || t('© {year} All rights reserved.') } },
+    { type: 'payment_icons', label: 'Payment Icons', description: 'Accepted payment method badges.', bottomOnly: true, config: { icons: form.bottom_bar.payment_icons.length ? [...form.bottom_bar.payment_icons] : ['visa', 'mastercard', 'paypal', 'stripe'] } },
+    { type: 'back_to_top', label: 'Back to Top', description: 'Scroll-to-top control.', bottomOnly: true, config: { label: t('Back to top') } },
+]
+
+const columnWidths = [25, 33, 50, 66, 75, 100]
+const paymentIcons = ['visa', 'mastercard', 'paypal', 'stripe', 'amex', 'discover', 'apple_pay', 'google_pay']
+const headingStyles: Array<{ value: HeadingStyle; label: string }> = [
+    { value: 'default', label: 'Default' },
+    { value: 'accent', label: 'Accent' },
+    { value: 'minimal', label: 'Minimal' },
+]
+const bottomAlignments: Array<{ value: BottomAlignment; label: string }> = [
+    { value: 'left', label: 'Left' },
+    { value: 'center', label: 'Center' },
+    { value: 'right', label: 'Right' },
+    { value: 'between', label: 'Space Between' },
+]
+
+const paletteDragOptions = {
+    group: { name: 'footer-blocks', pull: 'clone' as const, put: false },
+    sort: false,
+    clone: (item: BlockPaletteItem): FooterBlock => ({
+        id: createId(item.type),
+        type: item.type,
+        enabled: true,
+        config: JSON.parse(JSON.stringify(item.config)) as Record<string, ConfigValue>,
+    }),
+}
+
+const blockDragOptions = {
+    group: { name: 'footer-blocks', pull: true as const, put: true },
+    handle: '.footer-block-drag-handle',
+    animation: 180,
+    ghostClass: 'footer-block-ghost',
+    chosenClass: 'footer-block-chosen',
+}
+
+const columnDragOptions = {
+    group: 'footer-columns',
+    handle: '.footer-column-drag-handle',
+    animation: 180,
+    ghostClass: 'footer-column-ghost',
+}
+
+const selectedBlock = computed(() => {
+    if (selectedZone.value === 'bottom') {
+        return selectedBottomColumnIndex.value === null || selectedBlockIndex.value === null
+            ? null
+            : form.bottom_columns[selectedBottomColumnIndex.value]?.blocks[selectedBlockIndex.value] ?? null
     }
-});
 
-// Available block types
-const blockTypes = [
-    { type: 'about_text', label: 'About Text', desc: 'Logo and description paragraph' },
-    { type: 'menu_list', label: 'Menu List', desc: 'Vertical list of links from a saved menu' },
-    { type: 'contact_info', label: 'Contact Info', desc: 'Address, phone, email with icons' },
-    { type: 'social_icons', label: 'Social Icons', desc: 'Links to social media profiles' },
-    { type: 'newsletter', label: 'Newsletter Form', desc: 'Email subscription input' },
-    { type: 'custom_html', label: 'Custom HTML', desc: 'Raw HTML content' },
-];
-
-const availablePaymentIcons = ['visa', 'mastercard', 'paypal', 'stripe', 'amex', 'discover', 'apple_pay', 'google_pay'];
-
-// Modal states
-const blockModalOpen = ref(false);
-const editingBlock = ref<any>(null);
-const targetColIndex = ref<number>(0);
-
-const addBlockModalOpen = ref(false);
-
-const openAddBlock = (colIndex: number) => {
-    targetColIndex.value = colIndex;
-    addBlockModalOpen.value = true;
-};
-
-const addBlock = (type: string) => {
-    const newBlock = {
-        id: 'block_' + Math.random().toString(36).substr(2, 9),
-        type: type,
-        config: getDefaultConfigForType(type)
-    };
-    form.columns[targetColIndex.value].push(newBlock);
-    addBlockModalOpen.value = false;
-    openSettings(targetColIndex.value, form.columns[targetColIndex.value].length - 1);
-};
-
-const getDefaultConfigForType = (type: string) => {
-    switch(type) {
-        case 'about_text': return { logo: null, description: 'Enter your site description here.' };
-        case 'menu_list': return { title: 'Quick Links', menu_slug: '' };
-        case 'contact_info': return { title: 'Contact Us', address: '', phone: '', email: '' };
-        case 'social_icons': return { title: 'Follow Us', icons: [] };
-        case 'newsletter': return { title: 'Subscribe', description: 'Get the latest updates.' };
-        case 'custom_html': return { title: '', content: '' };
-        default: return {};
+    if (selectedColumnIndex.value === null || selectedBlockIndex.value === null) {
+        return null
     }
-};
 
-const removeBlock = (colIndex: number, blockIndex: number) => {
-    form.columns[colIndex].splice(blockIndex, 1);
-};
+    return form.columns[selectedColumnIndex.value]?.blocks[selectedBlockIndex.value] ?? null
+})
 
-const moveUp = (colIndex: number, blockIndex: number) => {
-    if (blockIndex > 0) {
-        const temp = form.columns[colIndex][blockIndex - 1];
-        form.columns[colIndex][blockIndex - 1] = form.columns[colIndex][blockIndex];
-        form.columns[colIndex][blockIndex] = temp;
+const previewGridClass = computed(() => {
+    if (previewMode.value === 'mobile') return 'grid-cols-1'
+    if (previewMode.value === 'tablet') return form.layout > 1 ? 'grid-cols-2' : 'grid-cols-1'
+    if (form.layout === 1) return 'grid-cols-1'
+    if (form.layout === 2) return 'grid-cols-2'
+    if (form.layout === 3) return 'grid-cols-3'
+
+    return 'grid-cols-4'
+})
+
+const bottomAlignmentField = computed(() => `alignment_${bottomSettingsDevice.value}` as keyof FooterBottomBar)
+const bottomPaddingField = computed(() => `padding_${bottomSettingsDevice.value}` as keyof FooterBottomBar)
+
+const blockLabel = (type: FooterBlockType) => availableBlocks.find((block) => block.type === type)?.label ?? type
+const blockDescription = (type: FooterBlockType) => availableBlocks.find((block) => block.type === type)?.description ?? ''
+
+const setLayout = (layout: number) => {
+    form.layout = layout
+    const width = defaultWidth(layout)
+
+    while (form.columns.length < layout) {
+        form.columns.push({
+            id: `footer_column_${form.columns.length + 1}`,
+            width,
+            title: '',
+            subtitle: '',
+            heading_style: 'default',
+            blocks: [],
+        })
     }
-};
 
-const moveDown = (colIndex: number, blockIndex: number) => {
-    if (blockIndex < form.columns[colIndex].length - 1) {
-        const temp = form.columns[colIndex][blockIndex + 1];
-        form.columns[colIndex][blockIndex + 1] = form.columns[colIndex][blockIndex];
-        form.columns[colIndex][blockIndex] = temp;
+    form.columns = form.columns.slice(0, layout).map((column) => ({
+        ...column,
+        width: column.width || width,
+        title: column.title ?? '',
+        subtitle: column.subtitle ?? '',
+        heading_style: column.heading_style ?? 'default',
+    }))
+}
+
+watch(() => form.layout, (layout) => setLayout(Number(layout)))
+
+const openSettings = (zone: 'columns' | 'bottom', blockIndex: number, columnIndex: number | null = null, bottomColumnIndex: number | null = null) => {
+    selectedZone.value = zone
+    selectedBlockIndex.value = blockIndex
+    selectedColumnIndex.value = columnIndex
+    selectedBottomColumnIndex.value = bottomColumnIndex
+}
+
+const closeSettings = () => {
+    selectedBlockIndex.value = null
+    selectedColumnIndex.value = null
+    selectedBottomColumnIndex.value = null
+}
+
+const removeBlock = () => {
+    if (selectedBlockIndex.value === null) return
+
+    if (selectedZone.value === 'bottom') {
+        if (selectedBottomColumnIndex.value !== null) {
+            form.bottom_columns[selectedBottomColumnIndex.value].blocks.splice(selectedBlockIndex.value, 1)
+        }
+    } else if (selectedColumnIndex.value !== null) {
+        form.columns[selectedColumnIndex.value].blocks.splice(selectedBlockIndex.value, 1)
     }
-};
 
-const openSettings = (colIndex: number, blockIndex: number) => {
-    editingBlock.value = {
-        colIndex,
-        blockIndex,
-        data: JSON.parse(JSON.stringify(form.columns[colIndex][blockIndex])) // deep clone
-    };
-    blockModalOpen.value = true;
-};
+    closeSettings()
+}
 
-const saveBlockSettings = () => {
-    if (editingBlock.value) {
-        form.columns[editingBlock.value.colIndex][editingBlock.value.blockIndex] = editingBlock.value.data;
-        blockModalOpen.value = false;
-        editingBlock.value = null;
+const duplicateSelectedBlock = () => {
+    if (!selectedBlock.value || selectedBlockIndex.value === null) return
+
+    const duplicate: FooterBlock = {
+        ...JSON.parse(JSON.stringify(selectedBlock.value)) as FooterBlock,
+        id: createId(selectedBlock.value.type),
     }
-};
 
-const getBlockLabel = (type: string) => {
-    const found = blockTypes.find(b => b.type === type);
-    return found ? found.label : type;
-};
-
-const togglePaymentIcon = (icon: string) => {
-    const index = form.bottom_bar.payment_icons.indexOf(icon);
-    if (index === -1) {
-        form.bottom_bar.payment_icons.push(icon);
-    } else {
-        form.bottom_bar.payment_icons.splice(index, 1);
+    if (selectedZone.value === 'bottom') {
+        if (selectedBottomColumnIndex.value !== null) {
+            form.bottom_columns[selectedBottomColumnIndex.value].blocks.splice(selectedBlockIndex.value + 1, 0, duplicate)
+            selectedBlockIndex.value += 1
+        }
+    } else if (selectedColumnIndex.value !== null) {
+        form.columns[selectedColumnIndex.value].blocks.splice(selectedBlockIndex.value + 1, 0, duplicate)
+        selectedBlockIndex.value += 1
     }
-};
+}
 
-const save = () => {
+const moveSelectedBlock = (direction: -1 | 1) => {
+    if (selectedBlockIndex.value === null) return
+
+    const blocks = selectedZone.value === 'bottom'
+        ? selectedBottomColumnIndex.value === null
+            ? []
+            : form.bottom_columns[selectedBottomColumnIndex.value].blocks
+        : selectedColumnIndex.value === null
+            ? []
+            : form.columns[selectedColumnIndex.value].blocks
+
+    const target = selectedBlockIndex.value + direction
+    if (target < 0 || target >= blocks.length) return
+
+    const [block] = blocks.splice(selectedBlockIndex.value, 1)
+    blocks.splice(target, 0, block)
+    selectedBlockIndex.value = target
+}
+
+const moveColumn = (columnIndex: number, direction: -1 | 1) => {
+    const target = columnIndex + direction
+    if (target < 0 || target >= form.columns.length) return
+
+    const [column] = form.columns.splice(columnIndex, 1)
+    form.columns.splice(target, 0, column)
+}
+
+const togglePaymentIcon = (icons: ConfigValue, icon: string) => {
+    if (!Array.isArray(icons)) return
+
+    const index = icons.indexOf(icon)
+    if (index >= 0) {
+        icons.splice(index, 1)
+        return
+    }
+
+    icons.push(icon)
+}
+
+const submit = () => {
+    form.bottom_bar.layout_desktop = 2
+    form.bottom_bar.layout_tablet = 2
+    form.bottom_bar.layout_mobile = 2
+    form.bottom_blocks = form.bottom_columns.flatMap((column) => column.blocks)
+
     form.post(route('admin.footer.update'), {
         preserveScroll: true,
-    });
-};
+    })
+}
 </script>
 
 <template>
-    <Head title="Footer Builder" />
+    <Head :title="t('Footer Builder')" />
 
     <AdminLayout>
-        <template #header>
-            <div class="flex items-center justify-between w-full">
+        <template #title>{{ t('Appearance') }}</template>
+
+        <div class="space-y-6">
+            <div class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Footer Builder</h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Design your platform's footer layout and content</p>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Footer Builder') }}</h1>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Drag footer widgets into columns and bottom bar zones.') }}</p>
                 </div>
-                <button @click="save" :disabled="form.processing" class="px-5 py-2.5 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50 flex items-center gap-2">
-                    <svg v-if="form.processing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    Save Changes
+                <button type="button" :disabled="form.processing" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-60" @click="submit">
+                    <svg v-if="form.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.37 0 0 5.37 0 12h4z" /></svg>
+                    <i v-else class="ti ti-device-floppy text-base"></i>
+                    {{ form.processing ? t('Saving...') : t('Save Changes') }}
                 </button>
             </div>
-        </template>
 
-        <div class="max-w-6xl mx-auto space-y-6">
-            <!-- Global Settings -->
-            <div class="bg-white dark:bg-surface-900 p-6 rounded-2xl border border-gray-100 dark:border-surface-700 shadow-sm">
-                <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs border-b border-gray-50 dark:border-surface-800 pb-4 mb-6">Column Layout</h3>
-                <div class="grid grid-cols-4 gap-4">
-                    <button v-for="n in 4" :key="n" @click="form.layout = n" :class="form.layout === n ? 'border-primary-500 ring-1 ring-primary-500 bg-primary-50 dark:bg-primary-900/10 text-primary-600 dark:text-primary-400' : 'border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 hover:bg-gray-100 dark:hover:bg-surface-700 text-gray-700 dark:text-gray-300'" class="w-full text-center p-4 rounded-xl border transition-all text-sm font-bold flex flex-col items-center gap-2">
-                        <div class="flex items-center gap-1">
-                            <div v-for="i in n" :key="i" class="w-4 h-6 rounded-sm" :class="form.layout === n ? 'bg-primary-400 dark:bg-primary-600' : 'bg-gray-300 dark:bg-surface-600'"></div>
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+                <aside class="xl:sticky xl:top-6 xl:self-start">
+                    <section class="flex max-h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                        <div class="border-b border-gray-100 p-5 dark:border-surface-800">
+                            <h3 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Block Palette') }}</h3>
+                            <p class="mt-1 text-xs text-gray-500">{{ t('Drag a widget into any footer drop zone.') }}</p>
                         </div>
-                        {{ n }} Column{{ n > 1 ? 's' : '' }}
-                    </button>
-                </div>
-            </div>
 
-            <!-- Builder Area -->
-            <div class="bg-white dark:bg-surface-900 p-6 rounded-2xl border border-gray-100 dark:border-surface-700 shadow-sm overflow-x-auto">
-                <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs border-b border-gray-50 dark:border-surface-800 pb-4 mb-6">Footer Blocks Grid</h3>
-                
-                <div class="flex gap-4 min-w-[800px]">
-                    <!-- Columns -->
-                    <div v-for="colIndex in form.layout" :key="colIndex" class="flex-1 bg-gray-50 dark:bg-surface-950 border-2 border-dashed border-gray-200 dark:border-surface-700 rounded-xl p-4 flex flex-col gap-3 min-h-[300px]">
-                        <div class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest text-center mb-2">Column {{ colIndex }}</div>
-                        
-                        <div v-for="(block, blockIndex) in form.columns[Number(colIndex) - 1]" :key="block.id" class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg p-3 shadow-sm flex items-center justify-between group relative overflow-hidden transition-all hover:shadow-md hover:border-primary-300 dark:hover:border-primary-700">
-                            <div class="flex items-center gap-3 w-full">
-                                <div class="flex flex-col gap-0.5">
-                                    <button @click="moveUp(Number(colIndex) - 1, Number(blockIndex))" :disabled="blockIndex === 0" class="p-0.5 text-gray-400 hover:text-primary-600 disabled:opacity-20 transition-colors">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg>
-                                    </button>
-                                    <button @click="moveDown(Number(colIndex) - 1, Number(blockIndex))" :disabled="blockIndex === form.columns[Number(colIndex) - 1].length - 1" class="p-0.5 text-gray-400 hover:text-primary-600 disabled:opacity-20 transition-colors">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                        <VueDraggable
+                            :model-value="availableBlocks"
+                            class="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1"
+                            v-bind="paletteDragOptions"
+                            @start="isDragging = true"
+                            @end="isDragging = false"
+                        >
+                            <div
+                                v-for="block in availableBlocks"
+                                :key="block.type"
+                                :data-type="block.type"
+                                class="cursor-grab rounded-xl border border-gray-200 bg-gray-50 p-3 transition hover:border-primary-200 hover:bg-primary-50 active:cursor-grabbing dark:border-surface-700 dark:bg-surface-800 dark:hover:bg-primary-900/20"
+                            >
+                                <div class="flex items-start gap-3">
+                                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+                                        <i class="ti ti-plus text-base"></i>
+                                    </span>
+                                    <span>
+                                        <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ t(block.label) }}</span>
+                                        <span class="mt-1 block text-xs leading-relaxed text-gray-500">{{ t(block.description) }}</span>
+                                        <span v-if="block.bottomOnly" class="mt-2 inline-flex rounded-full bg-secondary-100 px-2 py-0.5 text-[10px] font-bold uppercase text-secondary-700">{{ t('Bottom') }}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </VueDraggable>
+                    </section>
+                </aside>
+
+                <main class="min-w-0 space-y-6">
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                        <div class="mb-4 flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-surface-800 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Main Footer Grid') }}</h3>
+                                <p class="mt-1 text-xs text-gray-500">{{ t('Drag columns left or right, then drop widgets inside each column.') }}</p>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="grid grid-cols-4 gap-2">
+                                    <button v-for="n in 4" :key="n" type="button" class="rounded-lg border px-3 py-2 text-xs font-semibold transition" :class="form.layout === n ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-primary-200 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'" @click="setLayout(n)">
+                                        {{ n }}
                                     </button>
                                 </div>
-                                <div class="flex-1 min-w-0" @click="openSettings(Number(colIndex) - 1, Number(blockIndex))">
-                                    <div class="font-bold text-sm text-gray-900 dark:text-white truncate cursor-pointer">{{ getBlockLabel(block.type) }}</div>
-                                    <div class="text-[10px] text-gray-500 truncate mt-0.5 cursor-pointer">{{ block.config.title || 'No Title' }}</div>
-                                </div>
-                                <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button @click="openSettings(Number(colIndex) - 1, Number(blockIndex))" class="p-1.5 text-gray-400 hover:text-primary-600 bg-gray-50 hover:bg-primary-50 dark:bg-surface-800 dark:hover:bg-primary-900/20 rounded-md transition-colors" title="Settings">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                    </button>
-                                    <button @click="removeBlock(Number(colIndex) - 1, Number(blockIndex))" class="p-1.5 text-gray-400 hover:text-danger-500 bg-gray-50 hover:bg-danger-50 dark:bg-surface-800 dark:hover:bg-danger-500/20 rounded-md transition-colors" title="Remove">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-surface-700 dark:bg-surface-800">
+                                    <button v-for="mode in ['desktop', 'tablet', 'mobile'] as PreviewMode[]" :key="mode" type="button" class="rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition" :class="previewMode === mode ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400'" @click="previewMode = mode">
+                                        {{ t(mode) }}
                                     </button>
                                 </div>
                             </div>
                         </div>
 
-                        <button @click="openAddBlock(Number(colIndex) - 1)" class="w-full py-2 mt-auto border-2 border-dashed border-gray-300 dark:border-surface-600 rounded-lg text-xs font-bold text-gray-500 hover:text-primary-600 hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all flex items-center justify-center gap-1">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-                            Add Block
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sub-Footer (Bottom Bar) Settings -->
-            <div class="bg-white dark:bg-surface-900 p-6 rounded-2xl border border-gray-100 dark:border-surface-700 shadow-sm">
-                <h3 class="font-black text-gray-900 dark:text-white uppercase tracking-widest text-xs border-b border-gray-50 dark:border-surface-800 pb-4 mb-6">Sub-Footer (Bottom Bar)</h3>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Copyright Text</label>
-                        <input v-model="form.bottom_bar.copyright_text" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all" placeholder="© {year} Your Company. All rights reserved.">
-                        <p class="text-[10px] text-gray-500 mt-1">Use <code>{year}</code> to automatically output current year.</p>
-                    </div>
-                    
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Bottom Menu</label>
-                        <select v-model="form.bottom_bar.menu_slug" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            <option :value="null">None</option>
-                            <option v-for="menu in menus" :key="menu.id" :value="menu.slug">{{ menu.name }}</option>
-                        </select>
-                    </div>
-
-                    <div class="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100 dark:border-surface-800">
-                        <!-- Toggles -->
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="text-sm font-bold text-gray-900 dark:text-white">Back to Top Button</div>
-                                    <div class="text-[10px] text-gray-500">Show floating scroll-to-top arrow</div>
+                        <VueDraggable
+                            v-model="form.columns"
+                            class="grid gap-4"
+                            :class="previewGridClass"
+                            v-bind="columnDragOptions"
+                        >
+                            <section v-for="(column, columnIndex) in form.columns" :key="column.id" class="min-h-80 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-surface-700 dark:bg-surface-950">
+                                <div class="mb-3 flex items-center justify-between gap-3">
+                                    <button type="button" class="footer-column-drag-handle inline-flex cursor-grab items-center gap-2 rounded-lg px-2 py-1 text-xs font-bold uppercase tracking-wide text-gray-500 hover:bg-white hover:text-primary-700 active:cursor-grabbing dark:hover:bg-surface-900">
+                                        <i class="ti ti-grip-vertical text-base"></i>
+                                        {{ t('Column :count', { count: columnIndex + 1 }) }}
+                                    </button>
+                                    <div class="flex items-center gap-1">
+                                        <button type="button" class="rounded-md p-1 text-gray-400 hover:bg-white hover:text-primary-600 disabled:opacity-30 dark:hover:bg-surface-900" :disabled="columnIndex === 0" :aria-label="t('Move column left')" @click="moveColumn(Number(columnIndex), -1)">
+                                            <i class="ti ti-chevron-left text-base"></i>
+                                        </button>
+                                        <button type="button" class="rounded-md p-1 text-gray-400 hover:bg-white hover:text-primary-600 disabled:opacity-30 dark:hover:bg-surface-900" :disabled="columnIndex === form.columns.length - 1" :aria-label="t('Move column right')" @click="moveColumn(Number(columnIndex), 1)">
+                                            <i class="ti ti-chevron-right text-base"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <button @click="form.bottom_bar.show_back_to_top = !form.bottom_bar.show_back_to_top" type="button" :class="form.bottom_bar.show_back_to_top ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
-                                    <span :class="form.bottom_bar.show_back_to_top ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 mt-0.5 ml-0.5"></span>
+
+                                <div class="mb-3 grid gap-2">
+                                    <input v-model="column.title" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200" :placeholder="t('Column heading')">
+                                    <input v-model="column.subtitle" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200" :placeholder="t('Column sub heading')">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <select v-model="column.heading_style" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200">
+                                            <option v-for="style in headingStyles" :key="style.value" :value="style.value">{{ t(style.label) }}</option>
+                                        </select>
+                                        <select v-model.number="column.width" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200">
+                                            <option v-for="width in columnWidths" :key="width" :value="width">{{ width }}%</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <VueDraggable
+                                    v-model="column.blocks"
+                                    class="min-h-56 space-y-3 rounded-xl border border-dashed border-gray-200 bg-white/70 p-2 dark:border-surface-700 dark:bg-surface-900/50"
+                                    v-bind="blockDragOptions"
+                                    @start="isDragging = true"
+                                    @end="isDragging = false"
+                                >
+                                    <article v-for="(block, blockIndex) in column.blocks" :key="block.id" :data-type="block.type" class="rounded-xl border p-3 transition hover:shadow-md" :class="block.enabled ? 'border-primary-200 bg-primary-50/60 dark:border-primary-900/50 dark:bg-primary-900/10' : 'border-gray-200 bg-gray-100 opacity-75 dark:border-surface-700 dark:bg-surface-800'">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div class="flex min-w-0 items-center gap-3">
+                                                <button type="button" class="footer-block-drag-handle cursor-grab rounded-lg p-2 text-gray-400 hover:bg-white hover:text-primary-600 active:cursor-grabbing dark:hover:bg-surface-900" :aria-label="t('Drag block')">
+                                                    <i class="ti ti-grip-vertical text-base"></i>
+                                                </button>
+                                                <div class="min-w-0">
+                                                    <div class="truncate text-sm font-bold text-gray-900 dark:text-white">{{ t(blockLabel(block.type)) }}</div>
+                                                    <div class="truncate text-[11px] text-gray-400">{{ t(blockDescription(block.type)) }}</div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300" :aria-label="t('Settings')" @click="openSettings('columns', Number(blockIndex), Number(columnIndex))">
+                                                <i class="ti ti-settings text-base"></i>
+                                            </button>
+                                        </div>
+                                    </article>
+                                </VueDraggable>
+
+                                <p v-if="column.blocks.length === 0" class="mt-3 text-center text-xs text-gray-400">{{ t('Drop footer widgets here.') }}</p>
+                            </section>
+                        </VueDraggable>
+                    </section>
+
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                        <div class="mb-5 flex flex-col gap-3 border-b border-gray-100 pb-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Bottom Bar') }}</h3>
+                                <p class="mt-1 text-xs text-gray-500">{{ t('Drag copyright, payment, menu, social, and back-to-top blocks into the bottom bar.') }}</p>
+                            </div>
+                            <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-surface-700 dark:bg-surface-800">
+                                <button v-for="device in ['desktop', 'tablet', 'mobile'] as PreviewMode[]" :key="device" type="button" class="rounded-md px-3 py-1.5 text-xs font-semibold capitalize transition" :class="bottomSettingsDevice === device ? 'bg-white text-primary-700 shadow-sm dark:bg-surface-900 dark:text-primary-300' : 'text-gray-500 hover:text-gray-800 dark:text-gray-400'" @click="bottomSettingsDevice = device">
+                                    {{ t(device) }}
                                 </button>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="text-sm font-bold text-gray-900 dark:text-white">Payment Icons</div>
-                                    <div class="text-[10px] text-gray-500">Show accepted payment methods</div>
-                                </div>
-                                <button @click="form.bottom_bar.show_payment_icons = !form.bottom_bar.show_payment_icons" type="button" :class="form.bottom_bar.show_payment_icons ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
-                                    <span :class="form.bottom_bar.show_payment_icons ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition duration-200 mt-0.5 ml-0.5"></span>
-                                </button>
-                            </div>
                         </div>
 
-                        <!-- Payment Icons Select -->
-                        <div v-if="form.bottom_bar.show_payment_icons" class="bg-gray-50 dark:bg-surface-950 p-4 rounded-xl border border-gray-100 dark:border-surface-800">
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">Select Icons</label>
-                            <div class="flex flex-wrap gap-2">
-                                <button v-for="icon in availablePaymentIcons" :key="icon" @click="togglePaymentIcon(icon)" type="button" :class="form.bottom_bar.payment_icons.includes(icon) ? 'bg-primary-100 text-primary-700 border-primary-300 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-700' : 'bg-white text-gray-500 border-gray-200 dark:bg-surface-800 dark:text-gray-400 dark:border-surface-700'" class="px-3 py-1.5 text-[10px] font-bold border rounded-lg hover:shadow-sm transition-all capitalize">
-                                    {{ icon.replace('_', ' ') }}
-                                </button>
-                            </div>
+                        <div class="mb-5 grid gap-4 md:grid-cols-3">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Alignment') }}
+                                <select v-model="form.bottom_bar[bottomAlignmentField]" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                                    <option v-for="alignment in bottomAlignments" :key="alignment.value" :value="alignment.value">{{ t(alignment.label) }}</option>
+                                </select>
+                            </label>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Padding') }}
+                                <input v-model.number="form.bottom_bar[bottomPaddingField]" type="number" min="8" max="80" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
+                            <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Top Border') }}</span>
+                                <input v-model="form.bottom_bar.border_top" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                            </label>
                         </div>
-                    </div>
-                </div>
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <section v-for="(bottomColumn, bottomColumnIndex) in form.bottom_columns" :key="bottomColumn.id" class="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-3 dark:border-surface-700 dark:bg-surface-950">
+                                <div class="mb-3 flex items-center justify-between gap-3">
+                                    <h4 class="text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-300">{{ t(bottomColumn.title) }}</h4>
+                                    <span class="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-gray-400 dark:bg-surface-900">{{ bottomColumn.blocks.length }}</span>
+                                </div>
+                                <VueDraggable v-model="bottomColumn.blocks" class="flex min-h-24 flex-col gap-3" v-bind="blockDragOptions">
+                                    <article v-for="(block, blockIndex) in bottomColumn.blocks" :key="block.id" :data-type="block.type" class="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 dark:border-primary-900/50 dark:bg-primary-900/10">
+                                        <div class="flex min-w-0 items-center gap-3">
+                                            <button type="button" class="footer-block-drag-handle cursor-grab text-gray-400 hover:text-primary-600" :aria-label="t('Drag block')">
+                                                <i class="ti ti-grip-vertical text-base"></i>
+                                            </button>
+                                            <span class="truncate text-xs font-bold text-gray-800 dark:text-gray-100">{{ t(blockLabel(block.type)) }}</span>
+                                        </div>
+                                        <button type="button" class="rounded-lg p-2 text-primary-700 hover:bg-white dark:text-primary-300 dark:hover:bg-surface-900" :aria-label="t('Settings')" @click="openSettings('bottom', Number(blockIndex), null, Number(bottomColumnIndex))">
+                                            <i class="ti ti-settings text-base"></i>
+                                        </button>
+                                    </article>
+                                </VueDraggable>
+                            </section>
+                        </div>
+                    </section>
+                </main>
             </div>
         </div>
 
-        <!-- Add Block Modal -->
-        <div v-if="addBlockModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-6 overflow-y-auto">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Add Block to Column {{ targetColIndex + 1 }}</h3>
-                    <div class="space-y-2">
-                        <button v-for="bt in blockTypes" :key="bt.type" @click="addBlock(bt.type)" class="w-full flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-surface-700 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all text-left group">
-                            <div class="w-10 h-10 rounded-lg bg-gray-50 dark:bg-surface-800 group-hover:bg-white dark:group-hover:bg-surface-900 flex items-center justify-center shrink-0 border border-gray-100 dark:border-surface-700 shadow-sm">
-                                <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm text-gray-900 dark:text-white">{{ bt.label }}</div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ bt.desc }}</div>
-                            </div>
+        <Teleport to="body">
+            <div v-if="selectedBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="closeSettings">
+                <section class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                    <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                        <div>
+                            <h3 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t(blockLabel(selectedBlock.type)) }}</h3>
+                            <p class="mt-1 text-xs text-gray-500">{{ t(blockDescription(selectedBlock.type)) }}</p>
+                        </div>
+                        <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="closeSettings">
+                            <i class="ti ti-x text-xl"></i>
                         </button>
                     </div>
-                    <div class="mt-6 flex justify-end">
-                        <button @click="addBlockModalOpen = false" class="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">Cancel</button>
-                    </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Block Settings Modal -->
-        <div v-if="blockModalOpen && editingBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-6 overflow-y-auto">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        {{ getBlockLabel(editingBlock.data.type) }} Settings
-                    </h3>
+                    <div class="space-y-5 overflow-y-auto px-6 py-5">
+                        <label class="flex items-center justify-between gap-4">
+                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Enabled') }}</span>
+                            <input v-model="selectedBlock.enabled" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                        </label>
 
-                    <div class="space-y-4">
-                        <!-- Standard Block Title (Shared by most blocks) -->
-                        <div v-if="editingBlock.data.config.title !== undefined">
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Block Title</label>
-                            <input v-model="editingBlock.data.config.title" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                        </div>
+                        <label v-if="selectedBlock.config.title !== undefined" class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                            {{ t('Block Title') }}
+                            <input v-model="selectedBlock.config.title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                        </label>
 
-                        <!-- About Text Settings -->
-                        <template v-if="editingBlock.data.type === 'about_text'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Description</label>
-                                <textarea v-model="editingBlock.data.config.description" rows="3" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all"></textarea>
-                            </div>
+                        <template v-if="selectedBlock.type === 'about_text'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Logo URL') }}
+                                <input v-model="selectedBlock.config.logo" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Alt Text') }}
+                                <input v-model="selectedBlock.config.alt" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Description') }}
+                                <textarea v-model="selectedBlock.config.description" rows="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200"></textarea>
+                            </label>
                         </template>
 
-                        <!-- Menu List Settings -->
-                        <template v-if="editingBlock.data.type === 'menu_list'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Select Menu</label>
-                                <select v-model="editingBlock.data.config.menu_slug" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                                    <option value="">Select a menu</option>
+                        <template v-if="selectedBlock.type === 'menu_list'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Select Menu') }}
+                                <select v-model="selectedBlock.config.menu_slug" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                                    <option value="">{{ t('Select a menu') }}</option>
                                     <option v-for="menu in menus" :key="menu.id" :value="menu.slug">{{ menu.name }}</option>
                                 </select>
-                            </div>
+                            </label>
                         </template>
 
-                        <!-- Contact Info Settings -->
-                        <template v-if="editingBlock.data.type === 'contact_info'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Address</label>
-                                <input v-model="editingBlock.data.config.address" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Phone</label>
-                                <input v-model="editingBlock.data.config.phone" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Email</label>
-                                <input v-model="editingBlock.data.config.email" type="email" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            </div>
+                        <template v-if="selectedBlock.type === 'contact_info'">
+                            <label v-for="field in ['address', 'phone', 'email']" :key="field" class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t(field) }}
+                                <input v-model="selectedBlock.config[field]" :type="field === 'email' ? 'email' : 'text'" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
                         </template>
 
-                        <!-- Newsletter Settings -->
-                        <template v-if="editingBlock.data.type === 'newsletter'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Description</label>
-                                <input v-model="editingBlock.data.config.description" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            </div>
+                        <template v-if="selectedBlock.type === 'newsletter' || selectedBlock.type === 'trust_badges'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Description') }}
+                                <textarea v-model="selectedBlock.config.description" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200"></textarea>
+                            </label>
+                            <label v-if="selectedBlock.type === 'trust_badges'" class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Trust Text') }}
+                                <input v-model="selectedBlock.config.text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
                         </template>
 
-                        <!-- Custom HTML Settings -->
-                        <template v-if="editingBlock.data.type === 'custom_html'">
+                        <template v-if="selectedBlock.type === 'recent_blog_posts' || selectedBlock.type === 'ai_tool_categories'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Item Count') }}
+                                <input v-model.number="selectedBlock.config.count" type="number" min="1" max="12" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
+                        </template>
+
+                        <template v-if="selectedBlock.type === 'custom_html'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('HTML Content') }}
+                                <textarea v-model="selectedBlock.config.content" rows="7" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200"></textarea>
+                            </label>
+                        </template>
+
+                        <template v-if="selectedBlock.type === 'divider'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Spacing') }}
+                                <input v-model.number="selectedBlock.config.spacing" type="number" min="8" max="96" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            </label>
+                        </template>
+
+                        <template v-if="selectedBlock.type === 'copyright_text'">
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Copyright Text') }}
+                                <input v-model="selectedBlock.config.text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                                <span class="mt-1 block text-[11px] text-gray-400">{{ t('Use {year} for the current year.') }}</span>
+                            </label>
+                        </template>
+
+                        <template v-if="selectedBlock.type === 'payment_icons'">
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">HTML Content</label>
-                                <textarea v-model="editingBlock.data.config.content" rows="4" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white font-mono transition-all"></textarea>
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('Payment Icons') }}</label>
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <button v-for="icon in paymentIcons" :key="icon" type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize transition" :class="Array.isArray(selectedBlock.config.icons) && selectedBlock.config.icons.includes(icon) ? 'border-primary-300 bg-primary-100 text-primary-700 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-300' : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-primary-200 dark:border-surface-700 dark:bg-surface-800'" @click="togglePaymentIcon(selectedBlock.config.icons, icon)">
+                                        {{ icon.replace('_', ' ') }}
+                                    </button>
+                                </div>
                             </div>
                         </template>
                     </div>
 
-                    <div class="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-surface-800">
-                        <button @click="blockModalOpen = false" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-800 rounded-xl transition-colors">Cancel</button>
-                        <button @click="saveBlockSettings" class="px-5 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20">Apply Configuration</button>
+                    <div class="grid grid-cols-2 gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950 sm:grid-cols-4">
+                        <button type="button" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="moveSelectedBlock(-1)">{{ t('Move Up') }}</button>
+                        <button type="button" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="moveSelectedBlock(1)">{{ t('Move Down') }}</button>
+                        <button type="button" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="duplicateSelectedBlock">{{ t('Duplicate') }}</button>
+                        <button type="button" class="rounded-lg bg-danger-50 px-3 py-2 text-xs font-semibold text-danger-700 hover:bg-danger-100 dark:bg-danger-900/20 dark:text-danger-300" @click="removeBlock">{{ t('Remove') }}</button>
                     </div>
-                </div>
+                </section>
             </div>
-        </div>
+        </Teleport>
     </AdminLayout>
 </template>
+
+<style scoped>
+.footer-block-ghost,
+.footer-column-ghost {
+    opacity: 0.45;
+}
+
+.footer-block-chosen {
+    box-shadow: 0 10px 24px rgb(16 185 129 / 0.14);
+}
+</style>

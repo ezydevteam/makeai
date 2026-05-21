@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\TranslationBulkUpdateRequest;
+use App\Http\Requests\Admin\TranslationUpdateRequest;
 use App\Models\Language;
 use App\Models\Translation;
 use App\Models\User;
 use App\Services\AI\AiService;
 use App\Services\TranslationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class TranslationController extends Controller
@@ -39,15 +42,39 @@ class TranslationController extends Controller
     /**
      * Update a single translation.
      */
-    public function update(Request $request, Translation $translation)
+    public function update(TranslationUpdateRequest $request, Translation $translation)
     {
-        $request->validate(['value' => 'required|string']);
-
-        $translation->update(['value' => $request->value]);
+        $translation->update(['value' => $request->validated('value')]);
 
         TranslationService::clearCache($translation->language->code);
 
-        return back()->with('success', 'Translation updated.');
+        return back()->with('success', translate('Translation updated.'));
+    }
+
+    /**
+     * Update multiple translations from the current page.
+     */
+    public function bulkUpdate(TranslationBulkUpdateRequest $request, Language $language)
+    {
+        $payload = collect($request->validated('translations'));
+        $translations = Translation::where('language_id', $language->id)
+            ->whereIn('id', $payload->pluck('id'))
+            ->get()
+            ->keyBy('id');
+
+        if ($translations->count() !== $payload->count()) {
+            return back()->with('error', translate('Some translations do not belong to this language.'));
+        }
+
+        DB::transaction(function () use ($payload, $translations) {
+            $payload->each(function (array $item) use ($translations) {
+                $translations->get($item['id'])->update(['value' => $item['value']]);
+            });
+        });
+
+        TranslationService::clearCache($language->code);
+
+        return back()->with('success', translate(':count translations updated.', ['count' => $payload->count()]));
     }
 
     /**
@@ -63,7 +90,7 @@ class TranslationController extends Controller
         try {
             $user = User::first(); // System proxy user for admin tasks
             if (! $user) {
-                throw new \Exception('No user found to process AI request.');
+                throw new \Exception(translate('No user found to process AI request.'));
             }
 
             $aiService = app(AiService::class);
@@ -73,9 +100,9 @@ class TranslationController extends Controller
             $translation->update(['value' => trim($response)]);
             TranslationService::clearCache($translation->language->code);
 
-            return back()->with('success', 'AI Translation successful.');
+            return back()->with('success', translate('AI Translation successful.'));
         } catch (\Exception $e) {
-            return back()->with('error', 'AI Translation failed: '.$e->getMessage());
+            return back()->with('error', translate('AI Translation failed: :message', ['message' => $e->getMessage()]));
         }
     }
 
@@ -90,7 +117,7 @@ class TranslationController extends Controller
             ->get();
 
         if ($missing->isEmpty()) {
-            return back()->with('info', 'No translations needed processing.');
+            return back()->with('info', translate('No translations needed processing.'));
         }
 
         $targetLang = $language->name;
@@ -102,7 +129,7 @@ class TranslationController extends Controller
         try {
             $user = User::first();
             if (! $user) {
-                throw new \Exception('No user found.');
+                throw new \Exception(translate('No user found.'));
             }
 
             $aiService = app(AiService::class);
@@ -117,12 +144,12 @@ class TranslationController extends Controller
                 }
                 TranslationService::clearCache($language->code);
 
-                return back()->with('success', 'Batch AI Translation successful.');
+                return back()->with('success', translate('Batch AI Translation successful.'));
             }
 
-            return back()->with('error', 'AI returned invalid format.');
+            return back()->with('error', translate('AI returned invalid format.'));
         } catch (\Exception $e) {
-            return back()->with('error', 'AI Batch Translation failed.');
+            return back()->with('error', translate('AI Batch Translation failed.'));
         }
     }
 }

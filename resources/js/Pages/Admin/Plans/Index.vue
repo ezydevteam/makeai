@@ -261,7 +261,7 @@ const submitSettings = () => {
 </script>
 
 <template>
-    <Head title="Plans & Pricing" />
+    <Head :title="$t('Plans & Pricing')" />
 
     <AdminLayout>
         <div class="py-8">
@@ -445,8 +445,8 @@ const submitSettings = () => {
                                                 </select>
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.original_price_monthly" type="number" min="0" step="0.01" placeholder="Original" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <input v-model="row.price_monthly" type="number" min="0" step="0.01" placeholder="Discount" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.original_price_monthly" type="number" min="0" step="0.01" :placeholder="$t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.price_monthly" type="number" min="0" step="0.01" :placeholder="$t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                                 <label class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     <input v-model="row.trial_monthly_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                                     Start trial
@@ -454,8 +454,8 @@ const submitSettings = () => {
                                                 <input v-if="row.trial_monthly_enabled" v-model="row.trial_monthly_days" type="number" min="1" step="1" placeholder="30 days" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.original_price_yearly" type="number" min="0" step="0.01" placeholder="Original" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <input v-model="row.price_yearly" type="number" min="0" step="0.01" placeholder="Discount" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.original_price_yearly" type="number" min="0" step="0.01" :placeholder="$t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.price_yearly" type="number" min="0" step="0.01" :placeholder="$t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                                 <label class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     <input v-model="row.trial_yearly_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                                     Start trial
@@ -463,8 +463,8 @@ const submitSettings = () => {
                                                 <input v-if="row.trial_yearly_enabled" v-model="row.trial_yearly_days" type="number" min="1" step="1" placeholder="360 days" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.original_price_lifetime" type="number" min="0" step="0.01" placeholder="Original" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <input v-model="row.price_lifetime" type="number" min="0" step="0.01" placeholder="Discount" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.original_price_lifetime" type="number" min="0" step="0.01" :placeholder="$t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.price_lifetime" type="number" min="0" step="0.01" :placeholder="$t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                                 <label class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     <input v-model="row.trial_lifetime_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                                     Start trial
@@ -472,7 +472,7 @@ const submitSettings = () => {
                                                 <input v-if="row.trial_lifetime_enabled" v-model="row.trial_lifetime_days" type="number" min="1" step="1" placeholder="30 days" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.vat_percentage" type="number" min="0" max="100" step="0.01" placeholder="Default" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.vat_percentage" type="number" min="0" max="100" step="0.01" :placeholder="$t('Default')" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
                                                 <input v-model="row.is_active" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />

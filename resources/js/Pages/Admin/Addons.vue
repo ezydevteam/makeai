@@ -16,7 +16,7 @@ const deactivate = (slug: string) => router.post(route('admin.addons.deactivate'
 </script>
 
 <template>
-    <Head title="Addons — Admin" />
+    <Head :title="$t('Addons — Admin')" />
     <div class="max-w-6xl mx-auto px-6 py-8">
         <h1 class="text-2xl font-bold text-gray-900 mb-2">Addon Manager</h1>
         <p class="text-sm text-gray-500 mb-8">Install, activate, and configure platform addons.</p>

@@ -7,6 +7,8 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\AffiliateService;
+use App\Services\NotificationEventService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -14,7 +16,7 @@ class SubscriptionLifecycleService
 {
     public function activateFromPayment(Payment $payment, ?string $gatewayPaymentId = null, ?string $gatewaySubscriptionId = null): Payment
     {
-        return DB::transaction(function () use ($payment, $gatewayPaymentId, $gatewaySubscriptionId) {
+        $activatedPayment = DB::transaction(function () use ($payment, $gatewayPaymentId, $gatewaySubscriptionId) {
             $payment = Payment::query()
                 ->with(['plan', 'user'])
                 ->whereKey($payment->id)
@@ -55,15 +57,22 @@ class SubscriptionLifecycleService
             $this->markUserActive($payment->user, $payment->plan, $periodEnd);
             $this->allocatePlanCredits($payment->user, $payment->plan, $payment->ulid);
             $this->markCouponUsed($metadata);
-            $this->applyFirstPurchaseReferral($payment);
+            app(AffiliateService::class)->createCommissionForPayment($payment);
 
             return $payment->fresh(['plan', 'user', 'subscription']);
         });
+
+        app(NotificationEventService::class)->paymentSuccessful($activatedPayment);
+        if ($activatedPayment->subscription) {
+            app(NotificationEventService::class)->subscriptionStarted($activatedPayment->subscription);
+        }
+
+        return $activatedPayment;
     }
 
     public function renewFromGatewaySubscription(string $gateway, string $gatewaySubscriptionId, ?string $gatewayPaymentId = null, ?float $amount = null, ?string $currency = null): ?Payment
     {
-        return DB::transaction(function () use ($gateway, $gatewaySubscriptionId, $gatewayPaymentId, $amount, $currency) {
+        $payment = DB::transaction(function () use ($gateway, $gatewaySubscriptionId, $gatewayPaymentId, $amount, $currency) {
             $subscription = Subscription::query()
                 ->with(['plan', 'user'])
                 ->where('gateway', $gateway)
@@ -109,11 +118,17 @@ class SubscriptionLifecycleService
 
             return $payment;
         });
+
+        if ($payment) {
+            app(NotificationEventService::class)->paymentSuccessful($payment);
+        }
+
+        return $payment;
     }
 
     public function cancelAtPeriodEnd(Subscription $subscription): Subscription
     {
-        return DB::transaction(function () use ($subscription) {
+        $subscription = DB::transaction(function () use ($subscription) {
             $subscription = Subscription::query()
                 ->with('user')
                 ->whereKey($subscription->id)
@@ -132,6 +147,13 @@ class SubscriptionLifecycleService
 
             return $subscription->fresh();
         });
+
+        $subscription->loadMissing(['user', 'plan']);
+        if ($subscription->user && isProAvailable()) {
+            app(NotificationEventService::class)->subscriptionCanceled($subscription);
+        }
+
+        return $subscription;
     }
 
     public function expirePastDue(): int
@@ -150,6 +172,7 @@ class SubscriptionLifecycleService
                         'subscription_status' => 'none',
                         'subscription_ends_at' => $subscription->current_period_end,
                     ]);
+                    app(NotificationEventService::class)->subscriptionExpired($subscription);
                     $expired++;
                 }
             });
@@ -169,6 +192,8 @@ class SubscriptionLifecycleService
             'status' => 'failed',
             'metadata' => $metadata,
         ]);
+
+        app(NotificationEventService::class)->paymentFailed($payment->fresh(['user', 'plan']), $reason);
     }
 
     private function periodEndFor(string $billing): ?Carbon
@@ -211,43 +236,5 @@ class SubscriptionLifecycleService
         if ($couponId) {
             Coupon::whereKey($couponId)->increment('used_count');
         }
-    }
-
-    private function applyFirstPurchaseReferral(Payment $payment): void
-    {
-        $user = $payment->user;
-
-        if (! $user->referred_by) {
-            return;
-        }
-
-        $alreadyRewarded = Payment::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'completed')
-            ->where('id', '!=', $payment->id)
-            ->exists();
-
-        if ($alreadyRewarded) {
-            return;
-        }
-
-        $referrer = User::find($user->referred_by);
-
-        if (! $referrer) {
-            return;
-        }
-
-        $reward = round(((float) $payment->amount * (float) settings('referral_commission_percentage', 10)) / 100, 4);
-
-        if ($reward <= 0) {
-            return;
-        }
-
-        $referrer->increment('referral_earnings', $reward);
-        $referrer->increment('referral_count');
-        $referrer->addCredits($reward, 'referral', 'Referral commission', [
-            'payment_ulid' => $payment->ulid,
-            'referred_user_id' => $user->id,
-        ]);
     }
 }

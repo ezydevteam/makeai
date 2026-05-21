@@ -93,7 +93,7 @@ const formatPermissionName = (name: string) => {
 </script>
 
 <template>
-    <Head title="Roles & Permissions" />
+    <Head :title="$t('Roles & Permissions')" />
     <AdminLayout>
         <template #title>Roles & Permissions</template>
 

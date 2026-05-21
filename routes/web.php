@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdController;
+use App\Http\Controllers\AffiliateController;
 use App\Http\Controllers\AI\DocumentController;
 use App\Http\Controllers\AI\TemplateController;
 use App\Http\Controllers\Auth\LoginController;
@@ -12,7 +13,10 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\LiveSearchController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\NewsletterController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SubscriptionController;
@@ -61,6 +65,9 @@ Route::get('/', function () {
     ]);
 })->name('home');
 Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
+Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->name('affiliate.capture');
+Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch');
+Route::get('/live-search', LiveSearchController::class)->middleware('throttle:60,1')->name('live-search');
 
 // ─── Guest Auth ─────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -103,6 +110,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/checkout/pending/{payment}', [CheckoutController::class, 'pending'])->name('checkout.pending');
         Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
+        Route::get('/dashboard/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate.dashboard');
+        Route::post('/dashboard/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
+        Route::post('/dashboard/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
+
         Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
         Route::patch('/documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
 
@@ -113,10 +124,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/support/tickets/{ticket}/resolve', [SupportTicketController::class, 'resolve'])->name('support.tickets.resolve');
         Route::post('/support/tickets/{ticket}/rate', [SupportTicketController::class, 'rate'])->name('support.tickets.rate');
 
-        // Community Features
-        Route::post('/comments', [CommentController::class, 'store'])->name('comments.store');
-        Route::post('/comments/{comment}/like', [CommentController::class, 'like'])->name('comments.like');
+        Route::get('/dashboard/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
         Route::post('/favorites/toggle', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::get('/notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     });
 });
 
@@ -133,13 +147,19 @@ Route::get('/blog/tag/{slug}', [BlogController::class, 'tag'])->name('blog.tag')
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // ─── Public Community ───────────────────────
+Route::post('/comments', [CommentController::class, 'store'])->middleware('throttle:5,1')->name('comments.store');
+Route::patch('/comments/{comment}', [CommentController::class, 'update'])->middleware('auth')->name('comments.update');
+Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->middleware('auth')->name('comments.delete');
+Route::post('/comments/{comment}/like', [CommentController::class, 'like'])->middleware('throttle:20,1')->name('comments.like');
+Route::post('/comments/{comment}/report', [CommentController::class, 'report'])->middleware('throttle:5,1')->name('comments.report');
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:3,60')->name('newsletter.subscribe');
 Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 
 // ─── Ads ────────────────────────────────────
-Route::get('/api/ads/{placement}', [AdController::class, 'getActive'])->name('ads.active');
+Route::get('/api/ads/{zone}', [AdController::class, 'getActive'])->name('ads.active');
 Route::post('/api/ads/{ad}/view', [AdController::class, 'trackView'])->name('ads.trackView');
 Route::post('/api/ads/{ad}/click', [AdController::class, 'trackClick'])->name('ads.trackClick');
+Route::get('/ads/click/{ad}', [AdController::class, 'click'])->name('ads.click');
 
 // ─── Contact ────────────────────────────────
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');

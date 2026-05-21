@@ -1,68 +1,91 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import axios from 'axios';
-import { useIntersectionObserver } from '@vueuse/core';
+import { nextTick, onMounted, ref } from 'vue'
+import { useIntersectionObserver } from '@vueuse/core'
+
+type AdZone = 'header_banner' | 'sidebar_top' | 'sidebar_bottom' | 'content_top' | 'content_bottom' | 'content-injection' | 'between_posts' | 'chat_banner' | 'dashboard_top' | 'footer_banner'
+
+interface AdPayload {
+    id: number
+    title: string
+    type: 'adsense' | 'custom_html' | 'image_link'
+    zone: AdZone
+    custom_html: string | null
+    adsense_client: string | null
+    adsense_slot: string | null
+    adsense_format: string | null
+    image_url: string | null
+    link_url: string | null
+    link_target: '_blank' | '_self'
+    click_url: string | null
+}
 
 const props = defineProps<{
-    placement: 'top' | 'bottom' | 'sidebar' | 'feed' | 'blog_side'
-}>();
+    zone: AdZone
+}>()
 
-const ad = ref<any>(null);
-const adRef = ref(null);
-const hasTrackedView = ref(false);
+const ad = ref<AdPayload | null>(null)
+const adRef = ref<HTMLElement | null>(null)
+const hasTrackedView = ref(false)
 
 const fetchAd = async () => {
-    try {
-        const response = await axios.get(route('ads.active', props.placement));
-        ad.value = response.data;
-    } catch (e) {
-        console.error('Failed to load ad:', e);
+    const response = await fetch(route('ads.active', { zone: props.zone }), {
+        headers: { Accept: 'application/json' },
+    })
+
+    if (!response.ok) return
+
+    ad.value = await response.json()
+
+    if (ad.value?.type === 'adsense') {
+        await nextTick()
+        ;(window as any).adsbygoogle = (window as any).adsbygoogle || []
+        ;(window as any).adsbygoogle.push({})
     }
-};
+}
 
 const trackView = async () => {
-    if (!ad.value || hasTrackedView.value) return;
-    try {
-        await axios.post(route('ads.trackView', ad.value.id));
-        hasTrackedView.value = true;
-    } catch (e) {
-        // Silent fail for analytics
-    }
-};
+    if (!ad.value || hasTrackedView.value) return
 
-const trackClick = async (e: Event) => {
-    if (!ad.value) return;
-    try {
-        await axios.post(route('ads.trackClick', ad.value.id));
-    } catch (e) {
-        // Silent fail
-    }
-};
+    const adId = Number(ad.value.id)
 
-useIntersectionObserver(adRef, ([{ isIntersecting }]) => {
-    if (isIntersecting) {
-        trackView();
-    }
-});
+    if (!Number.isFinite(adId) || adId <= 0) return
 
-onMounted(fetchAd);
+    hasTrackedView.value = true
+    await fetch(`/api/ads/${encodeURIComponent(String(adId))}/view`, {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
+        },
+    })
+}
+
+useIntersectionObserver(adRef, ([entry]) => {
+    if (entry?.isIntersecting) {
+        void trackView()
+    }
+})
+
+onMounted(() => {
+    void fetchAd()
+})
 </script>
 
 <template>
-    <div v-if="ad" ref="adRef" class="ad-container overflow-hidden rounded-2xl transition-all hover:opacity-95">
-        <!-- Image Ad -->
-        <a v-if="ad.type === 'image'" :href="ad.link_url" target="_blank" @click="trackClick" class="block w-full h-full">
-            <img :src="ad.image_url" :alt="ad.name" class="w-full h-auto object-cover rounded-2xl">
+    <div v-if="ad" ref="adRef" class="ad-container overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900">
+        <a v-if="ad.type === 'image_link' && ad.image_url && ad.click_url" :href="ad.click_url" :target="ad.link_target" rel="noopener noreferrer" class="block">
+            <img :src="ad.image_url" :alt="ad.title" class="h-auto w-full object-cover" loading="lazy" />
         </a>
 
-        <!-- Script Ad -->
-        <div v-else v-html="ad.content" class="w-full h-full flex justify-center items-center"></div>
+        <div v-else-if="ad.type === 'custom_html'" class="flex min-h-16 items-center justify-center" v-html="ad.custom_html"></div>
+
+        <ins
+            v-else-if="ad.type === 'adsense'"
+            class="adsbygoogle block"
+            data-full-width-responsive="true"
+            :data-ad-client="ad.adsense_client"
+            :data-ad-slot="ad.adsense_slot"
+            :data-ad-format="ad.adsense_format || 'auto'"
+        ></ins>
     </div>
 </template>
-
-<style scoped>
-.ad-container {
-    min-height: 50px;
-    background: transparent;
-}
-</style>

@@ -15,12 +15,12 @@ export function useTranslate() {
         return (page.props.translations ?? {}) as Record<string, string>
     })
 
-    const t = (key: string, replace?: Record<string, string>): string => {
+    const t = (key: string, replace?: Record<string, string | number>): string => {
         let text = translations.value[key] ?? key
 
         if (replace) {
             Object.entries(replace).forEach(([k, v]) => {
-                text = text.replace(`:${k}`, v)
+                text = text.replace(new RegExp(`:${k}`, 'g'), String(v))
             })
         }
 

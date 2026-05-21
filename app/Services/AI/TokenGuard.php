@@ -9,6 +9,7 @@ use App\Models\AiModel;
 use App\Models\AiTemplate;
 use App\Models\AiUsageLog;
 use App\Models\User;
+use App\Services\NotificationEventService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -127,6 +128,7 @@ class TokenGuard
 
         // Update global spend tracker in cache using dated micro-USD precision.
         self::incrementGlobalSpend($costUsd);
+        self::notifyHighAiCostIfNeeded();
 
         $billingFailed = $deductCredits && ! $deducted;
 
@@ -170,6 +172,7 @@ class TokenGuard
             $credits = self::calculateCredits($dbModel, $inputTokens, $outputTokens);
 
             self::incrementGlobalSpend($costUsd);
+            self::notifyHighAiCostIfNeeded();
 
             if ($credits > 0 && $user) {
                 $deducted = $user->deductCredits($credits, "AI generation (partial/failed): {$model}", [
@@ -323,6 +326,21 @@ class TokenGuard
         }
 
         Cache::increment($key, $microUsd);
+    }
+
+    private static function notifyHighAiCostIfNeeded(): void
+    {
+        $globalBudget = (float) settings('global_daily_ai_budget_usd', 0);
+        if ($globalBudget <= 0) {
+            return;
+        }
+
+        $spentToday = self::getGlobalSpendTodayUsd();
+        $percentage = ($spentToday / $globalBudget) * 100;
+
+        if ($percentage >= (float) settings('ai_budget_alert_threshold_percent', 80)) {
+            app(NotificationEventService::class)->highAiCostAlert($percentage);
+        }
     }
 
     private static function globalSpendCacheKey(): string

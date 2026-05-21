@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\NotificationEventService;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,7 +25,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'credits', 'credits_used_today', 'credits_used_month',
         'daily_limit', 'monthly_limit',
         'plan_id', 'subscription_status', 'subscription_ends_at', 'trial_ends_at',
-        'referral_code', 'referred_by', 'referral_earnings', 'referral_count',
+        'referral_code', 'affiliate_custom_slug', 'referred_by', 'referral_earnings', 'referral_count',
         'theme_preference', 'locale', 'timezone',
         'personal_api_keys', 'brand_voice',
         'is_active', 'is_banned', 'ban_reason',
@@ -124,6 +125,21 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(User::class, 'referred_by');
     }
 
+    public function affiliateReferrals()
+    {
+        return $this->hasMany(AffiliateReferral::class, 'referrer_id');
+    }
+
+    public function affiliateCommissions()
+    {
+        return $this->hasMany(AffiliateCommission::class, 'referrer_id');
+    }
+
+    public function affiliatePayouts()
+    {
+        return $this->hasMany(AffiliatePayout::class);
+    }
+
     // ─── OTP ────────────────────────────────────
 
     public function generateOtp(): string
@@ -164,7 +180,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return true;
         }
 
-        return DB::transaction(function () use ($amount, $reason, $meta): bool {
+        $deducted = DB::transaction(function () use ($amount, $reason, $meta): bool {
             $user = self::query()->whereKey($this->id)->lockForUpdate()->first();
 
             if (! $user || (float) $user->credits < $amount) {
@@ -193,6 +209,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
             return true;
         });
+
+        if ($deducted) {
+            app(NotificationEventService::class)->creditBalanceChanged($this, (float) $this->credits);
+        }
+
+        return $deducted;
     }
 
     public function addCredits(float $amount, string $type, string $reason, array $meta = []): void
@@ -206,6 +228,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'description' => $reason,
             'meta' => $meta,
         ]);
+
+        app(NotificationEventService::class)->creditsAdded($this->fresh(), $amount, $reason);
     }
 
     // ─── Login ──────────────────────────────────

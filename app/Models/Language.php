@@ -10,6 +10,8 @@ class Language extends Model
     protected $fillable = [
         'code', 'name', 'flag', 'is_rtl',
         'is_default', 'is_active',
+        'date_format', 'time_format', 'decimal_separator',
+        'thousands_separator', 'number_system', 'currency_position',
     ];
 
     protected $casts = [

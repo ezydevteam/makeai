@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -51,7 +52,20 @@ class LoginController extends Controller
             ]);
         }
 
-        $user->recordLogin($request->ip());
+        $isNewLoginIp = ! $user->loginHistory()
+            ->where('ip', $request->ip())
+            ->where('success', true)
+            ->exists();
+
+        $user->recordLogin($request->ip(), (string) $request->userAgent());
+        if ($isNewLoginIp) {
+            app(NotificationEventService::class)->newLogin(
+                $user,
+                $request->ip(),
+                $request->header('CF-IPCity') ?: $request->header('X-Vercel-IP-City'),
+                $request->header('CF-IPCountry') ?: $request->header('X-Vercel-IP-Country')
+            );
+        }
         $request->session()->regenerate();
 
         return redirect()->intended(route('user.dashboard'));

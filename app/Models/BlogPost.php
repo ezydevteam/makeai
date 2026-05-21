@@ -109,6 +109,11 @@ class BlogPost extends Model
         return $this->morphMany(Comment::class, 'commentable');
     }
 
+    public function favorites(): MorphMany
+    {
+        return $this->morphMany(Favorite::class, 'favoriteable');
+    }
+
     public function scopePublished($query)
     {
         return $query->where('status', 'published')

@@ -53,7 +53,7 @@ class AiAccessController extends Controller
 
         $templates->each(fn (AiTemplate $template) => ToolCatalogCacheService::invalidateForTool($template));
 
-        return back()->with('success', 'Access levels updated successfully.');
+        return back()->with('success', translate('Access levels updated successfully.'));
     }
 
     /**
@@ -75,7 +75,7 @@ class AiAccessController extends Controller
         ToolCatalogCacheService::invalidateForCategory($category);
         $templates->each(fn (AiTemplate $template) => ToolCatalogCacheService::invalidateForTool($template));
 
-        return back()->with('success', 'Category access levels updated successfully.');
+        return back()->with('success', translate('Category access levels updated successfully.'));
     }
 
     /**
@@ -97,6 +97,6 @@ class AiAccessController extends Controller
         AiTemplate::query()->update(['access_level' => $level]);
         ToolCatalogCacheService::invalidateAll();
 
-        return back()->with('success', 'Preset applied successfully to all tools.');
+        return back()->with('success', translate('Preset applied successfully to all tools.'));
     }
 }

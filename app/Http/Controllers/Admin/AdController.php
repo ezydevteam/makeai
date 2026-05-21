@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AdRequest;
 use App\Models\Ad;
+use App\Models\Plan;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class AdController extends Controller
 {
-    public function index()
+    public function index(): Response
     {
-        $ads = Ad::latest()->get()->map(function ($ad) {
+        $ads = Ad::orderBy('zone')->orderBy('sort_order')->latest()->get()->map(function ($ad) {
             return array_merge($ad->toArray(), [
                 'ctr' => $ad->ctr,
             ]);
@@ -20,86 +23,92 @@ class AdController extends Controller
 
         return Inertia::render('Admin/Ads/Index', [
             'ads' => $ads,
+            'zones' => config('ads.zones'),
+            'settings' => [
+                'ads_enabled' => (bool) settings('ads_enabled', true),
+                'adsense_publisher_id' => (string) settings('adsense_publisher_id', ''),
+                'ads_auto_ads_enabled' => (bool) settings('ads_auto_ads_enabled', false),
+                'ads_disable_for_subscribed_users' => (bool) settings('ads_disable_for_subscribed_users', false),
+                'ads_disabled_plan_ids' => settings('ads_disabled_plan_ids', []),
+            ],
+            'plans' => Plan::query()->orderBy('sort_order')->get(['id', 'name']),
         ]);
     }
 
-    public function create()
+    public function create(): Response
     {
         return Inertia::render('Admin/Ads/Editor', [
             'ad' => null,
+            'zones' => config('ads.zones'),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(AdRequest $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:image,script',
-            'placement' => 'required|in:sidebar,top,bottom,feed,blog_side',
-            'content' => 'required_if:type,script|nullable|string',
-            'image' => 'required_if:type,image|nullable|image|max:2048',
-            'link_url' => 'required_if:type,image|nullable|url',
-            'is_active' => 'required|boolean',
-            'starts_at' => 'nullable|date',
-            'ends_at' => 'nullable|date|after_or_equal:starts_at',
-        ]);
-
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $request->file('image')->store('ads', 'public');
-        }
+        $validated = $this->payload($request);
 
         Ad::create($validated);
 
-        return redirect()->route('admin.ads.index')->with('success', 'Advertisement created successfully.');
+        return redirect()->route('admin.ads.index')->with('success', translate('Advertisement created successfully.'));
     }
 
-    public function edit(Ad $ad)
+    public function edit(Ad $ad): Response
     {
         return Inertia::render('Admin/Ads/Editor', [
             'ad' => $ad,
+            'zones' => config('ads.zones'),
         ]);
     }
 
-    public function update(Request $request, Ad $ad)
+    public function update(AdRequest $request, Ad $ad): RedirectResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'type' => 'required|in:image,script',
-            'placement' => 'required|in:sidebar,top,bottom,feed,blog_side',
-            'content' => 'required_if:type,script|nullable|string',
-            'image' => 'nullable|image|max:2048',
-            'link_url' => 'required_if:type,image|nullable|url',
-            'is_active' => 'required|boolean',
-            'starts_at' => 'nullable|date',
-            'ends_at' => 'nullable|date|after_or_equal:starts_at',
-        ]);
-
-        if ($request->hasFile('image')) {
-            if ($ad->image_path) {
-                Storage::disk('public')->delete($ad->image_path);
-            }
-            $validated['image_path'] = $request->file('image')->store('ads', 'public');
-        }
+        $validated = $this->payload($request);
 
         $ad->update($validated);
 
-        return redirect()->route('admin.ads.index')->with('success', 'Advertisement updated successfully.');
+        return redirect()->route('admin.ads.index')->with('success', translate('Advertisement updated successfully.'));
     }
 
-    public function destroy(Ad $ad)
+    public function destroy(Ad $ad): RedirectResponse
     {
-        if ($ad->image_path) {
-            Storage::disk('public')->delete($ad->image_path);
-        }
         $ad->delete();
 
-        return redirect()->route('admin.ads.index')->with('success', 'Advertisement deleted successfully.');
+        return redirect()->route('admin.ads.index')->with('success', translate('Advertisement deleted successfully.'));
     }
 
-    public function toggle(Ad $ad)
+    public function toggle(Ad $ad): RedirectResponse
     {
         $ad->update(['is_active' => ! $ad->is_active]);
 
         return back();
+    }
+
+    public function updateSettings(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'ads_enabled' => ['boolean'],
+            'adsense_publisher_id' => ['nullable', 'string', 'max:100', 'regex:/^ca-pub-[0-9]+$/'],
+            'ads_auto_ads_enabled' => ['boolean'],
+            'ads_disable_for_subscribed_users' => ['boolean'],
+            'ads_disabled_plan_ids' => ['array'],
+            'ads_disabled_plan_ids.*' => ['integer', 'exists:plans,id'],
+        ]);
+
+        settings_set('ads_enabled', (bool) ($data['ads_enabled'] ?? false), 'boolean', 'ads');
+        settings_set('adsense_publisher_id', $data['adsense_publisher_id'] ?? '', 'string', 'ads');
+        settings_set('ads_auto_ads_enabled', (bool) ($data['ads_auto_ads_enabled'] ?? false), 'boolean', 'ads');
+        settings_set('ads_disable_for_subscribed_users', (bool) ($data['ads_disable_for_subscribed_users'] ?? false), 'boolean', 'ads');
+        settings_set('ads_disabled_plan_ids', array_map('intval', $data['ads_disabled_plan_ids'] ?? []), 'json', 'ads');
+
+        return back()->with('success', translate('Ad settings updated successfully.'));
+    }
+
+    private function payload(AdRequest $request): array
+    {
+        $validated = $request->validated();
+        $validated['adsense_client'] = $validated['adsense_client'] ?: settings('adsense_publisher_id');
+        $validated['is_active'] = (bool) ($validated['is_active'] ?? false);
+
+        return $validated;
     }
 }

@@ -3,8 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\SendUserNotificationRequest;
+use App\Jobs\SendAdminNotificationEmail;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\InAppNotificationService;
+use App\Services\NotificationEventService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -80,7 +85,57 @@ class UserManagementController extends Controller
 
         $user->update($data);
 
-        return back()->with('success', 'User updated successfully.');
+        if ($request->filled('password')) {
+            app(NotificationEventService::class)->passwordChanged($user);
+        }
+
+        return back()->with('success', translate('User updated successfully.'));
+    }
+
+    public function sendNotification(
+        SendUserNotificationRequest $request,
+        User $user,
+        InAppNotificationService $notifications
+    ) {
+        $validated = $request->validated();
+        $scheduledAt = filled($validated['scheduled_at'] ?? null)
+            ? CarbonImmutable::parse($validated['scheduled_at'])
+            : null;
+        $deliverVia = $validated['deliver_via'];
+        $payload = [
+            'title' => $validated['title'],
+            'message' => $validated['message'],
+            'level' => $validated['level'],
+            'category' => 'admin_message',
+            'action_url' => $validated['action_url'] ?? null,
+            'action_label' => $validated['action_label'] ?? null,
+            'meta' => [
+                'sent_by_admin_id' => auth('admin')->id(),
+                'deliver_via' => $deliverVia,
+                'scheduled_at' => $scheduledAt?->toISOString(),
+            ],
+        ];
+
+        if (in_array($deliverVia, ['in_app', 'in_app_email'], true)) {
+            $notifications->send($user, $payload, $scheduledAt !== null, $scheduledAt);
+        }
+
+        if (in_array($deliverVia, ['email', 'in_app_email'], true)) {
+            $dispatch = SendAdminNotificationEmail::dispatch($user->id, [
+                'title' => $validated['title'],
+                'message' => $validated['message'],
+                'action_url' => $validated['action_url'] ?? null,
+                'action_label' => $validated['action_label'] ?? null,
+            ])->onQueue('emails');
+
+            if ($scheduledAt) {
+                $dispatch->delay($scheduledAt);
+            }
+        }
+
+        return back()->with('success', $scheduledAt
+            ? translate('Notification scheduled for :name.', ['name' => $user->name])
+            : translate('Notification queued for :name.', ['name' => $user->name]));
     }
 
     /**
@@ -106,7 +161,7 @@ class UserManagementController extends Controller
             case 'add_credits':
                 $amount = (float) $request->value;
                 foreach ($users->get() as $user) {
-                    $user->addCredits($amount, 'admin_add', 'Credits added by Administrator');
+                    $user->addCredits($amount, 'admin_add', translate('Credits added by Administrator'));
                 }
                 break;
             case 'delete':
@@ -114,7 +169,7 @@ class UserManagementController extends Controller
                 break;
         }
 
-        return back()->with('success', 'Bulk action completed.');
+        return back()->with('success', translate('Bulk action completed.'));
     }
 
     /**
@@ -128,7 +183,7 @@ class UserManagementController extends Controller
         // Log in as user in web guard
         Auth::guard('web')->login($user);
 
-        return redirect()->route('dashboard')->with('success', "Now impersonating {$user->name}");
+        return redirect()->route('dashboard')->with('success', translate('Now impersonating :name', ['name' => $user->name]));
     }
 
     /**
@@ -139,7 +194,7 @@ class UserManagementController extends Controller
         session()->forget('admin_impersonator_id');
         Auth::guard('web')->logout();
 
-        return redirect()->route('admin.dashboard')->with('success', 'Stopped impersonation.');
+        return redirect()->route('admin.dashboard')->with('success', translate('Stopped impersonation.'));
     }
 
     /**

@@ -182,7 +182,7 @@ const submit = () => {
                     <div class="grid grid-cols-2 gap-5">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Name *</label>
-                            <input v-model="form.name" @input="autoSlug" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" placeholder="Blog Post Writer" />
+                            <input v-model="form.name" @input="autoSlug" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="$t('Blog Post Writer')" />
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Slug *</label>
@@ -191,7 +191,7 @@ const submit = () => {
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Description *</label>
-                        <textarea v-model="form.description" rows="2" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" placeholder="Generate professional blog posts..." />
+                        <textarea v-model="form.description" rows="2" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="$t('Generate professional blog posts...')" />
                     </div>
                     <div class="grid grid-cols-3 gap-5">
                         <div>
@@ -249,12 +249,12 @@ const submit = () => {
                 <div v-show="activeTab === 'prompts'" class="space-y-5">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">System Prompt</label>
-                        <textarea v-model="form.prompt_system" rows="5" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" placeholder="You are a professional writer..." />
+                        <textarea v-model="form.prompt_system" rows="5" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" :placeholder="$t('You are a professional writer...')" />
                         <p class="text-xs text-gray-400 mt-1">Instructions for the AI's behavior and persona.</p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">User Prompt Template</label>
-                        <textarea v-model="form.prompt_user" rows="5" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" placeholder="Write a blog post about {topic}..." />
+                        <textarea v-model="form.prompt_user" rows="5" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" :placeholder="$t('Write a blog post about {topic}...')" />
                         <p class="text-xs text-gray-400 mt-1">Use <code class="text-primary-500">{field_key}</code> for dynamic field placeholders.</p>
                     </div>
                     <div class="grid grid-cols-3 gap-5">
@@ -275,7 +275,7 @@ const submit = () => {
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Model Override</label>
-                            <input v-model="form.model_override" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" placeholder="Leave empty for default" />
+                            <input v-model="form.model_override" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono" :placeholder="$t('Leave empty for default')" />
                         </div>
                     </div>
                 </div>
@@ -291,7 +291,7 @@ const submit = () => {
                         </div>
                         <div class="grid grid-cols-4 gap-3">
                             <input v-model="field.name" @input="field.key = field.name" type="text" placeholder="name" class="px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm font-mono" />
-                            <input v-model="field.label" type="text" placeholder="Label" class="px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
+                            <input v-model="field.label" type="text" :placeholder="$t('Label')" class="px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
                             <select v-model="field.type" class="px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm">
                                 <option v-for="type in fieldTypes" :key="type" :value="type">{{ type }}</option>
                             </select>
@@ -310,7 +310,7 @@ const submit = () => {
                 <div v-show="activeTab === 'content'" class="space-y-5">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">About Content</label>
-                        <textarea v-model="form.about_content" rows="4" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" placeholder="Describe what this tool does..." />
+                        <textarea v-model="form.about_content" rows="4" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="$t('Describe what this tool does...')" />
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">How It Works</label>
@@ -322,9 +322,9 @@ const submit = () => {
                             <div class="grid gap-3 md:grid-cols-[80px_1fr_1fr]">
                                 <input v-model.number="step.step" type="number" min="1" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                                 <input v-model="step.icon" type="text" placeholder="ti-forms" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-mono dark:border-surface-700 dark:bg-surface-900" />
-                                <input v-model="step.title" type="text" placeholder="Step title" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                                <input v-model="step.title" type="text" :placeholder="$t('Step title')" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             </div>
-                            <textarea v-model="step.description" rows="2" placeholder="Short step description" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                            <textarea v-model="step.description" rows="2" :placeholder="$t('Short step description')" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                         </div>
                         <button type="button" class="text-sm font-semibold text-primary-600 hover:text-primary-700" @click="addStep">+ Add Step</button>
                     </div>
@@ -335,7 +335,7 @@ const submit = () => {
                                 <span class="text-xs font-bold uppercase text-gray-400">Example {{ Number(i) + 1 }}</span>
                                 <button type="button" class="text-xs font-semibold text-red-500 hover:text-red-600" @click="removeExample(Number(i))">Remove</button>
                             </div>
-                            <input v-model="example.title" type="text" placeholder="Example title" class="mb-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                            <input v-model="example.title" type="text" :placeholder="$t('Example title')" class="mb-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             <textarea
                                 :value="JSON.stringify(example.input || {}, null, 2)"
                                 rows="4"
@@ -343,7 +343,7 @@ const submit = () => {
                                 placeholder='{"topic":"Laravel","tone":"Professional"}'
                                 @input="updateExampleInput(example, ($event.target as HTMLTextAreaElement).value)"
                             />
-                            <textarea v-model="example.output" rows="4" placeholder="Generated output preview" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                            <textarea v-model="example.output" rows="4" :placeholder="$t('Generated output preview')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                         </div>
                         <button type="button" class="text-sm font-semibold text-primary-600 hover:text-primary-700" @click="addExample">+ Add Example</button>
                     </div>
@@ -351,8 +351,8 @@ const submit = () => {
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">FAQs</label>
                         <div v-for="(faq, i) in form.faq_items" :key="i" class="flex gap-3 mb-3">
                             <div class="flex-1 space-y-2">
-                                <input v-model="faq.question" type="text" placeholder="Question" class="w-full px-3 py-2 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
-                                <textarea v-model="faq.answer" rows="2" placeholder="Answer" class="w-full px-3 py-2 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
+                                <input v-model="faq.question" type="text" :placeholder="$t('Question')" class="w-full px-3 py-2 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
+                                <textarea v-model="faq.answer" rows="2" :placeholder="$t('Answer')" class="w-full px-3 py-2 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
                             </div>
                             <button @click="removeFaq(Number(i))" class="p-1 text-gray-400 hover:text-red-500 self-start mt-2"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
                         </div>
@@ -372,12 +372,12 @@ const submit = () => {
                 <div v-show="activeTab === 'seo'" class="space-y-5">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Meta Title</label>
-                        <input v-model="form.meta_title" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" placeholder="Leave empty for auto-generated" />
+                        <input v-model="form.meta_title" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="$t('Leave empty for auto-generated')" />
                         <p class="text-xs text-gray-400 mt-1">{{ textLength(form.meta_title) }} / 60 characters</p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Meta Description</label>
-                        <textarea v-model="form.meta_description" rows="2" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" placeholder="Leave empty for auto-generated" />
+                        <textarea v-model="form.meta_description" rows="2" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="$t('Leave empty for auto-generated')" />
                         <p class="text-xs text-gray-400 mt-1">{{ textLength(form.meta_description) }} / 155 characters</p>
                     </div>
                     <div>

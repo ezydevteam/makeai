@@ -190,7 +190,7 @@ const sourceColor: Record<string, string> = {
 </script>
 
 <template>
-    <Head title="Testimonials — Admin" />
+    <Head :title="$t('Testimonials — Admin')" />
     <AdminLayout>
         <div class="max-w-7xl mx-auto px-6 py-8">
 
@@ -316,7 +316,7 @@ const sourceColor: Record<string, string> = {
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Role</label>
-                            <input v-model="form.role" type="text" placeholder="CEO, Developer…" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                            <input v-model="form.role" type="text" :placeholder="$t('CEO, Developer…')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Company</label>
@@ -405,7 +405,7 @@ const sourceColor: Record<string, string> = {
                     </label>
                     <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Prompt <span class="text-gray-400 normal-case">(optional)</span>
-                        <textarea v-model="aiForm.prompt" rows="3" class="mt-2 w-full resize-none bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Mention target audience, product benefits, wording to avoid..."></textarea>
+                        <textarea v-model="aiForm.prompt" rows="3" class="mt-2 w-full resize-none bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500" :placeholder="$t('Mention target audience, product benefits, wording to avoid...')"></textarea>
                     </label>
                     <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                         Count

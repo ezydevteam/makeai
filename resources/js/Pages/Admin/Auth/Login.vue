@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm } from '@inertiajs/vue3'
 import { ref } from 'vue'
 
 const form = useForm({
@@ -18,7 +18,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Admin Login" />
+    <Head :title="$t('Admin Login')" />
 
     <div class="min-h-screen bg-surface-950 flex items-center justify-center p-4">
         <!-- Ambient glow -->
@@ -38,8 +38,8 @@ const submit = () => {
                         </svg>
                     </div>
                 </div>
-                <h1 class="text-2xl font-bold text-white font-heading">Admin Panel</h1>
-                <p class="text-gray-500 mt-1 text-sm">Sign in to manage MakeAI</p>
+                <h1 class="text-2xl font-bold text-white font-heading">{{ $t('Admin Panel') }}</h1>
+                <p class="text-gray-500 mt-1 text-sm">{{ $t('Sign in to manage :app', { app: $page.props.appName }) }}</p>
             </div>
 
             <!-- Login Card -->
@@ -47,7 +47,7 @@ const submit = () => {
                 <form @submit.prevent="submit" class="space-y-5">
                     <!-- Email -->
                     <div>
-                        <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">Email</label>
+                        <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">{{ $t('Email') }}</label>
                         <input
                             id="email"
                             v-model="form.email"
@@ -56,14 +56,14 @@ const submit = () => {
                             autofocus
                             autocomplete="email"
                             class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-200"
-                            placeholder="admin@makeai.com"
+                            placeholder="admin@example.com"
                         />
                         <p v-if="form.errors.email" class="mt-1.5 text-sm text-danger-500">{{ form.errors.email }}</p>
                     </div>
 
                     <!-- Password -->
                     <div>
-                        <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">Password</label>
+                        <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">{{ $t('Password') }}</label>
                         <div class="relative">
                             <input
                                 id="password"
@@ -99,8 +99,11 @@ const submit = () => {
                                 type="checkbox"
                                 class="w-4 h-4 rounded border-white/20 bg-white/5 text-primary-500 focus:ring-primary-500/50 focus:ring-offset-0"
                             />
-                            <span class="text-sm text-gray-400">Remember me</span>
+                            <span class="text-sm text-gray-400">{{ $t('Remember me') }}</span>
                         </label>
+                        <Link :href="route('admin.password.request')" class="text-sm font-medium text-primary-400 transition-colors hover:text-primary-300">
+                            {{ $t('Forgot password?') }}
+                        </Link>
                     </div>
 
                     <!-- Submit -->
@@ -113,14 +116,14 @@ const submit = () => {
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span>{{ form.processing ? 'Signing in...' : 'Sign In' }}</span>
+                        <span>{{ form.processing ? $t('Signing in...') : $t('Sign In') }}</span>
                     </button>
                 </form>
             </div>
 
             <!-- Footer -->
             <p class="text-center mt-6 text-xs text-gray-600">
-                &copy; 2026 MakeAI. Admin access only.
+                &copy; 2026 {{ $page.props.appName }}. {{ $t('Admin access only.') }}
             </p>
         </div>
     </div>

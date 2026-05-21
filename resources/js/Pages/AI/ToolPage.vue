@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import DynamicForm, { type ToolField } from '@/Components/AI/DynamicForm.vue'
 import OutputPanel from '@/Components/AI/OutputPanel.vue'
+import FavoriteButton from '@/Components/FavoriteButton.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useStream } from '@/Composables/useStream'
@@ -35,6 +36,8 @@ interface ToolTemplate {
     show_faqs: boolean
     show_reviews: boolean
     show_related_tools?: boolean
+    favorites_count?: number
+    is_favorited?: boolean
     toolCategory?: { name: string; slug: string; icon?: string; color?: string }
 }
 
@@ -307,11 +310,11 @@ const submitReview = async () => {
                         <i :class="[template.icon || 'ti-wand', 'text-8xl']" :style="{ color: template.color || '#10b981' }"></i>
                     </div>
 
-                    <div class="flex items-center gap-4 mb-6">
+                    <div class="mb-6 flex items-start gap-4">
                         <div class="w-12 h-12 rounded-xl flex items-center justify-center border shrink-0" :style="{ background: (template.color || '#10b981') + '15', borderColor: (template.color || '#10b981') + '30' }">
                             <i :class="[template.icon || 'ti-wand', 'text-xl']" :style="{ color: template.color || '#10b981' }"></i>
                         </div>
-                        <div>
+                        <div class="min-w-0 flex-1">
                             <h1 class="text-lg font-bold text-white">{{ template.name }}</h1>
                             <div class="flex flex-wrap items-center gap-2 mt-1">
                                 <span v-if="template.toolCategory" class="text-xs text-gray-400 inline-flex items-center gap-1">
@@ -322,6 +325,14 @@ const submitReview = async () => {
                                 <span v-else class="px-1.5 py-0.5 bg-primary-500/10 text-primary-300 text-[10px] font-bold uppercase rounded border border-primary-500/20">Free</span>
                             </div>
                         </div>
+                        <FavoriteButton
+                            model-type="ai_templates"
+                            :model-id="template.id"
+                            :is-favorited="Boolean(template.is_favorited)"
+                            :count="template.favorites_count"
+                            show-count
+                            size="sm"
+                        />
                     </div>
 
                     <p class="text-sm text-gray-400 mb-6 leading-relaxed">{{ template.description }}</p>

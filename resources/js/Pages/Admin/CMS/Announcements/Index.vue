@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { useTranslate } from '@/Composables/useTranslate'
+import { useDateFormat } from '@/Composables/useDateFormat'
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
 
@@ -25,6 +27,8 @@ interface Announcement {
 }
 
 const props = defineProps<{ announcements: Announcement[] }>()
+const { t } = useTranslate()
+const { formatDate } = useDateFormat()
 
 const showForm = ref(false)
 const editingId = ref<number | null>(null)
@@ -91,7 +95,7 @@ const submit = () => {
 }
 
 const remove = (id: number) => {
-    if (!confirm('Delete this announcement?')) return
+    if (!confirm(t('Delete this announcement?'))) return
     router.delete(route('admin.announcements.delete', { announcement: id }), { preserveScroll: true })
 }
 
@@ -113,7 +117,7 @@ const typeColor: Record<string, string> = {
 </script>
 
 <template>
-    <Head title="Announcements — Admin" />
+    <Head :title="$t('Announcements — Admin')" />
     <AdminLayout>
         <div class="max-w-7xl mx-auto px-6 py-8">
 
@@ -184,8 +188,8 @@ const typeColor: Record<string, string> = {
                     <div class="text-xs text-gray-400 flex flex-col gap-1 bg-gray-50 dark:bg-surface-800 p-3 rounded-xl">
                         <div class="flex justify-between"><span>Audience:</span> <span class="text-gray-700 dark:text-gray-300 capitalize">{{ a.target_audience }}</span></div>
                         <div class="flex justify-between"><span>Frequency:</span> <span class="text-gray-700 dark:text-gray-300 capitalize">{{ a.show_frequency }}</span></div>
-                        <div v-if="a.starts_at" class="flex justify-between"><span>Starts:</span> <span class="text-gray-700 dark:text-gray-300">{{ new Date(a.starts_at).toLocaleDateString() }}</span></div>
-                        <div v-if="a.ends_at" class="flex justify-between"><span>Ends:</span> <span class="text-gray-700 dark:text-gray-300">{{ new Date(a.ends_at).toLocaleDateString() }}</span></div>
+                        <div v-if="a.starts_at" class="flex justify-between"><span>{{ t('Starts:') }}</span> <span class="text-gray-700 dark:text-gray-300">{{ formatDate(a.starts_at) }}</span></div>
+                        <div v-if="a.ends_at" class="flex justify-between"><span>{{ t('Ends:') }}</span> <span class="text-gray-700 dark:text-gray-300">{{ formatDate(a.ends_at) }}</span></div>
                     </div>
 
                     <!-- Actions -->

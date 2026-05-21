@@ -3,7 +3,7 @@
     "brainsync": {
       "command": "node",
       "args": [
-        "c:\\Users\\Qbits\\.antigravity\\extensions\\dawoodahmad.brainsync-3.0.12-universal\\dist\\mcp-server.js"
+        "c:\\Users\\Qbits\\.antigravity-ide\\extensions\\dawoodahmad.brainsync-3.0.12-universal\\dist\\mcp-server.js"
       ],
       "env": {
         "BRAINSYNC_ENV_FILE": "C:\\Users\\Qbits\\.bsync_core\\makeai\\mcp-secret-env.json"

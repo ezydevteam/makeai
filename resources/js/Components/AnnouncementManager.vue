@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useDateFormat } from '@/Composables/useDateFormat'
 
 interface Announcement {
     id: number
@@ -30,6 +31,7 @@ interface HeaderCoupon {
 
 const page = usePage()
 const { t } = useTranslate()
+const { formatDate } = useDateFormat()
 const now = ref(Date.now())
 let nowTimer: number | null = null
 const allAnnouncements = computed(() => (page.props.announcements as Announcement[]) || [])
@@ -43,8 +45,7 @@ const headerCouponVisible = computed(() => {
 const headerCouponEndingDate = computed(() => {
     if (!headerCoupon.value?.expires_at) return null
 
-    return new Intl.DateTimeFormat(String(page.props.locale || undefined), { dateStyle: 'medium' })
-        .format(new Date(headerCoupon.value.expires_at))
+    return formatDate(headerCoupon.value.expires_at)
 })
 
 const activeTopbars = ref<Announcement[]>([])
@@ -171,7 +172,7 @@ onUnmounted(() => {
                 </a>
             </div>
             <button @click="dismiss(banner)" type="button" class="flex-none p-1 focus-visible:outline-offset-[-4px] opacity-80 hover:opacity-100 transition-opacity">
-                <span class="sr-only">Dismiss</span>
+                <span class="sr-only">{{ t('Dismiss') }}</span>
                 <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
             </button>
         </div>
@@ -188,7 +189,7 @@ onUnmounted(() => {
                         <transition enter-active-class="ease-out duration-300" enter-from-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" enter-to-class="opacity-100 translate-y-0 sm:scale-100" leave-active-class="ease-in duration-200" leave-from-class="opacity-100 translate-y-0 sm:scale-100" leave-to-class="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95">
                             <div v-if="popupVisible" class="relative transform overflow-hidden rounded-2xl text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg" :style="{ backgroundColor: showPopup.bg_color || '#ffffff', color: showPopup.text_color || '#111827' }">
                                 <button @click="dismiss(showPopup)" type="button" class="absolute right-4 top-4 rounded-full p-2 hover:bg-black/10 transition-colors z-10" :style="{ color: showPopup.text_color || '#111827' }">
-                                    <span class="sr-only">Close</span>
+                                    <span class="sr-only">{{ t('Close') }}</span>
                                     <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
                                 </button>
                                 

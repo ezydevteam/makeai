@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiTemplate;
 use App\Models\AiToolCategory;
 use App\Models\ToolReview;
+use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -56,10 +57,14 @@ class AiTemplateController extends Controller
         $data['usage_examples'] = isset($data['usage_examples']) ? json_encode($data['usage_examples']) : null;
         $data['faq_items'] = isset($data['faq_items']) ? json_encode($data['faq_items']) : null;
 
-        AiTemplate::create($data);
+        $template = AiTemplate::create($data);
+
+        if ($template->is_active) {
+            app(NotificationEventService::class)->newToolLaunched($template);
+        }
 
         return redirect()->route('admin.ai.templates.index')
-            ->with('success', 'Template created successfully.');
+            ->with('success', translate('Template created successfully.'));
     }
 
     public function edit(AiTemplate $template)
@@ -85,9 +90,15 @@ class AiTemplateController extends Controller
         $data['usage_examples'] = isset($data['usage_examples']) ? json_encode($data['usage_examples']) : null;
         $data['faq_items'] = isset($data['faq_items']) ? json_encode($data['faq_items']) : null;
 
+        $wasActive = $template->is_active;
+
         $template->update($data);
 
-        return back()->with('success', 'Template updated successfully.');
+        if (! $wasActive && $template->is_active) {
+            app(NotificationEventService::class)->newToolLaunched($template);
+        }
+
+        return back()->with('success', translate('Template updated successfully.'));
     }
 
     public function destroy(AiTemplate $template)
@@ -95,7 +106,7 @@ class AiTemplateController extends Controller
         $template->delete();
 
         return redirect()->route('admin.ai.templates.index')
-            ->with('success', 'Template deleted.');
+            ->with('success', translate('Template deleted.'));
     }
 
     /**
@@ -105,7 +116,11 @@ class AiTemplateController extends Controller
     {
         $template->update(['is_active' => ! $template->is_active]);
 
-        return back()->with('success', $template->is_active ? 'Template activated.' : 'Template deactivated.');
+        if ($template->is_active) {
+            app(NotificationEventService::class)->newToolLaunched($template);
+        }
+
+        return back()->with('success', $template->is_active ? translate('Template activated.') : translate('Template deactivated.'));
     }
 
     /**
@@ -124,7 +139,7 @@ class AiTemplateController extends Controller
             $review->update(['admin_reply' => $request->admin_reply]);
         }
 
-        return back()->with('success', 'Review '.$action.'d.');
+        return back()->with('success', translate('Review :action.', ['action' => $action]));
     }
 
     private function validateTemplate(Request $request, ?int $ignoreId = null): array

@@ -71,6 +71,6 @@ class SidebarBuilderController extends Controller
             ['value' => json_encode($request->only(['blocks', 'position', 'sticky']))]
         );
 
-        return back()->with('success', 'Sidebar configuration updated successfully.');
+        return back()->with('success', translate('Sidebar configuration updated successfully.'));
     }
 }

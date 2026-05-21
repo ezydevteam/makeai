@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             $table->string('code', 10)->unique();       // en, bn, ar
             $table->string('name', 100);                 // English, বাংলা
-            $table->string('flag', 50)->nullable();      // emoji or image path
+            $table->string('flag')->nullable();          // uploaded public image path
             $table->boolean('is_rtl')->default(false);
             $table->boolean('is_default')->default(false)->index();
             $table->boolean('is_active')->default(true)->index();

@@ -86,14 +86,15 @@ class TemplateController extends Controller
         $template = AiTemplate::where('slug', $slug)
             ->where('is_active', true)
             ->with(['toolCategory:id,name,slug,icon,color'])
+            ->withCount('favorites')
             ->firstOrFail();
 
         if ($this->toolAccess->requiresAuth($template) && ! auth()->check()) {
-            return redirect()->route('login')->with('error', 'You must be logged in to access this tool.');
+            return redirect()->route('login')->with('error', translate('You must be logged in to access this tool.'));
         }
 
         if ($template->isProRequired() && ! auth()->user()?->isPro()) {
-            return redirect()->back()->with('error', 'This tool requires a Pro plan. Please upgrade to continue.');
+            return redirect()->back()->with('error', translate('This tool requires a Pro plan. Please upgrade to continue.'));
         }
 
         // Get SEO meta + schemas
@@ -131,6 +132,10 @@ class TemplateController extends Controller
         $safeTemplate = $this->toolCatalog->toolBySlug($template->slug);
         $safeTemplate['toolCategory'] = $safeTemplate['category'];
         $safeTemplate['category'] = $safeTemplate['category_key'];
+        $safeTemplate['favorites_count'] = $template->favorites_count;
+        $safeTemplate['is_favorited'] = auth()->check()
+            ? $template->favorites()->where('user_id', auth()->id())->exists()
+            : false;
 
         return Inertia::render('AI/ToolPage', [
             'template' => $safeTemplate,

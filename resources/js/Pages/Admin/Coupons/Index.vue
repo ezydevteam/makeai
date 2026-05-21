@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { useNumberFormat } from '@/Composables/useNumberFormat'
 
 interface PlanOption { id: number; name: string }
 type CouponUserLimit = 'all' | 'active' | 'inactive' | 'free' | 'pro' | 'recent_30_days'
@@ -28,6 +29,8 @@ const props = defineProps<{
     plans: PlanOption[]
 }>()
 
+const { formatCurrency } = useNumberFormat()
+
 const form = useForm({
     code: '',
     type: 'percent',
@@ -52,6 +55,10 @@ const userLimitOptions: { value: CouponUserLimit; label: string; description: st
     { value: 'recent_30_days', label: 'Recently joined', description: 'Users who joined in the last 30 days.' },
 ]
 const userLimitLabel = (limit: CouponUserLimit) => userLimitOptions.find((option) => option.value === limit)?.label ?? 'All users'
+const discountLabel = (coupon: Coupon) => coupon.type === 'percent'
+    ? `${coupon.value}%`
+    : formatCurrency(Number(coupon.value))
+
 const toggleHeader = (coupon: Coupon) => {
     router.post(route('admin.coupons.header', coupon.id), {}, { preserveScroll: true })
 }
@@ -92,7 +99,7 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Coupons" />
+    <Head :title="$t('Coupons')" />
 
     <AdminLayout>
         <div class="mx-auto max-w-7xl px-6 py-8">
@@ -195,7 +202,7 @@ const submit = () => {
                         <tbody>
                             <tr v-for="coupon in coupons.data" :key="coupon.id" class="border-t border-gray-100">
                                 <td class="px-4 py-3 font-bold">{{ coupon.code }}</td>
-                                <td class="px-4 py-3">{{ coupon.type === 'percent' ? `${coupon.value}%` : coupon.value }}</td>
+                                <td class="px-4 py-3">{{ discountLabel(coupon) }}</td>
                                 <td class="px-4 py-3">{{ coupon.plan?.name || 'All plans' }}</td>
                                 <td class="px-4 py-3">{{ userLimitLabel(coupon.user_limit) }}</td>
                                 <td class="px-4 py-3">{{ coupon.used_count }} / {{ coupon.max_uses || '∞' }}</td>

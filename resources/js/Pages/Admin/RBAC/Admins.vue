@@ -2,12 +2,16 @@
 import { ref } from 'vue';
 import { Head, useForm, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { useDateFormat } from '@/Composables/useDateFormat';
+import { useTranslate } from '@/Composables/useTranslate';
 
 const props = defineProps<{
     admins: any;
     roles: any[];
     filters: any;
 }>();
+const { t } = useTranslate();
+const { formatDate } = useDateFormat();
 
 const showModal = ref(false);
 const isEditing = ref(false);
@@ -63,7 +67,7 @@ const submit = () => {
 };
 
 const deleteAdmin = (admin: any) => {
-    if (confirm(`Are you sure you want to delete administrator ${admin.name}?`)) {
+    if (confirm(t('Are you sure you want to delete administrator :name?', { name: admin.name }))) {
         router.delete(route('admin.admins.delete', admin.id), {
             preserveScroll: true
         });
@@ -72,7 +76,7 @@ const deleteAdmin = (admin: any) => {
 </script>
 
 <template>
-    <Head title="Administrators" />
+    <Head :title="$t('Administrators')" />
     <AdminLayout>
         <template #title>Administrators</template>
 
@@ -121,7 +125,7 @@ const deleteAdmin = (admin: any) => {
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                    {{ admin.last_login_at ? new Date(admin.last_login_at).toLocaleDateString() : 'Never' }}
+                                    {{ admin.last_login_at ? formatDate(admin.last_login_at) : t('Never') }}
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">

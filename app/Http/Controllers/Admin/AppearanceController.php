@@ -29,6 +29,6 @@ class AppearanceController extends Controller
             );
         }
 
-        return back()->with('success', 'Appearance settings updated.');
+        return back()->with('success', translate('Appearance settings updated.'));
     }
 }

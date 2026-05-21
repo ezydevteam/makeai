@@ -52,7 +52,7 @@ class RoleController extends Controller
             $role->permissions()->sync($validated['permissions']);
         }
 
-        return back()->with('success', 'Role created successfully.');
+        return back()->with('success', translate('Role created successfully.'));
     }
 
     /**
@@ -63,7 +63,7 @@ class RoleController extends Controller
         abort_unless(auth('admin')->user()->hasPermission('roles.edit'), 403);
 
         if ($role->is_system) {
-            return back()->with('error', 'System roles cannot be modified.');
+            return back()->with('error', translate('System roles cannot be modified.'));
         }
 
         $validated = $request->validate([
@@ -85,7 +85,7 @@ class RoleController extends Controller
             $role->permissions()->detach();
         }
 
-        return back()->with('success', 'Role updated successfully.');
+        return back()->with('success', translate('Role updated successfully.'));
     }
 
     /**
@@ -96,15 +96,15 @@ class RoleController extends Controller
         abort_unless(auth('admin')->user()->hasPermission('roles.delete'), 403);
 
         if ($role->is_system) {
-            return back()->with('error', 'System roles cannot be deleted.');
+            return back()->with('error', translate('System roles cannot be deleted.'));
         }
 
         if ($role->admins()->count() > 0) {
-            return back()->with('error', 'Cannot delete role because it is assigned to one or more administrators.');
+            return back()->with('error', translate('Cannot delete role because it is assigned to one or more administrators.'));
         }
 
         $role->delete();
 
-        return back()->with('success', 'Role deleted successfully.');
+        return back()->with('success', translate('Role deleted successfully.'));
     }
 }

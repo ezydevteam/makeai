@@ -55,7 +55,7 @@ class AiManagementController extends Controller
         Setting::setValue('default_max_tokens', $data['max_tokens'], 'integer', 'ai');
         Setting::setValue('show_tool_credit_costs', $data['show_tool_credit_costs'], 'boolean', 'ai');
 
-        return back()->with('success', 'AI settings updated successfully.');
+        return back()->with('success', translate('AI settings updated successfully.'));
     }
 
     /**
@@ -95,7 +95,7 @@ class AiManagementController extends Controller
             'is_active' => true,
         ]);
 
-        return back()->with('success', 'API Key added successfully.');
+        return back()->with('success', translate('API Key added successfully.'));
     }
 
     /**
@@ -105,7 +105,7 @@ class AiManagementController extends Controller
     {
         $key->delete();
 
-        return back()->with('success', 'API Key deleted.');
+        return back()->with('success', translate('API Key deleted.'));
     }
 
     /**
@@ -123,7 +123,7 @@ class AiManagementController extends Controller
 
         $model->update($data);
 
-        return back()->with('success', "{$model->name} updated.");
+        return back()->with('success', translate(':model updated.', ['model' => $model->name]));
     }
 
     /**

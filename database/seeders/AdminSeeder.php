@@ -83,6 +83,7 @@ class AdminSeeder extends Seeder
             // Content
             ['slug' => 'content.pages', 'name' => 'Manage Pages', 'group' => 'content'],
             ['slug' => 'content.blog', 'name' => 'Manage Blog', 'group' => 'content'],
+            ['slug' => 'content.comments', 'name' => 'Manage Comments', 'group' => 'content'],
             ['slug' => 'content.faq', 'name' => 'Manage FAQ', 'group' => 'content'],
             ['slug' => 'content.testimonials', 'name' => 'Manage Testimonials', 'group' => 'content'],
 
@@ -146,7 +147,7 @@ class AdminSeeder extends Seeder
             'users.view', 'users.create', 'users.edit', 'users.credits',
             'settings.general', 'settings.ai', 'settings.payment', 'settings.mail',
             'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
-            'content.pages', 'content.blog', 'content.faq', 'content.testimonials',
+            'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
             'plans.view', 'plans.create', 'plans.edit',
             'payments.view', 'payments.gateways',
             'translations.view', 'translations.edit',
@@ -166,7 +167,7 @@ class AdminSeeder extends Seeder
         $contentManager->syncPermissionsBySlug([
             'dashboard.view',
             'ai.templates',
-            'content.pages', 'content.blog', 'content.faq', 'content.testimonials',
+            'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
             'translations.view', 'translations.edit',
         ]);
 

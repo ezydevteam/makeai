@@ -10,6 +10,7 @@ use App\Models\PaymentGateway;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\NotificationEventService;
 use App\Services\Payment\PaymentActivationService;
 use App\Services\Payment\PaymentGatewayManager;
 use App\Services\Pricing\PlanPriceResolver;
@@ -134,6 +135,8 @@ class CheckoutController extends Controller
         ]);
 
         if ($gateway->slug === 'bank_transfer') {
+            app(NotificationEventService::class)->transactionPending($payment);
+
             return redirect()->route('checkout.bank.show', $payment);
         }
 
@@ -168,6 +171,8 @@ class CheckoutController extends Controller
         if ($gateway->slug === '2checkout') {
             return $this->createTwoCheckoutUrl($request, $payment, $plan, $gateway);
         }
+
+        app(NotificationEventService::class)->transactionPending($payment);
 
         return redirect()->route('checkout.pending', $payment)
             ->with('info', translate(':gateway payment session is pending gateway integration.', ['gateway' => $gateway->name]));
@@ -251,6 +256,8 @@ class CheckoutController extends Controller
         ];
 
         $payment->update(['metadata' => $metadata]);
+
+        app(NotificationEventService::class)->transactionPending($payment);
 
         return redirect()->route('checkout.pending', $payment)
             ->with('success', translate('Payment proof uploaded. Your transaction is pending review.'));

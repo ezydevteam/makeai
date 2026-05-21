@@ -38,10 +38,10 @@ class ThemeAddonController extends Controller
     public function activateTheme(Request $request, string $slug)
     {
         if ($this->themeService->activate($slug)) {
-            return back()->with('success', "Theme '{$slug}' activated successfully.");
+            return back()->with('success', translate('Theme :theme activated successfully.', ['theme' => $slug]));
         }
 
-        return back()->with('error', 'Failed to activate theme. Check license requirements.');
+        return back()->with('error', translate('Failed to activate theme. Check license requirements.'));
     }
 
     /**
@@ -51,7 +51,7 @@ class ThemeAddonController extends Controller
     {
         $config = $this->themeService->getThemeConfig($slug);
         if (! $config) {
-            return back()->with('error', 'Theme not found.');
+            return back()->with('error', translate('Theme not found.'));
         }
 
         return Inertia::render('Admin/ThemeSettings', [
@@ -67,12 +67,12 @@ class ThemeAddonController extends Controller
     {
         $config = $this->themeService->getThemeConfig($slug);
         if (! $config) {
-            return back()->with('error', 'Theme not found.');
+            return back()->with('error', translate('Theme not found.'));
         }
 
         $this->themeService->saveThemeSettings($slug, $request->except('_token'));
 
-        return back()->with('success', 'Theme settings saved.');
+        return back()->with('success', translate('Theme settings saved.'));
     }
 
     // ─── Addons ──────────────────────────────────────────
@@ -93,10 +93,10 @@ class ThemeAddonController extends Controller
     public function activateAddon(Request $request, string $slug)
     {
         if ($this->addonService->activate($slug)) {
-            return back()->with('success', "Addon '{$slug}' activated successfully.");
+            return back()->with('success', translate('Addon :addon activated successfully.', ['addon' => $slug]));
         }
 
-        return back()->with('error', 'Failed to activate addon. Check license requirements.');
+        return back()->with('error', translate('Failed to activate addon. Check license requirements.'));
     }
 
     /**
@@ -106,7 +106,7 @@ class ThemeAddonController extends Controller
     {
         $this->addonService->deactivate($slug);
 
-        return back()->with('success', "Addon '{$slug}' deactivated.");
+        return back()->with('success', translate('Addon :addon deactivated.', ['addon' => $slug]));
     }
 
     /**
@@ -116,7 +116,7 @@ class ThemeAddonController extends Controller
     {
         $config = $this->addonService->getAddonConfig($slug);
         if (! $config) {
-            return back()->with('error', 'Addon not found.');
+            return back()->with('error', translate('Addon not found.'));
         }
 
         return Inertia::render('Admin/AddonSettings', [
@@ -132,11 +132,11 @@ class ThemeAddonController extends Controller
     {
         $config = $this->addonService->getAddonConfig($slug);
         if (! $config) {
-            return back()->with('error', 'Addon not found.');
+            return back()->with('error', translate('Addon not found.'));
         }
 
         $this->addonService->saveAddonSettings($slug, $request->except('_token'));
 
-        return back()->with('success', 'Addon settings saved.');
+        return back()->with('success', translate('Addon settings saved.'));
     }
 }

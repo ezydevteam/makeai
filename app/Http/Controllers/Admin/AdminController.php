@@ -56,7 +56,7 @@ class AdminController extends Controller
 
         Admin::create($validated);
 
-        return back()->with('success', 'Administrator created successfully.');
+        return back()->with('success', translate('Administrator created successfully.'));
     }
 
     /**
@@ -68,7 +68,7 @@ class AdminController extends Controller
 
         // Prevent super-admin modification by non-super-admins
         if ($admin->isSuperAdmin() && ! auth('admin')->user()->isSuperAdmin()) {
-            return back()->with('error', 'You cannot modify a Super Admin.');
+            return back()->with('error', translate('You cannot modify a Super Admin.'));
         }
 
         $validated = $request->validate([
@@ -92,13 +92,13 @@ class AdminController extends Controller
             })->where('is_active', true)->count();
 
             if ($superAdminCount <= 1) {
-                return back()->with('error', 'Cannot modify the role or deactivate the last active Super Admin.');
+                return back()->with('error', translate('Cannot modify the role or deactivate the last active Super Admin.'));
             }
         }
 
         $admin->update($validated);
 
-        return back()->with('success', 'Administrator updated successfully.');
+        return back()->with('success', translate('Administrator updated successfully.'));
     }
 
     /**
@@ -110,16 +110,16 @@ class AdminController extends Controller
 
         // Prevent super admin deletion by non-super admin
         if ($admin->isSuperAdmin() && ! auth('admin')->user()->isSuperAdmin()) {
-            return back()->with('error', 'You cannot delete a Super Admin.');
+            return back()->with('error', translate('You cannot delete a Super Admin.'));
         }
 
         // Prevent deleting yourself
         if (auth('admin')->id() === $admin->id) {
-            return back()->with('error', 'You cannot delete your own account.');
+            return back()->with('error', translate('You cannot delete your own account.'));
         }
 
         $admin->delete();
 
-        return back()->with('success', 'Administrator deleted successfully.');
+        return back()->with('success', translate('Administrator deleted successfully.'));
     }
 }

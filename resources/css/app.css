@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '@tabler/icons-webfont/dist/tabler-icons.css';
 
 /* =============================================
    MakeAI — Design System
@@ -6,6 +7,7 @@
 
 /* Dark Mode — must be top-level for Tailwind v4 */
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant rtl (&:where([dir="rtl"], [dir="rtl"] *));
 
 /* Custom Theme Variables */
 @theme {
@@ -56,6 +58,48 @@
 /* Support both light and dark color schemes */
 :root {
     color-scheme: light dark;
+    --start: left;
+    --end: right;
+}
+
+[dir="rtl"] {
+    --start: right;
+    --end: left;
+}
+
+/* RTL compatibility for legacy utility-heavy admin pages. */
+[dir="rtl"] .text-left { text-align: right; }
+[dir="rtl"] .text-right { text-align: left; }
+[dir="rtl"] .left-0 { left: auto; right: 0; }
+[dir="rtl"] .right-0 { right: auto; left: 0; }
+[dir="rtl"] .left-3 { left: auto; right: 0.75rem; }
+[dir="rtl"] .right-3 { right: auto; left: 0.75rem; }
+[dir="rtl"] .left-4 { left: auto; right: 1rem; }
+[dir="rtl"] .right-4 { right: auto; left: 1rem; }
+[dir="rtl"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .mr-1 { margin-right: 0; margin-left: 0.25rem; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+[dir="rtl"] .ml-3 { margin-left: 0; margin-right: 0.75rem; }
+[dir="rtl"] .mr-3 { margin-right: 0; margin-left: 0.75rem; }
+[dir="rtl"] .ml-4 { margin-left: 0; margin-right: 1rem; }
+[dir="rtl"] .mr-4 { margin-right: 0; margin-left: 1rem; }
+[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .mr-auto { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .pl-4 { padding-left: 0; padding-right: 1rem; }
+[dir="rtl"] .pr-4 { padding-right: 0; padding-left: 1rem; }
+[dir="rtl"] .pl-10 { padding-left: 1rem; padding-right: 2.5rem; }
+[dir="rtl"] .pr-10 { padding-right: 1rem; padding-left: 2.5rem; }
+[dir="rtl"] .border-l,
+[dir="rtl"] .border-l-2 {
+    border-left-width: 0;
+    border-right-width: 1px;
+}
+
+[dir="rtl"] .border-r,
+[dir="rtl"] .border-r-2 {
+    border-right-width: 0;
+    border-left-width: 1px;
 }
 
 body {

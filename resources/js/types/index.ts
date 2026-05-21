@@ -36,6 +36,37 @@ export interface FlashMessages {
     info: string | null
 }
 
+export interface LocaleInfo {
+    code: string
+    name: string
+    flag?: string | null
+    is_rtl: boolean
+    date_format?: string | null
+    time_format?: string | null
+    currency_position?: CurrencyPosition | null
+    number_format?: {
+        decimal?: string
+        thousands?: string
+        system?: string
+    }
+}
+
+export interface LanguageOption {
+    code: string
+    name: string
+    flag?: string | null
+    is_rtl?: boolean
+}
+
+export interface CurrencyInfo {
+    code: string
+    symbol?: string | null
+    position?: CurrencyPosition | null
+    decimals?: number
+}
+
+export type CurrencyPosition = 'before' | 'before_with_space' | 'after' | 'after_with_space'
+
 export interface SharedPageProps {
     auth: {
         user: User | null
@@ -51,16 +82,32 @@ export interface SharedPageProps {
         [key: string]: unknown
     }
     appName: string
-    locale:
-        | string
-        | {
-              code: string
-              direction?: 'ltr' | 'rtl'
-              [key: string]: unknown
-          }
+    locale: LocaleInfo
+    isRtl?: boolean
+    languages?: LanguageOption[]
+    currency?: CurrencyInfo
+    socialFollow?: SocialFollowPayload
+    cronStatus?: {
+        is_configured: boolean
+        last_run_at: string | null
+        setup_url: string
+    } | null
     settings?: Record<string, unknown>
     translations?: Record<string, string>
     [key: string]: unknown
+}
+
+export interface SocialFollowProfile {
+    platform: string
+    label: string
+    unit: string
+    url: string
+    count: number
+}
+
+export interface SocialFollowPayload {
+    display_mode: 'icons' | 'counts' | 'cards'
+    profiles: SocialFollowProfile[]
 }
 
 export interface PaginatedData<T> {

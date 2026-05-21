@@ -5,11 +5,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Route;
 
 class MenuItem extends Model
 {
     protected $fillable = [
-        'menu_id', 'parent_id', 'label', 'type', 'url', 'page_id', 'route_name', 'target', 'icon', 'sort_order',
+        'menu_id', 'parent_id', 'label', 'type', 'url', 'page_id', 'route_name', 'target', 'icon', 'badge_text',
+        'badge_color', 'is_active', 'requires_auth', 'mega_menu', 'mega_menu_content', 'sort_order',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'mega_menu' => 'boolean',
     ];
 
     public function menu(): BelongsTo
@@ -37,7 +44,7 @@ class MenuItem extends Model
         if ($this->type === 'page' && $this->page) {
             return route('page.show', $this->page->slug);
         }
-        if ($this->type === 'route' && $this->route_name) {
+        if ($this->type === 'route' && $this->route_name && Route::has($this->route_name)) {
             return route($this->route_name);
         }
 

@@ -2,6 +2,9 @@
 import { Head, Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
+import SocialShare from '@/Components/SocialShare.vue'
+import CommentSection from '@/Components/CommentSection.vue'
+import FavoriteButton from '@/Components/FavoriteButton.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserLayout })
@@ -11,6 +14,7 @@ declare const route: (name: string, params?: string | number) => string
 interface Author { name: string; avatar?: string | null }
 interface Taxonomy { id: number; name: string; slug: string }
 interface BlogPost {
+    id: number
     ulid: string
     title: string
     slug: string
@@ -25,14 +29,38 @@ interface BlogPost {
     show_reading_time: boolean
     show_share_buttons: boolean
     show_toc: boolean
+    allow_comments: boolean
+    favorites_count?: number
+    is_favorited?: boolean
     author: Author | null
     categories: Taxonomy[]
     tags: Taxonomy[]
 }
 
+type ShareNetwork = 'facebook' | 'x' | 'linkedin' | 'whatsapp' | 'telegram' | 'pinterest' | 'reddit' | 'email' | 'copy'
+
 const props = defineProps<{
     post: BlogPost
     relatedPosts: BlogPost[]
+    comments: {
+        data: any[]
+        links: Array<{ url: string | null; label: string; active: boolean }>
+        meta: { total: number }
+    }
+    commentSettings: {
+        enabled: boolean
+        allow_guests: boolean
+        poll_seconds: number
+    }
+    share: {
+        url: string
+        title: string
+        style: 'icon' | 'icon-label' | 'icon-count'
+        networks: ShareNetwork[]
+        urls: Partial<Record<Exclude<ShareNetwork, 'copy'>, string>>
+        counts: Partial<Record<ShareNetwork, number>>
+        show_counts: boolean
+    } | null
     schema: Record<string, unknown>
     meta: { title: string; description: string; no_index?: boolean }
 }>()
@@ -68,13 +96,34 @@ const formatDate = (value: string | null) => {
                         {{ category.name }}
                     </Link>
                 </div>
-                <h1 class="text-4xl font-bold leading-tight text-gray-900 dark:text-white">{{ post.title }}</h1>
+                <div class="flex items-start justify-between gap-4">
+                    <h1 class="text-4xl font-bold leading-tight text-gray-900 dark:text-white">{{ post.title }}</h1>
+                    <FavoriteButton
+                        model-type="blog_posts"
+                        :model-id="post.id"
+                        :is-favorited="Boolean(post.is_favorited)"
+                        :count="post.favorites_count"
+                        show-count
+                        size="md"
+                    />
+                </div>
                 <p v-if="post.excerpt" class="mt-4 text-lg text-gray-600 dark:text-gray-400">{{ post.excerpt }}</p>
                 <div class="mt-5 flex flex-wrap items-center gap-4 text-sm text-gray-500">
                     <span v-if="post.show_author && post.author">{{ post.author.name }}</span>
                     <span v-if="post.show_date">{{ formatDate(post.published_at) }}</span>
                     <span v-if="post.show_reading_time">{{ post.reading_time }} {{ t('min read') }}</span>
                 </div>
+                <SocialShare
+                    v-if="share"
+                    class="mt-6"
+                    :url="share.url"
+                    :title="share.title"
+                    :style="share.style"
+                    :networks="share.networks"
+                    :urls="share.urls"
+                    :counts="share.counts"
+                    :show-counts="share.show_counts"
+                />
             </header>
 
             <img v-if="post.featured_image" :src="post.featured_image" :alt="post.featured_image_alt || post.title" class="mb-8 aspect-[16/8] w-full rounded-xl object-cover shadow-sm">
@@ -98,6 +147,15 @@ const formatDate = (value: string | null) => {
                     </Link>
                 </div>
             </section>
+
+            <CommentSection
+                :comments="comments"
+                model-type="blog_posts"
+                :model-id="post.id"
+                :enabled="commentSettings.enabled"
+                :allow-guests="commentSettings.allow_guests"
+                :poll-seconds="commentSettings.poll_seconds"
+            />
         </div>
     </article>
 </template>

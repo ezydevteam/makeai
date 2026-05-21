@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -50,6 +51,7 @@ class PasswordResetController extends Controller
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password) {
                 $user->forceFill(['password' => $password])->save();
+                app(NotificationEventService::class)->passwordChanged($user);
             }
         );
 

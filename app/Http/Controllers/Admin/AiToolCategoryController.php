@@ -28,7 +28,7 @@ class AiToolCategoryController extends Controller
 
         AiToolCategory::create($data);
 
-        return back()->with('success', 'AI tool category created.');
+        return back()->with('success', translate('AI tool category created.'));
     }
 
     public function update(Request $request, AiToolCategory $category)
@@ -38,7 +38,7 @@ class AiToolCategoryController extends Controller
 
         $category->update($data);
 
-        return back()->with('success', 'AI tool category updated.');
+        return back()->with('success', translate('AI tool category updated.'));
     }
 
     public function destroy(AiToolCategory $category)
@@ -47,7 +47,7 @@ class AiToolCategoryController extends Controller
         $category->templates()->update(['category_id' => null]);
         $category->delete();
 
-        return back()->with('success', 'AI tool category deleted.');
+        return back()->with('success', translate('AI tool category deleted.'));
     }
 
     private function validateCategory(Request $request, ?int $ignoreId = null): array

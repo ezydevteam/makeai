@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Services\SocialService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,6 +27,10 @@ class BlogSettingsRequest extends FormRequest
             'words_per_minute' => ['required', 'integer', 'min:100', 'max:500'],
             'blog_sidebar' => ['required', 'boolean'],
             'blog_sidebar_position' => ['required', Rule::in(['right', 'left'])],
+            'social_share_networks' => ['required', 'array', 'min:1'],
+            'social_share_networks.*' => ['required', 'string', Rule::in(array_keys(SocialService::SHARE_NETWORKS))],
+            'social_share_blog_style' => ['required', 'string', Rule::in(SocialService::SHARE_STYLES)],
+            'social_share_show_counts' => ['required', 'boolean'],
         ];
     }
 }

@@ -21,7 +21,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
 
             // 2FA — TOTP (Google Authenticator)
-            $table->string('two_factor_secret', 255)->nullable();
+            $table->text('two_factor_secret')->nullable();
             $table->boolean('two_factor_enabled')->default(false);
 
             // 2FA — Email OTP

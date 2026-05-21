@@ -10,44 +10,56 @@ class Ad extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name',
+        'title',
         'type',
-        'placement',
-        'content',
-        'image_path',
+        'zone',
+        'custom_html',
+        'adsense_client',
+        'adsense_slot',
+        'adsense_format',
+        'image_url',
         'link_url',
+        'link_target',
+        'show_to',
         'is_active',
-        'starts_at',
-        'ends_at',
-        'views',
+        'start_at',
+        'end_at',
+        'impressions',
         'clicks',
+        'sort_order',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
-        'views' => 'integer',
+        'start_at' => 'datetime',
+        'end_at' => 'datetime',
+        'impressions' => 'integer',
         'clicks' => 'integer',
+        'sort_order' => 'integer',
     ];
 
     public function scopeActive($query)
     {
         return $query->where('is_active', true)
             ->where(function ($q) {
-                $q->whereNull('starts_at')->orWhere('starts_at', '<=', now());
+                $q->whereNull('start_at')->orWhere('start_at', '<=', now());
             })
             ->where(function ($q) {
-                $q->whereNull('ends_at')->orWhere('ends_at', '>=', now());
+                $q->whereNull('end_at')->orWhere('end_at', '>=', now());
             });
     }
 
     public function getCtrAttribute()
     {
-        if ($this->views === 0) {
+        if ($this->impressions === 0) {
             return 0;
         }
 
-        return round(($this->clicks / $this->views) * 100, 2);
+        return round(($this->clicks / $this->impressions) * 100, 2);
+    }
+
+    public function getDisplayTitleAttribute(): string
+    {
+        return $this->title;
     }
 }

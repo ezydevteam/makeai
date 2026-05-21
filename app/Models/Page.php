@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Page extends Model
@@ -63,6 +64,11 @@ class Page extends Model
     public function children()
     {
         return $this->hasMany(Page::class, 'parent_id')->orderBy('sort_order');
+    }
+
+    public function favorites(): MorphMany
+    {
+        return $this->morphMany(Favorite::class, 'favoriteable');
     }
 
     public function scopePublished($query)

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AffiliateController;
 use App\Http\Controllers\AI\AiController;
 use App\Http\Controllers\AI\DocumentController;
 use App\Http\Controllers\AI\GenerateController;
@@ -54,4 +55,12 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware(['web', 'auth'])->post('documents', [DocumentController::class, 'store']);
+
+    Route::middleware(['web', 'auth'])->prefix('affiliate')->group(function () {
+        Route::get('/', [AffiliateController::class, 'api']);
+        Route::get('referrals', [AffiliateController::class, 'referralsApi']);
+        Route::get('commissions', [AffiliateController::class, 'commissionsApi']);
+        Route::get('payouts', [AffiliateController::class, 'payoutsApi']);
+        Route::post('payouts', [AffiliateController::class, 'storePayout']);
+    });
 });

@@ -1,54 +1,140 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed } from 'vue'
+import { useToastr } from '@/Composables/useToastr'
+import { useTranslate } from '@/Composables/useTranslate'
 
-const props = defineProps<{
-    url: string;
-    title?: string;
-    style?: 'icon' | 'icon-label' | 'card';
-}>();
+type ShareStyle = 'icon' | 'icon-label' | 'icon-count'
+type ShareNetwork = 'facebook' | 'x' | 'linkedin' | 'whatsapp' | 'telegram' | 'pinterest' | 'reddit' | 'email' | 'copy'
 
-const shareLinks = computed(() => {
-    const u = encodeURIComponent(props.url);
-    const t = encodeURIComponent(props.title || '');
-    return [
-        { name: 'Facebook', icon: 'facebook', color: '#1877F2', url: `https://www.facebook.com/sharer/sharer.php?u=${u}` },
-        { name: 'X', icon: 'twitter', color: '#000000', url: `https://twitter.com/intent/tweet?url=${u}&text=${t}` },
-        { name: 'LinkedIn', icon: 'linkedin', color: '#0077B5', url: `https://www.linkedin.com/sharing/share-offsite/?url=${u}` },
-        { name: 'WhatsApp', icon: 'whatsapp', color: '#25D366', url: `https://api.whatsapp.com/send?text=${t}%20${u}` },
-        { name: 'Telegram', icon: 'telegram', color: '#0088cc', url: `https://t.me/share/url?url=${u}&text=${t}` },
-    ];
-});
+interface ShareLink {
+    key: ShareNetwork
+    label: string
+    url: string | null
+    external: boolean
+}
 
-const copyToClipboard = () => {
-    navigator.clipboard.writeText(props.url);
-    alert('Link copied to clipboard!');
-};
+const props = withDefaults(defineProps<{
+    url: string
+    title?: string
+    urls?: Partial<Record<Exclude<ShareNetwork, 'copy'>, string>>
+    networks?: ShareNetwork[]
+    counts?: Partial<Record<ShareNetwork, number>>
+    showCounts?: boolean
+    style?: ShareStyle
+}>(), {
+    title: '',
+    urls: () => ({}),
+    networks: () => ['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'pinterest', 'reddit', 'email', 'copy'],
+    counts: () => ({}),
+    showCounts: false,
+    style: 'icon-label',
+})
+
+const { t } = useTranslate()
+const toast = useToastr()
+
+const networkLabels: Record<ShareNetwork, string> = {
+    facebook: 'Facebook',
+    x: 'X',
+    linkedin: 'LinkedIn',
+    whatsapp: 'WhatsApp',
+    telegram: 'Telegram',
+    pinterest: 'Pinterest',
+    reddit: 'Reddit',
+    email: 'Email',
+    copy: 'Copy link',
+}
+
+const networkClasses: Record<ShareNetwork, string> = {
+    facebook: 'hover:border-blue-500 hover:bg-blue-600 hover:text-white',
+    x: 'hover:border-gray-900 hover:bg-gray-900 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-gray-950',
+    linkedin: 'hover:border-sky-700 hover:bg-sky-700 hover:text-white',
+    whatsapp: 'hover:border-emerald-500 hover:bg-emerald-500 hover:text-white',
+    telegram: 'hover:border-sky-500 hover:bg-sky-500 hover:text-white',
+    pinterest: 'hover:border-red-600 hover:bg-red-600 hover:text-white',
+    reddit: 'hover:border-orange-500 hover:bg-orange-500 hover:text-white',
+    email: 'hover:border-primary-500 hover:bg-primary-500 hover:text-white',
+    copy: 'hover:border-gray-900 hover:bg-gray-900 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-gray-950',
+}
+
+const encodedUrl = computed(() => encodeURIComponent(props.url))
+const encodedTitle = computed(() => encodeURIComponent(props.title))
+
+const fallbackUrls = computed<Record<Exclude<ShareNetwork, 'copy'>, string>>(() => ({
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl.value}`,
+    x: `https://twitter.com/intent/tweet?url=${encodedUrl.value}&text=${encodedTitle.value}`,
+    linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl.value}`,
+    whatsapp: `https://api.whatsapp.com/send?text=${encodedTitle.value}%20${encodedUrl.value}`,
+    telegram: `https://t.me/share/url?url=${encodedUrl.value}&text=${encodedTitle.value}`,
+    pinterest: `https://www.pinterest.com/pin/create/button/?url=${encodedUrl.value}&description=${encodedTitle.value}`,
+    reddit: `https://www.reddit.com/submit?url=${encodedUrl.value}&title=${encodedTitle.value}`,
+    email: `mailto:?subject=${encodedTitle.value}&body=${encodedTitle.value}%0A${encodedUrl.value}`,
+}))
+
+const shareLinks = computed<ShareLink[]>(() => props.networks
+    .filter((network) => network in networkLabels)
+    .map((network) => ({
+        key: network,
+        label: networkLabels[network],
+        url: network === 'copy' ? null : (props.urls[network] ?? fallbackUrls.value[network]),
+        external: network !== 'email' && network !== 'copy',
+    })))
+
+const showLabel = computed(() => props.style === 'icon-label')
+const showCount = (network: ShareNetwork) => props.style === 'icon-count' && props.showCounts && props.counts[network] !== undefined
+
+const copyToClipboard = async () => {
+    try {
+        await navigator.clipboard.writeText(props.url)
+        toast.success(t('Link copied to clipboard.'))
+    } catch {
+        toast.error(t('Unable to copy link.'))
+    }
+}
+
+const shareTitle = (label: string) => t('Share on :network', { network: t(label) })
 </script>
 
 <template>
-    <div class="flex flex-wrap gap-2">
-        <a v-for="link in shareLinks" :key="link.name" :href="link.url" target="_blank" :title="`Share on ${link.name}`" class="group flex items-center gap-2 p-2 rounded-xl border border-gray-100 hover:border-transparent transition-all" :style="{ '--hover-bg': link.color }">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 group-hover:bg-[var(--hover-bg)] group-hover:text-white transition-colors">
-                <svg v-if="link.icon === 'facebook'" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                <svg v-if="link.icon === 'twitter'" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.134l4.713 6.231zm-1.161 17.52h1.833L7.045 4.126H5.078z"/></svg>
-                <svg v-if="link.icon === 'linkedin'" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
-                <svg v-if="link.icon === 'whatsapp'" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-                <svg v-if="link.icon === 'telegram'" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm5.891 8.146l-1.92 9.043c-.144.64-.523.797-1.058.497l-2.924-2.155-1.412 1.358c-.156.156-.288.288-.59.288l.21-2.975 5.414-4.891c.235-.208-.052-.323-.365-.115l-6.691 4.213-2.883-.9c-.627-.196-.639-.627.13-.923l11.267-4.342c.523-.196.98.115.822.846z"/></svg>
-            </div>
-            <span v-if="style !== 'icon'" class="text-xs font-bold text-gray-700 group-hover:text-white transition-colors">{{ link.name }}</span>
-        </a>
-        <button @click="copyToClipboard" title="Copy Link" class="flex items-center gap-2 p-2 rounded-xl border border-gray-100 hover:bg-gray-900 hover:text-white transition-all group">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 group-hover:text-white">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-            </div>
-            <span v-if="style !== 'icon'" class="text-xs font-bold">Copy</span>
-        </button>
+    <div class="flex flex-wrap gap-2" :aria-label="t('Social share buttons')">
+        <template v-for="link in shareLinks" :key="link.key">
+            <button
+                v-if="link.key === 'copy'"
+                type="button"
+                :title="t('Copy link')"
+                class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm transition dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300"
+                :class="networkClasses[link.key]"
+                @click="copyToClipboard"
+            >
+                <span class="inline-flex h-5 w-5 items-center justify-center">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M16 7V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                </span>
+                <span v-if="showLabel">{{ t(link.label) }}</span>
+                <span v-if="showCount(link.key)" class="text-xs">{{ counts[link.key] }}</span>
+            </button>
+
+            <a
+                v-else
+                :href="link.url ?? '#'"
+                :target="link.external ? '_blank' : undefined"
+                :rel="link.external ? 'noopener noreferrer' : undefined"
+                :title="shareTitle(link.label)"
+                class="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 shadow-sm transition dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300"
+                :class="networkClasses[link.key]"
+            >
+                <span class="inline-flex h-5 w-5 items-center justify-center">
+                    <svg v-if="link.key === 'facebook'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M13.5 22v-8h2.7l.4-3h-3.1V9.1c0-.9.2-1.5 1.5-1.5h1.7V4.9c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1V11H7.6v3h2.7v8h3.2Z"/></svg>
+                    <svg v-else-if="link.key === 'x'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.2 2.3h3.3l-7.2 8.2 8.5 11.2h-6.7l-5.2-6.8-6 6.8H1.7l7.7-8.8L1.3 2.3h6.9l4.7 6.2 5.3-6.2Zm-1.2 17.5h1.8L7.1 4.1H5.1L17 19.8Z"/></svg>
+                    <svg v-else-if="link.key === 'linkedin'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6.9 20.5H3.5V9h3.4v11.5ZM5.2 7.4a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm15.3 13.1h-3.4v-5.6c0-1.3 0-3-1.8-3s-2.1 1.4-2.1 2.9v5.7H9.8V9h3.3v1.6h.1c.5-.9 1.6-1.9 3.4-1.9 3.6 0 4.2 2.4 4.2 5.5v6.3Z"/></svg>
+                    <svg v-else-if="link.key === 'whatsapp'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.5 3.5A11.8 11.8 0 0 0 12.1 0C5.5 0 .2 5.3.2 11.9c0 2.1.5 4.1 1.6 5.9L.1 24l6.3-1.7a11.9 11.9 0 0 0 5.7 1.5c6.6 0 11.9-5.3 11.9-11.9 0-3.2-1.2-6.2-3.5-8.4Zm-8.4 18.3c-1.8 0-3.5-.5-5-1.4l-.4-.2-3.7 1 1-3.6-.2-.4a9.8 9.8 0 0 1-1.5-5.3c0-5.4 4.4-9.9 9.9-9.9 2.6 0 5.1 1 7 2.9a9.8 9.8 0 0 1 2.9 7c0 5.5-4.5 9.9-10 9.9Zm5.4-7.4c-.3-.1-1.8-.9-2-.9-.3-.1-.5-.2-.7.1-.2.3-.8 1-.9 1.2-.2.2-.4.2-.7.1a8 8 0 0 1-2.4-1.5 9 9 0 0 1-1.7-2c-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2.1-.4 0-.5l-.9-2.2c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.8-.7 2-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.4Z"/></svg>
+                    <svg v-else-if="link.key === 'telegram'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M21.9 4.2 18.7 19c-.2 1-.8 1.2-1.6.8l-4.8-3.5-2.3 2.2c-.3.3-.5.5-1 .5l.4-4.9 8.9-8c.4-.3-.1-.5-.6-.2L6.6 12.8l-4.7-1.5c-1-.3-1-1 .2-1.4L20.4 2.8c.9-.3 1.7.2 1.5 1.4Z"/></svg>
+                    <svg v-else-if="link.key === 'pinterest'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12.2 0C5.5 0 2.1 4.8 2.1 8.8c0 2.4.9 4.6 2.9 5.4.3.1.6 0 .7-.4l.3-1.2c.1-.4.1-.5-.2-.9-.6-.7-1-1.6-1-2.8 0-3.6 2.7-6.8 7-6.8 3.8 0 5.9 2.3 5.9 5.4 0 4.1-1.8 7.5-4.5 7.5-1.5 0-2.6-1.2-2.2-2.7.4-1.8 1.3-3.8 1.3-5.1 0-1.2-.6-2.2-2-2.2-1.6 0-2.8 1.6-2.8 3.8 0 1.4.5 2.3.5 2.3l-1.9 8c-.6 2.4-.1 5.3 0 5.6 0 .2.3.2.4.1.2-.2 2.6-3.2 3.4-6.1l1-3.7c.5.9 1.8 1.7 3.2 1.7 4.2 0 7-3.8 7-8.9C21.1 3.9 17.8 0 12.2 0Z"/></svg>
+                    <svg v-else-if="link.key === 'reddit'" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 11.8a2.7 2.7 0 0 0-4.6-1.9 13.3 13.3 0 0 0-6.5-2l1.1-5 3.5.8a2.2 2.2 0 1 0 .3-1.4l-4.2-.9a.7.7 0 0 0-.8.5l-1.3 6a13.4 13.4 0 0 0-6.9 2 2.7 2.7 0 1 0-3 4.4c0 .2-.1.5-.1.8 0 4 4.7 7.2 10.5 7.2s10.5-3.2 10.5-7.2c0-.3 0-.6-.1-.8 1-.5 1.6-1.4 1.6-2.5ZM7.5 14a1.5 1.5 0 1 1 3 0 1.5 1.5 0 0 1-3 0Zm8.1 4.3c-1 .9-2.3 1.3-3.6 1.3s-2.7-.4-3.6-1.3a.7.7 0 0 1 1-1c.6.6 1.6.9 2.6.9s1.9-.3 2.6-.9a.7.7 0 0 1 1 1Zm.9-2.8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/></svg>
+                    <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.25"><path stroke-linecap="round" stroke-linejoin="round" d="M21 8v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8"/><path stroke-linecap="round" stroke-linejoin="round" d="m3 8 9 6 9-6"/><path stroke-linecap="round" stroke-linejoin="round" d="M5 6h14a2 2 0 0 1 2 2"/></svg>
+                </span>
+                <span v-if="showLabel">{{ t(link.label) }}</span>
+                <span v-if="showCount(link.key)" class="text-xs">{{ counts[link.key] }}</span>
+            </a>
+        </template>
     </div>
 </template>
-
-<style scoped>
-.group:hover {
-    background-color: var(--hover-bg);
-    border-color: var(--hover-bg);
-}
-</style>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\CMS;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -41,9 +42,18 @@ class AnnouncementController extends Controller
 
         $validated['created_by'] = auth()->id();
 
-        Announcement::create($validated);
+        $announcement = Announcement::create($validated);
 
-        return back()->with('success', 'Announcement created successfully.');
+        if ($announcement->type === 'notification' && $announcement->is_active) {
+            app(NotificationEventService::class)->adminAnnouncement(
+                $announcement->title ?: translate('Announcement'),
+                strip_tags((string) $announcement->content),
+                $announcement->target_audience,
+                $announcement->cta_url
+            );
+        }
+
+        return back()->with('success', translate('Announcement created successfully.'));
     }
 
     public function update(Request $request, Announcement $announcement)
@@ -68,20 +78,20 @@ class AnnouncementController extends Controller
 
         $announcement->update($validated);
 
-        return back()->with('success', 'Announcement updated successfully.');
+        return back()->with('success', translate('Announcement updated successfully.'));
     }
 
     public function destroy(Announcement $announcement)
     {
         $announcement->delete();
 
-        return back()->with('success', 'Announcement deleted successfully.');
+        return back()->with('success', translate('Announcement deleted successfully.'));
     }
 
     public function toggleActive(Announcement $announcement)
     {
         $announcement->update(['is_active' => ! $announcement->is_active]);
 
-        return back()->with('success', 'Announcement status updated.');
+        return back()->with('success', translate('Announcement status updated.'));
     }
 }

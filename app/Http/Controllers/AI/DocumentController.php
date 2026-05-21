@@ -5,6 +5,7 @@ namespace App\Http\Controllers\AI;
 use App\Http\Controllers\Controller;
 use App\Models\AiTemplate;
 use App\Models\Document;
+use App\Services\NotificationEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -31,6 +32,8 @@ class DocumentController extends Controller
             'word_count' => str_word_count(strip_tags($data['content'])),
             'folder_id' => $data['folder_id'] ?? null,
         ]);
+
+        app(NotificationEventService::class)->documentReady($document);
 
         return response()->json([
             'success' => true,

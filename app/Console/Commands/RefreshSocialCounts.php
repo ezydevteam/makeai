@@ -13,8 +13,8 @@ class RefreshSocialCounts extends Command
 
     public function handle(SocialService $socialService): void
     {
-        $this->info('Refreshing social follow counts...');
+        $this->info(translate('Refreshing social follow counts...'));
         $socialService->refreshCounts();
-        $this->info('Done!');
+        $this->info(translate('Done!'));
     }
 }

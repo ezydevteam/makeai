@@ -1,6 +1,8 @@
 <?php
 
 use App\Services\AI\TokenGuard;
+use App\Services\NotificationEventService;
+use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -16,10 +18,33 @@ Artisan::command('ai:reset-usage-counters', function () {
     $this->info(translate(':count user AI usage counters reset.', ['count' => $updated]));
 })->purpose('Reset daily AI usage counters and monthly counters on month start');
 
+Artisan::command('notifications:subscription-reminders', function () {
+    $count = app(NotificationEventService::class)->notifySubscriptionsRenewingSoon();
+
+    $this->info(translate(':count subscription renewal reminders checked.', ['count' => $count]));
+})->purpose('Send in-app subscription renewal reminders');
+
+Artisan::command('subscriptions:expire-past-due', function () {
+    $expired = app(SubscriptionLifecycleService::class)->expirePastDue();
+
+    $this->info(translate(':count expired subscriptions processed.', ['count' => $expired]));
+})->purpose('Expire past-due subscriptions and notify users');
+
 Schedule::command('ai:reset-usage-counters')
     ->dailyAt('00:05')
     ->withoutOverlapping();
 
+Schedule::command('notifications:subscription-reminders')
+    ->dailyAt('09:00')
+    ->withoutOverlapping();
+
+Schedule::command('subscriptions:expire-past-due')
+    ->hourly()
+    ->withoutOverlapping();
+
 Schedule::call(function (): void {
-    Cache::put('last_scheduler_run', now()->toDateTimeString(), now()->addMinutes(10));
+    $timestamp = now()->toDateTimeString();
+
+    Cache::put('last_scheduler_run', $timestamp, now()->addMinutes(10));
+    settings_set('last_scheduler_run', $timestamp, 'string', 'system');
 })->everyMinute();

@@ -39,7 +39,7 @@ const sendTest = () => {
 </script>
 
 <template>
-    <Head title="Mail Settings — Admin" />
+    <Head :title="$t('Mail Settings — Admin')" />
     <div class="max-w-5xl mx-auto px-6 py-8">
         <div class="mb-8">
             <h1 class="text-2xl font-bold text-gray-900">Mail System</h1>
@@ -69,7 +69,7 @@ const sendTest = () => {
                         </div>
                         <div>
                             <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">From Name</label>
-                            <input v-model="form.mail_from_name" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" placeholder="MakeAI Team">
+                            <input v-model="form.mail_from_name" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="$t('MakeAI Team')">
                         </div>
                     </div>
 

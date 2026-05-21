@@ -102,7 +102,7 @@ const moveBlockDown = (index: number) => {
 
 <template>
     <AdminLayout>
-        <Head title="Sidebar Builder — Admin" />
+        <Head :title="$t('Sidebar Builder — Admin')" />
         
         <div class="max-w-6xl mx-auto px-6 py-8">
             <div class="flex items-center justify-between mb-8">

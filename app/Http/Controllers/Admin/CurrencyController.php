@@ -35,7 +35,7 @@ class CurrencyController extends Controller
 
         Currency::create($request->all());
 
-        return back()->with('success', 'Currency added successfully.');
+        return back()->with('success', translate('Currency added successfully.'));
     }
 
     /**
@@ -53,7 +53,7 @@ class CurrencyController extends Controller
 
         $currency->update($request->only(['symbol', 'name', 'exchange_rate', 'decimal_places', 'is_active']));
 
-        return back()->with('success', 'Currency updated successfully.');
+        return back()->with('success', translate('Currency updated successfully.'));
     }
 
     /**
@@ -64,7 +64,7 @@ class CurrencyController extends Controller
         Currency::where('is_default', true)->update(['is_default' => false]);
         $currency->update(['is_default' => true, 'is_active' => true, 'exchange_rate' => 1.000000]);
 
-        return back()->with('success', "{$currency->code} is now the default currency.");
+        return back()->with('success', translate(':currency is now the default currency.', ['currency' => $currency->code]));
     }
 
     /**
@@ -79,7 +79,7 @@ class CurrencyController extends Controller
             // but usually we need an API key. We'll check settings.
             $apiKey = settings('exchange_rate_api_key');
             if (! $apiKey) {
-                return back()->with('error', 'Please configure Exchange Rate API Key in settings first.');
+                return back()->with('error', translate('Please configure Exchange Rate API Key in settings first.'));
             }
 
             $response = Http::get("https://v6.exchangerate-api.com/v6/{$apiKey}/latest/{$base}");
@@ -90,12 +90,12 @@ class CurrencyController extends Controller
                     Currency::where('code', $code)->update(['exchange_rate' => $rate]);
                 }
 
-                return back()->with('success', 'Exchange rates updated successfully.');
+                return back()->with('success', translate('Exchange rates updated successfully.'));
             }
 
-            return back()->with('error', 'Failed to fetch exchange rates.');
+            return back()->with('error', translate('Failed to fetch exchange rates.'));
         } catch (\Exception $e) {
-            return back()->with('error', 'Exchange rate sync failed: '.$e->getMessage());
+            return back()->with('error', translate('Exchange rate sync failed: :message', ['message' => $e->getMessage()]));
         }
     }
 
@@ -105,11 +105,11 @@ class CurrencyController extends Controller
     public function destroy(Currency $currency)
     {
         if ($currency->is_default) {
-            return back()->with('error', 'Cannot delete the default currency.');
+            return back()->with('error', translate('Cannot delete the default currency.'));
         }
 
         $currency->delete();
 
-        return back()->with('success', 'Currency deleted successfully.');
+        return back()->with('success', translate('Currency deleted successfully.'));
     }
 }

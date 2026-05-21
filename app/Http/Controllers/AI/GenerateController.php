@@ -10,6 +10,7 @@ use App\Services\AI\PromptBuilder;
 use App\Services\AI\ProviderRegistry;
 use App\Services\AI\TokenGuard;
 use App\Services\AI\ToolAccessService;
+use App\Services\NotificationEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -331,13 +332,17 @@ class GenerateController extends Controller
 
     private function saveGeneratedDocument(AiTemplate $template, User $user, string $content): Document
     {
-        return Document::create([
+        $document = Document::create([
             'user_id' => $user->id,
             'title' => $template->name.' Output',
             'content' => $content,
             'tool_slug' => $template->slug,
             'word_count' => str_word_count(strip_tags($content)),
         ]);
+
+        app(NotificationEventService::class)->documentReady($document);
+
+        return $document;
     }
 
     private function currentUser(): ?User

@@ -4,6 +4,8 @@ import { Head, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import Pagination from '@/Components/Pagination.vue';
 import RichEditor from '@/Components/RichEditor.vue';
+import { useTranslate } from '@/Composables/useTranslate';
+import { useDateFormat } from '@/Composables/useDateFormat';
 
 defineOptions({ layout: AdminLayout });
 
@@ -16,6 +18,8 @@ const props = defineProps<{
 }>();
 
 const activeTab = ref('subscribers');
+const { t } = useTranslate();
+const { formatDate } = useDateFormat();
 
 const showCampaignModal = ref(false);
 const campaignForm = useForm({
@@ -25,15 +29,15 @@ const campaignForm = useForm({
 });
 
 const audienceOptions = [
-    { value: 'subscribers', label: 'Newsletter subscribers', countKey: 'active' },
-    { value: 'users_all', label: 'All opted-in users', countKey: 'users_all' },
-    { value: 'users_active', label: 'Active users', countKey: 'users_active' },
-    { value: 'users_inactive', label: 'Inactive users', countKey: 'users_inactive' },
-    { value: 'users_pro', label: 'Pro users', countKey: 'users_pro' },
-    { value: 'users_free', label: 'Free users', countKey: 'users_free' },
+    { value: 'subscribers', label: t('Newsletter subscribers'), countKey: 'active' },
+    { value: 'users_all', label: t('All opted-in users'), countKey: 'users_all' },
+    { value: 'users_active', label: t('Active users'), countKey: 'users_active' },
+    { value: 'users_inactive', label: t('Inactive users'), countKey: 'users_inactive' },
+    { value: 'users_pro', label: t('Pro users'), countKey: 'users_pro' },
+    { value: 'users_free', label: t('Free users'), countKey: 'users_free' },
 ];
 
-const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || 'Newsletter subscribers';
+const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || t('Newsletter subscribers');
 
 const submitCampaign = () => {
     campaignForm.post(route('admin.newsletter.campaign.store'), {
@@ -45,13 +49,13 @@ const submitCampaign = () => {
 };
 
 const sendCampaign = (id: number) => {
-    if (confirm('Send this campaign to all active subscribers?')) {
+    if (confirm(t('Send this campaign to all active subscribers?'))) {
         useForm({}).post(route('admin.newsletter.campaign.send', id));
     }
 };
 
 const deleteSubscriber = (id: number) => {
-    if (confirm('Remove this subscriber?')) {
+    if (confirm(t('Remove this subscriber?'))) {
         useForm({}).delete(route('admin.newsletter.subscriber.delete', id));
     }
 };
@@ -84,7 +88,7 @@ const saveSettings = () => {
 </script>
 
 <template>
-    <Head title="Newsletter — Admin" />
+    <Head :title="$t('Newsletter — Admin')" />
     <div class="max-w-6xl mx-auto px-6 py-8">
         <div class="flex items-center justify-between mb-8">
             <div>
@@ -155,7 +159,7 @@ const saveSettings = () => {
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 text-xs text-gray-500">
-                                    {{ new Date(sub.created_at).toLocaleDateString() }}
+                                    {{ formatDate(sub.created_at) }}
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <button @click="deleteSubscriber(sub.id)" class="text-gray-400 hover:text-danger-600 transition-colors">
@@ -184,7 +188,11 @@ const saveSettings = () => {
                                     {{ camp.status.toUpperCase() }}
                                 </span>
                             </div>
-                            <p class="text-xs text-gray-500">Created: {{ new Date(camp.created_at).toLocaleDateString() }} <span v-if="camp.sent_at">• Sent: {{ new Date(camp.sent_at).toLocaleDateString() }}</span> • {{ audienceLabel(camp.audience) }} • {{ camp.recipient_count }} recipients • {{ camp.sent_count || 0 }} sent • {{ camp.failed_count || 0 }} failed</p>
+                            <p class="text-xs text-gray-500">
+                                {{ t('Created: :date', { date: formatDate(camp.created_at) }) }}
+                                <span v-if="camp.sent_at">{{ t(' • Sent: :date', { date: formatDate(camp.sent_at) }) }}</span>
+                                {{ t(' • :audience • :recipients recipients • :sent sent • :failed failed', { audience: audienceLabel(camp.audience), recipients: camp.recipient_count, sent: camp.sent_count || 0, failed: camp.failed_count || 0 }) }}
+                            </p>
                         </div>
                         <button v-if="camp.status === 'draft'" @click="sendCampaign(camp.id)" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-xs font-bold hover:bg-primary-500 transition-all">
                             QUEUE SEND
@@ -344,7 +352,7 @@ const saveSettings = () => {
                 <form @submit.prevent="submitCampaign" class="p-6 space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Subject</label>
-                        <input v-model="campaignForm.subject" type="text" placeholder="Weekly AI Updates" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
+                        <input v-model="campaignForm.subject" type="text" :placeholder="$t('Weekly AI Updates')" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Audience</label>

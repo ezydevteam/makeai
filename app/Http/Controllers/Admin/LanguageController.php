@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\LanguageStoreRequest;
+use App\Http\Requests\Admin\LanguageUpdateRequest;
 use App\Models\Language;
 use App\Models\Translation;
 use App\Services\TranslationService;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class LanguageController extends Controller
@@ -24,16 +27,12 @@ class LanguageController extends Controller
     /**
      * Store a new language.
      */
-    public function store(Request $request)
+    public function store(LanguageStoreRequest $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'code' => 'required|string|max:10|unique:languages,code',
-            'flag' => 'nullable|string',
-            'is_rtl' => 'required|boolean',
-        ]);
+        $data = $request->safe()->except('flag_file');
+        $data['flag'] = $this->storeFlag($request);
 
-        $lang = Language::create($request->all());
+        $lang = Language::create($data);
 
         // Sync existing keys to this new language
         $keys = Translation::distinct()->pluck('key');
@@ -47,26 +46,27 @@ class LanguageController extends Controller
 
         TranslationService::clearCache($lang->code);
 
-        return back()->with('success', 'Language created successfully.');
+        return back()->with('success', translate('Language created successfully.'));
     }
 
     /**
      * Update language details.
      */
-    public function update(Request $request, Language $language)
+    public function update(LanguageUpdateRequest $request, Language $language)
     {
-        $request->validate([
-            'name' => 'required|string|max:100',
-            'flag' => 'nullable|string',
-            'is_rtl' => 'required|boolean',
-            'is_active' => 'required|boolean',
-        ]);
+        $data = $request->safe()->except('flag_file');
+        $flag = $this->storeFlag($request);
 
-        $language->update($request->only(['name', 'flag', 'is_rtl', 'is_active']));
+        if ($flag) {
+            $this->deleteFlag($language->flag);
+            $data['flag'] = $flag;
+        }
+
+        $language->forceFill($data)->save();
 
         TranslationService::clearCache($language->code);
 
-        return back()->with('success', 'Language updated successfully.');
+        return back()->with('success', translate('Language updated successfully.'));
     }
 
     /**
@@ -76,8 +76,13 @@ class LanguageController extends Controller
     {
         Language::where('is_default', true)->update(['is_default' => false]);
         $language->update(['is_default' => true, 'is_active' => true]);
+        session([
+            'locale' => $language->code,
+            'locale_manually_selected' => false,
+        ]);
+        app()->setLocale($language->code);
 
-        return back()->with('success', "{$language->name} is now the default language.");
+        return back()->with('success', translate(':language is now the default language.', ['language' => $language->name]));
     }
 
     /**
@@ -86,13 +91,38 @@ class LanguageController extends Controller
     public function destroy(Language $language)
     {
         if ($language->is_default) {
-            return back()->with('error', 'Cannot delete the default language.');
+            return back()->with('error', translate('Cannot delete the default language.'));
         }
 
         $code = $language->code;
+        $this->deleteFlag($language->flag);
         $language->delete();
         TranslationService::clearCache($code);
 
-        return back()->with('success', 'Language deleted successfully.');
+        return back()->with('success', translate('Language deleted successfully.'));
+    }
+
+    private function storeFlag(LanguageStoreRequest|LanguageUpdateRequest $request): ?string
+    {
+        $file = $request->file('flag_file');
+
+        if (! $file) {
+            return null;
+        }
+
+        $extension = strtolower($file->getClientOriginalExtension());
+        $filename = Str::slug((string) $request->input('code')).'-'.Str::ulid().'.'.$extension;
+        $path = $file->storeAs('language-flags', $filename, 'public');
+
+        return Storage::url($path);
+    }
+
+    private function deleteFlag(?string $flag): void
+    {
+        if (! $flag || ! str_starts_with($flag, '/storage/language-flags/')) {
+            return;
+        }
+
+        Storage::disk('public')->delete(str_replace('/storage/', '', $flag));
     }
 }

@@ -2,8 +2,10 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { ref } from 'vue';
+import { useDateFormat } from '@/Composables/useDateFormat';
 
 defineOptions({ layout: AdminLayout });
+const { formatDateTime } = useDateFormat();
 
 const props = defineProps<{
     user: any,
@@ -20,12 +22,29 @@ const form = useForm({
     password_confirmation: '',
 });
 
+const notificationForm = useForm({
+    title: '',
+    message: '',
+    level: 'info',
+    deliver_via: 'in_app',
+    scheduled_at: '',
+    action_url: '',
+    action_label: '',
+});
+
 const submit = () => {
     form.post(route('admin.users.update', props.user.ulid), {
         onSuccess: () => {
             form.password = '';
             form.password_confirmation = '';
         }
+    });
+};
+
+const sendNotification = () => {
+    notificationForm.post(route('admin.users.notification', props.user.ulid), {
+        preserveScroll: true,
+        onSuccess: () => notificationForm.reset(),
     });
 };
 </script>
@@ -78,7 +97,7 @@ const submit = () => {
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-                                    <input v-model="form.password" type="password" placeholder="Leave blank to keep current" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" />
+                                    <input v-model="form.password" type="password" :placeholder="$t('Leave blank to keep current')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
@@ -143,6 +162,53 @@ const submit = () => {
                     </div>
                 </div>
 
+                <form @submit.prevent="sendNotification" class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+                    <h3 class="font-bold text-gray-900 mb-4">{{ $t('Send Notification') }}</h3>
+                    <div class="space-y-4">
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('Title') }}</span>
+                            <input v-model="notificationForm.title" type="text" maxlength="120" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none">
+                            <p v-if="notificationForm.errors.title" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.title }}</p>
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('Message') }}</span>
+                            <textarea v-model="notificationForm.message" rows="4" maxlength="1000" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none"></textarea>
+                            <p v-if="notificationForm.errors.message" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.message }}</p>
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('Type') }}</span>
+                            <select v-model="notificationForm.level" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none">
+                                <option value="info">{{ $t('Info') }}</option>
+                                <option value="success">{{ $t('Success') }}</option>
+                                <option value="warning">{{ $t('Warning') }}</option>
+                                <option value="error">{{ $t('Error') }}</option>
+                            </select>
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('Deliver via') }}</span>
+                            <select v-model="notificationForm.deliver_via" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:outline-none">
+                                <option value="in_app">{{ $t('In-app only') }}</option>
+                                <option value="in_app_email">{{ $t('In-app + email') }}</option>
+                                <option value="email">{{ $t('Email only') }}</option>
+                            </select>
+                            <p v-if="notificationForm.errors.deliver_via" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.deliver_via }}</p>
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('Schedule') }}</span>
+                            <input v-model="notificationForm.scheduled_at" type="datetime-local" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none">
+                            <p class="mt-1 text-xs text-gray-400">{{ $t('Leave blank to send now.') }}</p>
+                            <p v-if="notificationForm.errors.scheduled_at" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.scheduled_at }}</p>
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700">{{ $t('Action URL') }}</span>
+                            <input v-model="notificationForm.action_url" type="text" maxlength="500" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" :placeholder="$t('Optional')">
+                        </label>
+                        <button type="submit" :disabled="notificationForm.processing" class="w-full rounded-xl bg-primary-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition-colors hover:bg-primary-500 disabled:opacity-50">
+                            {{ notificationForm.processing ? $t('Sending...') : $t('Send Notification') }}
+                        </button>
+                    </div>
+                </form>
+
                 <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
                     <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
                         <h3 class="font-bold text-gray-900">Recent Logins</h3>
@@ -151,7 +217,7 @@ const submit = () => {
                         <div v-for="log in user.login_history" :key="log.id" class="px-6 py-4">
                             <p class="text-sm font-medium text-gray-900">{{ log.ip }}</p>
                             <p class="text-[10px] text-gray-500 truncate mb-1">{{ log.user_agent }}</p>
-                            <p class="text-[10px] text-gray-400">{{ new Date(log.created_at).toLocaleString() }}</p>
+                            <p class="text-[10px] text-gray-400">{{ formatDateTime(log.created_at) }}</p>
                         </div>
                         <div v-if="!user.login_history?.length" class="px-6 py-8 text-center text-xs text-gray-500 italic">
                             No login history available.
