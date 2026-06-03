@@ -14,6 +14,8 @@ interface Program {
     payouts_enabled: boolean
     payout_methods: string[] | null
     auto_approve_commissions: boolean
+    referral_credits_enabled: boolean
+    referral_credits_amount: string | number
     commission_hold_days: number
     allow_custom_alias: boolean
     terms_page_slug: string | null
@@ -44,6 +46,8 @@ const form = useForm({
     payouts_enabled: props.program.payouts_enabled,
     payout_methods: props.program.payout_methods ?? ['paypal', 'bank_transfer', 'credits'],
     auto_approve_commissions: props.program.auto_approve_commissions,
+    referral_credits_enabled: props.program.referral_credits_enabled,
+    referral_credits_amount: String(props.program.referral_credits_amount),
     commission_hold_days: props.program.commission_hold_days,
     allow_custom_alias: props.program.allow_custom_alias,
     terms_page_slug: props.program.terms_page_slug ?? '',
@@ -142,6 +146,15 @@ const processPayout = (id: number) => router.post(route('admin.affiliate.payouts
                             <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium">
                                 {{ t('Auto approve commissions') }}
                                 <input v-model="form.auto_approve_commissions" type="checkbox" />
+                            </label>
+                            <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium">
+                                {{ t('Award credits on first purchase') }}
+                                <input v-model="form.referral_credits_enabled" type="checkbox" />
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('First purchase credit amount') }}</span>
+                                <input v-model="form.referral_credits_amount" type="number" min="0" step="0.0001" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                                <span class="mt-1 block text-xs text-gray-500">{{ t('Credits are added to the referrer only once, when the referred user completes the first purchase.') }}</span>
                             </label>
                             <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium">
                                 {{ t('Allow custom alias') }}

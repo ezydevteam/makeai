@@ -2,20 +2,20 @@
 
 > Auto-synced | 230 observations
 
-**Stack:** JavaScript/Python/TypeScript · Tailwind + Vue
+**Stack:** PHP 8.3+ · Laravel 13.x · Laravel AI SDK (`laravel/ai`) · Vue 3 + TypeScript · Tailwind CSS v4 · MySQL · Redis
 
 ## 🏛️ CORE ARCHITECTURE
 
-> **CRITICAL:** The following rules represent strict architectural boundaries defined by the user. NEVER violate them in your generated code or explanations.
+> **CRITICAL:** The following rules represent strict architectural boundaries. NEVER violate them.
 
-# Intellectual Property & Architecture Rules
-Write your strict architectural boundaries here. 
-BrainSync will automatically enforce these rules across all agents (Cursor, Windsurf, Cline) 
-and inject them into the memory context.
+# Architecture & Code Standards
 
-Example:
-- NEVER use TailwindCSS. Only use vanilla CSS.
-- NEVER write class components. Only use functional React components.
+**AI Engine:** ALL AI operations go through `AiService` → `ProviderRegistry` → `LaravelAiDriver`. Never call raw HTTP or SDK providers directly.
+
+**References:**
+- `.commandcode/standards.md` — full coding standards (loads every session)
+- `.commandcode/taste/taste.md` — learned preferences
+- `.commandcode/skills/makeai/SKILL.md` — project conventions (1359 lines)
 
 ## 🛡️ GLOBAL SAFETY RULES
 

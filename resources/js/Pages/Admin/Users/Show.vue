@@ -32,6 +32,8 @@ const notificationForm = useForm({
     action_label: '',
 });
 
+const twoFactorForm = useForm({});
+
 const submit = () => {
     form.post(route('admin.users.update', props.user.ulid), {
         onSuccess: () => {
@@ -45,6 +47,12 @@ const sendNotification = () => {
     notificationForm.post(route('admin.users.notification', props.user.ulid), {
         preserveScroll: true,
         onSuccess: () => notificationForm.reset(),
+    });
+};
+
+const disableTwoFactor = () => {
+    twoFactorForm.post(route('admin.users.2fa.disable', props.user.ulid), {
+        preserveScroll: true,
     });
 };
 </script>
@@ -158,6 +166,15 @@ const sendNotification = () => {
                         </button>
                         <button class="w-full py-3 bg-gray-50 border border-gray-200 text-gray-700 font-bold text-sm rounded-xl hover:bg-gray-100 transition-colors">
                             Clear Session
+                        </button>
+                        <button
+                            v-if="user.two_factor_enabled"
+                            type="button"
+                            :disabled="twoFactorForm.processing"
+                            @click="disableTwoFactor"
+                            class="w-full py-3 bg-danger-50 border border-danger-200 text-danger-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors disabled:opacity-50"
+                        >
+                            {{ twoFactorForm.processing ? $t('Disabling...') : $t('Disable User 2FA') }}
                         </button>
                     </div>
                 </div>

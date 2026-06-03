@@ -5,14 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * ToolReview — user reviews for AI tool templates.
+ * ToolReview — user reviews for AI tools.
  *
  * Ref: AI_SaaS_Master_Prompt Part 15.14.5
  */
 class ToolReview extends Model
 {
     protected $fillable = [
-        'template_slug', 'user_id',
+        'tool_slug', 'user_id',
         'rating', 'comment', 'admin_reply',
         'is_approved', 'is_featured', 'helpful_count',
     ];
@@ -26,11 +26,9 @@ class ToolReview extends Model
         ];
     }
 
-    // ─── Relationships ──────────────────────────
-
-    public function template()
+    public function tool()
     {
-        return $this->belongsTo(AiTemplate::class, 'template_slug', 'slug');
+        return $this->belongsTo(AiTool::class, 'tool_slug', 'slug');
     }
 
     public function user()
@@ -43,8 +41,6 @@ class ToolReview extends Model
         return $this->hasMany(ToolReviewVote::class, 'review_id');
     }
 
-    // ─── Scopes ─────────────────────────────────
-
     public function scopeApproved($query)
     {
         return $query->where('is_approved', true);
@@ -55,12 +51,6 @@ class ToolReview extends Model
         return $query->where('is_featured', true);
     }
 
-    // ─── Methods ────────────────────────────────
-
-    /**
-     * Auto-approve logic: returns true if auto-approval is enabled AND the reviewer
-     * has an established history (>5 past approved reviews).
-     */
     public function shouldAutoApprove(): bool
     {
         if (! settings('tool_reviews_auto_approve', false)) {
@@ -74,17 +64,14 @@ class ToolReview extends Model
         return $userApprovedCount >= (int) settings('tool_reviews_auto_approve_threshold', 5);
     }
 
-    /**
-     * Update the parent template's cached review stats after save/delete.
-     */
     protected static function booted(): void
     {
         static::saved(function (ToolReview $review) {
-            $review->template?->updateReviewStats();
+            $review->tool?->updateReviewStats();
         });
 
         static::deleted(function (ToolReview $review) {
-            $review->template?->updateReviewStats();
+            $review->tool?->updateReviewStats();
         });
     }
 }

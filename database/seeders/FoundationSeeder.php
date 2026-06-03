@@ -30,6 +30,7 @@ class FoundationSeeder extends Seeder
             ['key' => 'maintenance_mode', 'value' => '0', 'type' => 'boolean', 'group' => 'general'],
             ['key' => 'app_version', 'value' => '1.0.0', 'type' => 'string', 'group' => 'general'],
             ['key' => 'active_theme', 'value' => 'default', 'type' => 'string', 'group' => 'general'],
+            ['key' => 'homepage_template', 'value' => 'default', 'type' => 'string', 'group' => 'general'],
 
             // AI
             ['key' => 'default_ai_provider', 'value' => 'openai', 'type' => 'string', 'group' => 'ai'],

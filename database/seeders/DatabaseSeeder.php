@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             AiModelSeeder::class,
             AiToolCategorySeeder::class,
             AiTemplateSeeder::class,
+            SiteTemplateSeeder::class,
             PlanSeeder::class,
             PaymentGatewaySeeder::class,
             PageSeeder::class,

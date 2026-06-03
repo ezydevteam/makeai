@@ -6,7 +6,7 @@ use App\Exceptions\AI\CreditLimitException;
 use App\Exceptions\AI\GlobalBudgetExceededException;
 use App\Exceptions\AI\InsufficientCreditsException;
 use App\Models\AiModel;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\AiUsageLog;
 use App\Models\User;
 use App\Services\NotificationEventService;
@@ -32,7 +32,7 @@ class TokenGuard
      * @throws InsufficientCreditsException
      * @throws GlobalBudgetExceededException
      */
-    public static function before(?User $user, ?AiTemplate $template = null, ?string $model = null): void
+    public static function before(?User $user, ?AiTool $template = null, ?string $model = null): void
     {
         // 0. Check active status
         if ($user) {
@@ -261,7 +261,7 @@ class TokenGuard
     /**
      * Estimate credit cost for pre-flight check.
      */
-    private static function estimateCreditCost(?AiTemplate $template, ?string $model): float
+    private static function estimateCreditCost(?AiTool $template, ?string $model): float
     {
         $estimatedTokens = $template?->avg_output_tokens ?? 500;
         $modelSlug = $model ?? settings('default_ai_model', 'gpt-4o-mini');

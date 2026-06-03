@@ -52,6 +52,20 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('admin-password-reset', function (Request $request) {
             return Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
         });
+
+        RateLimiter::for('password-email', function (Request $request) {
+            return Limit::perHour(3)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
+        });
+
+        RateLimiter::for('password-reset', function (Request $request) {
+            return Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
+        });
+
+        RateLimiter::for('user-2fa', function (Request $request) {
+            return Limit::perMinutes(15, 5)->by(
+                $request->session()->get('user_2fa_id', $request->user()?->id ?: 'guest').'|'.$request->ip()
+            );
+        });
     }
 
     private function configureBroadcasting(): void

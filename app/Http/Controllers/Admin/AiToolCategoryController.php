@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiToolCategory;
+use App\Models\Category;
 use App\Services\AI\ToolCatalogCacheService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -14,7 +14,9 @@ class AiToolCategoryController extends Controller
     public function index()
     {
         return Inertia::render('Admin/AI/Categories/Index', [
-            'categories' => AiToolCategory::withCount(['templates as tools_count'])
+            'categories' => Category::query()
+                ->aiTools()
+                ->withCount(['tools as tools_count'])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(),
@@ -24,14 +26,15 @@ class AiToolCategoryController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateCategory($request);
+        $data['type'] = 'ai_tool';
         $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
 
-        AiToolCategory::create($data);
+        Category::create($data);
 
         return back()->with('success', translate('AI tool category created.'));
     }
 
-    public function update(Request $request, AiToolCategory $category)
+    public function update(Request $request, Category $category)
     {
         $data = $this->validateCategory($request, $category->id);
         $data['slug'] = $data['slug'] ?: Str::slug($data['name']);
@@ -41,10 +44,17 @@ class AiToolCategoryController extends Controller
         return back()->with('success', translate('AI tool category updated.'));
     }
 
-    public function destroy(AiToolCategory $category)
+    public function destroy(Category $category)
     {
+        if ($category->isSystem()) {
+            return back()->with('error', translate('System categories cannot be deleted.'));
+        }
+
+        if ($category->hasTools()) {
+            return back()->with('error', translate('This category contains tools. Please reassign or delete the tools first.'));
+        }
+
         ToolCatalogCacheService::invalidateForCategory($category);
-        $category->templates()->update(['category_id' => null]);
         $category->delete();
 
         return back()->with('success', translate('AI tool category deleted.'));
@@ -52,7 +62,7 @@ class AiToolCategoryController extends Controller
 
     private function validateCategory(Request $request, ?int $ignoreId = null): array
     {
-        $unique = $ignoreId ? "unique:ai_tool_categories,slug,{$ignoreId}" : 'unique:ai_tool_categories,slug';
+        $unique = $ignoreId ? "unique:categories,slug,{$ignoreId}" : 'unique:categories,slug';
 
         return $request->validate([
             'name' => 'required|string|max:255',

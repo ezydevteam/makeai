@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Requests\Admin\FooterBuilderRequest;
-use App\Models\AiToolCategory;
+use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Setting;
 use Illuminate\Routing\Controller;
@@ -275,7 +275,7 @@ class FooterBuilderController extends Controller
         }
 
         $menus = Menu::orderBy('name')->get(['id', 'name', 'slug']);
-        $aiCategories = AiToolCategory::active()
+        $aiCategories = Category::active()->aiTools()
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'tools_count']);

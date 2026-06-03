@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiTemplate;
 use App\Models\AiUsageLog;
 use App\Models\ToolReview;
 use App\Models\ToolReviewVote;
@@ -28,7 +27,7 @@ class ToolReviewController extends Controller
             'sort' => ['nullable', Rule::in(['recent', 'helpful', 'highest', 'lowest'])],
         ]);
 
-        $query = ToolReview::where('template_slug', $slug)
+        $query = ToolReview::where('tool_slug', $slug)
             ->approved()
             ->with(['user:id,name,avatar']);
 
@@ -55,7 +54,7 @@ class ToolReviewController extends Controller
      */
     public function store(Request $request, string $slug): JsonResponse
     {
-        $template = AiTemplate::where('slug', $slug)->where('is_active', true)->firstOrFail();
+        $template = AiTool::where('slug', $slug)->where('is_active', true)->firstOrFail();
 
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
@@ -79,7 +78,7 @@ class ToolReviewController extends Controller
 
         // Check for existing review
         $existing = ToolReview::where('user_id', $user->id)
-            ->where('template_slug', $slug)
+            ->where('tool_slug', $slug)
             ->first();
 
         if ($existing) {
@@ -104,7 +103,7 @@ class ToolReviewController extends Controller
         }
 
         $review = ToolReview::create([
-            'template_slug' => $slug,
+            'tool_slug' => $slug,
             'user_id' => $user->id,
             'rating' => $validated['rating'],
             'comment' => $validated['comment'],
@@ -165,7 +164,7 @@ class ToolReviewController extends Controller
 
     private function ratingDistribution(string $slug): array
     {
-        $counts = ToolReview::where('template_slug', $slug)
+        $counts = ToolReview::where('tool_slug', $slug)
             ->approved()
             ->selectRaw('rating, COUNT(*) as total')
             ->groupBy('rating')

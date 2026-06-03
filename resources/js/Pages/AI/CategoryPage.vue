@@ -20,9 +20,8 @@ interface Template {
     description: string
     icon: string
     color: string
-    is_premium: boolean
-    is_featured: boolean
     requires_pro: boolean
+    is_featured: boolean
 }
 
 const props = defineProps<{
@@ -74,7 +73,7 @@ const props = defineProps<{
             >
                 <!-- Badges -->
                 <div v-if="t.requires_pro" class="absolute top-3 right-3 px-2 py-0.5 bg-gradient-to-r from-primary-500/20 to-accent-500/20 text-accent-400 text-[10px] font-bold uppercase rounded-full border border-accent-500/20 shadow-sm shadow-accent-500/10">PRO</div>
-                <div v-else-if="t.is_premium" class="absolute top-3 right-3 px-2 py-0.5 bg-warning-500/15 text-warning-400 text-[10px] font-bold uppercase rounded-full border border-warning-500/20">PREMIUM</div>
+                <div v-else-if="t.requires_pro" class="absolute top-3 right-3 px-2 py-0.5 bg-warning-500/15 text-warning-400 text-[10px] font-bold uppercase rounded-full border border-warning-500/20">PREMIUM</div>
 
                 <!-- Icon -->
                 <div

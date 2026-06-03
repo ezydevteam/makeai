@@ -1,7 +1,7 @@
 # MakeAI — Complete Development Master Prompt
 
 > **Version 3.0** — Reorganized & Deduplicated
-> Stack: PHP 8.3+ · Laravel 12+ · LLPhant · Inertia SSR · Vue 3 · Tailwind v4 · MySQL · Redis · Horizon · **Laravel Reverb**
+> Stack: PHP 8.3+ · Laravel 12+ · Laravel AI SDK Engine · Inertia SSR · Vue 3 · Tailwind v4 · MySQL · Redis · Horizon · **Laravel Reverb**
 
 ---
 
@@ -24,7 +24,7 @@
   `P10` ADMIN MODEL & RBAC
 
 **🔷 LAYER 3 — AI CORE**
-  `P11` AI ENGINE (LLPhant Core)
+  `P11` AI ENGINE (Laravel AI SDK (laravel/ai) core)
   `P12` AI INTEGRATIONS & CREDENTIALS
   `P13` AI TOOL ACCESS CONTROL
   `P14` AI TOOLS & TEMPLATES (255 Templates)
@@ -112,7 +112,7 @@
 |-------|-----------|
 | Language | PHP 8.3+ |
 | Framework | Laravel 12+ |
-| AI Framework | LLPhant (RAG, Agents, Vector store) |
+| AI Framework | Laravel AI SDK (laravel/ai) � text, embeddings, images, audio, RAG, Agents |
 | Frontend | Vue 3 Composition API + TypeScript |
 | SSR | Inertia.js with SSR (Node.js server) |
 | Styling | Tailwind CSS v4 |
@@ -132,7 +132,7 @@
 2. **License-gated features** — `isProAvailable()` gates subscription UI at every layer
 3. **Separate admin auth** — Admin model/guard completely isolated from user auth
 4. **OTP-only auth** — no magic links anywhere, 6-box digit input throughout
-5. **LLPhant-native AI** — real RAG + agents, not raw API calls
+5. **SDK-native AI** — real RAG + agents, not raw API calls
 6. **Queue everything** — no AI/email/media job blocks HTTP response
 7. **Laravel Reverb** — first-party WebSocket, no paid external service needed
 8. **ULID public IDs** — never expose auto-increment integers in URLs/API
@@ -443,7 +443,7 @@ export function useToastr() {
 
 **Table: `languages`**
 ```sql
-id, code (e.g. 'bn', 'ar'), name, flag nullable uploaded image path, is_rtl boolean, is_default boolean, is_active boolean
+id, code (e.g. 'bn', 'ar'), name, flag, is_rtl boolean, is_default boolean, is_active boolean
 ```
 
 **Table: `translations`**
@@ -457,18 +457,16 @@ The `translate()` helper:
 3. Admin panel has Translation Manager: list all keys, edit translations, import/export JSON, auto-translate via AI (GPT) with one click
 4. RTL support: if active language `is_rtl = true`, inject `dir="rtl"` on `<html>` via Inertia shared props
 
-### 2.6 Country-Specific Subscription Pricing
+### 2.6 Multi-Currency
 
-The old exchange-rate based multi-currency system is not used for subscriptions. Do not convert plan prices by exchange rate. Subscription pricing is configured directly by country in Part 26 so admins can set real market prices.
-
-**Country/currency reference data**
+**Table: `currencies`**
 ```sql
-country_code (US/BD/IN), country_name, currency_code (USD/BDT/INR), currency_symbol, decimal_places, is_active boolean
+id, code (USD/BDT/EUR), symbol ($, ৳, €), name, exchange_rate (relative to USD), decimal_places, is_default boolean, is_active boolean
 ```
 
-Admin does not manage exchange rates. Admin manages actual monthly/yearly/lifetime prices per country from the subscription plan editor.
+Admin can: add/remove currencies, set default, manually update exchange rates, or enable auto-update (via fixer.io or exchangerate-api.com — stored API key in settings).
 
-`format_currency()` formats resolved plan prices by currency. Do not use `convert_currency()` for subscription prices.
+`format_currency()` and `convert_currency()` helpers use this table.
 
 ---
 
@@ -820,7 +818,7 @@ tool_reviews            -- id, template_slug, user_id, rating, comment, is_appro
 tool_review_votes       -- id, review_id, user_id, is_helpful boolean (unique: review_id+user_id)
 ```
 
-Add columns to `ai_templates`:
+Add columns to `ai_tools`:
 ```
 about_content, how_it_works (json), usage_examples (json), faq_items (json),
 show_about, show_how_it_works, show_usage_examples, show_faqs, show_reviews,
@@ -1166,9 +1164,9 @@ Built with **Chart.js** (loaded via npm). Dashboard cards and charts:
 
 ## 🔷 LAYER 3 — AI CORE
 
-## PART 11 — AI ENGINE (LLPhant Core)
+## PART 11 — AI ENGINE ("Laravel AI SDK" Core)
 
-### 5.1 Provider Registry ✅
+### 5.1 Provider Registry
 
 **`app/Services/AI/ProviderRegistry.php`**
 
@@ -1186,12 +1184,12 @@ Multiple API keys per provider → round-robin load balancing → automatic fail
 
 **User personal API keys:** If user has set their own key for a provider, use their key for that provider (bypasses admin key, does not charge credits for that request).
 
-### 5.2 LLPhant Integration ✅
+### 5.2 Laravel AI SDK Engine Integration
 
-**`app/Services/AI/LLPhantService.php`**
+**`app/Services/AI/AiService.php`**
 
 ```php
-class LLPhantService
+class AiService
 {
     // Simple completion
     public function complete(CompletionRequest $request): CompletionResponse
@@ -1293,14 +1291,14 @@ Each module is a dedicated Service class + Controller + Vue page:
 #### AI Chat Bot Builder
 - Create custom chatbots with: name, avatar, persona, system prompt
 - Training sources: website URL (scraper), PDF upload, text/Q&A pairs, CSV
-- Vector embeddings stored per chatbot (LLPhant RAG)
+- Vector embeddings stored per chatbot (SDK RAG)
 - Embeddable widget (JS snippet) for external websites
 - CRM inbox: view all conversations from embedded bots
 - WhatsApp integration (Twilio/360dialog — addon)
 - Telegram integration (addon)
 
 #### Knowledge Base (RAG Documents)
-- Upload documents → automatic chunking + embedding (LLPhant)
+- Upload documents → automatic chunking + embedding (Laravel AI SDK, `laravel/ai`)
 - Collections/workspaces per user
 - Chat with any collection
 - Admin can create shared knowledge bases available to all users
@@ -1474,7 +1472,7 @@ Integrations are lazy-loaded in tabs to avoid page performance issues:
 ---
 
 
-## PART 13 — AI TOOL ACCESS CONTROL ✅
+## PART 13 — AI TOOL ACCESS CONTROL
 
 Admin → AI Tools → Access Settings
 
@@ -1535,12 +1533,12 @@ When a free user tries a `pro_plan` tool:
 
 ---
 
-All templates stored in `ai_templates` table and seeded via `database/seeders/AiTemplateSeeder.php`. Each template belongs to a category, has a unique `slug`, system prompt, user input fields definition (JSON), and can be enabled/disabled from admin panel.
+All templates stored in `ai_tools` table and seeded via `database/seeders/AiToolSeeder.php`. Each template belongs to a category, has a unique `slug`, system prompt, user input fields definition (JSON), and can be enabled/disabled from admin panel.
 
 ### Template Table Structure
 
 ```sql
-ai_templates
+ai_tools
   id
   category_id          FK → categories (type='ai_tool')
   name                 varchar(255)
@@ -2027,24 +2025,24 @@ Admin → AI Tools → Categories:
 
 ### 14.1 Terminology — What Each Word Means
 
-These three terms are often confused. They are NOT interchangeable:
+These terms have distinct meanings. They are NOT interchangeable:
 
 | Term | What it is | Who creates it | Where stored |
 |------|-----------|---------------|-------------|
-| **Category** | A grouping label (e.g. "Blog & Content", "Social Media") | Admin (from panel) | `categories` table |
-| **Tool** / **Template** | A specific AI-powered task (e.g. "Blog Article Generator") | Developer (seeded) + Admin (can create more) | `ai_templates` table |
-| **Generation** | The actual AI output when a user runs a tool | System (auto) | `documents` + `ai_usage_logs` tables |
+| **Category** | A grouping label for AI tools (e.g. "Blog & Content") | Admin (full CRUD) | `categories` table |
+| **AI Tool** | A single-task AI generator (e.g. "Blog Article Generator") | Developer (seeded) + Admin (can create more) | `ai_tools` table |
+| **Site Template** | A full pre-built page experience (e.g. "Social Media Manager") | Developer only (seeded) — admin can EDIT, NOT create | `site_templates` table |
+| **Generation** | The AI output produced when a user runs a tool | System (auto) | `documents` + `ai_usage_logs` |
 
-**In this codebase: "Tool" and "Template" mean the exact same thing.**
-- The database table is called `ai_templates`
-- The admin panel calls them "Templates"
-- The user-facing UI calls them "Tools" or "AI Tools"
-- Both words refer to the same `ai_templates` row
-- Use whichever word matches the UI context — they are identical under the hood
+**Critical naming rules — memorize these:**
+- **"Tool"** = single AI task. Table: `ai_tools`. URL: `/tools/{slug}`
+- **"Template"** = full page experience bundling multiple tools. Table: `site_templates`. URL: `/app/{slug}`
+- **Never** use "template" to mean an AI tool — they are completely different things
+- The old table name `ai_templates` has been permanently renamed to `ai_tools`
 
 ---
 
-### 14.2 Categories — Fully Dynamic, Admin-Controlled ✅
+### 14.2 Categories — Fully Dynamic, Admin-Controlled
 
 **RULE: Categories are NEVER hardcoded in PHP or Vue files.**
 
@@ -2128,10 +2126,10 @@ const categories = ['blog-content', 'social-media']
 
 ### 14.3 Tools / Templates — Structure ✅
 
-Each row in `ai_templates` is one AI tool. Here is the complete field reference:
+Each row in `ai_tools` is one AI tool. Here is the complete field reference:
 
 ```sql
-ai_templates
+ai_tools
   -- Identity
   id
   ulid            char(26) UNIQUE              -- public-facing ID
@@ -2189,7 +2187,7 @@ ai_templates
 
 ---
 
-### 14.4 Tool Fields JSON — Complete Reference
+### 14.4 Tool Fields JSON — Complete Reference ✅
 
 The `fields` column defines what input form the user sees. It is a JSON array.
 
@@ -2340,7 +2338,7 @@ categories (type='ai_tool')
   id: 1, name: "Blog & Content", slug: "blog-content", ...
   id: 2, name: "Social Media",   slug: "social-media", ...
 
-ai_templates
+ai_tools
   id: 1, slug: "blog-article",      category_id: 1, name: "Blog Article Generator"
   id: 2, slug: "blog-intro",        category_id: 1, name: "Blog Intro Writer"
   id: 3, slug: "instagram-caption", category_id: 2, name: "Instagram Caption"
@@ -2395,9 +2393,9 @@ GET /api/v1/tools?category=blog-content → filter by category slug
 
 ---
 
-### 14.7 The 255 Predefined Tools — Summary by Category ✅
+### 14.7 The 255 Predefined Tools — Summary by Category
 
-> All 255 tools are seeded via `AiTemplateSeeder`. Each has a default `prompt_system`, `prompt_user`, and `fields` JSON. Admin can edit any of these after install.
+> All 255 tools are seeded via `AiToolSeeder`. Each has a default `prompt_system`, `prompt_user`, and `fields` JSON. Admin can edit any of these after install.
 
 | Category | Tools | Key tools |
 |----------|-------|-----------|
@@ -2421,7 +2419,7 @@ GET /api/v1/tools?category=blog-content → filter by category slug
 | Legal & Finance | 7 | contract-summary, privacy-policy, disclaimer, fundraising-pitch |
 | Productivity | 12 | pros-cons, smart-goals, action-plan, how-to-guide, prompt-generator |
 
-**Full slug list is in `database/seeders/AiTemplateSeeder.php` — 255 entries total.**
+**Full slug list is in `database/seeders/AiToolSeeder.php` — 255 entries total.**
 
 ---
 
@@ -2461,7 +2459,7 @@ $categories = Category::where('type','ai_tool')->where('is_active',true)->get();
 
 ---
 
-### 14.9 Access Control Per Tool ✅
+### 14.9 Access Control Per Tool
 
 Each tool has an `access_level` field. Resolution order:
 
@@ -2497,7 +2495,7 @@ Possible values:
 
 ---
 
-### 14.10 Tool Page URL & Routing
+### 14.10 Tool Page URL & Routing ✅
 
 ```php
 // web.php
@@ -2534,7 +2532,7 @@ They are server-side only. The frontend only receives the `fields` array and dis
 
 ### 14.11 Checklist — Categories & Tools
 
-- [ ] `category_id` is always a FK integer — never a hardcoded string category name in `ai_templates`
+- [ ] `category_id` is always a FK integer — never a hardcoded string category name in `ai_tools`
 - [ ] Frontend never has a hardcoded array of category names — always reads from DB via API/props
 - [ ] Categories page in admin: create, edit, rename, reorder, deactivate all work
 - [ ] Deactivating a category hides ALL its tools from users immediately (cache cleared)
@@ -2556,13 +2554,1027 @@ They are server-side only. The frontend only receives the `fields` array and dis
 ---
 
 
+## PART 14B — SITE TEMPLATES
+
+> Site Templates are full pre-built page experiences. They are completely different from AI Tools.
+> Admin can EDIT existing templates but CANNOT create new ones.
+> Only developers add new templates by seeding or deploying new code.
+
+---
+
+### 14B.1 What Is a Site Template?
+
+A Site Template is a **complete page experience** — it has its own layout, color scheme, navigation, and bundles a curated set of AI tools together under a specific use case.
+
+**Examples of predefined site templates:**
+
+| Slug | Name | Description | Bundled tools (examples) |
+|------|------|-------------|--------------------------|
+| `default` | Default Homepage | The standard homepage with section builder | — |
+| `social-media-manager` | Social Media Manager | Dashboard for social content creation | instagram-caption, twitter-thread, linkedin-post, tiktok-script, hashtag-strategy, content-calendar |
+| `marketing-suite` | Marketing Suite | End-to-end marketing content wizard | landing-page-copy, facebook-ad, google-ads-headline, email-generator, value-proposition, competitor-analysis |
+| `content-studio` | Content Studio | Editorial content creation hub | blog-article, blog-outline, article-rewriter, content-improver, seo-blog, meta-seo |
+| `ecommerce-toolkit` | eCommerce Toolkit | Product and store content tools | product-description, amazon-listing, review-responder, abandoned-cart-email, upsell-message, flash-sale-copy |
+| `developer-assistant` | Developer Assistant | Code-focused dark-theme IDE experience | code-generator, bug-fixer, code-optimizer, unit-test, api-docs, git-commit |
+| `ai-chatbot-builder` | AI Chatbot Builder | Conversational bot creation interface | chatbot-script, faq-generator, kb-article, onboarding-guide |
+| `academic-writer` | Academic Writer | Student and researcher writing tools | essay-writer, thesis-statement, research-outline, citation-generator, study-guide |
+
+**Key rules:**
+- Templates are **seeded by developers** — not created via admin panel
+- Admin can **edit** (colors, text, SEO, custom HTML) but **not create or delete** templates
+- Each template can be set as the **homepage** via Admin → Settings → General
+- Each template can be added to the **navigation** as a menu link
+- Templates can be **enabled/disabled** per plan (free vs pro)
+
+---
+
+### 14B.2 `site_templates` Table
+
+```sql
+site_templates
+  id
+  slug              varchar(100) UNIQUE     -- 'social-media-manager' (never changes)
+  name              varchar(255)            -- "Social Media Manager" (admin can edit)
+  tagline           varchar(500) NULL       -- hero subtitle (admin can edit)
+  description       text NULL               -- shown in admin template picker
+  preview_image     varchar(500) NULL       -- screenshot in admin selector (1280×800px)
+  icon              varchar(100) NULL       -- Tabler icon for menu/nav
+  layout_component  varchar(100)            -- Vue component name: 'SocialMediaTemplate'
+                                            -- references a file in resources/js/Templates/
+  bundled_tool_slugs json                   -- ["instagram-caption","twitter-thread",...] ordered
+  requires_pro      boolean DEFAULT false   -- only available on extended license
+
+  -- Admin-editable appearance
+  color_primary     varchar(20) NULL        -- override #hex (null = use global primary)
+  color_secondary   varchar(20) NULL        -- override #hex (null = use global secondary)
+  color_bg          varchar(20) NULL        -- page background override
+  color_surface     varchar(20) NULL        -- card/panel background override
+  color_text        varchar(20) NULL        -- body text override
+  font_heading      varchar(100) NULL       -- Google Font name override (null = global)
+  font_body         varchar(100) NULL       -- Google Font name override (null = global)
+
+  -- Admin-editable content
+  hero_headline     varchar(500) NULL       -- main heading on template landing
+  hero_subheadline  text NULL               -- subtitle text
+  hero_cta_text     varchar(100) NULL       -- "Get Started" button text
+  hero_cta_url      varchar(500) NULL       -- null = registration/login
+  hero_bg_image     varchar(500) NULL       -- uploaded background image
+  custom_html_head  text NULL               -- injected in <head> (scripts, fonts)
+  custom_html_body  text NULL               -- injected before </body>
+  custom_css        text NULL               -- scoped CSS override for this template
+
+  -- SEO (all admin-editable)
+  meta_title        varchar(255) NULL
+  meta_description  text NULL
+  og_image          varchar(500) NULL
+
+  -- Admin controls
+  is_active         boolean DEFAULT true    -- false = hidden from all users + nav
+  sort_order        int DEFAULT 0
+
+  -- Timestamps
+  created_at, updated_at
+  -- NO deleted_at — templates cannot be deleted
+```
+
+---
+
+### 14B.3 Admin Editor — What Admin Can Edit
+
+**Admin → Appearance → Site Templates**
+
+Admin sees a grid of all seeded templates with:
+- Preview thumbnail
+- Name + tagline
+- Active/inactive toggle
+- "Edit" button → opens editor
+- NO "New Template" button — this is intentional by design
+
+**Template editor tabs:**
+
+**Tab 1 — Appearance**
+- Primary color (color picker, null = inherit global)
+- Secondary color (color picker)
+- Background color (color picker)
+- Surface/card color (color picker)
+- Text color (color picker)
+- Heading font (Google Font dropdown, null = inherit global)
+- Body font (Google Font dropdown, null = inherit global)
+- Live preview iframe (right panel, updates as user changes values)
+- "Reset to defaults" button (clears all overrides → inherits global design system)
+
+**Tab 2 — Content**
+- Hero headline (text input, `{app_name}` variable supported)
+- Hero subheadline (textarea)
+- Hero CTA button text
+- Hero CTA URL (null = goes to register/login)
+- Hero background image (upload, max 2MB)
+- Template name (shown in admin picker and nav)
+- Template tagline
+
+**Tab 3 — Custom Code**
+- Custom CSS (CodeMirror, scoped to template — no global bleed)
+- Custom HTML (head) — for analytics, third-party scripts
+- Custom HTML (body end) — for chat widgets, pixels
+- Warning banner: "Custom code can break the template. Test carefully."
+
+**Tab 4 — SEO**
+- Meta title (input + 60 char counter)
+- Meta description (textarea + 160 char counter)
+- OG image upload
+- SERP snippet preview (live)
+- Canonical URL (auto-set, read-only)
+- No-index toggle
+
+**Tab 5 — Tools** *(view only — admin cannot add/remove bundled tools)*
+- Shows the list of tools bundled in this template
+- "These tools are defined by the developer and cannot be changed here."
+- Each tool: icon, name, category badge, active indicator
+- If a bundled tool is disabled, it shows a warning: "This tool is disabled. Enable it in AI Tools to restore functionality."
+
+---
+
+### 14B.4 Homepage Setting
+
+**Admin → Settings → General → Homepage**
+
+```
+Homepage: [ Default Landing Page ▾ ]
+          ┌─────────────────────────────────┐
+          │ ● Default Landing Page          │  ← uses homepage builder sections
+          │ ○ Social Media Manager          │
+          │ ○ Marketing Suite               │
+          │ ○ Content Studio                │
+          │ ○ eCommerce Toolkit             │
+          │ ○ Developer Assistant           │
+          │ ○ AI Chatbot Builder            │
+          │ ○ Academic Writer               │
+          └─────────────────────────────────┘
+          Only active templates appear in this list.
+          Pro-only templates shown with lock icon if !isProAvailable().
+```
+
+**Implementation:**
+```php
+// settings('homepage_template') returns slug: 'default' | 'social-media-manager' | etc.
+
+// routes/web.php
+Route::get('/', function () {
+    $slug = settings('homepage_template', 'default');
+
+    if ($slug === 'default') {
+        return app(HomepageController::class)->show();
+    }
+
+    $template = SiteTemplate::where('slug', $slug)
+        ->where('is_active', true)
+        ->firstOrFail();
+
+    return Inertia::render("Templates/{$template->layout_component}", [
+        'template' => SiteTemplateResource::make($template),
+        'tools'    => AiToolService::getBySlugList($template->bundled_tool_slugs),
+    ]);
+})->name('home');
+```
+
+---
+
+### 14B.5 Template Navigation Integration
+
+Admin can add any active template as a menu link in Menu Builder (Part 29):
+
+```sql
+menu_items
+  type enum: 'url' | 'page' | 'blog_category' | 'ai_category' | 'route' | 'site_template'
+
+-- When type = 'site_template':
+  site_template_id  bigint NULL FK → site_templates.id
+  -- label auto-filled from template.name but admin can override
+```
+
+Templates with `requires_pro = true` show a lock icon in the nav builder and are automatically hidden from the rendered menu when `!isProAvailable()`.
+
+---
+
+### 14B.6 Vue Template Components
+
+Each site template has its own Vue component in:
+```
+resources/js/Templates/
+  SocialMediaManagerTemplate.vue
+  MarketingSuiteTemplate.vue
+  ContentStudioTemplate.vue
+  EcommerceToolkitTemplate.vue
+  DeveloperAssistantTemplate.vue
+  AiChatbotBuilderTemplate.vue
+  AcademicWriterTemplate.vue
+```
+
+**All template components receive the same props:**
+```typescript
+interface TemplateProps {
+  template: SiteTemplateResource  // colors, content, meta, custom code
+  tools: AiToolResource[]         // the bundled tools for this template
+}
+```
+
+**Template component responsibilities:**
+- Apply `template.color_primary` etc. as CSS custom properties scoped to the component
+- Render `template.hero_headline`, `template.hero_subheadline`, `template.hero_cta_text`
+- Show the bundled `tools` as tool cards in its layout
+- Inject `template.custom_css` in a `<style>` tag scoped to the component
+- Inject `template.custom_html_head` via Inertia `<Head>`
+- Inject `template.custom_html_body` at bottom of component
+
+**Color application (scoped CSS custom properties):**
+```vue
+<template>
+  <div class="template-wrapper" :style="cssVars">
+    <!-- template content -->
+  </div>
+</template>
+
+<script setup lang="ts">
+const cssVars = computed(() => ({
+  '--t-primary':   props.template.color_primary   ?? 'var(--color-primary-500)',
+  '--t-secondary': props.template.color_secondary ?? 'var(--color-secondary-500)',
+  '--t-bg':        props.template.color_bg        ?? 'var(--surface-bg)',
+  '--t-surface':   props.template.color_surface   ?? 'var(--surface-card)',
+  '--t-text':      props.template.color_text      ?? 'var(--color-gray-700)',
+}))
+</script>
+
+<style scoped>
+/* Use --t-* variables inside the template component */
+.template-wrapper { background: var(--t-bg); }
+.template-card    { background: var(--t-surface); }
+.template-btn     { background: var(--t-primary); }
+</style>
+```
+
+---
+
+### 14B.7 `SiteTemplateResource` — What Admin Edits Are Exposed to Frontend
+
+```php
+// app/Http/Resources/SiteTemplateResource.php
+return [
+    'slug'             => $this->slug,
+    'name'             => $this->name,
+    'tagline'          => $this->tagline,
+    'layout_component' => $this->layout_component,
+
+    // Appearance overrides (null = use global design system)
+    'color_primary'    => $this->color_primary,
+    'color_secondary'  => $this->color_secondary,
+    'color_bg'         => $this->color_bg,
+    'color_surface'    => $this->color_surface,
+    'color_text'       => $this->color_text,
+    'font_heading'     => $this->font_heading,
+    'font_body'        => $this->font_body,
+
+    // Content
+    'hero_headline'    => $this->hero_headline ?? settings('app_name'),
+    'hero_subheadline' => $this->hero_subheadline ?? settings('app_tagline'),
+    'hero_cta_text'    => $this->hero_cta_text ?? translate('Get Started'),
+    'hero_cta_url'     => $this->hero_cta_url ?? route('register'),
+    'hero_bg_image'    => $this->hero_bg_image ? Storage::url($this->hero_bg_image) : null,
+
+    // Custom code (HTML-escaped for safety display, raw for injection)
+    'custom_css'       => $this->custom_css,
+    'custom_html_head' => $this->custom_html_head,
+    'custom_html_body' => $this->custom_html_body,
+
+    // SEO
+    'meta_title'       => $this->meta_title ?? ($this->name . ' — ' . settings('app_name')),
+    'meta_description' => $this->meta_description ?? $this->tagline,
+    'og_image'         => $this->og_image ? Storage::url($this->og_image) : settings('app_og_image'),
+];
+// bundled_tool_slugs and layout_component never exposed raw — tools passed separately as AiToolResource[]
+```
+
+---
+
+### 14B.8 Caching
+
+```php
+// Cache keys for site templates
+'makeai:site_template:{slug}'     TTL: forever (invalidated on save)
+'makeai:site_templates:active'    TTL: forever (invalidated on any save/toggle)
+'makeai:homepage_template'        TTL: forever (invalidated when homepage setting changes)
+```
+
+---
+
+### 14B.9 Checklist: Site Templates
+
+- [ ] Admin can edit all 5 tabs (Appearance, Content, Custom Code, SEO, Tools) for every template
+- [ ] Admin CANNOT create new templates — "+ New Template" button does not exist anywhere
+- [ ] Admin CANNOT delete templates — no delete button in UI or API
+- [ ] Color overrides applied as scoped CSS vars — never bleed into global design system
+- [ ] `color_primary = null` correctly falls back to global `--color-primary-500`
+- [ ] Font override loads correct Google Font when set, falls back to global fonts when null
+- [ ] "Reset to defaults" clears all color/font overrides (sets all to null)
+- [ ] Homepage selector shows only active templates + "Default" option
+- [ ] Pro-only templates locked (shown with padlock) when `!isProAvailable()`
+- [ ] Template route resolves correctly: `settings('homepage_template')` → correct Vue component
+- [ ] `bundled_tool_slugs` respects tool `is_active` state — disabled tools show warning in Tab 5
+- [ ] Custom CSS is scoped — cannot override styles outside the template wrapper
+- [ ] Custom HTML head injected via Inertia `<Head>` (SSR-rendered)
+- [ ] Custom HTML body injected at bottom of template component
+- [ ] SERP preview in SEO tab updates live as meta title/description is typed
+- [ ] Template OG image renders in social share preview
+- [ ] Menu Builder correctly shows `site_template` type items with template names
+- [ ] Template cache invalidated on every save
+- [ ] All 8 predefined templates seeded with sensible default content
+
+---
+
+## 14C.1 Laravel AI SDK
+
+IMPORTANT:
+This project was originally designed around Laravel AI SDK.
+
+I have decided to REMOVE Laravel AI SDK Engine completely.
+
+This is NOT a compatibility migration.
+
+This is a FULL migration to Laravel AI SDK.
+
+There should be NO Laravel AI SDK Engine dependency, NO AiService, NO Laravel AI SDK Engine wrapper, NO Laravel AI SDK Engine adapter, and NO Laravel AI SDK Engine fallback.
+
+Laravel AI SDK is now the only AI engine used in the application.
+
+==================================================
+PROJECT RULES (NON-NEGOTIABLE)
+==================================================
+
+1. isProAvailable() is the gate for ALL subscription features.
+
+Every subscription-related:
+- UI
+- menu
+- route
+- API
+- email
+- billing action
+
+must be wrapped by:
+
+isProAvailable()
+
+If false:
+Pro functionality must be completely hidden.
+
+Never disabled.
+Never locked.
+Never shown.
+
+==================================================
+
+2. Configuration
+
+Use:
+
+settings('key')
+
+for everything.
+
+Never hardcode:
+
+- API keys
+- provider names
+- model names
+- app name
+- branding
+- subscription configuration
+
+==================================================
+
+3. Authentication
+
+OTP only.
+
+No magic links.
+
+OTP must:
+
+- be numeric
+- hashed in database
+- use reusable 6-box OTP component
+- support paste
+- support auto submit
+- support cooldown
+- support lockout
+
+==================================================
+
+4. Streaming
+
+DO NOT use EventSource.
+
+Streaming must use:
+
+POST + fetch() + ReadableStream
+
+Backend streaming responses must include:
+
+X-Accel-Buffering: no
+
+==================================================
+
+5. Frontend
+
+Vue 3
+TypeScript
+<script setup>
+
+Inertia SSR
+
+Tailwind CSS v4
+
+==================================================
+
+6. Database
+
+Never expose users.id
+
+Use ULID publicly.
+
+==================================================
+
+7. AI Usage Tracking
+
+Every AI request must be logged.
+
+Success or failure.
+
+All requests go through TokenGuard.
+
+Before request:
+check limits
+
+After request:
+deduct credits
+calculate cost
+store usage logs
+
+==================================================
+CURRENT STATE
+==================================================
+
+The project currently contains SDK-based architecture.
+
+Search entire codebase for:
+
+Laravel AI SDK
+AiService
+ragQuery
+runAgent
+ingestDocument
+embedText
+embedBatch
+
+and identify all references.
+
+==================================================
+GOAL
+==================================================
+
+Remove Laravel AI SDK Engine completely.
+
+Replace entire AI layer with Laravel AI SDK.
+
+Create a clean enterprise architecture.
+
+Controllers must NEVER call Laravel AI SDK directly.
+
+Controllers must ONLY call:
+
+AiService
+
+==================================================
+TARGET ARCHITECTURE
+==================================================
+
+app/Services/AI/
+
+AiService.php
+
+Contracts/
+  AiDriverInterface.php
+
+Drivers/
+  LaravelAiDriver.php
+
+DTO/
+  CompletionRequest.php
+  CompletionResponse.php
+  StreamChunk.php
+  EmbeddingResult.php
+  RagResult.php
+
+Rag/
+  TextExtractionService.php
+  ChunkingService.php
+  VectorStoreService.php
+  DocumentIngestionService.php
+  KnowledgeBaseSearchService.php
+
+Agents/
+  AgentService.php
+
+==================================================
+REMOVE COMPLETELY
+==================================================
+
+Delete:
+
+- AiService
+- AI config
+- AI imports
+- AI providers
+- AI drivers
+- Laravel AI SDK dependency
+
+Composer:
+
+composer remove laravel/ai
+
+No compatibility wrappers.
+
+No legacy drivers.
+
+No deprecated classes.
+
+==================================================
+AISERVICE CONTRACT
+==================================================
+
+AiService must expose:
+
+complete()
+
+stream()
+
+embedText()
+
+embedBatch()
+
+generateImage()
+
+generateAudio()
+
+generateVideo()
+
+searchKnowledgeBase()
+
+answerWithKnowledgeBase()
+
+runAgent()
+
+summarizeDocument()
+
+extractStructuredData()
+
+All controllers use AiService only.
+
+==================================================
+LARAVEL AI SDK
+==================================================
+
+Use Laravel AI SDK as the only AI implementation.
+
+LaravelAiDriver must support:
+
+- chat completion
+- streaming
+- embeddings
+- image generation
+- audio generation
+- structured output
+- tool calling
+- agent execution
+- vector search
+
+Read provider configuration from settings().
+
+Never hardcode providers.
+
+==================================================
+RAG REQUIREMENTS
+==================================================
+
+Implement a complete production RAG pipeline.
+
+Process:
+
+Upload PDF/DOCX/TXT/CSV
+
+↓
+
+Extract text
+
+↓
+
+Normalize text
+
+↓
+
+Chunk text
+
+↓
+
+Create embeddings
+
+↓
+
+Store vectors
+
+↓
+
+Semantic search
+
+↓
+
+Inject context
+
+↓
+
+Generate answer
+
+↓
+
+Stream answer
+
+==================================================
+DOCUMENT INGESTION
+==================================================
+
+DocumentIngestionService:
+
+Supported:
+
+PDF
+DOCX
+TXT
+CSV
+Markdown
+
+Workflow:
+
+1. upload document
+2. extract text
+3. normalize text
+4. split chunks
+5. create embeddings
+6. save chunks
+7. save vectors
+8. store metadata
+
+==================================================
+CHUNKING RULES
+==================================================
+
+Chunk size:
+
+settings('ai_chunk_size')
+
+Overlap:
+
+settings('ai_chunk_overlap')
+
+No hardcoded values.
+
+==================================================
+VECTOR STORAGE
+==================================================
+
+Review current database.
+
+Create missing migrations if needed.
+
+Support:
+
+knowledge_bases
+knowledge_base_documents
+knowledge_base_chunks
+vector_embeddings
+
+Store:
+
+knowledge_base_id
+document_id
+chunk_id
+user_id
+embedding
+metadata
+
+Do not destroy existing data.
+
+Use safe migrations only.
+
+==================================================
+KNOWLEDGEBASE SEARCH
+==================================================
+
+KnowledgeBaseSearchService
+
+Must:
+
+retrieve top chunks
+
+rank by similarity
+
+return contextual matches
+
+support filters
+
+support multiple knowledge bases
+
+==================================================
+PROMPT BUILDER
+==================================================
+
+Keep existing prompt architecture.
+
+Continue supporting:
+
+ai_templates.prompt_system
+
+ai_templates.prompt_user
+
+fields JSON
+
+brand voice
+
+language
+
+tone
+
+length
+
+knowledgebase context injection
+
+==================================================
+STREAMING
+==================================================
+
+Replace all EventSource implementations.
+
+Frontend must use:
+
+fetch()
+
+ReadableStream
+
+POST requests
+
+Backend response headers:
+
+Content-Type: text/event-stream
+
+Cache-Control: no-cache
+
+X-Accel-Buffering: no
+
+==================================================
+TOKEN GUARD
+==================================================
+
+Before generation:
+
+TokenGuard::before()
+
+After generation:
+
+TokenGuard::after()
+
+Must execute for:
+
+chat
+text
+image
+audio
+video
+agents
+knowledgebase
+
+==================================================
+AI USAGE LOGGING
+==================================================
+
+Log every request.
+
+Store:
+
+provider
+
+model
+
+input_tokens
+
+output_tokens
+
+cost
+
+credits
+
+tool
+
+status
+
+request_id
+
+response_time
+
+Success and failure both logged.
+
+==================================================
+SETTINGS REQUIRED
+==================================================
+
+Create or verify:
+
+ai_default_provider
+
+ai_default_model
+
+ai_embedding_provider
+
+ai_embedding_model
+
+ai_chunk_size
+
+ai_chunk_overlap
+
+ai_max_context_chunks
+
+ai_vector_store_driver
+
+All provider API keys encrypted.
+
+==================================================
+ADMIN PANEL
+==================================================
+
+Update AI settings panel.
+
+Show:
+
+Default provider
+
+Default model
+
+Embedding provider
+
+Embedding model
+
+Chunk size
+
+Chunk overlap
+
+Vector store settings
+
+Test connection
+
+All settings must save via settings().
+
+==================================================
+SEARCH ENTIRE PROJECT
+==================================================
+
+First perform a complete scan.
+
+Find:
+
+- Laravel AI SDK references
+- AI services
+- Controllers
+- Streaming composables
+- Knowledgebase code
+- Embedding code
+- Agent code
+
+List all affected files.
+
+==================================================
+IMPLEMENTATION ORDER
+==================================================
+
+STEP 1
+Create AiService architecture.
+
+STEP 2
+Install and configure Laravel AI SDK.
+
+STEP 3
+Create LaravelAiDriver.
+
+STEP 4
+Migrate text generation.
+
+STEP 5
+Migrate streaming.
+
+STEP 6
+Migrate embeddings.
+
+STEP 7
+Migrate knowledgebase.
+
+STEP 8
+Migrate document ingestion.
+
+STEP 9
+Migrate agents.
+
+STEP 10
+Update admin settings.
+
+STEP 11
+Remove Laravel AI SDK Engine entirely.
+
+STEP 12
+Add tests.
+
+==================================================
+TESTS REQUIRED
+==================================================
+
+Verify:
+
+1. AiService used everywhere.
+
+2. No Laravel AI SDK references remain.
+
+3. Streaming uses POST.
+
+4. Streaming includes X-Accel-Buffering: no.
+
+5. TokenGuard executes.
+
+6. Usage logs created.
+
+7. PDF ingestion works.
+
+8. Embeddings generated.
+
+9. Knowledgebase retrieval works.
+
+10. Agent execution works.
+
+11. Provider settings loaded from settings().
+
+12. No hardcoded provider keys.
+
+==================================================
+OUTPUT FORMAT
+==================================================
+
+Before modifying code:
+
+Show:
+
+1. Laravel AI SDK references found
+2. Files affected
+3. Migration plan
+
+Then implement step by step.
+
+After implementation show:
+
+- changed files
+- removed files
+- new migrations
+- composer changes
+- tests added
+- commands to run
+
+Do not make unrelated UI changes.
+
+Do not introduce EventSource.
+
+Do not introduce magic links.
+
+Do not bypass TokenGuard.
+
+Do not bypass isProAvailable().
+
+Do not hardcode MakeAI in source code.
+
+The final architecture must be Laravel AI SDK only.
+
+---
+
+
 ## PART 15 — AI TOOLS DEVELOPMENT GUIDELINES
 
 > This part covers how every AI tool is architected, rendered, and connected — from DB template to streaming output. Follow this pattern for all 255 tools consistently.
 
 ---
 
-### 15.1 Core Data Flow (Every Tool) ✅
+### 15.1 Core Data Flow (Every Tool)
 
 ```
 User fills form
@@ -2571,7 +3583,7 @@ User fills form
       → CheckCredits middleware
         → TokenGuard::before()
           → ProviderRegistry resolves model
-            → LLPhantService::stream() or complete()
+            → AiService::stream() or complete()
               → SSE stream / JSON response
                 → TokenGuard::after() deducts credits
                   → ai_usage_logs insert
@@ -2581,7 +3593,7 @@ User fills form
 
 ---
 
-### 15.2 Database: `ai_templates` Fields Reference ✅
+### 15.2 Database: `ai_tools` Fields Reference
 
 ```sql
 slug                varchar(100)   -- unique, used in API routes and Vue routing
@@ -2709,7 +3721,7 @@ Admin can edit both `prompt_system` and `prompt_user` from Admin → AI Tools �
 
 ---
 
-### 15.4 Frontend Tool Page Architecture ✅
+### 15.4 Frontend Tool Page Architecture
 
 Every tool uses the **same Vue page component** — `resources/js/Pages/AI/ToolPage.vue`.
 The template slug from the URL (`/ai-tools/{slug}`) is used to fetch the tool definition and dynamically render the correct form.
@@ -2751,7 +3763,7 @@ URL: /ai-tools/blog-article
 
 ---
 
-### 15.5 Streaming Output (SSE) ✅
+### 15.5 Streaming Output (SSE)
 
 For text generation tools, output streams token by token via Server-Sent Events.
 
@@ -2765,7 +3777,7 @@ public function stream(StreamRequest $request): StreamedResponse
     // 3. Build prompt from template
     // 4. Return StreamedResponse:
     return response()->stream(function () use ($request) {
-        $stream = $this->llphant->stream($completionRequest);
+        $stream = $this->aiService->stream($completionRequest);
         foreach ($stream as $token) {
             echo "data: " . json_encode(['token' => $token]) . "\n\n";
             ob_flush(); flush();
@@ -2793,22 +3805,28 @@ export function useStream() {
     isStreaming.value = true
     error.value = null
 
-    const response = await fetch('/api/v1/generate/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', 'X-CSRF-TOKEN': csrf },
-      body: JSON.stringify({ slug, fields })
-    })
+    const es = new EventSource(
+      `/api/v1/generate/stream?` + new URLSearchParams({ slug, ...fields })
+    )
+    // OR use fetch + ReadableStream for POST with body
 
-    const reader = response.body!.getReader()
-    const decoder = new TextDecoder()
-    // Parse SSE chunks from the POST response body.
+    es.onmessage = (e) => {
+      if (e.data === '[DONE]') { isStreaming.value = false; es.close(); return }
+      const { token } = JSON.parse(e.data)
+      output.value += token
+    }
+    es.onerror = () => {
+      isStreaming.value = false
+      error.value = 'Generation failed. Please try again.'
+      es.close()
+    }
   }
 
   return { output, isStreaming, error, generate }
 }
 ```
 
-**POST streaming (required for all AI generation):**
+**POST streaming (for fields that need request body):**
 Use `fetch()` with `ReadableStream` instead of `EventSource` (EventSource only supports GET).
 
 ```typescript
@@ -2829,7 +3847,7 @@ while (true) {
 
 ---
 
-### 15.6 Prompt Assembly Service ✅
+### 15.6 Prompt Assembly Service
 
 **`app/Services/AI/PromptBuilder.php`**
 
@@ -2883,7 +3901,7 @@ class PromptBuilder
 
 ---
 
-### 15.7 Tool-Specific Output Types & Rendering ✅
+### 15.7 Tool-Specific Output Types & Rendering
 
 | output_type | How rendered in OutputPanel |
 |-------------|---------------------------|
@@ -2924,7 +3942,7 @@ Used: 0.6 credits  (312 tokens)
 
 ---
 
-### 15.9 Save to Documents ✅
+### 15.9 Save to Documents
 
 After generation, output can be saved:
 
@@ -2935,7 +3953,7 @@ After generation, output can be saved:
 
 ---
 
-### 15.10 Regenerate & Variations ✅
+### 15.10 Regenerate & Variations
 
 OutputPanel action buttons:
 - **Regenerate**: re-runs exact same prompt, gets fresh output (replaces current)
@@ -2946,166 +3964,57 @@ OutputPanel action buttons:
 
 ### 15.11 Special Tool Categories & Their Extra Logic
 
-These are not slug-specific hacks. Every special tool must be routed by database metadata and a handler service so admin-created tools can reuse the same engine without adding Vue pages or controller branches.
-
-#### Required Tool Routing Contract
-
-Add these columns to `ai_templates`:
-
-```sql
-generation_type enum(
-  'llm_text',
-  'llm_code',
-  'image',
-  'tts',
-  'document_analysis',
-  'translation',
-  'rewrite',
-  'social_post',
-  'email',
-  'seo',
-  'external_api'
-) DEFAULT 'llm_text'
-
-handler_class varchar(255) NULL
-fixed_credit_cost decimal(10,2) NULL
-async_mode enum('stream','sync','queued') DEFAULT 'stream'
-result_schema json NULL
-```
-
-Routing rules:
-- `output_type` controls rendering only.
-- `generation_type` controls which backend pipeline runs.
-- `handler_class` overrides the default handler for advanced/admin-created tools.
-- Never branch on hardcoded tool slugs in controllers.
-- Every handler must implement `ToolGenerationHandlerInterface`.
-
-```php
-interface ToolGenerationHandlerInterface
-{
-    public function validate(AiTemplate $template, array $fields, ?User $user): array;
-    public function estimate(AiTemplate $template, array $fields, ?User $user): CreditEstimate;
-    public function handle(AiTemplate $template, array $fields, ?User $user): ToolGenerationResult;
-}
-```
-
-Every special handler must define:
-- FormRequest validation rules generated from `fields` JSON plus handler-specific safety rules
-- queue name (`ai`, `media`, `embeddings`, `webhooks`, or `default`)
-- credit calculation method (token-based, fixed, per-character, per-image, per-minute, or provider-cost markup)
-- structured output payload schema
-- storage destination (`documents`, image/audio library, external result table, or none)
-- failure behavior and retry policy
-- `ai_usage_logs` metadata fields
-- public-tool behavior (truncate/preview only, no document/library save)
-
 #### Image Generation Tools
 - Extra fields: `size` (512×512, 1024×1024, 1792×1024, etc.), `style` (vivid/natural), `quality` (standard/HD)
 - Provider selector: DALL-E 3 / Flux / Stable Diffusion / Ideogram (only providers with valid API key)
 - Output: image card with download, copy URL, regenerate, save to image library
 - Prompt enhancer toggle: AI rewrites user prompt for better image results before sending to provider
-- Handler: `ImageGenerationHandler`
-- Queue: `media`
-- Async mode: `queued` by default; return `job_id`, then update UI by polling or Reverb event
-- Prompt enhancer is a separate AI request and must run through `TokenGuard::before()`, `LLPhantService`, `TokenGuard::after()`, and `ai_usage_logs`
-- Generated files must be stored via Laravel Storage; never hotlink temporary provider URLs as permanent assets
-- Validate provider, size, quality, and style against enabled provider capabilities loaded from `settings()`
-- Result payload:
-```json
-{
-  "type": "image",
-  "assets": [{ "url": "...", "width": 1024, "height": 1024, "mime": "image/png" }],
-  "meta": { "provider": "flux", "prompt_enhanced": true, "seed": null },
-  "usage": { "credits_used": 4.2, "cost_usd": 0.04 }
-}
-```
 
 #### Code Generation Tools
 - Extra fields: `language` (50+ options), `framework` (context-sensitive)
 - Output: CodeMirror/highlight.js block with: copy, download as file, run (if sandbox enabled), explain this code button
 - Language auto-detected from output for syntax highlighting
-- Handler: `CodeGenerationHandler`
-- Queue: `ai`
-- The "run" button is disabled unless `settings('code_sandbox_enabled') === true` and a sandbox provider is configured
-- Never execute generated code on the Laravel app server
-- Sandbox execution must enforce timeout, memory limit, no private network access, and no filesystem persistence unless explicitly allowed
-- Result payload includes `language`, `filename`, `code`, `explanation`, and optional `sandbox_result`
 
 #### TTS (Text to Speech) Tools
 - Extra fields: `voice` (loaded from provider), `speed` (0.5–2.0), `pitch`
 - Voice preview: play 3-second sample of selected voice before generating
 - Output: audio player + download MP3/WAV
 - Character limit enforced (provider-specific, shown as counter)
-- Handler: `TtsGenerationHandler`
-- Queue: `media`
-- Async mode: `queued`
-- Credit cost is provider-cost markup or per-character, not token-based
-- Voice list is loaded from provider capability cache; do not hardcode voices in Vue
-- Store generated audio via Laravel Storage and save metadata: duration, format, voice, provider, character count
-- Result payload includes `audio_url`, `duration_seconds`, `format`, `voice`, and `character_count`
 
 #### Document Analysis / Summarize Tools
 - Extra field: `file_upload` (PDF/DOCX/TXT) OR `text_input` (paste content)
 - File upload → server extracts text → injected into user prompt as `{document_content}`
 - Large files chunked and processed in sections
-- Handler: `DocumentAnalysisHandler`
-- Queue: `embeddings` for ingestion/chunking, then `ai` for summarization/generation
-- Validate uploaded files by extension, MIME type, and detected content type; never trust extension only
-- Max size, allowed MIME types, and chunk size must come from `settings()`
-- Extracted text is sanitized and stored only when the user saves the result or the tool requires document history
-- Large documents use map-reduce summarization: chunk summaries first, final synthesis second
-- Failed extraction returns a translated validation error, not a generic generation error
 
 #### Translation Tools
 - Source language auto-detect toggle
 - Target language = `language_select` field
 - Output split: original (left) | translated (right) side-by-side on desktop
-- Handler: `TranslationHandler`
-- Queue: `ai`
-- Preserve formatting where possible; never translate code blocks, URLs, placeholders, or protected terms
-- Result payload includes `source_language`, `target_language`, `original_text`, `translated_text`, and `protected_terms`
 
 #### Rewrite / Paraphrase Tools
 - Input = textarea (paste original content)
 - Side-by-side diff view toggle: shows original vs rewritten
 - Similarity score shown (rough Levenshtein % — how different from original)
-- Handler: `RewriteHandler`
-- Queue: `ai`
-- Similarity score must be computed server-side and returned as metadata
-- Never claim plagiarism safety from Levenshtein alone; label it as "difference score"
 
 #### Social Media Post Tools
 - Platform-specific character counter (Twitter: 280, LinkedIn: 3000, etc.)
 - Hashtag extractor: after generation, one-click extracts all hashtags into copyable list
 - Copy formatted for each platform button (removes hashtags for LinkedIn, etc.)
-- Handler: `SocialPostHandler`
-- Queue: `ai`
-- Platform rules come from config/settings table, not hardcoded inside Vue
-- Result payload includes `platform`, `posts`, `hashtags`, `character_counts`, and `warnings`
 
 #### Email Tools
 - Subject line generator included (separate output field)
 - Preview: renders as actual email (header + body + footer) in iframe
-- Handler: `EmailGenerationHandler`
-- Queue: `ai`
-- Result payload must split `subject`, `preheader`, `body_html`, and `body_text`
-- Preview iframe must be sandboxed
-- Do not send generated email directly from this tool; sending must go through `MailTemplateService` or campaign flow
 
 #### SEO Tools
 - After generation: keyword density counter highlights target keywords in output
 - Meta title: character counter with Google SERP width simulation (600px pixel width)
 - Meta description: 160 char limit, SERP snippet preview updates live
-- Handler: `SeoToolHandler`
-- Queue: `ai`
-- Keyword density, title width estimate, and description length are computed server-side and mirrored client-side for live feedback
-- Result payload includes `content`, `keywords`, `density`, `meta_title`, `meta_description`, and `serp_preview`
 
 ---
 
-### 15.12 Tools That Use External APIs (Beyond LLM) ✅
+### 15.12 Tools That Use External APIs (Beyond LLM)
 
-Some tools call non-LLM APIs. These always use `generation_type = 'external_api'` and go through a dedicated service class. Controllers never call vendor SDKs directly.
+Some tools call non-LLM APIs. These go through their own Service class:
 
 | Tool | External API | Service Class |
 |------|-------------|---------------|
@@ -3121,91 +4030,14 @@ Some tools call non-LLM APIs. These always use `generation_type = 'external_api'
 | Speech to Text | Whisper / AssemblyAI | `SpeechToTextService` |
 
 Each service:
-1. Reads API keys and options only from encrypted `settings()` values
-2. Checks if the integration is enabled and configured; otherwise throws `IntegrationNotConfiguredException`
-3. Validates request fields with service-specific rules
-4. Applies timeout, retry, and circuit-breaker limits
-5. Makes the API call through the service class
-6. Deducts credits according to the service billing model
-7. Inserts an `ai_usage_logs` row for success and failure
-8. Returns a structured `ToolGenerationResult`
-
-#### External API Service Contract ✅
-
-```php
-interface ExternalToolServiceInterface
-{
-    public function configured(): bool;
-    public function estimate(array $fields, ?User $user): CreditEstimate;
-    public function run(array $fields, ?User $user): ToolGenerationResult;
-}
-```
-
-Every external service must define:
-- setting keys required, all encrypted when secrets (`settings_set('...','...','encrypted')`)
-- queue name and timeout
-- retry policy (`tries`, backoff, and which exceptions are retryable)
-- fixed or metered credit calculation
-- normalized result schema
-- safe error mapping for users
-- raw provider response logging policy with secrets redacted
-
-#### Credit & Logging Rules
-
-- Run `TokenGuard::before()` before paid external calls using the estimated/fixed credit cost.
-- Run `TokenGuard::afterExternal()` or equivalent after success to deduct exact fixed/metered credits.
-- On provider failure after billable work, log partial cost with `status = failed`.
-- Guest public tools never save external results and only show safe previews.
-- Admin test runs may skip credit deduction, but must be visibly marked as test runs and must not pollute user analytics.
-
-`ai_usage_logs.metadata` for external APIs must include:
-
-```json
-{
-  "template_slug": "plagiarism-checker",
-  "generation_type": "external_api",
-  "service": "PlagiarismService",
-  "external_provider": "copyscape",
-  "request_id": "provider-request-id-if-available",
-  "billable_units": 1234,
-  "personal_api_key": false
-}
-```
-
-#### Security Rules For External APIs ✅
-
-- Never expose provider API keys, request signatures, or raw error payloads to Vue.
-- Never store full third-party responses unless needed for audit/debug and explicitly redacted.
-- URL scraper and web search must block private IP ranges, localhost, link-local, metadata IPs, and internal hostnames to prevent SSRF.
-- File-based external tools must validate MIME type and content before upload to the provider.
-- Provider webhooks must go through the `webhooks` queue and verify signatures before processing.
-- All user-facing messages must use `translate()`.
-
-#### Normalized Result Examples ✅
-
-Plagiarism checker:
-```json
-{
-  "type": "plagiarism",
-  "score": 12.5,
-  "matches": [{ "url": "https://example.com", "percent": 8.4, "snippet": "..." }],
-  "meta": { "provider": "copyscape", "checked_words": 850 }
-}
-```
-
-Speech to text:
-```json
-{
-  "type": "transcript",
-  "text": "...",
-  "segments": [{ "start": 0.0, "end": 4.2, "text": "..." }],
-  "meta": { "provider": "assemblyai", "duration_seconds": 92 }
-}
-```
+1. Checks if relevant API key is configured in settings (throws `IntegrationNotConfiguredException` if not)
+2. Makes the API call
+3. Deducts credits (if applicable — some tools have fixed credit cost, not token-based)
+4. Returns structured result
 
 ---
 
-### 15.13 Token Guard — Full Implementation ✅
+### 15.13 Token Guard — Full Implementation
 
 ```php
 // app/Services/AI/TokenGuard.php
@@ -3279,10 +4111,10 @@ class TokenGuard
 
 Each tool page (`/ai-tools/{slug}`) has a **content area below the generator** containing rich informational sections. All sections are optional and togglable per-tool from admin.
 
-#### Database additions to `ai_templates` ✅
+#### Database additions to `ai_tools`
 
 ```sql
--- Add to ai_templates table
+-- Add to ai_tools table
 about_content         longtext NULL        -- rich HTML (Tiptap)
 how_it_works          json NULL            -- array of steps [{step, title, description, icon}]
 usage_examples        json NULL            -- array of [{title, input_snapshot, output_snapshot}]
@@ -3296,14 +4128,14 @@ meta_title            varchar(255) NULL    -- SEO: override auto-generated
 meta_description      text NULL           -- SEO: override auto-generated
 ```
 
-#### 15.14.1 About Section ✅
+#### 15.14.1 About Section
 
 - Rich HTML content editable from admin template editor (Tiptap MinimalEditor)
 - Shown below the generator in a `<section id="about">` card
 - Can include: what the tool does, who it's for, key benefits, any limitations
 - If `about_content` is null → section hidden automatically (no empty block shown)
 
-#### 15.14.2 How It Works Section ✅
+#### 15.14.2 How It Works Section
 
 Steps stored as JSON array:
 
@@ -3319,7 +4151,7 @@ Rendered as: horizontal step row (desktop) / vertical timeline (mobile). Icons f
 
 Admin edits steps inline in template editor: add/remove/reorder steps, edit icon/title/description per step.
 
-#### 15.14.3 Usage Examples Section ✅
+#### 15.14.3 Usage Examples Section
 
 Shows real input → output examples so users understand what to expect.
 
@@ -3338,7 +4170,7 @@ Rendered as: tabbed cards (1–3 examples). Each card shows:
 - Output in a styled preview box (truncated at 200 chars with "see full" expand)
 - "Try this example" button → pre-fills the form with those input values
 
-#### 15.14.4 FAQ Section (Per-Tool) ✅
+#### 15.14.4 FAQ Section (Per-Tool)
 
 Stored as JSON on the template (not from global `faqs` table — tool-specific).
 
@@ -3352,14 +4184,14 @@ Stored as JSON on the template (not from global `faqs` table — tool-specific).
 Rendered as accordion (Tiptap MinimalEditor for answers in admin).
 Schema.org `FAQPage` JSON-LD injected automatically from this data (see 41.15).
 
-#### 15.14.5 Review / Rating System ✅
+#### 15.14.5 Review / Rating System
 
 Simple star-rating + comment system tied to each AI tool.
 
 **Table: `tool_reviews`**
 ```sql
 id
-template_slug     varchar(100) FK → ai_templates.slug
+template_slug     varchar(100) FK → ai_tools.slug
 user_id           bigint FK → users.id
 rating            tinyint            -- 1–5
 comment           text NULL
@@ -3373,9 +4205,9 @@ created_at, updated_at
 - Only logged-in users who have used the tool at least once can leave a review
 - One review per user per tool (edit allowed within 30 days)
 - Admin must approve before public display (or auto-approve — settings toggle)
-- Aggregate: `avg_rating` and `review_count` cached in `ai_templates` table
+- Aggregate: `avg_rating` and `review_count` cached in `ai_tools` table
 
-**Add to `ai_templates`:**
+**Add to `ai_tools`:**
 ```sql
 avg_rating     decimal(3,2) DEFAULT 0.00
 review_count   int DEFAULT 0
@@ -3680,7 +4512,7 @@ Per-tool setting overrides global default.
 - [ ] `BreadcrumbList` schema always rendered on tool pages
 - [ ] All 4 schemas validate at schema.org/validator with no errors
 - [ ] Google Rich Results Test passes for both FAQ and SoftwareApplication schemas
-- [ ] `avg_rating` and `review_count` on `ai_templates` updated after each review approval
+- [ ] `avg_rating` and `review_count` on `ai_tools` updated after each review approval
 - [ ] Users cannot review a tool they haven't used (check `ai_usage_logs`)
 - [ ] One review per user per tool enforced at DB level (unique constraint: `user_id + template_slug`)
 - [ ] Review auto-approve setting works (immediate vs pending)
@@ -3837,7 +4669,7 @@ Admin → AI Tools → Overview:
 
 ## 🔷 LAYER 4 — CONTENT & CMS
 
-## PART 16 — BLOG SYSTEM ✅
+## PART 16 — BLOG SYSTEM
 
 ### 41.1 Blog Post Table
 
@@ -4033,7 +4865,6 @@ Both show category/tag description at top, full SEO meta.
 
 **Admin → Settings → Blog:**
 ```
-enable_blog_system      boolean true
 posts_per_page          int     9
 related_posts_count     int     3
 related_posts_algorithm varchar  tags_first / category_first / recent
@@ -4093,7 +4924,7 @@ Page options panel (right sidebar in editor):
 - Password protection
 - Parent page (for hierarchy/breadcrumbs)
 
-### 18.2 Default System Pages ✅
+### 18.2 Default System Pages
 
 Auto-created on install (seeded, `is_system = true`):
 - `/privacy-policy` — Privacy Policy (default template content)
@@ -4105,7 +4936,7 @@ Auto-created on install (seeded, `is_system = true`):
 
 These pages are linked in footer automatically. Admin can edit content but cannot delete them.
 
-### 18.3 Contact Form ✅
+### 18.3 Contact Form
 
 **Table: `contact_messages`**
 ```sql
@@ -4130,7 +4961,7 @@ Admin → Messages: list, mark read, reply via email (reply form in admin, sends
 ---
 
 
-## PART 18 — CATEGORIES & ORGANIZATION ✅
+## PART 18 — CATEGORIES & ORGANIZATION
 
 ### 19.1 Category System
 
@@ -4168,9 +4999,9 @@ Frontend:
 
 ---
 
-## PART 19 — TESTIMONIALS & FAQS ✅
+## PART 19 — TESTIMONIALS & FAQS
 
-### 19.1 Testimonials
+### 28.1 Testimonials
 
 **Table: `testimonials`**
 ```sql
@@ -4191,7 +5022,7 @@ Admin → Content → Testimonials:
 - Bulk import from CSV
 - AI Generate button: inputs company type + tone → AI generates realistic testimonials for demo/seeding purposes
 
-### 19.2 FAQs
+### 28.2 FAQs
 
 **Table: `faqs`**
 ```sql
@@ -4216,7 +5047,7 @@ Admin → Content → FAQs:
 
 ---
 
-## PART 20 — RICH TEXT EDITOR (Full Tiptap) ✅
+## PART 20 — RICH TEXT EDITOR (Full Tiptap)
 
 The AI Editor and all rich text areas use **Tiptap v2** with a comprehensive extension set. No feature cut — full word-processor capability.
 
@@ -4351,7 +5182,7 @@ Configured via `variant` prop: `<RichTextEditor variant="full" v-model="content"
 
 ## 🔷 LAYER 5 — COMMUNICATION
 
-## PART 21 — MAIL SYSTEM ✅
+## PART 21 — MAIL SYSTEM
 
 ### 22.1 Mail Configuration (Admin → Mail → Configuration)
 
@@ -4485,11 +5316,11 @@ Admin → Mail → Templates → click any template → full-screen editor:
 
 **Global mail layout wrapper** (`resources/views/emails/layout.blade.php`):
 - Site logo (from settings)
-- Header styling follows the MakeAI email theme defaults
+- Header background color (configurable in Mail → Settings)
 - Content area
 - Footer: site name, address (from settings), unsubscribe link (auto-appended to marketing emails)
 - Social icons (from social settings)
-- Not exposed as an admin WYSIWYG editor; keep layout markup stable to prevent broken production emails
+- Admin can edit the global wrapper too (Admin → Mail → Layout)
 
 ### 22.6 Available Variables per Template
 
@@ -4573,6 +5404,7 @@ Mail
 │   ├── Subscription       (only visible if isProAvailable())
 │   ├── Newsletter         (confirm, unsubscribe, campaign base)
 │   └── Custom             (admin-created templates)
+├── Layout Editor          (global email wrapper HTML/CSS)
 └── Mail Logs              (sent emails log: to, subject, template, status, sent_at)
 ```
 
@@ -4587,7 +5419,7 @@ Admin can view mail logs, resend failed emails, search by recipient/template/dat
 
 ---
 
-## PART 22 — NEWSLETTER SYSTEM ✅
+## PART 22 — NEWSLETTER SYSTEM
 
 Extends Part 16 with Mailchimp sync and popup functionality.
 
@@ -4597,7 +5429,6 @@ Admin → Mail → Newsletter → Driver:
 - **Internal** (default) — uses `newsletter_subscribers` table + configured mail driver
 - **Mailchimp** — syncs to Mailchimp list, campaigns sent from Mailchimp
 - **Both** — stores locally AND syncs to Mailchimp
-- Mailchimp sync MUST run through `SyncMailchimpSubscriber` on the `webhooks` queue; never block the subscribe HTTP request
 
 **Mailchimp settings:**
 ```
@@ -4609,44 +5440,10 @@ mailchimp_tags          varchar   -- default tags for new subscribers (comma-sep
 ```
 
 When Mailchimp is active:
-- New subscriber → queued sync to Mailchimp API (`PUT /3.0/lists/{id}/members/{subscriber_hash}`)
-- Unsubscribe → queued status update to `unsubscribed`
+- New subscriber → added to Mailchimp list via API (`POST /3.0/lists/{id}/members`)
+- Unsubscribe → updated in Mailchimp (`PATCH` status to `unsubscribed`)
 - Campaigns sent via Mailchimp dashboard (MakeAI just manages the list)
 - OR: MakeAI campaign → `POST /3.0/campaigns` → create + send via Mailchimp API
-
-### 34.1.1 Newsletter Campaigns
-
-Admin → Newsletter → Campaigns:
-- Campaigns are created as drafts with `subject` and rich HTML `content`
-- Admin chooses campaign audience:
-  - `subscribers` — active newsletter subscribers
-  - `users_all` — all active, non-banned users with `email_marketing = true`
-  - `users_active` — opted-in users with `last_login_at >= now() - 30 days`
-  - `users_inactive` — opted-in users with no login or login older than 30 days
-  - `users_pro` — opted-in users with active/trialing subscription, hidden when `!isProAvailable()`
-  - `users_free` — opted-in users without active/trialing subscription
-- Sending a campaign MUST only queue work; controller must never loop subscribers or mark sent synchronously
-- `SendNewsletterCampaign` runs on the `emails` queue and sends in chunks of 100 active subscribers
-- For user audiences, each recipient is linked to/created as a newsletter subscriber so one-click unsubscribe works
-- Campaign email rendering uses the active `newsletter_campaign` mail template as the base wrapper
-- Each recipient gets a unique `{unsubscribe_url}`
-- If campaign content does not include `{unsubscribe_url}`, append an unsubscribe link automatically
-- Track per-recipient delivery in `newsletter_campaign_recipients`
-- Update campaign counters: `recipient_count`, `sent_count`, `failed_count`, `started_at`, `finished_at`, `sent_at`
-- `status` flow: `draft` → `sending` → `sent`
-
-**Table: `newsletter_campaign_recipients`**
-```sql
-id
-campaign_id FK → newsletter_campaigns.id
-subscriber_id FK → newsletter_subscribers.id NULL
-email
-name NULL
-status enum('pending','sent','failed')
-error_message text NULL
-sent_at timestamp NULL
-created_at, updated_at
-```
 
 ### 34.2 Popup Newsletter Form
 
@@ -4688,7 +5485,7 @@ Admin can place the newsletter section via Homepage Builder (see Part 31) and Si
 ---
 
 
-## PART 23 — IN-APP NOTIFICATIONS (Reverb) ✅
+## PART 23 — IN-APP NOTIFICATIONS (Reverb)
 
 ### 30.1 Architecture
 
@@ -4711,7 +5508,6 @@ type        varchar(255)           -- e.g. App\Notifications\NewUserRegistered
 notifiable_type varchar(255)       -- App\Models\User or App\Models\Admin
 notifiable_id   bigint
 data        json                   -- notification payload
-status      enum('read','unread')  -- default: 'unread'
 read_at     timestamp NULL
 created_at, updated_at
 ```
@@ -4730,8 +5526,6 @@ Events that trigger notifications to users:
 | Subscription expired | "⚠️ Your subscription has expired" |
 | Payment successful | "💳 Payment of {amount} received. Invoice: #{id}" |
 | Payment failed | "❌ Payment failed for your subscription. Please update billing." |
-| Payout Request cancelled | "❌ Your payout request has been cancelled" |
-| Payout Approved  | "Your payout request has been approved" |
 | Referral earned | "🎁 You earned {amount} credits from a referral!" |
 | Admin announcement | Custom message from admin broadcast |
 | Document processing complete | "✅ Your document '{name}' has been processed" |
@@ -4745,12 +5539,9 @@ Events that trigger notifications to admins (all admins or specific roles):
 
 | Event | Notification | Role |
 |-------|-------------|------|
-| New login from new device | "🔐 New login detected from {city}, {country}" | all |
 | New user registered | "👤 New user: {name} ({email})" | all |
-| New transaction pending | "New transaction pending by {user}, trx id: {trx_id}" | all |
 | New payment received | "💰 New payment: {amount} from {user}" | all |
 | Payment failed | "❌ Payment failed: {user}" | all |
-| Payout Request | "💰 You have a new payout request: {amount}" | super_admin |
 | New support ticket | "🎫 New ticket: '{subject}' from {user}" | support |
 | New contact form message | "✉️ New contact: '{subject}' from {email}" | all |
 | License expiring soon | "⚠️ License re-verification failed — {days} days grace period remaining" | super_admin |
@@ -4786,7 +5577,7 @@ Admin → Content → Announcements → "Broadcast Notification":
 
 ---
 
-## PART 24 — SUPPORT TICKET SYSTEM ✅ COMPLETED
+## PART 24 — SUPPORT TICKET SYSTEM
 
 ### 42.1 Tables
 
@@ -4883,7 +5674,7 @@ id, title, content, department_id NULL FK, created_by FK → admins.id, usage_co
 - Full reply timeline
 - Internal notes tab (admin-only — yellow background, lock icon)
 - "AI Suggest Reply" button:
-  1. Sends ticket subject + all replies to LLPhant
+  1. sends ticket subject + all replies to AI
   2. AI generates suggested reply
   3. Shown in editor as draft (flagged `is_ai_draft = true`)
   4. Admin edits if needed + sends
@@ -4923,7 +5714,7 @@ ai_reply_suggestion          boolean  true
 
 ---
 
-## PART 25 — ANNOUNCEMENT SYSTEM ✅
+## PART 25 — ANNOUNCEMENT SYSTEM
 
 ### 29.1 Announcement Types
 
@@ -4991,66 +5782,18 @@ created_at, updated_at
 
 ## 🔷 LAYER 6 — MONETIZATION
 
-## PART 26 — SUBSCRIPTION SYSTEM (Pro) ✅
+## PART 26 — SUBSCRIPTION SYSTEM (Pro)
 
 Only rendered/accessible when `isProAvailable() === true`.
 
 ### Plans Table
 ```sql
 id, name, slug, description, price_monthly, price_yearly, price_lifetime,
-currency_code DEFAULT 'USD',
 credits_monthly (how many credits per billing period),
 features json (array of feature flags),
 is_featured boolean, is_active boolean, trial_days int DEFAULT 0,
 sort_order int, created_at, updated_at
 ```
-
-### Country-Specific Plan Prices
-Admins can override monthly/yearly/lifetime prices for each country. If a visitor's country has no active price row, show the default plan price from `plans`.
-
-**Table: `plan_country_prices`**
-```sql
-id
-plan_id FK → plans.id
-country_code char(2)              -- ISO 3166-1 alpha-2, e.g. US, BD, IN
-currency_code char(3)             -- ISO 4217, e.g. USD, BDT, INR
-price_monthly decimal(12,2) NULL  -- NULL = fallback to default plan price
-price_yearly decimal(12,2) NULL   -- NULL = fallback to default plan price
-price_lifetime decimal(12,2) NULL -- NULL = fallback to default plan price
-trial_monthly_days int NULL       -- used when price_monthly = 0
-trial_yearly_days int NULL        -- used when price_yearly = 0
-trial_lifetime_days int NULL      -- used when price_lifetime = 0
-is_active boolean DEFAULT true
-created_at, updated_at
-
-UNIQUE(plan_id, country_code)
-INDEX(country_code)
-```
-
-**Price resolution rules**
-1. Resolve visitor country on the server.
-2. Load active `plan_country_prices` row for `plan_id + country_code`.
-3. For each billing cycle, use country price when it is not `NULL`.
-4. If country price is `NULL`, fallback to default plan price.
-5. If country price is `0`, it does not mean free forever. It starts an admin-controlled free trial for that billing cycle.
-6. Default trial days:
-   - monthly: 30 days
-   - yearly: 360 days
-   - lifetime: admin-defined limited trial window, default 30 days
-7. Admin can override trial days per country and billing cycle.
-8. After the trial ends, user must pay the real renewal/upgrade price configured for that country or fallback default price if no paid follow-up price exists.
-
-**Important:** Use `NULL` for fallback and `0` for free trial. Never use falsy checks for price fallback because `0` is a valid configured value.
-
-### Country Detection & Proxy Security
-Pricing country must be resolved server-side, never trusted from frontend input.
-
-- Configure Laravel trusted proxies and only trust `X-Forwarded-For` from known proxy/load balancer IPs.
-- If Cloudflare is enabled, trust `CF-IPCountry` only when the request comes from a verified Cloudflare IP range.
-- Otherwise use GeoIP lookup from the normalized client IP after trusted proxy handling.
-- Store detected country in session for display, but re-resolve country during checkout.
-- Checkout amount must always be calculated by the backend `PlanPriceResolver`.
-- If billing country and detected IP country conflict, admin setting decides whether to allow, block, or require manual review.
 
 ### Payment Gateways
 Each gateway has its own Service class in `app/Services/Payment/`:
@@ -5058,11 +5801,11 @@ Each gateway has its own Service class in `app/Services/Payment/`:
 - **PayPal** — subscriptions + one-time
 - **Paddle** — handles VAT automatically
 - **Razorpay** — India market
-- **SSLCommerz** — Bangladesh market
+- **SSLCommerz** — Bangladesh market (already in your roadmap)
 - **CoinGate** — crypto payments
 - **Paystack** — Africa market
 - **Bank Transfer** — manual, admin approval
-- **2Checkout**
+- **2Checkout / Verifone**
 
 Each gateway implements `PaymentGatewayInterface`:
 ```php
@@ -5081,14 +5824,13 @@ interface PaymentGatewayInterface
 - Monthly/yearly renewal via gateway webhook → credits refill
 - Cancellation → access until `subscription_ends_at`
 - Trial period → `subscription_status = 'trialing'`, `trial_ends_at` set
-- Country price `0` creates a controlled trial, not permanent free access
 - Feature flags from plan stored on user session for fast access
 - Coupon system: admin creates coupons (% or fixed, one-time or recurring, expiry date)
 - Affiliate/Referral: configurable commission % on referred user's first purchase
 
 ---
 
-## PART 27 — AFFILIATE & REFERRAL SYSTEM ✅
+## PART 27 — AFFILIATE & REFERRAL SYSTEM
 
 ### 43.1 Tables
 
@@ -5147,7 +5889,7 @@ processed_at             timestamp NULL
 created_at, updated_at
 ```
 
-### 43.2 User Affiliate Dashboard (`/affiliate`) ✅
+### 43.2 User Affiliate Dashboard (`/affiliate`)
 
 **Overview cards:**
 - Total earnings (all time)
@@ -5216,7 +5958,7 @@ created_at, updated_at
 
 ---
 
-## PART 28 — ADS SYSTEM ✅
+## PART 28 — ADS SYSTEM
 
 Admin can place ads in predefined zones across the frontend. Fully controllable from admin panel.
 
@@ -5228,7 +5970,6 @@ Predefined zones (hardcoded in layout, rendered via `@ads('zone_slug')`):
 - `sidebar_bottom` — bottom of right sidebar
 - `content_top` — above page content
 - `content_bottom` — below page content
-- `content-injection` - inside content (injected after every N grids)
 - `between_posts` — between blog post list items (every N posts, configurable)
 - `chat_banner` — above AI chat input box
 - `dashboard_top` — top of user dashboard
@@ -5345,7 +6086,7 @@ Translations are passed from `HandleInertiaRequests` as shared props (only curre
 
 ## PART 30 — LOCALIZATION OF VUE COMPONENTS
 
-### 30.1 Architecture Overview ✅
+### 30.1 Architecture Overview
 
 MakeAI uses a **hybrid localization approach:**
 - Backend: `translate()` PHP helper (DB-based, admin-editable)
@@ -5356,7 +6097,7 @@ All three must be consistent — if backend sends `created_at` as a timestamp, f
 
 ---
 
-### 30.2 Translation Flow (Backend → Frontend) ✅
+### 30.2 Translation Flow (Backend → Frontend)
 
 **`HandleInertiaRequests.php` shared props:**
 ```php
@@ -5379,6 +6120,12 @@ public function share(Request $request): array
             ],
         ],
         'translations' => TranslationService::getForLocale($locale), // cached
+        'currency' => [
+            'code'    => settings('default_currency', 'USD'),
+            'symbol'  => settings('currency_symbol', '$'),
+            'position'=> settings('currency_position', 'before'), // before | after
+            'decimals'=> (int) settings('currency_decimals', 2),
+        ],
     ];
 }
 ```
@@ -5391,7 +6138,7 @@ public function share(Request $request): array
 
 ---
 
-### 30.3 `useTranslate` Composable ✅
+### 30.3 `useTranslate` Composable
 
 ```typescript
 // composables/useTranslate.ts
@@ -5432,16 +6179,18 @@ app.config.globalProperties.$t = t
 
 ---
 
-### 30.4 RTL Support ✅
+### 30.4 RTL Support
 
 When `locale.is_rtl === true` (Arabic, Persian, Urdu, Hebrew):
 
 **`app.vue` root layout:**
+```vue
 <html
   :lang="$page.props.locale.code"
   :dir="$page.props.locale.is_rtl ? 'rtl' : 'ltr'"
   :class="{ rtl: $page.props.locale.is_rtl }"
 >
+```
 
 **Tailwind RTL classes** — use `rtl:` variant throughout:
 ```html
@@ -5485,7 +6234,7 @@ Using CSS logical properties (`margin-inline-start`, `padding-inline-end`, `inse
 
 ---
 
-### 30.5 Date & Time Formatting ✅
+### 30.5 Date & Time Formatting
 
 **Composable `useDateFormat.ts`:**
 ```typescript
@@ -5544,7 +6293,7 @@ export function useDateFormat() {
 
 ---
 
-### 30.6 Number & Currency Formatting ✅
+### 30.6 Number & Currency Formatting
 
 **Composable `useNumberFormat.ts`:**
 ```typescript
@@ -5599,7 +6348,7 @@ export function useNumberFormat() {
 
 ---
 
-### 30.7 Languages Table — Additional Columns ✅
+### 30.7 Languages Table — Additional Columns
 
 ```sql
 ALTER TABLE languages ADD COLUMN
@@ -5616,7 +6365,7 @@ Admin → Settings → Languages → Edit Language:
 
 ---
 
-### 30.8 Language Switcher Component ✅
+### 30.8 Language Switcher Component
 
 ```vue
 <!-- LanguageSwitcher.vue -->
@@ -5624,8 +6373,7 @@ Admin → Settings → Languages → Edit Language:
 <template>
   <div class="lang-switcher">
     <button @click="open = !open" class="btn-ghost btn-sm">
-      <FlagIcon :flag="currentLang.flag" :language-code="currentLang.code" :language-name="currentLang.name" />
-      {{ currentLang.name }}
+      {{ currentLang.flag }} {{ currentLang.name }}
       <ChevronDown :size="14" />
     </button>
     <div v-if="open" class="lang-dropdown">
@@ -5635,8 +6383,7 @@ Admin → Settings → Languages → Edit Language:
         @click="switchLanguage(lang.code)"
         :class="{ active: lang.code === currentLocale }"
       >
-        <FlagIcon :flag="lang.flag" :language-code="lang.code" :language-name="lang.name" />
-        {{ lang.name }}
+        {{ lang.flag }} {{ lang.name }}
         <Check v-if="lang.code === currentLocale" :size="14" />
       </button>
     </div>
@@ -5644,8 +6391,6 @@ Admin → Settings → Languages → Edit Language:
 </template>
 
 <script setup lang="ts">
-// languages.flag stores an admin-uploaded public image path, e.g. /storage/language-flags/bn.svg.
-// FlagIcon renders uploaded flat flag images and falls back to a neutral text marker when empty.
 const switchLanguage = async (code: string) => {
     // For guests: sets session via POST /locale
     // For logged-in: updates users.language via PATCH /user/language
@@ -5666,7 +6411,7 @@ Language switch takes effect **without full page reload** — Inertia partial re
 
 ---
 
-### 30.9 Admin Translation Manager ✅
+### 30.9 Admin Translation Manager
 
 Admin → Settings → Languages → Translations:
 
@@ -5677,7 +6422,7 @@ Admin → Settings → Languages → Translations:
 - Table: Original (English) | Translation | Last updated | Edit button
 - Filter: Untranslated only / All / Search by key
 - Inline edit: click translation cell → input appears → Enter to save
-- **AI Auto-translate button:** selects all untranslated keys → sends to DeepL (add api key in admin panel settings, external apis) or GPT-4o → fills translations in bulk (admin reviews before saving)
+- **AI Auto-translate button:** selects all untranslated keys → sends to DeepL or GPT-4o → fills translations in bulk (admin reviews before saving)
 - Import JSON (overwrite or merge)
 - Export JSON for offline editing
 
@@ -5784,7 +6529,9 @@ All values injected as CSS custom properties in `:root {}` via a dynamic `GET /c
 - Card/panel background color
 - Border radius preset: `sharp` (0px), `soft` (8px), `rounded` (16px), `pill` (9999px) — affects all buttons and cards globally
 
-### 16.3 Live Search System ✅
+### 16.3 Live Search System
+
+**Livewire component `LiveSearch`:**
 
 ```
 Trigger: user types 3+ characters in global search bar (debounce 300ms)
@@ -5796,11 +6543,12 @@ Searches across (configurable per category in settings):
 - Pages (by title)
 - Prompt library (by title + content)
 - Users (admin only — by name/email)
-- on click search box overlay shows with suggested/recent search keywords
 
 Results grouped by type, shown in dropdown below search bar.
 
 Keyboard navigation: arrow up/down to select, Enter to go, Escape to close.
+
+**`app/Http/Livewire/LiveSearch.php`** — uses `FULLTEXT` MySQL index on searchable columns, falls back to `LIKE` if fulltext not available.
 
 Highlighted matched text in results (wraps matched portion in `<mark>` tag).
 
@@ -6001,6 +6749,7 @@ interface MenuGroup {
    │     ├── Subscription              [Pro badge — hidden if !isProAvailable()]
    │     ├── Newsletter
    │     └── Custom
+   ├── Layout Editor
    └── Mail Logs
 
 📨 Newsletter                         [chevron ▾]
@@ -6114,7 +6863,7 @@ const toggle = (slug: string) => {
 
 ## PART 34 — SOCIAL FEATURES
 
-### 20.1 Social Share Buttons ✅
+### 20.1 Social Share Buttons
 
 **`app/View/Components/SocialShare.php`** + Vue component `SocialShare.vue`
 
@@ -6135,7 +6884,7 @@ Share count display: uses each platform's public share count API where available
 
 Placements: blog posts, AI-generated content (share your generated text/image), custom pages.
 
-### 20.2 Social Follow Counters ✅
+### 20.2 Social Follow Counters
 
 Admin → Settings → Social Media:
 - Add social profile URLs: Facebook page, X/Twitter, Instagram, LinkedIn, YouTube, TikTok, GitHub, Discord invite
@@ -6219,17 +6968,22 @@ Flow:
 
 ### 15.3 Cache Management
 
-Admin header → three-dots dropdown → Clear Cache
+Admin → System → Cache
 
-Header dropdown menu:
-- **Visit Site** — opens the public site.
-- **Clear Cache** — runs `php artisan optimize:clear`.
+Buttons with confirmation modals:
+- **Clear application cache** — `php artisan cache:clear`
+- **Clear config cache** — `php artisan config:clear` then `config:cache`
+- **Clear route cache** — `php artisan route:clear` then `route:cache`
+- **Clear view cache** — `php artisan view:clear` then `view:cache`
+- **Clear all caches** — all of the above in sequence
+- **Clear OPcache** — `opcache_reset()` if available
+- **Flush Redis** — flushes only the app's Redis DB (not all Redis keys)
 
-Do not add separate application/config/route/view cache buttons on the System Tools page. Cache clearing must be a single admin-header action with immediate feedback.
+Each button shows last cleared timestamp. All operations run via artisan commands dispatched as synchronous jobs (not queued — needs immediate feedback).
 
-### 15.4 Cron Job Setup ✅
+### 15.4 Cron Job Setup
 
-Admin → System → Cron Jobs 
+Admin → System → Cron Jobs
 
 Page shows:
 - Required cron entry: `* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1`
@@ -6253,7 +7007,7 @@ Schedule::command('ai:cleanup-temp-files')->daily();
 Schedule::command('analytics:aggregate')->hourly();
 ```
 
-### 15.5 Maintenance Mode ✅
+### 15.5 Maintenance Mode
 
 Admin → System → Maintenance
 
@@ -6349,30 +7103,10 @@ Mobile header: separate simplified builder — logo + hamburger (opens `mobile_o
 
 Admin → Appearance → Footer
 
-Visual drag-and-drop footer layout builder, matching the Header Builder interaction model instead of manual configuration. Admins build the footer by dragging widgets from a block palette into footer zones and columns, then reordering or moving them between zones.
-
-Footer zones:
-- Main footer grid (1/2/3/4 column layout)
-- Bottom bar / sub-footer
-- Mobile footer (optional simplified layout)
-
-Drag-and-drop requirements:
-- Drag widgets from the available block palette into any footer column or bottom-bar slot
-- Reorder widgets inside the same column
-- Move widgets across columns and zones
-- Drag columns left/right to reorder column positions
-- Add/remove columns with grid presets: 1, 2, 3, 4 columns
-- Resize column width using preset fractions only: 25%, 33%, 50%, 66%, 75%, 100%
-- Duplicate any configured widget
-- Collapse/expand widget settings panels
-- Show empty drop zones with translated helper text
-- Validate required widget settings before save
-- Save layout as structured JSON through a FormRequest, never raw HTML-only configuration
-- Use accessible keyboard fallback controls for reorder, move up/down, move column, duplicate, and remove
-- Preview desktop, tablet, and mobile footer layouts before saving
+Drag-and-drop column layout (1/2/3/4 column grid):
 
 Available footer widgets/blocks per column:
-- About text (logo upload + alt text + description paragraph)
+- About text (logo + description paragraph)
 - Menu list (select from saved menus)
 - Contact info (address, phone, email with icons)
 - Social follow icons
@@ -6380,36 +7114,12 @@ Available footer widgets/blocks per column:
 - Custom HTML
 - Recent blog posts (last N posts, N configurable)
 - AI tool categories list
-- App/legal links group (privacy, terms, refund, contact page selectors)
-- Language switcher
-- Dark mode toggle
-- Trust badges / payment security text
-- Store badges / external CTA buttons
-- Divider / spacer block
 
 Bottom bar (sub-footer):
 - Copyright text (supports `{year}` variable)
 - Bottom menu (select from saved menus)
 - Payment icons (Visa, Mastercard, PayPal, Stripe — toggleable)
 - Back to top button toggle
-- Social icons row
-- Language/currency selector slots
-
-Widget settings rules:
-- Every widget has its own settings drawer, icon, visibility toggle, and responsive visibility options
-- Menu widgets must load saved menus from the Menu Builder, not hardcoded links
-- AI tool category widgets must load active `categories` rows where `type = ai_tool`
-- Recent posts must use paginated/admin-safe queries and configurable count
-- Newsletter block must use the existing Livewire newsletter subscribe component
-- Custom HTML must be sanitized before rendering and must not allow unsafe scripts
-- All labels, helper text, validation errors, and preview empty states must use `translate()` / `$t()`
-
-Rendering and storage:
-- Store layout configuration in settings or footer builder table as versioned structured JSON
-- Render through a dedicated FooterBuilder service/component, cached per locale and invalidated on save
-- Frontend output must support RTL using logical properties and Tailwind `rtl:` variants
-- Hide Pro-only footer widgets completely when `!isProAvailable()`
-- Never expose internal database IDs in public rendered output unless required for non-public admin operations
 
 ### 17.4 Sidebar Builder
 
@@ -6443,7 +7153,37 @@ Sidebar position: left/right/hidden (per page template).
 
 Use **Laravel Livewire v3** for all real-time interactive community features — these are server-driven and do not require Vue, keeping them SEO-friendly and lightweight.
 
-### 13.1 Comments System ✅
+### 13.1 Newsletter System
+
+**Table: `newsletter_subscribers`**
+```sql
+id, email, name NULL, status enum('subscribed','unsubscribed','bounced'),
+token varchar(64) UNIQUE,   -- for unsubscribe link
+subscribed_at timestamp, unsubscribed_at timestamp NULL, created_at
+```
+
+**Table: `newsletter_campaigns`**
+```sql
+id, subject, content longtext, sent_at timestamp NULL,
+recipient_count int DEFAULT 0, opened_count int DEFAULT 0,
+status enum('draft','sending','sent'), created_at
+```
+
+**Admin features:**
+- Subscriber list with export CSV
+- Compose campaign (rich HTML editor with Quill)
+- Send campaign (queued, batch sending via configured mail driver)
+- Open tracking (1px pixel tracking image)
+- Unsubscribe page at `/newsletter/unsubscribe/{token}`
+- Double opt-in toggle (settings)
+
+**Frontend Livewire component `NewsletterSubscribe`:**
+- Inline email input + subscribe button
+- Real-time validation feedback
+- Success/already-subscribed/error states
+- Embeddable anywhere via `@livewire('newsletter-subscribe')`
+
+### 13.2 Comments System
 
 **Table: `comments`**
 ```sql
@@ -6479,7 +7219,7 @@ created_at, updated_at, deleted_at
 - Notify admin on new comment (email)
 - Akismet spam filter API key (optional)
 
-### 13.2 Favorites / Bookmarks System ✅
+### 13.3 Favorites / Bookmarks System
 
 **Table: `favorites`**
 ```sql
@@ -6487,7 +7227,7 @@ id, user_id FK, favoriteable_type, favoriteable_id,  -- polymorphic
 created_at
 ```
 
-Polymorphic: works on `blog_posts`, `ai_templates`, `chatbots`, `generated_images`, `prompt_library`.
+Polymorphic: works on `blog_posts`, `ai_tools`, `chatbots`, `generated_images`, `prompt_library`.
 
 **Livewire component `FavoriteButton`:**
 - Heart/bookmark icon button
@@ -6789,10 +7529,10 @@ Auto-generated with **Dedoc Scramble** (`dedoc/scramble`) — served at `/api/do
 **Queue: `ai`**
 | Job | Trigger | Description |
 |-----|---------|-------------|
-| `ProcessTextGeneration` | Non-streaming AI tool usage | Runs LLPhant completion, saves result to document, deducts credits |
-| `ProcessAgentRun` | AI Workflow node execution | Runs multi-step LLPhant agent with tool calls |
-| `ProcessRagQuery` | Knowledge base chat (non-streaming) | Vector search + LLPhant completion |
-| `GenerateEmbeddings` | Document upload to knowledge base | Chunks text, generates embeddings via LLPhant, stores in vector DB |
+| `ProcessTextGeneration` | Non-streaming AI tool usage | Runs AI completion, saves result to document, deducts credits |
+| `ProcessAgentRun` | AI Workflow node execution | Runs multi-step AI agent with tool calls |
+| `ProcessRagQuery` | Knowledge base chat (non-streaming) | Vector search + AI completion |
+| `GenerateEmbeddings` | Document upload to knowledge base | Chunks text, generates embeddings via Laravel AI SDK, stores in vector DB |
 | `ReprocessFailedAiJob` | Admin retry from dashboard | Re-queues a failed AI job with fresh token check |
 
 **Queue: `media`**
@@ -6845,6 +7585,7 @@ Auto-generated with **Dedoc Scramble** (`dedoc/scramble`) — served at `/api/do
 |-----|---------|-------------|
 | `SendInAppNotification` | Any notifiable event | Broadcasts via Reverb + stores in DB |
 | `ProcessLicenseVerification` | Cron weekly | Re-verifies license against Envato API, updates status |
+| `UpdateExchangeRates` | Cron daily | Fetches latest rates from configured API, updates `currencies` table |
 | `CheckForUpdates` | Cron daily | Hits Envato API to check for new version, sets `update_available` in settings |
 | `AggregateAnalytics` | Cron hourly | Flushes Redis view/usage counters to MySQL |
 | `ProcessSubscriptionRenewals` | Cron hourly | Checks expiring subscriptions, triggers renewal or sends expiry notification |
@@ -6860,7 +7601,7 @@ Auto-generated with **Dedoc Scramble** (`dedoc/scramble`) — served at `/api/do
 | Job | Trigger | Description |
 |-----|---------|-------------|
 | `IncrementPostViews` | Blog post viewed | Batched view count increment (Redis → MySQL flush) |
-| `IncrementToolUsage` | AI tool used | Increments `ai_templates.usage_count` |
+| `IncrementToolUsage` | AI tool used | Increments `ai_tools.usage_count` |
 | `IncrementAdImpressions` | Ad zone rendered | Increments `ads.impressions` async |
 | `TrackAdClick` | Ad link clicked | Increments `ads.clicks` then redirects |
 | `TrackAffiliateClick` | Referral link visited | Logs click, sets cookie |
@@ -6892,6 +7633,7 @@ Schedule::job(new ProcessSubscriptionRenewals)->hourly();
 
 // Daily
 Schedule::job(new ResetDailyCredits)->dailyAt('00:00');
+Schedule::job(new UpdateExchangeRates)->dailyAt('02:00');
 Schedule::job(new CheckForUpdates)->dailyAt('03:00');
 Schedule::job(new FetchSocialFollowerCounts)->dailyAt('04:00');
 Schedule::job(new CleanupTempFiles)->dailyAt('05:00');
@@ -6933,7 +7675,7 @@ $this->call([
 
     // Content
     CategorySeeder::class,          // all AI tool categories + blog categories + faq categories
-    AiTemplateSeeder::class,        // all 255 templates with default prompts
+    AiToolSeeder::class,        // all 255 templates with default prompts
     FaqSeeder::class,               // 20 default FAQs
     PageSeeder::class,              // privacy, terms, contact, about, faq, cookie
     MailTemplateSeeder::class,      // all 23 predefined mail templates
@@ -6974,7 +7716,7 @@ app/
     Admin.php, User.php, Setting.php, Plan.php, etc.
   Services/
     AI/
-      LLPhantService.php
+      AiService.php
       ProviderRegistry.php
       TokenGuard.php
       StreamService.php
@@ -7933,7 +8675,7 @@ FULLTEXT INDEX ft_blog (title, excerpt, content)
 INDEX idx_blog_status_date (status, published_at)
 INDEX idx_blog_author      (author_id)
 
--- ai_templates
+-- ai_tools
 INDEX idx_templates_category  (category_id, is_active, sort_order)
 INDEX idx_templates_slug       (slug)
 INDEX idx_templates_featured   (is_featured, is_active)
@@ -8008,7 +8750,7 @@ makeai:tool_related:{slug}         TTL: 24h
 
 | Metric | Count |
 |--------|-------|
-| Version | 1.0 |
+| Version | 4.0 |
 | Total Parts | 50 |
 | AI Templates | 255 |
 | Mail Templates | 23 |

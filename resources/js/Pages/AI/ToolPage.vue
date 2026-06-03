@@ -11,16 +11,15 @@ import { useStream } from '@/Composables/useStream'
 
 defineOptions({ layout: UserLayout })
 
-interface ToolTemplate {
+interface ToolData {
     id: number
     name: string
     slug: string
     description: string
-    category?: string
+    category?: { name: string; slug: string; icon?: string; color?: string }
     icon?: string
     color?: string
     output_type?: string
-    is_premium?: boolean
     requires_pro?: boolean
     access_level?: string
     fields: ToolField[] | string | Record<string, ToolField>
@@ -38,11 +37,10 @@ interface ToolTemplate {
     show_related_tools?: boolean
     favorites_count?: number
     is_favorited?: boolean
-    toolCategory?: { name: string; slug: string; icon?: string; color?: string }
 }
 
 const props = defineProps<{
-    template: ToolTemplate
+    tool: ToolData
     seo: Record<string, string>
     schemas: Array<Record<string, unknown>>
     relatedTools: Array<{ name: string; slug: string; description: string; icon?: string; color?: string; avg_rating?: number }>
@@ -79,15 +77,15 @@ const toast = useToastr()
 const routeTo = (name: string, params?: unknown): string => route(name, params)
 
 const fields = computed<ToolField[]>(() => {
-    if (!props.template.fields) return []
-    if (typeof props.template.fields === 'string') {
+    if (!props.tool.fields) return []
+    if (typeof props.tool.fields === 'string') {
         try {
-            return JSON.parse(props.template.fields)
+            return JSON.parse(props.tool.fields)
         } catch {
             return []
         }
     }
-    return Array.isArray(props.template.fields) ? props.template.fields : Object.values(props.template.fields)
+    return Array.isArray(props.tool.fields) ? props.tool.fields : Object.values(props.tool.fields)
 })
 
 const normalizeArray = <T,>(value: unknown): T[] => {
@@ -109,9 +107,9 @@ const normalizeArray = <T,>(value: unknown): T[] => {
     return []
 }
 
-const howItWorks = computed(() => normalizeArray<{ step?: number; icon?: string; title?: string; description?: string }>(props.template.how_it_works))
-const usageExamples = computed(() => normalizeArray<{ title?: string; input?: Record<string, unknown>; output?: unknown }>(props.template.usage_examples))
-const faqItems = computed(() => normalizeArray<{ question?: string; answer?: string }>(props.template.faq_items))
+const howItWorks = computed(() => normalizeArray<{ step?: number; icon?: string; title?: string; description?: string }>(props.tool.how_it_works))
+const usageExamples = computed(() => normalizeArray<{ title?: string; input?: Record<string, unknown>; output?: unknown }>(props.tool.usage_examples))
+const faqItems = computed(() => normalizeArray<{ question?: string; answer?: string }>(props.tool.faq_items))
 
 const fieldName = (field: ToolField): string => field.name || field.key || field.id || ''
 
@@ -131,20 +129,20 @@ const contentTabsVisible = computed(() => (
     || hasHowItWorks.value
     || hasUsageExamples.value
     || hasFaqs.value
-    || props.template.show_reviews
-    || (props.template.show_related_tools && props.relatedTools.length)
+    || props.tool.show_reviews
+    || (props.tool.show_related_tools && props.relatedTools.length)
 ))
 
-const hasAbout = computed(() => props.template.show_about && String(props.template.about_content || '').trim() !== '')
-const hasHowItWorks = computed(() => props.template.show_how_it_works && howItWorks.value.some((step) => (
+const hasAbout = computed(() => props.tool.show_about && String(props.tool.about_content || '').trim() !== '')
+const hasHowItWorks = computed(() => props.tool.show_how_it_works && howItWorks.value.some((step) => (
     String(step.title || '').trim() !== '' || String(step.description || '').trim() !== ''
 )))
-const hasUsageExamples = computed(() => props.template.show_usage_examples && usageExamples.value.some((example) => (
+const hasUsageExamples = computed(() => props.tool.show_usage_examples && usageExamples.value.some((example) => (
     String(example.title || '').trim() !== ''
     || Object.keys(example.input || {}).length > 0
     || exampleOutput(example.output).trim() !== ''
 )))
-const hasFaqs = computed(() => props.template.show_faqs && faqItems.value.some((faq) => (
+const hasFaqs = computed(() => props.tool.show_faqs && faqItems.value.some((faq) => (
     String(faq.question || '').trim() !== '' || String(faq.answer || '').trim() !== ''
 )))
 
@@ -158,14 +156,14 @@ onMounted(() => {
     else if (hasHowItWorks.value) activeTab.value = 'how'
     else if (hasUsageExamples.value) activeTab.value = 'examples'
     else if (hasFaqs.value) activeTab.value = 'faqs'
-    else if (props.template.show_reviews) activeTab.value = 'reviews'
+    else if (props.tool.show_reviews) activeTab.value = 'reviews'
     else if (props.relatedTools.length) activeTab.value = 'related'
 })
 
 const runGenerate = () => {
     if (!canSubmit.value) return
     generate({
-        slug: props.template.slug,
+        slug: props.tool.slug,
         fields: formValues.value,
         model: String(formValues.value.model || ''),
     })
@@ -194,7 +192,7 @@ const fetchReviews = async (page = 1, append = false) => {
     reviewsLoading.value = true
 
     try {
-        const response = await fetch(`/api/v1/tools/${props.template.slug}/reviews?sort=${reviewSort.value}&page=${page}`, {
+        const response = await fetch(`/api/v1/tools/${props.tool.slug}/reviews?sort=${reviewSort.value}&page=${page}`, {
             headers: { Accept: 'application/json' },
         })
         const data = await response.json()
@@ -253,7 +251,7 @@ const submitReview = async () => {
 
     try {
         const cookie = document.cookie.match('(^|;)\\s*XSRF-TOKEN\\s*=\\s*([^;]+)')
-        const response = await fetch(`/api/v1/tools/${props.template.slug}/reviews`, {
+        const response = await fetch(`/api/v1/tools/${props.tool.slug}/reviews`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -279,8 +277,8 @@ const submitReview = async () => {
 
 <template>
     <Head>
-        <title>{{ seo.title || template.name }}</title>
-        <meta name="description" :content="seo.description || template.description" />
+        <title>{{ seo.title || tool.name }}</title>
+        <meta name="description" :content="seo.description || tool.description" />
         <meta name="keywords" :content="seo.keywords" />
         <link rel="canonical" :href="seo.canonical" />
         <meta property="og:title" :content="seo.og_title || seo.title" />
@@ -296,46 +294,46 @@ const submitReview = async () => {
         <div class="flex items-center gap-2 mb-6 text-sm">
             <Link :href="routeTo('ai.tools.index')" class="text-gray-500 hover:text-primary-400 transition-colors">AI Tools</Link>
             <i class="ti-chevron-right text-gray-600 text-xs"></i>
-            <Link v-if="template.toolCategory" :href="routeTo('ai.tools.category', template.toolCategory.slug)" class="text-gray-500 hover:text-primary-400 transition-colors">
-                {{ template.toolCategory.name }}
+            <Link v-if="tool.category" :href="routeTo('ai.tools.category', tool.category.slug)" class="text-gray-500 hover:text-primary-400 transition-colors">
+                {{ tool.category.name }}
             </Link>
-            <i v-if="template.toolCategory" class="ti-chevron-right text-gray-600 text-xs"></i>
-            <span class="text-gray-300">{{ template.name }}</span>
+            <i v-if="tool.category" class="ti-chevron-right text-gray-600 text-xs"></i>
+            <span class="text-gray-300">{{ tool.name }}</span>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
             <div class="lg:col-span-4 space-y-5">
                 <div class="bg-white/[0.03] border border-white/5 rounded-2xl p-6 relative overflow-hidden">
                     <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                        <i :class="[template.icon || 'ti-wand', 'text-8xl']" :style="{ color: template.color || '#10b981' }"></i>
+                        <i :class="[tool.icon || 'ti-wand', 'text-8xl']" :style="{ color: tool.color || '#10b981' }"></i>
                     </div>
 
                     <div class="mb-6 flex items-start gap-4">
-                        <div class="w-12 h-12 rounded-xl flex items-center justify-center border shrink-0" :style="{ background: (template.color || '#10b981') + '15', borderColor: (template.color || '#10b981') + '30' }">
-                            <i :class="[template.icon || 'ti-wand', 'text-xl']" :style="{ color: template.color || '#10b981' }"></i>
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center border shrink-0" :style="{ background: (tool.color || '#10b981') + '15', borderColor: (tool.color || '#10b981') + '30' }">
+                            <i :class="[tool.icon || 'ti-wand', 'text-xl']" :style="{ color: tool.color || '#10b981' }"></i>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <h1 class="text-lg font-bold text-white">{{ template.name }}</h1>
+                            <h1 class="text-lg font-bold text-white">{{ tool.name }}</h1>
                             <div class="flex flex-wrap items-center gap-2 mt-1">
-                                <span v-if="template.toolCategory" class="text-xs text-gray-400 inline-flex items-center gap-1">
-                                    <i v-if="template.toolCategory.icon" :class="template.toolCategory.icon"></i>
-                                    {{ template.toolCategory.name }}
+                                <span v-if="tool.category" class="text-xs text-gray-400 inline-flex items-center gap-1">
+                                    <i v-if="tool.category.icon" :class="tool.category.icon"></i>
+                                    {{ tool.category.name }}
                                 </span>
-                                <span v-if="template.requires_pro" class="px-1.5 py-0.5 bg-accent-500/10 text-accent-400 text-[10px] font-bold uppercase rounded border border-accent-500/20">PRO</span>
+                                <span v-if="tool.requires_pro" class="px-1.5 py-0.5 bg-accent-500/10 text-accent-400 text-[10px] font-bold uppercase rounded border border-accent-500/20">PRO</span>
                                 <span v-else class="px-1.5 py-0.5 bg-primary-500/10 text-primary-300 text-[10px] font-bold uppercase rounded border border-primary-500/20">Free</span>
                             </div>
                         </div>
                         <FavoriteButton
                             model-type="ai_templates"
-                            :model-id="template.id"
-                            :is-favorited="Boolean(template.is_favorited)"
-                            :count="template.favorites_count"
+                            :model-id="tool.id"
+                            :is-favorited="Boolean(tool.is_favorited)"
+                            :count="tool.favorites_count"
                             show-count
                             size="sm"
                         />
                     </div>
 
-                    <p class="text-sm text-gray-400 mb-6 leading-relaxed">{{ template.description }}</p>
+                    <p class="text-sm text-gray-400 mb-6 leading-relaxed">{{ tool.description }}</p>
 
                     <DynamicForm
                         v-model="formValues"
@@ -372,14 +370,14 @@ const submitReview = async () => {
             <div class="lg:col-span-8">
                 <OutputPanel
                     :output="output"
-                    :output-type="template.output_type || 'markdown'"
+                    :output-type="tool.output_type || 'markdown'"
                     :loading="isStreaming"
                     :usage="usage"
                     :saved-document="savedDocument"
                     :show-credit-costs="showCreditCosts"
                     :can-save="Boolean(authUser)"
-                    :slug="template.slug"
-                    :default-title="`${template.name} Output`"
+                    :slug="tool.slug"
+                    :default-title="`${tool.name} Output`"
                     @document-saved="handleDocumentSaved"
                 />
 
@@ -400,19 +398,19 @@ const submitReview = async () => {
                 <button v-if="hasHowItWorks" @click="activeTab = 'how'" :class="[activeTab === 'how' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('How It Works') }}</button>
                 <button v-if="hasUsageExamples" @click="activeTab = 'examples'" :class="[activeTab === 'examples' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('Examples') }}</button>
                 <button v-if="hasFaqs" @click="activeTab = 'faqs'" :class="[activeTab === 'faqs' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('FAQs') }}</button>
-                <button v-if="template.show_reviews" @click="activeTab = 'reviews'" :class="[activeTab === 'reviews' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('Reviews') }}</button>
-                <button v-if="template.show_related_tools && relatedTools.length" @click="activeTab = 'related'" :class="[activeTab === 'related' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('Related') }}</button>
+                <button v-if="tool.show_reviews" @click="activeTab = 'reviews'" :class="[activeTab === 'reviews' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('Reviews') }}</button>
+                <button v-if="tool.show_related_tools && relatedTools.length" @click="activeTab = 'related'" :class="[activeTab === 'related' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-700']" class="px-1 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap">{{ t('Related') }}</button>
             </div>
 
             <div>
-                <section v-if="activeTab === 'about' && hasAbout" id="about" class="prose prose-invert prose-sm max-w-none text-gray-300" v-html="template.about_content"></section>
+                <section v-if="activeTab === 'about' && hasAbout" id="about" class="prose prose-invert prose-sm max-w-none text-gray-300" v-html="tool.about_content"></section>
 
                 <div v-if="activeTab === 'how' && hasHowItWorks" class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div v-for="(step, index) in howItWorks" :key="index" class="bg-white/[0.02] border border-white/5 rounded-2xl p-6 relative">
                         <div class="absolute -top-4 -left-4 w-8 h-8 rounded-full bg-primary-500/20 text-primary-400 flex items-center justify-center font-bold text-sm border border-primary-500/30">
                             {{ step.step || index + 1 }}
                         </div>
-                        <i :class="[step.icon || 'ti-check', 'text-2xl mb-4 block']" :style="{ color: template.color || '#10b981' }"></i>
+                        <i :class="[step.icon || 'ti-check', 'text-2xl mb-4 block']" :style="{ color: tool.color || '#10b981' }"></i>
                         <h4 class="text-white font-semibold mb-2">{{ step.title }}</h4>
                         <p class="text-gray-500 text-sm leading-relaxed">{{ step.description }}</p>
                     </div>
@@ -461,7 +459,7 @@ const submitReview = async () => {
                     <div class="flex flex-wrap items-center justify-between gap-4">
                         <div>
                             <h3 class="text-xl font-bold text-white">{{ t('User Reviews') }}</h3>
-                            <p class="text-gray-500 text-sm">{{ template.avg_rating || 0 }}/5 {{ t('from') }} {{ template.review_count || 0 }} {{ t('reviews') }}</p>
+                            <p class="text-gray-500 text-sm">{{ tool.avg_rating || 0 }}/5 {{ t('from') }} {{ tool.review_count || 0 }} {{ t('reviews') }}</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <select v-model="reviewSort" class="px-3 py-2 bg-white/[0.03] border border-white/10 rounded-xl text-sm text-white" @change="changeReviewSort">

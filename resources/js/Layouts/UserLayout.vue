@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { usePage, router } from '@inertiajs/vue3'
+import { Link, usePage, router } from '@inertiajs/vue3'
 import AppHeader from '@/Components/AppHeader.vue'
 import AppFooter from '@/Components/AppFooter.vue'
 import AnnouncementManager from '@/Components/AnnouncementManager.vue'
@@ -42,6 +42,12 @@ onUnmounted(() => document.removeEventListener('click', close))
         <!-- Content -->
         <main class="flex-1">
             <AdSection zone="content_top" class="mx-auto mt-4 w-full max-w-7xl px-6" />
+            <div v-if="user" class="mx-auto mt-4 flex w-full max-w-7xl justify-end px-6">
+                <Link :href="route('user.settings')" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-primary-900/20">
+                    <i class="ti ti-settings text-base"></i>
+                    {{ $t('Settings') }}
+                </Link>
+            </div>
             <slot />
             <AdSection zone="content_bottom" class="mx-auto mb-4 w-full max-w-7xl px-6" />
         </main>

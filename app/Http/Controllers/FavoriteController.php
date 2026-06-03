@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\FavoriteToggleRequest;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\BlogPost;
 use App\Models\Document;
 use App\Models\Favorite;
@@ -86,7 +86,7 @@ class FavoriteController extends Controller
 
         return match ($favoriteableClass) {
             BlogPost::class => $query->published(),
-            AiTemplate::class => $query->active(),
+            AiTool::class => $query->active(),
             Document::class => $query->where('user_id', $user->id),
             Page::class => $query->published(),
             default => $query,
@@ -114,7 +114,7 @@ class FavoriteController extends Controller
                 'color' => '#10b981',
                 'favorited_at' => $favorite->created_at?->toISOString(),
             ],
-            AiTemplate::class => [
+            AiTool::class => [
                 'id' => $favorite->id,
                 'type' => 'ai_templates',
                 'model_id' => $favoriteable->id,

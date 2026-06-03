@@ -58,6 +58,7 @@ class SubscriptionLifecycleService
             $this->allocatePlanCredits($payment->user, $payment->plan, $payment->ulid);
             $this->markCouponUsed($metadata);
             app(AffiliateService::class)->createCommissionForPayment($payment);
+            app(AffiliateService::class)->awardReferralCreditsForPayment($payment);
 
             return $payment->fresh(['plan', 'user', 'subscription']);
         });

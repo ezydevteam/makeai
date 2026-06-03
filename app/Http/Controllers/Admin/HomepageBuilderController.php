@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Models\SiteTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -32,10 +33,36 @@ class HomepageBuilderController extends Controller
         $savedConfig = Setting::getValue('homepage_config');
         $config = is_array($savedConfig) ? array_replace_recursive($this->getDefaults(), $savedConfig) : $this->getDefaults();
 
+        $activeHomepageTemplate = settings('homepage_template', 'default');
+
+        $availableTemplates = SiteTemplate::active()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['slug', 'name', 'requires_pro'])
+            ->map(fn ($t) => [
+                'slug' => $t->slug,
+                'name' => $t->name,
+                'requires_pro' => (bool) $t->requires_pro,
+            ])
+            ->values();
+
         return Inertia::render('Admin/Appearance/HomepageBuilder', [
             'config' => $config,
             'sectionTypes' => self::SECTION_TYPES,
+            'activeHomepageTemplate' => $activeHomepageTemplate,
+            'availableTemplates' => $availableTemplates,
         ]);
+    }
+
+    public function setHomepage(Request $request)
+    {
+        $validated = $request->validate([
+            'homepage_template' => ['required', 'string', 'max:100'],
+        ]);
+
+        settings_set('homepage_template', $validated['homepage_template'], 'string', 'general');
+
+        return back()->with('success', translate('Homepage setting updated.'));
     }
 
     public function update(Request $request)

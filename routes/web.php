@@ -7,6 +7,8 @@ use App\Http\Controllers\AI\TemplateController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Auth\SocialAuthController;
+use App\Http\Controllers\Auth\TwoFactorLoginController;
 use App\Http\Controllers\Auth\VerificationController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CheckoutController;
@@ -21,10 +23,15 @@ use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\User\SettingsController as UserSettingsController;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
+use App\Http\Controllers\HomepageController;
+use App\Http\Resources\SiteTemplateResource;
+use App\Models\AiTool;
 use App\Models\Faq;
 use App\Models\Page;
 use App\Models\Setting;
+use App\Models\SiteTemplate;
 use App\Models\Testimonial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -45,23 +52,40 @@ Route::middleware('web')->prefix('admin')->group(base_path('routes/admin.php'));
 
 // ─── Public ─────────────────────────────────
 Route::get('/', function () {
-    $savedConfig = Setting::getValue('homepage_config');
+    $slug = settings('homepage_template', 'default');
 
-    $testimonials = Testimonial::active()
-        ->ordered()
-        ->get(['id', 'name', 'role', 'company', 'avatar', 'content', 'rating', 'is_featured', 'source'])
-        ->toArray();
+    if ($slug === 'default') {
+        return app(HomepageController::class)->show();
+    }
 
-    $faqs = Faq::active()
-        ->ordered()
-        ->with('category:id,name,sort_order')
-        ->get(['id', 'question', 'answer', 'category_id', 'sort_order'])
-        ->toArray();
+    $template = SiteTemplate::where('slug', $slug)
+        ->where('is_active', true)
+        ->firstOrFail();
 
-    return Inertia::render('Welcome', [
-        'homepage' => is_array($savedConfig) ? $savedConfig : null,
-        'testimonials' => $testimonials,
-        'faqs' => $faqs,
+    if ($template->requires_pro && ! isProAvailable()) {
+        return app(HomepageController::class)->show();
+    }
+
+    $rawSlugs = $template->bundled_tool_slugs;
+
+    if (is_string($rawSlugs)) {
+        $rawSlugs = json_decode($rawSlugs, true);
+    }
+
+    $slugs = is_array($rawSlugs) ? $rawSlugs : [];
+
+    $tools = empty($slugs)
+        ? collect()
+        : AiTool::whereIn('slug', $slugs)
+            ->where('is_active', true)
+            ->orderByRaw('FIELD(slug, '.collect($slugs)->map(fn ($s) => "'{$s}'")->join(',').')')
+            ->get();
+
+    $resolvedTemplate = (new SiteTemplateResource($template))->resolve();
+
+    return Inertia::render("Templates/{$template->layout_component}", [
+        'template' => $resolvedTemplate,
+        'tools' => $tools,
     ]);
 })->name('home');
 Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
@@ -75,12 +99,23 @@ Route::middleware('guest')->group(function () {
     Route::post('login', [LoginController::class, 'login'])->name('login.attempt');
     Route::get('register', [RegisterController::class, 'showRegistrationForm'])->name('register');
     Route::post('register', [RegisterController::class, 'register'])->name('register.attempt');
+    Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
+        ->whereIn('provider', ['google', 'github', 'facebook', 'reddit', 'twitter'])
+        ->middleware('throttle:10,1')
+        ->name('social.redirect');
+    Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
+        ->whereIn('provider', ['google', 'github', 'facebook', 'reddit', 'twitter'])
+        ->middleware('throttle:10,1')
+        ->name('social.callback');
 
     // Password Reset
     Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-    Route::post('forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
-    Route::get('reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-    Route::post('reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update');
+    Route::post('forgot-password', [PasswordResetController::class, 'sendResetOtp'])->middleware('throttle:password-email')->name('password.email');
+    Route::get('reset-password', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
+    Route::post('reset-password/verify', [PasswordResetController::class, 'verifyResetOtp'])->middleware('throttle:password-reset')->name('password.verify');
+    Route::post('reset-password', [PasswordResetController::class, 'resetPassword'])->middleware('throttle:password-reset')->name('password.update');
+    Route::get('two-factor', [TwoFactorLoginController::class, 'show'])->name('two-factor.show');
+    Route::post('two-factor', [TwoFactorLoginController::class, 'verify'])->middleware('throttle:user-2fa')->name('two-factor.verify');
 });
 
 // ─── Authenticated ──────────────────────────
@@ -100,6 +135,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/dashboard', function () {
             return Inertia::render('User/Dashboard');
         })->name('user.dashboard');
+        Route::get('/dashboard/settings', [UserSettingsController::class, 'show'])->name('user.settings');
+        Route::post('/dashboard/settings/two-factor', [UserSettingsController::class, 'enableTwoFactor'])->middleware('throttle:user-2fa')->name('user.settings.2fa.enable');
+        Route::post('/dashboard/settings/two-factor/disable', [UserSettingsController::class, 'disableTwoFactor'])->middleware('throttle:user-2fa')->name('user.settings.2fa.disable');
+        Route::post('/dashboard/settings/two-factor/recovery-codes', [UserSettingsController::class, 'regenerateRecoveryCodes'])->middleware('throttle:user-2fa')->name('user.settings.2fa.recovery-codes');
 
         Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
         Route::post('/checkout/coupon-preview', [CheckoutController::class, 'previewCoupon'])->name('checkout.coupon-preview');
@@ -136,8 +175,8 @@ Route::middleware('auth')->group(function () {
 
 // ─── AI Tools ───────────────────────────────
 Route::get('/ai-tools', [TemplateController::class, 'index'])->name('ai.tools.index');
-Route::get('/ai-tools/{slug}', [TemplateController::class, 'show'])->name('ai.tools.show');
 Route::get('/ai-tools/category/{slug}', [TemplateController::class, 'category'])->name('ai.tools.category');
+Route::get('/ai-tools/{slug}', [TemplateController::class, 'show'])->name('ai.tools.show');
 
 // ─── Blog ───────────────────────────────────
 Route::get('/blog/rss', [BlogController::class, 'rss'])->name('blog.rss');

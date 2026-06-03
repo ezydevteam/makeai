@@ -3,81 +3,79 @@
 namespace App\Services\AI;
 
 use App\Models\AiKey;
+use App\Services\AI\Contracts\AiDriverInterface;
+use App\Services\AI\Drivers\LaravelAiDriver;
 use InvalidArgumentException;
 
 /**
- * ProviderRegistry — resolves AI provider adapters by name.
+ * ProviderRegistry — resolves AI provider drivers with round-robin key load balancing.
  *
- * CAVEMAN say: "One registry to rule them all!" 🦴
- * Add new providers here when you add new adapters.
+ * All providers are now backed by LaravelAiDriver, which wraps the
+ * official Laravel AI SDK (laravel/ai) behind AiDriverInterface.
+ *
+ * To add a new provider:
+ *   1. Add to config/ai.php 'providers' array
+ *   2. Register here in $providers map
+ *   3. Add API keys to ai_keys DB table
  */
 class ProviderRegistry
 {
     /**
-     * @var array<string, class-string<ProviderInterface>>
+     * @var array<string, string>  provider name → driver driver name
      */
     private static array $providers = [
-        'openai' => OpenAiProvider::class,
-        'anthropic' => AnthropicProvider::class,
-        'google' => GoogleProvider::class,
-        'xai' => XaiProvider::class,
-        'deepseek' => DeepSeekProvider::class,
-        'openrouter' => OpenRouterProvider::class,
+        'openai' => 'openai',
+        'anthropic' => 'anthropic',
+        'google' => 'google',
+        'gemini' => 'google',
+        'xai' => 'xai',
+        'deepseek' => 'deepseek',
+        'openrouter' => 'openrouter',
+        'groq' => 'groq',
+        'mistral' => 'mistral',
     ];
 
     /**
-     * Resolve a provider instance by name.
+     * Resolve a provider driver instance by name.
+     *
+     * Uses round-robin API key load balancing from ai_keys table.
      */
-    public static function resolve(string $name): ProviderInterface
+    public static function resolve(string $name): AiDriverInterface
     {
-        $name = strtolower($name);
+        $driverName = self::normalizeName($name);
 
-        if (! isset(self::$providers[$name])) {
-            throw new InvalidArgumentException("AI provider '{$name}' is not registered.");
-        }
-
-        $instance = app(self::$providers[$name]);
-
-        // CAVEMAN MAGIC: Load balancing API keys! 🦴
-        // Fetch an available key, sorted by last_used_at ASC (round-robin)
-        $keyRecord = AiKey::forProvider($name)
+        $keyRecord = AiKey::forProvider($driverName)
             ->available()
             ->orderBy('last_used_at', 'asc')
             ->first();
 
+        $apiKey = null;
         if ($keyRecord) {
-            $instance->setApiKey($keyRecord->api_key);
-
-            // Update last used
+            $apiKey = $keyRecord->api_key;
             $keyRecord->update(['last_used_at' => now(), 'usage_count' => $keyRecord->usage_count + 1]);
         }
 
-        return $instance;
+        $driver = new LaravelAiDriver($driverName, $apiKey);
+
+        return $driver;
     }
 
     /**
      * Resolve a provider with a specific API key (e.g. user's personal key).
      */
-    public static function resolveWithKey(string $name, string $apiKey): ProviderInterface
+    public static function resolveWithKey(string $name, string $apiKey): AiDriverInterface
     {
-        $name = strtolower($name);
+        $driverName = self::normalizeName($name);
 
-        if (! isset(self::$providers[$name])) {
-            throw new InvalidArgumentException("AI provider '{$name}' is not registered.");
-        }
-
-        $instance = app(self::$providers[$name]);
-        $instance->setApiKey($apiKey);
-
-        return $instance;
+        return new LaravelAiDriver($driverName, $apiKey);
     }
 
     /**
-     * Get the default provider.
+     * Get the default provider driver.
      */
-    public static function default(): ProviderInterface
+    public static function default(): AiDriverInterface
     {
-        $defaultProvider = settings('default_ai_provider', config('ai.default_provider', 'openai'));
+        $defaultProvider = settings('default_ai_provider', config('ai.default', 'openai'));
 
         return self::resolve($defaultProvider);
     }
@@ -93,22 +91,32 @@ class ProviderRegistry
     /**
      * Register a new provider at runtime (for addons).
      */
-    public static function register(string $name, string $class): void
+    public static function register(string $name, string $driverName): void
     {
-        self::$providers[$name] = $class;
+        self::$providers[strtolower($name)] = strtolower($driverName);
+    }
+
+    /**
+     * Check if a provider is registered.
+     */
+    public static function has(string $name): bool
+    {
+        return isset(self::$providers[strtolower($name)]);
     }
 
     /**
      * Get all configured (has API key) providers.
+     *
+     * @return AiDriverInterface[]
      */
     public static function configured(): array
     {
         $result = [];
-        foreach (self::$providers as $name => $class) {
+        foreach (self::$providers as $name => $driverName) {
             try {
-                $provider = app($class);
-                if ($provider->isConfigured()) {
-                    $result[$name] = $provider;
+                $driver = new LaravelAiDriver($driverName, settings("{$driverName}_api_key"));
+                if ($driver->isConfigured() || AiKey::forProvider($driverName)->available()->exists()) {
+                    $result[$name] = $driver;
                 }
             } catch (\Throwable) {
                 // Skip misconfigured providers
@@ -116,5 +124,23 @@ class ProviderRegistry
         }
 
         return $result;
+    }
+
+    /**
+     * Normalize provider name to driver name.
+     */
+    private static function normalizeName(string $name): string
+    {
+        $name = strtolower($name);
+
+        if (config("ai.providers.{$name}") !== null) {
+            return $name;
+        }
+
+        if (isset(self::$providers[$name])) {
+            return self::$providers[$name];
+        }
+
+        throw new InvalidArgumentException("AI provider '{$name}' is not registered.");
     }
 }

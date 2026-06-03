@@ -2,22 +2,22 @@
 
 namespace App\Services\AI;
 
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\User;
 
 class ToolAccessService
 {
-    public function effectiveLevel(AiTemplate $tool): string
+    public function effectiveLevel(AiTool $tool): string
     {
         return $tool->getEffectiveAccessLevel();
     }
 
-    public function requiresAuth(AiTemplate $tool): bool
+    public function requiresAuth(AiTool $tool): bool
     {
         return $this->effectiveLevel($tool) !== 'public' || $tool->isProRequired();
     }
 
-    public function assertCanUse(AiTemplate $tool, ?User $user): void
+    public function assertCanUse(AiTool $tool, ?User $user): void
     {
         $accessLevel = $this->effectiveLevel($tool);
 

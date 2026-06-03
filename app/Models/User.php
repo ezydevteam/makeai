@@ -3,14 +3,18 @@
 namespace App\Models;
 
 use App\Services\NotificationEventService;
+use App\Services\Security\TotpService;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * MakeAI User model — aligned with AI_SaaS_Master_Prompt Part 4.1.
@@ -29,15 +33,15 @@ class User extends Authenticatable implements MustVerifyEmail
         'theme_preference', 'locale', 'timezone',
         'personal_api_keys', 'brand_voice',
         'is_active', 'is_banned', 'ban_reason',
-        'otp_code', 'otp_expires_at',
-        'two_factor_secret', 'two_factor_enabled', 'two_factor_confirmed_at',
+        'otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until',
+        'two_factor_secret', 'two_factor_enabled', 'two_factor_confirmed_at', 'two_factor_recovery_codes',
         'login_attempts', 'locked_until',
         'oauth_provider', 'oauth_id',
         'last_login_at', 'last_login_ip', 'email_marketing',
     ];
 
     protected $hidden = [
-        'password', 'remember_token', 'otp_code', 'two_factor_secret', 'personal_api_keys',
+        'password', 'remember_token', 'otp_code', 'two_factor_secret', 'two_factor_recovery_codes', 'personal_api_keys',
     ];
 
     protected function casts(): array
@@ -54,8 +58,10 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_active' => 'boolean',
             'is_banned' => 'boolean',
             'two_factor_enabled' => 'boolean',
+            'two_factor_recovery_codes' => 'array',
             'email_marketing' => 'boolean',
             'otp_expires_at' => 'datetime',
+            'otp_locked_until' => 'datetime',
             'last_login_at' => 'datetime',
             'subscription_ends_at' => 'datetime',
             'trial_ends_at' => 'datetime',
@@ -145,26 +151,165 @@ class User extends Authenticatable implements MustVerifyEmail
     public function generateOtp(): string
     {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        $this->update(['otp_code' => $code, 'otp_expires_at' => now()->addMinutes(10)]);
+        $this->update([
+            'otp_code' => Hash::make($code),
+            'otp_expires_at' => now()->addMinutes((int) settings('otp_expiry_minutes', 10)),
+            'otp_attempts' => 0,
+            'otp_locked_until' => null,
+        ]);
 
         return $code;
     }
 
+    public function isOtpLocked(): bool
+    {
+        return $this->otp_locked_until && now()->isBefore($this->otp_locked_until);
+    }
+
     public function verifyOtp(string $code): bool
     {
+        if ($this->isOtpLocked()) {
+            return false;
+        }
+
         if (! $this->otp_code || ! $this->otp_expires_at) {
             return false;
         }
+
         if (now()->isAfter($this->otp_expires_at)) {
             return false;
         }
 
-        return $this->otp_code === $code;
+        if (! Hash::check($code, $this->otp_code)) {
+            $maxAttempts = (int) settings('otp_max_attempts', 5);
+            $lockoutMinutes = (int) settings('otp_lockout_minutes', 10);
+            $attempts = $this->otp_attempts + 1;
+
+            if ($attempts >= $maxAttempts) {
+                $this->forceFill([
+                    'otp_attempts' => $attempts,
+                    'otp_locked_until' => now()->addMinutes($lockoutMinutes),
+                ])->save();
+            } else {
+                $this->increment('otp_attempts');
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     public function clearOtp(): void
     {
-        $this->update(['otp_code' => null, 'otp_expires_at' => null]);
+        $this->update([
+            'otp_code' => null,
+            'otp_expires_at' => null,
+            'otp_attempts' => 0,
+            'otp_locked_until' => null,
+        ]);
+    }
+
+    public function hasTotpEnabled(): bool
+    {
+        return $this->two_factor_enabled && filled($this->getTwoFactorSecret());
+    }
+
+    public function getTwoFactorSecret(): ?string
+    {
+        if (! $this->two_factor_secret) {
+            return null;
+        }
+
+        try {
+            return Crypt::decryptString($this->two_factor_secret);
+        } catch (Throwable) {
+            return $this->two_factor_secret;
+        }
+    }
+
+    public function verifyTotp(string $code, TotpService $totp): bool
+    {
+        $secret = $this->getTwoFactorSecret();
+
+        if (! $this->hasTotpEnabled() || ! $secret) {
+            return false;
+        }
+
+        return $totp->verify($secret, $code);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function enableTotp(string $secret): array
+    {
+        $this->forceFill([
+            'two_factor_secret' => Crypt::encryptString($secret),
+            'two_factor_enabled' => true,
+            'two_factor_confirmed_at' => now(),
+        ])->save();
+
+        return $this->generateRecoveryCodes();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function generateRecoveryCodes(int $count = 8): array
+    {
+        $codes = collect(range(1, $count))
+            ->map(fn () => Str::upper(Str::random(5).'-'.Str::random(5)))
+            ->values()
+            ->all();
+
+        $this->forceFill([
+            'two_factor_recovery_codes' => collect($codes)
+                ->map(fn (string $code) => Hash::make($this->normalizeRecoveryCode($code)))
+                ->all(),
+        ])->save();
+
+        return $codes;
+    }
+
+    public function useRecoveryCode(string $code): bool
+    {
+        $normalized = $this->normalizeRecoveryCode($code);
+        $recoveryCodes = $this->two_factor_recovery_codes ?? [];
+
+        foreach ($recoveryCodes as $index => $hashedCode) {
+            if (Hash::check($normalized, $hashedCode)) {
+                unset($recoveryCodes[$index]);
+
+                $this->forceFill([
+                    'two_factor_recovery_codes' => array_values($recoveryCodes),
+                ])->save();
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function recoveryCodesCount(): int
+    {
+        return count($this->two_factor_recovery_codes ?? []);
+    }
+
+    public function disableTotp(): void
+    {
+        $this->forceFill([
+            'two_factor_secret' => null,
+            'two_factor_enabled' => false,
+            'two_factor_confirmed_at' => null,
+            'two_factor_recovery_codes' => null,
+        ])->save();
+    }
+
+    private function normalizeRecoveryCode(string $code): string
+    {
+        return Str::lower(str_replace([' ', '-'], '', $code));
     }
 
     // ─── Credits ────────────────────────────────

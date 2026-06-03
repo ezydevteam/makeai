@@ -52,6 +52,14 @@ class LoginController extends Controller
             ]);
         }
 
+        if ($user->hasTotpEnabled()) {
+            $request->session()->put('user_2fa_id', $user->id);
+            $request->session()->put('user_2fa_remember', $request->boolean('remember'));
+            Auth::logout();
+
+            return redirect()->route('two-factor.show');
+        }
+
         $isNewLoginIp = ! $user->loginHistory()
             ->where('ip', $request->ip())
             ->where('success', true)

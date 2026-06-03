@@ -3,20 +3,17 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiTemplate;
-use App\Models\AiToolCategory;
+use App\Models\AiTool;
+use App\Models\Category;
 use App\Services\AI\ToolCatalogCacheService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class AiAccessController extends Controller
 {
-    /**
-     * Display the access settings grid.
-     */
     public function index(Request $request)
     {
-        $query = AiTemplate::with('toolCategory:id,name,slug')
+        $query = AiTool::with('category:id,name,slug')
             ->orderBy('sort_order')
             ->orderBy('name');
 
@@ -28,59 +25,50 @@ class AiAccessController extends Controller
         }
 
         return Inertia::render('Admin/AI/AccessSettings/Index', [
-            'templates' => $query->paginate(30)->withQueryString(),
-            'categories' => AiToolCategory::orderBy('sort_order')->get(['id', 'name', 'slug']),
+            'tools' => $query->paginate(30)->withQueryString(),
+            'categories' => Category::aiTools()->orderBy('sort_order')->get(['id', 'name', 'slug']),
             'filters' => $request->only(['category', 'search']),
-            'globalDefault' => settings('default_tool_access_level', settings('ai_tools_default_access', 'login_required')),
+            'globalDefault' => settings('default_tool_access_level', 'login_required'),
         ]);
     }
 
-    /**
-     * Bulk update access level for multiple templates.
-     */
     public function bulkUpdate(Request $request)
     {
         $data = $request->validate([
-            'template_ids' => 'required|array',
-            'template_ids.*' => 'exists:ai_templates,id',
+            'tool_ids' => 'required|array',
+            'tool_ids.*' => 'exists:ai_tools,id',
             'access_level' => 'required|in:inherit,public,login_required,free_plan,pro_plan',
         ]);
 
-        $templates = AiTemplate::whereIn('id', $data['template_ids'])->get();
+        $tools = AiTool::whereIn('id', $data['tool_ids'])->get();
 
-        AiTemplate::whereIn('id', $data['template_ids'])
+        AiTool::whereIn('id', $data['tool_ids'])
             ->update(['access_level' => $data['access_level']]);
 
-        $templates->each(fn (AiTemplate $template) => ToolCatalogCacheService::invalidateForTool($template));
+        $tools->each(fn (AiTool $tool) => ToolCatalogCacheService::invalidateForTool($tool));
 
         return back()->with('success', translate('Access levels updated successfully.'));
     }
 
-    /**
-     * Update access level for an entire category.
-     */
     public function categoryUpdate(Request $request)
     {
         $data = $request->validate([
-            'category_id' => 'required|exists:ai_tool_categories,id',
+            'category_id' => 'required|exists:categories,id',
             'access_level' => 'required|in:inherit,public,login_required,free_plan,pro_plan',
         ]);
 
-        $category = AiToolCategory::findOrFail($data['category_id']);
-        $templates = AiTemplate::where('category_id', $category->id)->get();
+        $category = Category::findOrFail($data['category_id']);
+        $tools = AiTool::where('category_id', $category->id)->get();
 
-        AiTemplate::where('category_id', $category->id)
+        AiTool::where('category_id', $category->id)
             ->update(['access_level' => $data['access_level']]);
 
         ToolCatalogCacheService::invalidateForCategory($category);
-        $templates->each(fn (AiTemplate $template) => ToolCatalogCacheService::invalidateForTool($template));
+        $tools->each(fn (AiTool $tool) => ToolCatalogCacheService::invalidateForTool($tool));
 
         return back()->with('success', translate('Category access levels updated successfully.'));
     }
 
-    /**
-     * Apply a quick preset.
-     */
     public function presetUpdate(Request $request)
     {
         $preset = $request->validate([
@@ -94,7 +82,7 @@ class AiAccessController extends Controller
             'reset_inherit' => 'inherit',
         };
 
-        AiTemplate::query()->update(['access_level' => $level]);
+        AiTool::query()->update(['access_level' => $level]);
         ToolCatalogCacheService::invalidateAll();
 
         return back()->with('success', translate('Preset applied successfully to all tools.'));

@@ -1,0 +1,67 @@
+<template>
+  <AppLayout>
+    <div class="template-wrapper" :style="cssVars">
+      <Head>
+        <title>{{ template.meta_title ?? 'Social Media Manager — ' + $page.props.appName }}</title>
+        <meta name="description" :content="template.meta_description ?? template.tagline" />
+      </Head>
+      <article v-if="template.custom_html_head" v-html="template.custom_html_head" />
+
+      <section class="relative py-20 md:py-32 bg-gradient-to-br from-indigo-50 to-white dark:from-surface-900 dark:to-surface-950">
+        <div class="max-w-7xl mx-auto px-6 text-center">
+          <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white tracking-tight">{{ template.hero_headline ?? 'Social Media Manager' }}</h1>
+          <p v-if="template.hero_subheadline" class="mt-4 text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">{{ template.hero_subheadline }}</p>
+          <Link v-if="template.hero_cta_text" :href="template.hero_cta_url" class="inline-flex items-center mt-8 px-8 py-3 rounded-xl text-white font-bold transition-all shadow-lg" :style="{ background: cssVars['--t-primary'] }">
+            {{ template.hero_cta_text }}
+          </Link>
+        </div>
+      </section>
+
+      <section class="py-16 md:py-24 bg-white dark:bg-surface-950">
+        <div class="max-w-7xl mx-auto px-6">
+          <h2 class="text-3xl font-extrabold text-gray-900 dark:text-white text-center mb-12">Your Content Toolkit</h2>
+          <div v-if="tools.length === 0" class="text-center text-gray-400 dark:text-gray-500 py-12">
+            No tools bundled with this template.
+          </div>
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="tool in tools"
+              :key="tool.slug"
+              class="group rounded-2xl border border-gray-100 dark:border-surface-700 p-6 transition-all hover:shadow-lg"
+              :style="{ background: cssVars['--t-surface'] }"
+            >
+              <i v-if="tool.icon" :class="tool.icon" class="text-2xl mb-3" :style="{ color: cssVars['--t-primary'] }" />
+              <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">{{ tool.name }}</h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ tool.description }}</p>
+              <Link :href="'/ai-tools/' + tool.slug" class="text-sm font-semibold" :style="{ color: cssVars['--t-primary'] }">
+                Use Tool →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <article v-if="template.custom_html_body" v-html="template.custom_html_body" />
+      <component :is="'style'" v-if="template.custom_css" v-text="template.custom_css" />
+    </div>
+  </AppLayout>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import { Head, Link } from '@inertiajs/vue3'
+import AppLayout from '@/Layouts/AppLayout.vue'
+
+const props = defineProps<{
+  template: Record<string, any>
+  tools: any[]
+}>()
+
+const cssVars = computed(() => ({
+  '--t-primary': props.template.color_primary ?? 'var(--color-primary-500)',
+  '--t-secondary': props.template.color_secondary ?? 'var(--color-secondary-500)',
+  '--t-bg': props.template.color_bg ?? 'var(--surface-bg)',
+  '--t-surface': props.template.color_surface ?? 'var(--surface-card)',
+  '--t-text': props.template.color_text ?? 'var(--color-gray-700)',
+}))
+</script>

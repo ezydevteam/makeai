@@ -1,6 +1,17 @@
 <script setup lang="ts">
-import { Head, useForm, Link } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { Head, useForm, Link, usePage } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { useTranslate } from '@/Composables/useTranslate'
+
+interface SocialLoginProvider {
+    provider: string
+    label: string
+    url: string
+}
+
+interface PageProps {
+    socialLoginProviders?: SocialLoginProvider[]
+}
 
 const form = useForm({
     email: '',
@@ -9,6 +20,13 @@ const form = useForm({
 })
 
 const showPassword = ref(false)
+const page = usePage()
+const { t } = useTranslate()
+const socialProviders = computed(() => {
+    const props = page.props as unknown as PageProps
+
+    return props.socialLoginProviders ?? []
+})
 
 const submit = () => {
     form.post(route('login.attempt'), {
@@ -41,6 +59,22 @@ const submit = () => {
 
             <!-- Card -->
             <div class="auth-card">
+                <div v-if="socialProviders.length > 0" class="mb-8 space-y-3">
+                    <a
+                        v-for="provider in socialProviders"
+                        :key="provider.provider"
+                        :href="provider.url"
+                        class="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary-300 hover:bg-primary-50"
+                    >
+                        {{ t('Continue with :provider', { provider: provider.label }) }}
+                    </a>
+                    <div class="flex items-center gap-3">
+                        <span class="h-px flex-1 bg-gray-100"></span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ t('or') }}</span>
+                        <span class="h-px flex-1 bg-gray-100"></span>
+                    </div>
+                </div>
+
                 <form @submit.prevent="submit" class="space-y-6">
                     <div>
                         <label for="email" class="auth-label">Email Address</label>

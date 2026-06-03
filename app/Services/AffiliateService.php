@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AffiliateCommission;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateReferral;
+use App\Models\CreditTransaction;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -144,6 +145,56 @@ class AffiliateService
 
             return $commission;
         });
+    }
+
+    public function awardReferralCreditsForPayment(Payment $payment): void
+    {
+        if (! $this->isEnabled()) {
+            return;
+        }
+
+        $payment->loadMissing(['user', 'plan']);
+        $user = $payment->user;
+        $program = $this->program();
+
+        if (
+            ! $user
+            || ! $user->referred_by
+            || ! $program->referral_credits_enabled
+            || (float) $program->referral_credits_amount <= 0
+            || $this->hasEarlierCompletedPayment($payment)
+        ) {
+            return;
+        }
+
+        $referrer = User::find($user->referred_by);
+
+        if (! $referrer) {
+            return;
+        }
+
+        $alreadyAwarded = CreditTransaction::query()
+            ->where('user_id', $referrer->id)
+            ->where('type', 'referral')
+            ->where('meta->payment_id', $payment->id)
+            ->where('meta->reward', 'first_purchase_referral_credit')
+            ->exists();
+
+        if ($alreadyAwarded) {
+            return;
+        }
+
+        $referrer->addCredits(
+            (float) $program->referral_credits_amount,
+            'referral',
+            translate('First purchase referral credits'),
+            [
+                'reward' => 'first_purchase_referral_credit',
+                'payment_id' => $payment->id,
+                'payment_ulid' => $payment->ulid,
+                'referred_user_id' => $user->id,
+            ]
+        );
     }
 
     public function approveCommission(AffiliateCommission $commission): void

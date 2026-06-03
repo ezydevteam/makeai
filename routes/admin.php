@@ -7,7 +7,7 @@ use App\Http\Controllers\Admin\AdminTwoFactorController;
 use App\Http\Controllers\Admin\AffiliateController;
 use App\Http\Controllers\Admin\AiAccessController;
 use App\Http\Controllers\Admin\AiManagementController;
-use App\Http\Controllers\Admin\AiTemplateController;
+use App\Http\Controllers\Admin\AiToolController;
 use App\Http\Controllers\Admin\AiToolCategoryController;
 use App\Http\Controllers\Admin\AiUsageLogController;
 use App\Http\Controllers\Admin\AppearanceController;
@@ -47,6 +47,7 @@ use App\Http\Controllers\Admin\TestimonialController;
 use App\Http\Controllers\Admin\ThemeAddonController;
 use App\Http\Controllers\Admin\TranslationController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\SiteTemplateController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -105,6 +106,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::get('users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
     Route::post('users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
     Route::post('users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
+    Route::post('users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->name('admin.users.2fa.disable');
     Route::post('users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
     Route::post('users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
 
@@ -217,6 +219,16 @@ Route::middleware('admin.auth')->group(function () {
     // Appearance: Homepage Builder
     Route::get('appearance/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
     Route::post('appearance/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
+    Route::post('appearance/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
+
+    // Appearance: Site Templates
+    Route::prefix('appearance/site-templates')->name('admin.site-templates.')->group(function () {
+        Route::get('/', [SiteTemplateController::class, 'index'])->name('index');
+        Route::get('{template}/edit', [SiteTemplateController::class, 'edit'])->name('edit');
+        Route::post('{template}', [SiteTemplateController::class, 'update'])->name('update');
+        Route::post('{template}/toggle', [SiteTemplateController::class, 'toggle'])->name('toggle');
+        Route::post('{template}/reset', [SiteTemplateController::class, 'resetToDefaults'])->name('reset');
+    });
 
     // Appearance: Header Builder
     Route::get('appearance/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
@@ -355,10 +367,10 @@ Route::middleware('admin.auth')->group(function () {
         // Usage Logs
         Route::get('/logs', [AiUsageLogController::class, 'index'])->name('logs.index');
 
-        // Templates (Full CRUD)
-        Route::post('/templates/{template}/toggle', [AiTemplateController::class, 'toggle'])->name('templates.toggle');
-        Route::post('/templates/reviews/{review}/action', [AiTemplateController::class, 'reviewAction'])->name('templates.reviews.action');
+        // Tools (Full CRUD)
+        Route::post('/tools/{tool}/toggle', [AiToolController::class, 'toggle'])->name('tools.toggle');
+        Route::post('/tools/reviews/{review}/action', [AiToolController::class, 'reviewAction'])->name('tools.reviews.action');
         Route::resource('categories', AiToolCategoryController::class)->except(['create', 'show', 'edit']);
-        Route::resource('templates', AiTemplateController::class);
+        Route::resource('tools', AiToolController::class);
     });
 });

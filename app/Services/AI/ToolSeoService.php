@@ -2,7 +2,7 @@
 
 namespace App\Services\AI;
 
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 
 /**
  * ToolSeoService — generates SEO meta tags and Schema.org JSON-LD for tool pages.
@@ -21,7 +21,7 @@ class ToolSeoService
     /**
      * Generate meta tags for a tool page.
      */
-    public function getMeta(AiTemplate $tool): array
+    public function getMeta(AiTool $tool): array
     {
         $name = settings('app_name', config('app.name', ''));
         $baseUrl = rtrim(config('app.url'), '/');
@@ -47,7 +47,7 @@ class ToolSeoService
     /**
      * Generate all applicable Schema.org JSON-LD schemas.
      */
-    public function getSchemas(AiTemplate $tool): array
+    public function getSchemas(AiTool $tool): array
     {
         $schemas = [];
         $baseUrl = rtrim(config('app.url'), '/');
@@ -74,7 +74,7 @@ class ToolSeoService
     /**
      * SoftwareApplication schema — makes Google show ratings in search results.
      */
-    private function buildSoftwareApplicationSchema(AiTemplate $tool, string $baseUrl): array
+    private function buildSoftwareApplicationSchema(AiTool $tool, string $baseUrl): array
     {
         $appName = settings('app_name', config('app.name', ''));
 
@@ -116,7 +116,7 @@ class ToolSeoService
     /**
      * FAQPage schema — auto-generated from faq_items JSON.
      */
-    private function buildFaqSchema(AiTemplate $tool): array
+    private function buildFaqSchema(AiTool $tool): array
     {
         $faqItems = is_string($tool->faq_items)
             ? json_decode($tool->faq_items, true)
@@ -148,7 +148,7 @@ class ToolSeoService
     /**
      * HowTo schema — auto-generated from how_it_works JSON.
      */
-    private function buildHowToSchema(AiTemplate $tool): array
+    private function buildHowToSchema(AiTool $tool): array
     {
         $steps = is_string($tool->how_it_works)
             ? json_decode($tool->how_it_works, true)
@@ -175,7 +175,7 @@ class ToolSeoService
     /**
      * BreadcrumbList schema.
      */
-    private function buildBreadcrumbSchema(AiTemplate $tool, string $baseUrl): array
+    private function buildBreadcrumbSchema(AiTool $tool, string $baseUrl): array
     {
         $items = [
             ['@type' => 'ListItem', 'position' => 1, 'name' => translate('Home'),     'item' => $baseUrl],
@@ -183,12 +183,12 @@ class ToolSeoService
         ];
 
         // Add category if tool has one
-        if ($tool->category_id && $tool->toolCategory) {
+        if ($tool->category_id && $tool->category) {
             $items[] = [
                 '@type' => 'ListItem',
                 'position' => 3,
-                'name' => $tool->toolCategory->name,
-                'item' => "{$baseUrl}/ai-tools/category/{$tool->toolCategory->slug}",
+                'name' => $tool->category->name,
+                'item' => "{$baseUrl}/ai-tools/category/{$tool->category->slug}",
             ];
             $items[] = [
                 '@type' => 'ListItem',
@@ -213,9 +213,9 @@ class ToolSeoService
     /**
      * Generate keywords for a tool.
      */
-    private function generateKeywords(AiTemplate $tool): string
+    private function generateKeywords(AiTool $tool): string
     {
-        $categoryName = $tool->toolCategory?->name ?? '';
+        $categoryName = $tool->category?->name ?? '';
         $keywords = [
             $tool->name,
             "AI {$categoryName}",

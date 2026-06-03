@@ -1,0 +1,124 @@
+<?php
+
+namespace App\Http\Controllers\User;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\DisableTwoFactorRequest;
+use App\Http\Requests\Auth\EnableTwoFactorRequest;
+use App\Http\Requests\Auth\RegenerateRecoveryCodesRequest;
+use App\Models\User;
+use App\Services\Security\TotpService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class SettingsController extends Controller
+{
+    public function show(Request $request, TotpService $totp): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $pendingSecret = null;
+        $provisioningUri = null;
+
+        if (! $user->hasTotpEnabled()) {
+            $pendingSecret = $request->session()->get('user_pending_totp_secret');
+
+            if (! $pendingSecret) {
+                $pendingSecret = $totp->generateSecret();
+                $request->session()->put('user_pending_totp_secret', $pendingSecret);
+            }
+
+            $provisioningUri = $totp->provisioningUri(
+                settings('app_name', 'Application'),
+                $user->email,
+                $pendingSecret,
+            );
+        }
+
+        return Inertia::render('User/Settings', [
+            'twoFactor' => [
+                'enabled' => $user->hasTotpEnabled(),
+                'confirmed_at' => $user->two_factor_confirmed_at?->toDateTimeString(),
+                'recovery_codes_count' => $user->recoveryCodesCount(),
+                'manual_key' => $pendingSecret,
+                'provisioning_uri' => $provisioningUri,
+            ],
+            'recoveryCodes' => $request->session()->pull('user_plain_recovery_codes', []),
+        ]);
+    }
+
+    public function enableTwoFactor(EnableTwoFactorRequest $request, TotpService $totp): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $secret = $request->session()->get('user_pending_totp_secret');
+
+        if (! $secret || ! $totp->verify($secret, $request->validated('code'))) {
+            throw ValidationException::withMessages([
+                'code' => [translate('Invalid authenticator code.')],
+            ]);
+        }
+
+        $recoveryCodes = $user->enableTotp($secret);
+        $request->session()->forget('user_pending_totp_secret');
+        $request->session()->put('user_plain_recovery_codes', $recoveryCodes);
+
+        return redirect()
+            ->route('user.settings')
+            ->with('success', translate('Two-factor authentication enabled successfully.'));
+    }
+
+    public function disableTwoFactor(DisableTwoFactorRequest $request, TotpService $totp): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->ensurePasswordMatches($user, (string) $request->validated('password'));
+        $this->ensureValidSecondFactor($user, (string) $request->validated('code'), $totp);
+
+        $user->disableTotp();
+
+        return back()->with('success', translate('Two-factor authentication disabled successfully.'));
+    }
+
+    public function regenerateRecoveryCodes(RegenerateRecoveryCodesRequest $request, TotpService $totp): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $this->ensurePasswordMatches($user, (string) $request->validated('password'));
+        $this->ensureValidSecondFactor($user, (string) $request->validated('code'), $totp);
+
+        $request->session()->put('user_plain_recovery_codes', $user->generateRecoveryCodes());
+
+        return redirect()
+            ->route('user.settings')
+            ->with('success', translate('Recovery codes regenerated successfully.'));
+    }
+
+    private function ensurePasswordMatches(User $user, string $password): void
+    {
+        if (! Hash::check($password, $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => [translate('The provided password is incorrect.')],
+            ]);
+        }
+    }
+
+    private function ensureValidSecondFactor(User $user, string $code, TotpService $totp): void
+    {
+        if ($user->verifyTotp($code, $totp)) {
+            return;
+        }
+
+        if ($user->useRecoveryCode($code)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'code' => [translate('Invalid authenticator or recovery code.')],
+        ]);
+    }
+}

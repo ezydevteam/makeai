@@ -2,29 +2,34 @@
 
 namespace App\Services\AI;
 
+use App\DTO\CompletionResponse;
+use App\DTO\EmbeddingResult;
+use App\DTO\RagResult;
 use App\Models\AiChat;
 use App\Models\AiChatMessage;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\User;
+use App\Services\AI\Agents\AgentService;
+use App\Services\AI\Rag\DocumentIngestionService;
+use App\Services\AI\Rag\KnowledgeBaseSearchService;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
  * AiService — the main entry point for all AI operations.
  *
- * CAVEMAN say: "One service to make fire! 🔥"
- * Controllers call this. This calls TokenGuard → Provider → UsageLog.
+ * All controllers call this. This orchestrates TokenGuard → Provider → UsageLog.
+ * Backed by Laravel AI SDK (laravel/ai) via LaravelAiDriver.
  *
- * Ref: AI_SaaS_Master_Prompt Part 11
+ * Ref: AI_SaaS_Master_Prompt Part 14C.1
  */
 class AiService
 {
-    private PromptBuilder $promptBuilder;
+    public function __construct(
+        private PromptBuilder $promptBuilder,
+    ) {}
 
-    public function __construct(PromptBuilder $promptBuilder)
-    {
-        $this->promptBuilder = $promptBuilder;
-    }
+    // ─── Core: Text Completions ───────────────────────────────────
 
     /**
      * Run a chat completion (stateless — no history).
@@ -36,24 +41,20 @@ class AiService
         ?string $provider = null,
         ?string $model = null,
         array $options = []
-    ): array {
-        // Resolve provider + model
+    ): CompletionResponse {
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
         $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
         $adapter = ProviderRegistry::resolve($providerName);
 
         try {
-            // TokenGuard pre-flight check
             TokenGuard::before($user, null, $modelName);
         } catch (Throwable $e) {
             TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
                 'preflight_error' => class_basename($e),
             ]);
-
             throw $e;
         }
 
-        // Build messages
         $messages = [];
         if ($systemPrompt) {
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
@@ -61,10 +62,8 @@ class AiService
         $messages[] = ['role' => 'user', 'content' => $prompt];
 
         try {
-            // Call provider
             $result = $adapter->chatCompletion($messages, $modelName, $options);
 
-            // TokenGuard post-completion
             TokenGuard::after(
                 $user,
                 $result['input_tokens'],
@@ -73,15 +72,19 @@ class AiService
                 $providerName,
                 'chat'
             );
+
+            return new CompletionResponse(
+                content: $result['content'],
+                inputTokens: $result['input_tokens'],
+                outputTokens: $result['output_tokens'],
+                model: $result['model'],
+            );
         } catch (Throwable $e) {
             TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
                 'error' => $e->getMessage(),
             ]);
-
             throw $e;
         }
-
-        return $result;
     }
 
     /**
@@ -89,44 +92,37 @@ class AiService
      */
     public function runTemplate(
         User $user,
-        AiTemplate $template,
+        AiTool $template,
         array $inputs,
         ?string $provider = null,
         ?string $model = null
     ): array {
-        // Use PromptBuilder for proper prompt assembly
         $completion = $this->promptBuilder->build($template, $inputs, $user);
 
-        // Override model if explicitly provided
         $finalModel = $model ?? $completion->model;
         $providerName = $provider ?? $completion->provider ?? settings('default_ai_provider', 'openai');
 
         try {
-            // TokenGuard pre-flight check
             TokenGuard::before($user, $template, $finalModel);
         } catch (Throwable $e) {
             TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
                 'template_slug' => $template->slug,
                 'preflight_error' => class_basename($e),
             ]);
-
             throw $e;
         }
 
-        // Resolve provider with appropriate API key
         $adapter = $completion->apiKey
             ? ProviderRegistry::resolveWithKey($providerName, $completion->apiKey)
             : ProviderRegistry::resolve($providerName);
 
         try {
-            // Call provider
             $result = $adapter->chatCompletion(
                 $completion->toMessages(),
                 $finalModel,
                 $completion->toOptions()
             );
 
-            // TokenGuard post-completion
             TokenGuard::after(
                 $user,
                 $result['input_tokens'],
@@ -141,7 +137,6 @@ class AiService
                 'template_slug' => $template->slug,
                 'error' => $e->getMessage(),
             ]);
-
             throw $e;
         }
 
@@ -166,33 +161,27 @@ class AiService
         $modelName = $model ?? $chat->model ?? settings('default_ai_model', 'gpt-4o-mini');
 
         try {
-            // TokenGuard pre-flight check
             TokenGuard::before($user, null, $modelName);
         } catch (Throwable $e) {
             TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
                 'chat_id' => $chat->id,
                 'preflight_error' => class_basename($e),
             ]);
-
             throw $e;
         }
 
         $adapter = ProviderRegistry::resolve($providerName);
 
-        // Save user message
         $userMessage = $chat->messages()->create([
             'role' => 'user',
             'content' => $message,
         ]);
 
-        // Get conversation history
         $messages = $chat->getMessagesForApi();
 
         try {
-            // Call provider
             $result = $adapter->chatCompletion($messages, $modelName);
 
-            // Save assistant response
             $assistantMessage = $chat->messages()->create([
                 'role' => 'assistant',
                 'content' => $result['content'],
@@ -201,7 +190,6 @@ class AiService
                 'metadata' => ['model' => $result['model'], 'provider' => $providerName],
             ]);
 
-            // TokenGuard post-completion
             TokenGuard::after(
                 $user,
                 $result['input_tokens'],
@@ -216,16 +204,13 @@ class AiService
                 'chat_id' => $chat->id,
                 'error' => $e->getMessage(),
             ]);
-
             throw $e;
         }
 
-        // Update chat title if it's the first message
         if ($chat->messages()->count() <= 2 && $chat->title === 'New Chat') {
             $chat->update(['title' => Str::limit($message, 60)]);
         }
 
-        // Update model on chat
         if ($chat->model !== $modelName) {
             $chat->update(['model' => $modelName]);
         }
@@ -235,40 +220,33 @@ class AiService
 
     /**
      * Stream a template-based completion.
-     *
-     * Returns a Generator that yields tokens.
      */
     public function streamTemplate(
         User $user,
-        AiTemplate $template,
+        AiTool $template,
         array $inputs,
         ?string $provider = null,
         ?string $model = null
     ): \Generator {
-        // Use PromptBuilder
         $completion = $this->promptBuilder->build($template, $inputs, $user);
         $finalModel = $model ?? $completion->model;
         $providerName = $provider ?? $completion->provider ?? settings('default_ai_provider', 'openai');
 
         try {
-            // TokenGuard pre-flight check
             TokenGuard::before($user, $template, $finalModel);
         } catch (Throwable $e) {
             TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
                 'template_slug' => $template->slug,
                 'preflight_error' => class_basename($e),
             ]);
-
             throw $e;
         }
 
-        // Resolve provider
         $adapter = $completion->apiKey
             ? ProviderRegistry::resolveWithKey($providerName, $completion->apiKey)
             : ProviderRegistry::resolve($providerName);
 
         try {
-            // Stream
             $usageStats = null;
             foreach ($adapter->streamChatCompletion($completion->toMessages(), $finalModel, $completion->toOptions()) as $chunk) {
                 if (is_string($chunk)) {
@@ -278,7 +256,6 @@ class AiService
                 }
             }
 
-            // Record usage after stream completes
             if ($usageStats) {
                 $creditsUsed = TokenGuard::after(
                     $user,
@@ -305,8 +282,388 @@ class AiService
                 'template_slug' => $template->slug,
                 'error' => $e->getMessage(),
             ]);
-
             throw $e;
+        }
+    }
+
+    // ─── 14C.1: Streaming (public entry) ─────────────────────────
+
+    /**
+     * Stream a simple prompt (no template).
+     */
+    public function stream(
+        User $user,
+        string $prompt,
+        ?string $systemPrompt = null,
+        ?string $provider = null,
+        ?string $model = null,
+    ): \Generator {
+        $providerName = $provider ?? settings('default_ai_provider', 'openai');
+        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $adapter = ProviderRegistry::resolve($providerName);
+
+        try {
+            TokenGuard::before($user, null, $modelName);
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure($user, $providerName, $modelName, 'stream', 0, 0, [
+                'preflight_error' => class_basename($e),
+            ]);
+            throw $e;
+        }
+
+        $messages = [];
+        if ($systemPrompt) {
+            $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+        }
+        $messages[] = ['role' => 'user', 'content' => $prompt];
+
+        try {
+            $usageStats = null;
+            foreach ($adapter->streamChatCompletion($messages, $modelName) as $chunk) {
+                if (is_string($chunk)) {
+                    yield $chunk;
+                } elseif (is_array($chunk)) {
+                    $usageStats = $chunk;
+                }
+            }
+
+            if ($usageStats) {
+                TokenGuard::after(
+                    $user,
+                    $usageStats['input_tokens'],
+                    $usageStats['output_tokens'],
+                    $usageStats['model'] ?? $modelName,
+                    $providerName,
+                    'stream',
+                );
+            }
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure($user, $providerName, $modelName, 'stream', 0, 0, [
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    // ─── 14C.1: Embeddings ───────────────────────────────────────
+
+    /**
+     * Generate an embedding vector for a single text.
+     */
+    public function embedText(
+        string $text,
+        ?string $provider = null,
+        ?string $model = null,
+    ): EmbeddingResult {
+        $providerName = $provider ?? settings('ai_embedding_provider', config('ai.default_for_embeddings', 'openai'));
+
+        $adapter = ProviderRegistry::resolve($providerName);
+
+        $result = $adapter->embedText($text);
+
+        return new EmbeddingResult(
+            vector: $result['vector'],
+            dimensions: $result['dimensions'],
+            model: $result['model'],
+            tokensUsed: $result['tokens_used'],
+        );
+    }
+
+    /**
+     * Generate embedding vectors for multiple texts.
+     *
+     * @param  string[]  $texts
+     * @return EmbeddingResult[]
+     */
+    public function embedBatch(
+        array $texts,
+        ?string $provider = null,
+    ): array {
+        $providerName = $provider ?? settings('ai_embedding_provider', config('ai.default_for_embeddings', 'openai'));
+
+        $adapter = ProviderRegistry::resolve($providerName);
+
+        $results = $adapter->embedBatch($texts);
+
+        return array_map(fn (array $r) => new EmbeddingResult(
+            vector: $r['vector'],
+            dimensions: $r['dimensions'],
+            model: $r['model'],
+            tokensUsed: $r['tokens_used'],
+        ), $results);
+    }
+
+    // ─── 14C.1: Image Generation ─────────────────────────────────
+
+    /**
+     * Generate an image from a text prompt.
+     */
+    public function generateImage(
+        string $prompt,
+        ?string $provider = null,
+        ?string $model = null,
+        ?string $size = null,
+        ?string $quality = null,
+    ): array {
+        $providerName = $provider ?? settings('ai_image_provider', config('ai.default_for_images', 'openai'));
+        $provider = app(\Laravel\Ai\AiManager::class)->imageProvider($providerName);
+
+        $response = $provider->image(
+            prompt: $prompt,
+            size: $size,
+            quality: $quality,
+            model: $model,
+        );
+
+        return [
+            'images' => collect($response->images)->map(fn ($img) => [
+                'url' => $img->url,
+                'revised_prompt' => $img->revisedPrompt,
+            ])->all(),
+            'model' => $response->meta->model,
+        ];
+    }
+
+    // ─── 14C.1: Audio Generation ─────────────────────────────────
+
+    /**
+     * Generate audio/speech from text.
+     */
+    public function generateAudio(
+        string $text,
+        string $voice = 'default-female',
+        ?string $provider = null,
+        ?string $model = null,
+    ): array {
+        $providerName = $provider ?? settings('ai_audio_provider', config('ai.default_for_audio', 'openai'));
+
+        $provider = app(\Laravel\Ai\AiManager::class)->audioProvider($providerName);
+
+        $response = $provider->audio(
+            text: $text,
+            voice: $voice,
+            model: $model,
+        );
+
+        return [
+            'audio_url' => $response->audioUrl,
+            'duration' => $response->duration,
+            'model' => $response->meta->model,
+        ];
+    }
+
+    /**
+     * Transcribe audio to text.
+     */
+    public function generateTranscription(
+        \Laravel\Ai\Contracts\Files\TranscribableAudio $audio,
+        ?string $language = null,
+        bool $diarize = false,
+        ?string $provider = null,
+        ?string $model = null,
+    ): array {
+        $providerName = $provider ?? settings('ai_transcription_provider', config('ai.default_for_transcription', 'openai'));
+
+        $provider = app(\Laravel\Ai\AiManager::class)->transcriptionProvider($providerName);
+
+        $response = $provider->transcribe(
+            audio: $audio,
+            language: $language,
+            diarize: $diarize,
+            model: $model,
+        );
+
+        return [
+            'text' => $response->text,
+            'segments' => $response->segments,
+            'language' => $response->language,
+            'model' => $response->meta->model,
+        ];
+    }
+
+    // ─── 14C.1: Video Generation ─────────────────────────────────
+
+    /**
+     * Generate video from text prompt.
+     *
+     * Stub — video generation coming in Phase 12.
+     */
+    public function generateVideo(
+        string $prompt,
+        ?string $provider = null,
+        ?string $model = null,
+    ): array {
+        throw new \RuntimeException('Video generation is not yet implemented. Coming in Phase 12.');
+    }
+
+    // ─── 14C.1: RAG / Knowledge Base ─────────────────────────────
+
+    /**
+     * Search a knowledge base with natural language.
+     */
+    public function searchKnowledgeBase(
+        string $query,
+        string $knowledgeBaseId,
+        int $topK = 5,
+    ): RagResult {
+        if (! app()->bound(KnowledgeBaseSearchService::class)) {
+            throw new \RuntimeException('Knowledge base search is not yet available. Configure vector store first.');
+        }
+
+        return app(KnowledgeBaseSearchService::class)->search($query, $knowledgeBaseId, $topK);
+    }
+
+    /**
+     * Answer a question using knowledge base context.
+     */
+    public function answerWithKnowledgeBase(
+        string $query,
+        string $knowledgeBaseId,
+        ?User $user = null,
+        int $topK = 5,
+        ?string $provider = null,
+        ?string $model = null,
+    ): RagResult {
+        if (! app()->bound(KnowledgeBaseSearchService::class)) {
+            throw new \RuntimeException('Knowledge base search is not yet available. Configure vector store first.');
+        }
+
+        $providerName = $provider ?? settings('default_ai_provider', 'openai');
+        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+
+        return app(KnowledgeBaseSearchService::class)->answer(
+            query: $query,
+            knowledgeBaseId: $knowledgeBaseId,
+            provider: $providerName,
+            model: $modelName,
+            topK: $topK,
+        );
+    }
+
+    /**
+     * Ingest a document into the knowledge base.
+     */
+    public function ingestDocument(
+        $file,
+        int $userId,
+        string $collectionId,
+    ): array {
+        if (! app()->bound(DocumentIngestionService::class)) {
+            throw new \RuntimeException('Document ingestion is not yet available. Configure vector store first.');
+        }
+
+        return app(DocumentIngestionService::class)->ingest($file, $userId, $collectionId);
+    }
+
+    // ─── 14C.1: Agents ───────────────────────────────────────────
+
+    /**
+     * Run an AI agent with tool calling.
+     */
+    public function runAgent(
+        string $agentName,
+        string $userMessage,
+        array $tools = [],
+        ?string $provider = null,
+        ?string $model = null,
+    ): array {
+        if (! app()->bound(AgentService::class)) {
+            throw new \RuntimeException('Agent execution is not yet available. Coming in Phase 14.');
+        }
+
+        return app(AgentService::class)->run(
+            agentName: $agentName,
+            userMessage: $userMessage,
+            tools: $tools,
+            provider: $provider,
+            model: $model,
+        );
+    }
+
+    // ─── 14C.1: Document Operations ──────────────────────────────
+
+    /**
+     * Summarize a document using AI.
+     */
+    public function summarizeDocument(
+        string $content,
+        ?string $maxLength = null,
+        ?string $provider = null,
+        ?string $model = null,
+    ): CompletionResponse {
+        $prompt = "Please provide a concise summary of the following content.";
+
+        if ($maxLength) {
+            $prompt .= " Keep the summary to approximately {$maxLength} words.";
+        }
+
+        $prompt .= "\n\n---\n{$content}\n---\n\nSummary:";
+
+        $systemPrompt = 'You are an expert document summarizer. Provide clear, accurate summaries that capture the key points without losing important context.';
+
+        $providerName = $provider ?? settings('default_ai_provider', 'openai');
+        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $adapter = ProviderRegistry::resolve($providerName);
+
+        try {
+            $result = $adapter->chatCompletion([
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $prompt],
+            ], $modelName);
+
+            return new CompletionResponse(
+                content: $result['content'],
+                inputTokens: $result['input_tokens'],
+                outputTokens: $result['output_tokens'],
+                model: $result['model'],
+            );
+        } catch (Throwable $e) {
+            throw new \RuntimeException("Document summarization failed: {$e->getMessage()}", 0, $e);
+        }
+    }
+
+    /**
+     * Extract structured data from a document using AI.
+     */
+    public function extractStructuredData(
+        string $content,
+        array $schema,
+        ?string $provider = null,
+        ?string $model = null,
+    ): array {
+        $schemaJson = json_encode($schema, JSON_PRETTY_PRINT);
+        $prompt = "Extract the following structured data from the content below. Respond ONLY with valid JSON matching this schema:\n\nSchema:\n{$schemaJson}\n\nContent:\n---\n{$content}\n---";
+
+        $systemPrompt = 'You are a data extraction AI. Always respond with valid, parseable JSON only. Do not include any explanatory text outside the JSON.';
+
+        $providerName = $provider ?? settings('default_ai_provider', 'openai');
+        $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
+        $adapter = ProviderRegistry::resolve($providerName);
+
+        try {
+            $result = $adapter->chatCompletion([
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $prompt],
+            ], $modelName, ['temperature' => 0.1]);
+
+            $extracted = json_decode($result['content'], true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                // Try to extract JSON from the response
+                preg_match('/\{.*\}/s', $result['content'], $matches);
+                if (! empty($matches[0])) {
+                    $extracted = json_decode($matches[0], true);
+                }
+            }
+
+            return [
+                'data' => $extracted ?? $result['content'],
+                'input_tokens' => $result['input_tokens'],
+                'output_tokens' => $result['output_tokens'],
+                'model' => $result['model'],
+            ];
+        } catch (Throwable $e) {
+            throw new \RuntimeException("Data extraction failed: {$e->getMessage()}", 0, $e);
         }
     }
 }

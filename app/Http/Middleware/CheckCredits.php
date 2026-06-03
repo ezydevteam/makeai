@@ -5,7 +5,7 @@ namespace App\Http\Middleware;
 use App\Exceptions\AI\CreditLimitException;
 use App\Exceptions\AI\GlobalBudgetExceededException;
 use App\Exceptions\AI\InsufficientCreditsException;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\User;
 use App\Services\AI\TokenGuard;
 use App\Services\AI\ToolAccessService;
@@ -32,7 +32,7 @@ class CheckCredits
         $template = null;
         $slug = $request->input('slug');
         if ($slug) {
-            $template = AiTemplate::where('slug', $slug)->where('is_active', true)->first();
+            $template = AiTool::where('slug', $slug)->where('is_active', true)->first();
         }
 
         $accessLevel = $template ? $access->effectiveLevel($template) : 'login_required';
@@ -134,4 +134,6 @@ class CheckCredits
             default => 422,
         };
     }
+}
+}
 }

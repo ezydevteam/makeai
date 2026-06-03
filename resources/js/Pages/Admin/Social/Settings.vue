@@ -32,9 +32,20 @@ interface EditableProfile {
     last_error: string | null
 }
 
+interface SocialLoginProvider {
+    provider: 'google' | 'github' | 'facebook' | 'reddit' | 'twitter'
+    label: string
+    enabled: boolean
+    client_id: string
+    client_secret: string
+    client_secret_configured: boolean
+    redirect_url: string
+}
+
 const props = defineProps<{
     platforms: PlatformOption[]
     profiles: EditableProfile[]
+    socialLoginProviders: SocialLoginProvider[]
     settings: {
         social_follow_display_mode: 'icons' | 'counts' | 'cards'
         social_follow_refresh_hours: number
@@ -45,6 +56,7 @@ const { t } = useTranslate()
 
 const form = useForm({
     settings: { ...props.settings },
+    social_login_providers: props.socialLoginProviders.map((provider) => ({ ...provider, client_secret: '' })),
     profiles: props.profiles.map((profile) => ({ ...profile, api_key: '' })),
 })
 
@@ -106,6 +118,48 @@ const submit = () => {
                             <input v-model="form.settings.social_follow_refresh_hours" type="number" min="1" max="168" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                             <p class="mt-1 text-xs text-gray-500">{{ t('Used by the social:refresh scheduler when API fetching is configured.') }}</p>
                         </label>
+                    </div>
+                </section>
+
+                <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-surface-800 dark:bg-surface-800/60">
+                        <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Social login') }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Enable OAuth registration and login providers for user auth pages.') }}</p>
+                    </div>
+
+                    <div class="divide-y divide-gray-100 dark:divide-surface-800">
+                        <div v-for="(provider, index) in form.social_login_providers" :key="provider.provider" class="grid gap-4 p-5 lg:grid-cols-[160px_minmax(0,1fr)]">
+                            <div>
+                                <div class="font-semibold text-gray-900 dark:text-white">{{ t(provider.label) }}</div>
+                                <label class="mt-4 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                    <input v-model="provider.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600">
+                                    <span>{{ t('Enable login') }}</span>
+                                </label>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <label class="block">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Client ID') }}</span>
+                                    <input v-model="provider.client_id" type="text" autocomplete="off" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('OAuth client ID')">
+                                    <p v-if="form.errors[`social_login_providers.${index}.client_id`]" class="mt-1 text-xs text-danger-600">
+                                        {{ form.errors[`social_login_providers.${index}.client_id`] }}
+                                    </p>
+                                </label>
+
+                                <label class="block">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Client secret') }}</span>
+                                    <input v-model="provider.client_secret" type="password" autocomplete="new-password" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="provider.client_secret_configured ? t('Configured - leave blank to keep') : t('OAuth client secret')">
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        {{ provider.client_secret_configured ? t('A secret is already saved. Enter a new secret only to replace it.') : t('This secret will be encrypted before storage.') }}
+                                    </p>
+                                </label>
+
+                                <label class="block md:col-span-2">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Redirect URL') }}</span>
+                                    <input :value="provider.redirect_url" type="text" readonly class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300">
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </section>
 

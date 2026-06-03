@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\Document;
 use App\Services\NotificationEventService;
 use Illuminate\Http\JsonResponse;
@@ -22,7 +22,7 @@ class DocumentController extends Controller
             'folder_id' => 'nullable|integer',
         ]);
 
-        $template = AiTemplate::where('slug', $data['slug'])->firstOrFail();
+        $template = AiTool::where('slug', $data['slug'])->firstOrFail();
 
         $document = Document::create([
             'user_id' => $request->user()->id,

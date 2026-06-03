@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use App\Models\AiTemplate;
-use App\Models\AiToolCategory;
+use App\Models\AiTool;
+use App\Models\Category;
 use App\Services\AI\ToolCatalogCacheService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -16,7 +16,7 @@ class AiTemplateSeeder extends Seeder
 {
     public function run(): void
     {
-        $categories = AiToolCategory::where('is_active', true)->get()->keyBy('slug');
+        $categories = Category::aiTools()->where('is_active', true)->get()->keyBy('slug');
         $catalog = $this->catalog();
         $expectedTotal = 255;
         $actualTotal = collect($catalog)->flatten(1)->count();
@@ -38,7 +38,7 @@ class AiTemplateSeeder extends Seeder
             foreach ($tools as $tool) {
                 $activeSlugs[] = $tool['slug'];
 
-                AiTemplate::updateOrCreate(
+                AiTool::updateOrCreate(
                     ['slug' => $tool['slug']],
                     $this->payload($tool, $category, $sortOrder++)
                 );
@@ -47,7 +47,7 @@ class AiTemplateSeeder extends Seeder
             $category->updateToolsCount();
         }
 
-        AiTemplate::whereNotIn('slug', $activeSlugs)->update(['is_active' => false]);
+        AiTool::whereNotIn('slug', $activeSlugs)->update(['is_active' => false]);
 
         foreach ($categories as $category) {
             $category->updateToolsCount();
@@ -56,7 +56,7 @@ class AiTemplateSeeder extends Seeder
         ToolCatalogCacheService::invalidateAll();
     }
 
-    private function payload(array $tool, AiToolCategory $category, int $sortOrder): array
+    private function payload(array $tool, Category $category, int $sortOrder): array
     {
         $name = $tool['name'] ?? Str::headline($tool['slug']);
         $description = $tool['description'] ?? $this->description($name, $category->name);
@@ -65,10 +65,8 @@ class AiTemplateSeeder extends Seeder
         return [
             'name' => $name,
             'description' => $description,
-            'prompt' => $this->promptUser($name),
             'prompt_system' => $this->promptSystem($name, $category->name, $outputType),
             'prompt_user' => $this->promptUser($name),
-            'category' => $category->slug,
             'category_id' => $category->id,
             'icon' => $tool['icon'] ?? $category->icon,
             'color' => $tool['color'] ?? $category->color,
@@ -77,7 +75,6 @@ class AiTemplateSeeder extends Seeder
             'model_override' => null,
             'max_tokens_override' => $this->maxTokens($category->slug, $tool['slug']),
             'access_level' => 'inherit',
-            'is_premium' => false,
             'is_active' => true,
             'is_featured' => in_array($tool['slug'], $this->featuredSlugs(), true),
             'requires_pro' => in_array($category->slug, ['legal-finance', 'business', 'development'], true)

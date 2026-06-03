@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GeneralSettingsRequest;
 use App\Models\Currency;
 use App\Models\Language;
+use App\Models\SiteTemplate;
 use Inertia\Inertia;
 
 class GeneralSettingsController extends Controller
@@ -24,6 +25,7 @@ class GeneralSettingsController extends Controller
                 'currency_position' => settings('currency_position', 'before'),
                 'currency_decimals' => (int) settings('currency_decimals', 2),
                 'app_timezone' => settings('app_timezone', config('app.timezone', 'UTC')),
+                'homepage_template' => settings('homepage_template', 'default'),
             ],
             'languages' => Language::query()
                 ->where('is_active', true)
@@ -36,6 +38,16 @@ class GeneralSettingsController extends Controller
                 ->orderBy('code')
                 ->get(['code', 'name', 'symbol']),
             'timezones' => timezone_identifiers_list(),
+            'homepage_templates' => SiteTemplate::active()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'requires_pro'])
+                ->map(fn ($t) => [
+                    'slug' => $t->slug,
+                    'name' => $t->name,
+                    'requires_pro' => (bool) $t->requires_pro,
+                ])
+                ->values(),
         ]);
     }
 

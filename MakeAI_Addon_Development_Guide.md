@@ -866,11 +866,11 @@ DB::statement('ALTER TABLE users ADD COLUMN whatsapp_number VARCHAR(20)');
 ❌ **NEVER override core service bindings without a fallback:**
 ```php
 // ❌ WRONG — breaks core if addon is deactivated
-$this->app->bind(LLPhantService::class, MyCustomLLPhantService::class);
+$this->app->bind(AiService::class, MyCustomAiService::class);
 
 // ✅ CORRECT — extend, don't replace
-$this->app->extend(LLPhantService::class, function($service, $app) {
-    return new ExtendedLLPhantService($service);
+$this->app->extend(AiService::class, function($service, $app) {
+    return new ExtendedAiService($service);
 });
 ```
 

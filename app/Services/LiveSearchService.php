@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Admin;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\BlogPost;
 use App\Models\Page;
 use App\Models\User;
@@ -110,19 +110,19 @@ class LiveSearchService
 
     private function searchTools(string $term): Collection
     {
-        $query = AiTemplate::query()
+        $query = AiTool::query()
             ->active()
-            ->with('toolCategory:id,name,slug')
+            ->with('category:id,name,slug')
             ->select(['id', 'name', 'slug', 'description', 'icon', 'category_id', 'usage_count']);
 
         return $this->searchWithFullTextFallback($query, ['name', 'description'], $term, function (Builder $query, string $term): void {
             $query->orderByDesc('usage_count');
-        })->map(fn (AiTemplate $tool): array => [
+        })->map(fn (AiTool $tool): array => [
             'key' => 'tool-'.$tool->slug,
             'title' => $tool->name,
             'excerpt' => $this->highlight($tool->description ?: translate('AI tool template'), $term),
             'url' => route('ai.tools.show', $tool->slug),
-            'meta' => $tool->toolCategory?->name ?? translate('AI Tool'),
+            'meta' => $tool->category?->name ?? translate('AI Tool'),
         ]);
     }
 
@@ -203,17 +203,17 @@ class LiveSearchService
 
     private function searchAdminTools(string $term): Collection
     {
-        $query = AiTemplate::query()
-            ->with('toolCategory:id,name,slug')
+        $query = AiTool::query()
+            ->with('category:id,name,slug')
             ->select(['id', 'name', 'slug', 'description', 'category_id', 'is_active', 'usage_count']);
 
         return $this->searchWithFullTextFallback($query, ['name', 'description'], $term, function (Builder $query, string $term): void {
             $query->orderByDesc('usage_count');
-        })->map(fn (AiTemplate $tool): array => [
+        })->map(fn (AiTool $tool): array => [
             'key' => 'admin-tool-'.$tool->id,
             'title' => $tool->name,
             'excerpt' => $this->highlight($tool->description ?: translate('AI tool template'), $term),
-            'url' => route('admin.ai.templates.edit', $tool->id),
+            'url' => route('admin.ai.tools.edit', $tool->id),
             'meta' => $tool->is_active ? translate('Active template') : translate('Inactive template'),
         ]);
     }
@@ -348,7 +348,7 @@ class LiveSearchService
             ['title' => 'AI Providers & Keys', 'section' => 'AI Tools', 'route' => 'admin.ai.index', 'permissions' => ['ai.templates'], 'description' => 'Configure AI providers, models, and API keys.', 'keywords' => 'openai anthropic gemini model provider'],
             ['title' => 'External APIs', 'section' => 'AI Tools', 'route' => 'admin.ai.external-apis.index', 'permissions' => ['ai.templates'], 'description' => 'Configure third-party APIs used by non-LLM tools.', 'keywords' => 'pexels unsplash search transcript'],
             ['title' => 'AI Categories', 'section' => 'AI Tools', 'route' => 'admin.ai.categories.index', 'permissions' => ['ai.templates'], 'description' => 'Manage AI tool categories.', 'keywords' => 'tool category'],
-            ['title' => 'AI Templates', 'section' => 'AI Tools', 'route' => 'admin.ai.templates.index', 'permissions' => ['ai.templates'], 'description' => 'Manage AI tool templates, prompts, fields, and SEO.', 'keywords' => 'tools prompts generation'],
+            ['title' => 'AI Tools', 'section' => 'AI Tools', 'route' => 'admin.ai.tools.index', 'permissions' => ['ai.templates'], 'description' => 'Manage AI tools, prompts, fields, and SEO.', 'keywords' => 'tools prompts generation'],
             ['title' => 'AI Access Settings', 'section' => 'AI Tools', 'route' => 'admin.ai.access.index', 'permissions' => ['ai.templates'], 'description' => 'Control public, login, free, and pro access for tools.', 'keywords' => 'permissions access level'],
             ['title' => 'AI Usage & Logs', 'section' => 'AI Tools', 'route' => 'admin.ai.logs.index', 'permissions' => ['ai.templates'], 'description' => 'Review AI usage logs and generation activity.', 'keywords' => 'tokens credits logs'],
             ['title' => 'Plans & Pricing', 'section' => 'Payments', 'route' => 'admin.plans.index', 'permissions' => ['plans.view'], 'description' => 'Manage subscription plans and pricing.', 'keywords' => 'subscriptions billing price', 'pro_only' => true],

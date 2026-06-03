@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Comments;
 
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\BlogPost;
 use App\Models\Page;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,7 +13,7 @@ class StoreCommentRequest extends FormRequest
     public const COMMENTABLES = [
         'blog_posts' => BlogPost::class,
         'pages' => Page::class,
-        'ai_tools' => AiTemplate::class,
+        'ai_tools' => AiTool::class,
     ];
 
     public function authorize(): bool

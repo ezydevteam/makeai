@@ -63,7 +63,15 @@ interface EditingSection {
 const props = defineProps<{
     config: HomepageConfig
     sectionTypes: SectionType[]
+    activeHomepageTemplate: string
+    availableTemplates: Array<{ slug: string; name: string; requires_pro: boolean }>
 }>()
+
+const isCustomHomepage = computed(() => props.activeHomepageTemplate === 'default')
+
+const homepageTemplateForm = useForm({
+    homepage_template: props.activeHomepageTemplate,
+})
 
 const form = useForm<HomepageConfig>({
     sections: props.config.sections,
@@ -302,6 +310,11 @@ const normalizePhrases = () => {
     if (Array.isArray(phrases)) return
     editingSection.value.data.config.typing_phrases = String(phrases).split(',').map((phrase) => phrase.trim()).filter(Boolean)
 }
+
+const setHomepageTemplate = (slug: string) => {
+    homepageTemplateForm.homepage_template = slug
+    homepageTemplateForm.post(route('admin.homepage.set'), { preserveScroll: true })
+}
 </script>
 
 <template>
@@ -326,7 +339,37 @@ const normalizePhrases = () => {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <!-- Homepage Selector -->
+            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-gray-100 dark:border-surface-800 p-6 mb-8">
+                <h2 class="text-base font-bold text-gray-900 dark:text-white mb-4">Choose Homepage</h2>
+                <div class="flex flex-wrap items-center gap-3">
+                    <label
+                        @click="setHomepageTemplate('default')"
+                        :class="isCustomHomepage ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500' : 'border-gray-200 dark:border-surface-700 hover:border-gray-300 dark:hover:border-surface-600'"
+                        class="cursor-pointer rounded-xl border px-5 py-3 transition-all"
+                    >
+                        <span class="text-sm font-semibold text-gray-900 dark:text-white">Custom Homepage</span>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Drag & drop builder</p>
+                    </label>
+                    <label
+                        v-for="tpl in props.availableTemplates"
+                        :key="tpl.slug"
+                        @click="setHomepageTemplate(tpl.slug)"
+                        :class="!isCustomHomepage && props.activeHomepageTemplate === tpl.slug ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 ring-2 ring-primary-500' : 'border-gray-200 dark:border-surface-700 hover:border-gray-300 dark:hover:border-surface-600'"
+                        class="cursor-pointer rounded-xl border px-5 py-3 transition-all"
+                    >
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ tpl.name }}</span>
+                            <span v-if="tpl.requires_pro" class="inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-400">Pro</span>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Site template</p>
+                    </label>
+                </div>
+                <p v-if="homepageTemplateForm.recentlySuccessful" class="mt-3 text-sm text-green-600 dark:text-green-400 font-medium">✓ Homepage updated</p>
+            </div>
+
+            <!-- Show section builder only when Custom is selected -->
+            <div v-if="isCustomHomepage" class="grid grid-cols-1 xl:grid-cols-3 gap-8">
                 <div class="xl:col-span-2 space-y-6">
                     <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-gray-100 dark:border-surface-800 p-6">
                         <div class="flex items-center justify-between gap-4 mb-6">
@@ -575,6 +618,27 @@ const normalizePhrases = () => {
                 </div>
                 <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end">
                     <button @click="settingsModalOpen = false" type="button" class="px-5 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all">Done</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- When a site template is active, show a message instead of the builder -->
+        <div v-if="!isCustomHomepage" class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <div class="xl:col-span-2">
+                <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-gray-100 dark:border-surface-800 p-10 text-center">
+                    <div class="text-4xl mb-4">🎨</div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Site Template Active</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+                        The homepage is currently using the <strong>{{ props.availableTemplates.find(t => t.slug === props.activeHomepageTemplate)?.name ?? props.activeHomepageTemplate }}</strong> template.
+                        Switch to <strong>Custom Homepage</strong> above to use the drag & drop builder.
+                    </p>
+                    <a
+                        v-if="props.activeHomepageTemplate !== 'default'"
+                        :href="route('admin.site-templates.edit', props.activeHomepageTemplate)"
+                        class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-bold hover:bg-primary-500 transition-colors"
+                    >
+                        Edit Template Settings
+                    </a>
                 </div>
             </div>
         </div>

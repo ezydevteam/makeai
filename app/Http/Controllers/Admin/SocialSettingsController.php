@@ -11,6 +11,14 @@ use Inertia\Inertia;
 
 class SocialSettingsController extends Controller
 {
+    private const SOCIAL_LOGIN_PROVIDERS = [
+        'google' => 'Google',
+        'github' => 'GitHub',
+        'facebook' => 'Facebook',
+        'reddit' => 'Reddit',
+        'twitter' => 'Twitter',
+    ];
+
     public function edit(SocialService $socialService)
     {
         $this->authorizeSocialSettings();
@@ -22,6 +30,7 @@ class SocialSettingsController extends Controller
                 'social_follow_display_mode' => $socialService->followDisplayMode(),
                 'social_follow_refresh_hours' => (int) settings('social_follow_refresh_hours', 24),
             ],
+            'socialLoginProviders' => $this->socialLoginProviders(),
         ]);
     }
 
@@ -44,6 +53,33 @@ class SocialSettingsController extends Controller
                 'integer',
                 'social'
             );
+
+            foreach ($validated['social_login_providers'] as $provider) {
+                $slug = $provider['provider'];
+
+                settings_set(
+                    "social_login_{$slug}_enabled",
+                    (bool) $provider['enabled'],
+                    'boolean',
+                    'social_login'
+                );
+
+                settings_set(
+                    "social_login_{$slug}_client_id",
+                    $provider['client_id'] ?? '',
+                    'encrypted',
+                    'social_login'
+                );
+
+                if (! empty($provider['client_secret'])) {
+                    settings_set(
+                        "social_login_{$slug}_client_secret",
+                        $provider['client_secret'],
+                        'encrypted',
+                        'social_login'
+                    );
+                }
+            }
 
             foreach ($validated['profiles'] as $profile) {
                 if (! empty($profile['api_key'])) {
@@ -83,5 +119,21 @@ class SocialSettingsController extends Controller
     private function authorizeSocialSettings(): void
     {
         abort_unless(auth('admin')->user()?->hasPermission('settings.manage'), 403);
+    }
+
+    private function socialLoginProviders(): array
+    {
+        return collect(self::SOCIAL_LOGIN_PROVIDERS)
+            ->map(fn (string $label, string $provider) => [
+                'provider' => $provider,
+                'label' => $label,
+                'enabled' => (bool) settings("social_login_{$provider}_enabled", false),
+                'client_id' => (string) settings("social_login_{$provider}_client_id", ''),
+                'client_secret' => '',
+                'client_secret_configured' => filled(settings("social_login_{$provider}_client_secret", '')),
+                'redirect_url' => route('social.callback', $provider),
+            ])
+            ->values()
+            ->all();
     }
 }

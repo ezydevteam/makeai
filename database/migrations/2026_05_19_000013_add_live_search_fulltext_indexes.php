@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     private array $indexes = [
-        'ai_templates' => [
-            'live_search_ai_templates_fulltext' => ['name', 'description'],
+        'ai_tools' => [
+            'live_search_ai_tools_fulltext' => ['name', 'description'],
         ],
         'blog_posts' => [
             'live_search_blog_posts_fulltext' => ['title', 'excerpt', 'content'],

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\BlogPost;
 use App\Models\Document;
 use App\Models\Page;
@@ -13,7 +13,7 @@ class FavoriteToggleRequest extends FormRequest
 {
     public const FAVORITEABLES = [
         'blog_posts' => BlogPost::class,
-        'ai_templates' => AiTemplate::class,
+        'ai_templates' => AiTool::class,
         'documents' => Document::class,
         'pages' => Page::class,
     ];

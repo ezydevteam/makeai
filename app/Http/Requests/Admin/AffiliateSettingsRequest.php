@@ -24,6 +24,8 @@ class AffiliateSettingsRequest extends FormRequest
             'payout_methods' => ['array'],
             'payout_methods.*' => ['in:paypal,bank_transfer,credits'],
             'auto_approve_commissions' => ['boolean'],
+            'referral_credits_enabled' => ['boolean'],
+            'referral_credits_amount' => ['required', 'numeric', 'min:0', 'max:999999.9999'],
             'commission_hold_days' => ['required', 'integer', 'min:0', 'max:365'],
             'allow_custom_alias' => ['boolean'],
             'terms_page_slug' => ['nullable', 'string', 'max:255', 'exists:pages,slug'],

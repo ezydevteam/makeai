@@ -2,8 +2,8 @@
 
 namespace App\Services\AI;
 
-use App\Models\AiTemplate;
-use App\Models\AiToolCategory;
+use App\Models\AiTool;
+use App\Models\Category;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -22,9 +22,10 @@ class ToolCatalogCacheService
     public function activeCategories(): Collection
     {
         return $this->cachedCollection(self::CATEGORIES_KEY, null, function () {
-            return AiToolCategory::query()
+            return Category::query()
+                ->aiTools()
                 ->active()
-                ->withCount(['activeTemplates as active_tools_count'])
+                ->withCount(['activeTools as active_tools_count'])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get([
@@ -38,7 +39,7 @@ class ToolCatalogCacheService
                     'sort_order',
                     'tools_count',
                 ])
-                ->map(fn (AiToolCategory $category) => $this->serializeCategory($category));
+                ->map(fn (Category $category) => $this->serializeCategory($category));
         });
     }
 
@@ -49,32 +50,32 @@ class ToolCatalogCacheService
             : self::TOOL_LIST_KEY;
 
         return $this->cachedCollection($key, self::TOOL_TTL_SECONDS, function () use ($categorySlug) {
-            return AiTemplate::query()
+            return AiTool::query()
                 ->select($this->toolListColumns())
                 ->active()
-                ->whereHas('toolCategory', fn ($query) => $query->active())
+                ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
                 ->when($categorySlug, function ($query) use ($categorySlug) {
-                    $query->whereHas('toolCategory', function ($categoryQuery) use ($categorySlug) {
-                        $categoryQuery->active()->where('slug', $categorySlug);
+                    $query->whereHas('category', function ($q) use ($categorySlug) {
+                        $q->active()->ofType('ai_tool')->where('slug', $categorySlug);
                     });
                 })
-                ->with(['toolCategory:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
+                ->with(['category:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get()
-                ->map(fn (AiTemplate $tool) => $this->serializeTool($tool));
+                ->map(fn (AiTool $tool) => $this->serializeTool($tool));
         });
     }
 
     public function toolBySlug(string $slug): array
     {
         return Cache::remember(self::TOOL_KEY_PREFIX.$slug, self::TOOL_TTL_SECONDS, function () use ($slug) {
-            $tool = AiTemplate::query()
+            $tool = AiTool::query()
                 ->select($this->toolDetailColumns())
                 ->active()
                 ->where('slug', $slug)
-                ->whereHas('toolCategory', fn ($query) => $query->active())
-                ->with(['toolCategory:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
+                ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
+                ->with(['category:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
                 ->firstOrFail();
 
             return array_merge($this->serializeTool($tool, true), [
@@ -104,7 +105,7 @@ class ToolCatalogCacheService
         }
     }
 
-    public static function invalidateForTool(AiTemplate $tool): void
+    public static function invalidateForTool(AiTool $tool): void
     {
         self::forgetTool($tool->slug);
         self::forgetTool($tool->getOriginal('slug'));
@@ -115,17 +116,17 @@ class ToolCatalogCacheService
         }
     }
 
-    public static function invalidateForCategory(AiToolCategory $category): void
+    public static function invalidateForCategory(Category $category): void
     {
         self::forgetCategories();
         self::forgetToolLists();
         self::forgetToolLists($category->slug);
         self::forgetToolLists($category->getOriginal('slug'));
 
-        $category->templates()
+        $category->tools()
             ->select(['slug'])
             ->get()
-            ->each(fn (AiTemplate $tool) => self::forgetTool($tool->slug));
+            ->each(fn (AiTool $tool) => self::forgetTool($tool->slug));
     }
 
     public static function invalidateAll(): void
@@ -133,18 +134,18 @@ class ToolCatalogCacheService
         self::forgetCategories();
         self::forgetToolLists();
 
-        AiToolCategory::query()
+        Category::query()->aiTools()
             ->pluck('slug')
             ->filter()
             ->each(fn (string $slug) => self::forgetToolLists($slug));
 
-        AiTemplate::query()
+        AiTool::query()
             ->pluck('slug')
             ->filter()
             ->each(fn (string $slug) => self::forgetTool($slug));
     }
 
-    private static function categorySlugsForTool(AiTemplate $tool): array
+    private static function categorySlugsForTool(AiTool $tool): array
     {
         $categoryIds = collect([
             $tool->category_id,
@@ -158,7 +159,7 @@ class ToolCatalogCacheService
             return [];
         }
 
-        return AiToolCategory::query()
+        return Category::query()->aiTools()
             ->whereIn('id', $categoryIds)
             ->pluck('slug')
             ->filter()
@@ -194,43 +195,41 @@ class ToolCatalogCacheService
         return collect($items);
     }
 
-    private function relatedTools(AiTemplate $tool): array
+    private function relatedTools(AiTool $tool): array
     {
         if (! $tool->show_related_tools) {
             return [];
         }
 
-        return AiTemplate::query()
+        return AiTool::query()
             ->select($this->toolListColumns())
             ->active()
             ->where('id', '!=', $tool->id)
             ->where('category_id', $tool->category_id)
-            ->whereHas('toolCategory', fn ($query) => $query->active())
-            ->with(['toolCategory:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
+            ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
+            ->with(['category:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
             ->orderByDesc('usage_count')
             ->orderBy('name')
             ->limit(6)
             ->get()
-            ->map(fn (AiTemplate $relatedTool) => $this->serializeTool($relatedTool))
+            ->map(fn (AiTool $relatedTool) => $this->serializeTool($relatedTool))
             ->values()
             ->all();
     }
 
-    private function serializeTool(AiTemplate $tool, bool $includeContent = false): array
+    private function serializeTool(AiTool $tool, bool $includeContent = false): array
     {
         $data = [
             'id' => $tool->id,
             'name' => $tool->name,
             'slug' => $tool->slug,
             'description' => $tool->description,
-            'category_key' => $tool->category,
-            'category' => $this->serializeCategory($tool->toolCategory),
+            'category' => $this->serializeCategory($tool->category),
             'icon' => $tool->icon,
             'color' => $tool->color,
             'fields' => $tool->fields ?? [],
             'output_type' => $tool->output_type ?? 'markdown',
             'access_level' => $tool->access_level,
-            'is_premium' => (bool) $tool->is_premium,
             'is_featured' => (bool) $tool->is_featured,
             'requires_pro' => (bool) $tool->requires_pro,
             'supports_brand_voice' => (bool) $tool->supports_brand_voice,
@@ -262,7 +261,7 @@ class ToolCatalogCacheService
         return $data;
     }
 
-    private function serializeCategory(?AiToolCategory $category): ?array
+    private function serializeCategory(?Category $category): ?array
     {
         if (! $category) {
             return null;
@@ -289,14 +288,12 @@ class ToolCatalogCacheService
             'name',
             'slug',
             'description',
-            'category',
             'category_id',
             'icon',
             'color',
             'fields',
             'output_type',
             'access_level',
-            'is_premium',
             'is_featured',
             'requires_pro',
             'supports_brand_voice',

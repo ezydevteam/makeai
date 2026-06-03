@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
+use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
 use App\Services\AffiliateService;
 use App\Services\NotificationEventService;
@@ -36,11 +37,19 @@ class RegisterController extends Controller
 
         Auth::login($user);
 
-        // Generate OTP for email verification
         $otp = $user->generateOtp();
-        // TODO: Send OTP email (Mail::to($user)->send(new VerifyEmailOtp($otp)))
+        $this->sendVerificationOtp($user, $otp);
 
         return redirect()->route('verification.notice')
             ->with('success', translate('Account created! Please verify your email.'));
+    }
+
+    private function sendVerificationOtp(User $user, string $otp): void
+    {
+        SendTemplatedEmail::dispatch('email_verify_otp', $user->email, [
+            'user_name' => $user->name,
+            'site_name' => settings('app_name', 'Application'),
+            'otp_code' => $otp,
+        ])->onQueue('otp');
     }
 }

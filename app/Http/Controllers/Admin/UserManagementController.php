@@ -138,6 +138,19 @@ class UserManagementController extends Controller
             : translate('Notification queued for :name.', ['name' => $user->name]));
     }
 
+    public function disableTwoFactor(User $user)
+    {
+        abort_unless(auth('admin')->user()?->hasPermission('users.edit'), 403);
+
+        if (! $user->hasTotpEnabled()) {
+            return back()->with('info', translate('Two-factor authentication is not enabled for this user.'));
+        }
+
+        $user->disableTotp();
+
+        return back()->with('success', translate('Two-factor authentication disabled for :name.', ['name' => $user->name]));
+    }
+
     /**
      * Bulk actions.
      */

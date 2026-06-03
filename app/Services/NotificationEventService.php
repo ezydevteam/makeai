@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\AffiliateCommission;
 use App\Models\AffiliatePayout;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\Comment;
 use App\Models\Document;
 use App\Models\Payment;
@@ -403,7 +403,7 @@ class NotificationEventService
         return $sent;
     }
 
-    public function newToolLaunched(AiTemplate $tool): int
+    public function newToolLaunched(AiTool $tool): int
     {
         if (! $tool->is_active) {
             return 0;

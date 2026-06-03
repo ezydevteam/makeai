@@ -4,7 +4,7 @@ namespace App\Services\AI;
 
 use App\DTO\CompletionRequest;
 use App\Models\AiModel;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\User;
 
 /**
@@ -24,7 +24,7 @@ class PromptBuilder
     /**
      * Build a CompletionRequest from template + user inputs.
      */
-    public function build(AiTemplate $template, array $fields, ?User $user): CompletionRequest
+    public function build(AiTool $template, array $fields, ?User $user): CompletionRequest
     {
         // 1. Replace {field_name} in prompt_system and prompt_user
         $systemPrompt = $this->getSystemPrompt($template);
@@ -72,7 +72,7 @@ class PromptBuilder
     /**
      * Get the system prompt, falling back to legacy 'prompt' column.
      */
-    private function getSystemPrompt(AiTemplate $template): string
+    private function getSystemPrompt(AiTool $template): string
     {
         return $template->prompt_system ?? $template->prompt ?? '';
     }
@@ -80,7 +80,7 @@ class PromptBuilder
     /**
      * Get the user prompt template.
      */
-    private function getUserPrompt(AiTemplate $template): string
+    private function getUserPrompt(AiTool $template): string
     {
         return $template->prompt_user ?? '';
     }
@@ -169,7 +169,7 @@ class PromptBuilder
     /**
      * Estimate credit cost before generation.
      */
-    public function estimateCost(AiTemplate $template, string $model): array
+    public function estimateCost(AiTool $template, string $model): array
     {
         $estimatedTokens = $template->avg_output_tokens ?? 400;
         $dbModel = AiModel::where('slug', $model)->first();

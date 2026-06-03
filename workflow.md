@@ -2,7 +2,7 @@
 
 > **Inspired by:** [MagicAI](https://codecanyon.net/item/magicai-openai-content-code-chat-image-generator-as-saas/45408109) from CodeCanyon
 > **Master Prompt:** [`AI_SaaS_Master_Prompt.md`](AI_SaaS_Master_Prompt.md) — the **single source of truth** for all specs, tables, and architecture
-> **Stack:** PHP 8.3+ · Laravel 12 · LLPhant · Inertia.js (SSR) · Vue 3 Composition API · Tailwind CSS v4 · MySQL · Redis · Laravel Horizon
+> **Stack:** PHP 8.3+ · Laravel 13 · Laravel AI SDK (laravel/ai) · Inertia.js (SSR) · Vue 3 Composition API · Tailwind CSS v4 · MySQL · Redis · Laravel Horizon
 
 > [!IMPORTANT]
 > **Every phase MUST cross-reference the Master Prompt before implementation.**
@@ -14,7 +14,7 @@
 
 1. **Foundation first** — database, auth, settings, helpers must exist before any feature
 2. **Admin before user** — admin panel controls everything, so it must be built first
-3. **Core AI engine before AI tools** — provider registry, token guard, LLPhant service are shared
+3. **Core AI engine before AI tools** — provider registry, token guard, AiService are shared
 4. **One feature at a time** — each phase produces a testable, working increment
 5. **No hardcoded strings** — use `translate()` helper from day 1
 
@@ -30,7 +30,7 @@
 | **3** | Admin Panel Shell | Layout, sidebar, dashboard (empty cards), navigation | Phase 2 | Part 3.3, 3.4 |
 | **4** | User Auth System | Registration, login, social auth, 2FA, email verify | Phase 1 | Part 4 |
 | **5** | User Dashboard Shell | Layout, sidebar, profile, basic pages | Phase 4 | Part 4.3 |
-| **6** | AI Engine Core | ProviderRegistry, LLPhantService, TokenGuard, StreamService | Phase 1 | Part 5 |
+| **6** | AI Engine Core | ProviderRegistry, AiService, TokenGuard, StreamService | Phase 1 | Part 5 |
 | **7** | AI Writer | Templates, editor (Tiptap), brand voice, export | Phase 5, 6 | Part 5.4 (AI Writer) |
 | **8** | AI Chat Pro | Multi-model chat, history, file attach, memory | Phase 5, 6 | Part 5.4 (AI Chat) |
 | **9** | AI Image Generator | DALL-E, SD, Flux integration, gallery | Phase 5, 6 | Part 5.4 (Image) |
@@ -134,7 +134,7 @@ Tasks:
 | Charts | Chart.js | Lightweight, well-supported |
 | CSS framework | Tailwind v4 | Utility-first, theme-able |
 | Realtime community | Livewire v3 | SEO-friendly, no separate Vue build |
-| AI library | LLPhant | PHP-native RAG, agents, embeddings |
+| AI library \| Laravel AI SDK | PHP-native RAG, agents, embeddings |
 | Queue | Horizon | Dashboard, monitoring, Redis-backed |
 | API auth | Sanctum | Token-based, built into Laravel |
 | Public IDs | ULID | Non-sequential, URL-safe |

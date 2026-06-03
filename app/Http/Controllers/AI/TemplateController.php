@@ -4,7 +4,7 @@ namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiModel;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\AiUsageLog;
 use App\Models\Language;
 use App\Services\AI\PromptBuilder;
@@ -14,11 +14,6 @@ use App\Services\AI\ToolSeoService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-/**
- * TemplateController — frontend AI tool pages.
- *
- * Ref: AI_SaaS_Master_Prompt Parts P13–P15
- */
 class TemplateController extends Controller
 {
     public function __construct(
@@ -27,18 +22,9 @@ class TemplateController extends Controller
         private ToolAccessService $toolAccess,
     ) {}
 
-    /**
-     * Template gallery — all active templates organized by category.
-     */
     public function index(Request $request)
     {
-        $templates = $this->toolCatalog->activeTools()
-            ->map(function (array $tool) {
-                $tool['toolCategory'] = $tool['category'];
-                $tool['category'] = $tool['category_key'];
-
-                return $tool;
-            });
+        $tools = $this->toolCatalog->activeTools();
 
         $categories = $this->toolCatalog->activeCategories();
 
@@ -54,91 +40,68 @@ class TemplateController extends Controller
                 : (string) $requestedCategory;
         }
 
-        // Also get legacy string categories for backward compat
-        $legacyCategories = AiTemplate::active()
-            ->whereNull('category_id')
-            ->distinct()
-            ->pluck('category')
-            ->filter()
-            ->sort()
-            ->values()
-            ->toArray();
-
-        // Featured tools
-        $featured = $templates->where('is_featured', true)->take(6)->values();
+        $featured = $tools->where('is_featured', true)->take(6)->values();
 
         return Inertia::render('AI/Templates', [
-            'templates' => $templates,
+            'tools' => $tools,
             'categories' => $categories,
-            'legacyCategories' => $legacyCategories,
             'featured' => $featured,
             'initialCategory' => $initialCategory,
         ]);
     }
 
-    /**
-     * Tool page — unified template execution + content sections.
-     *
-     * Ref: P15.14 — ToolPage layout with Input/Output panels + content tabs
-     */
     public function show(string $slug)
     {
-        $template = AiTemplate::where('slug', $slug)
-            ->where('is_active', true)
-            ->with(['toolCategory:id,name,slug,icon,color'])
-            ->withCount('favorites')
-            ->firstOrFail();
+        $toolData = $this->toolCatalog->toolBySlug($slug);
 
-        if ($this->toolAccess->requiresAuth($template) && ! auth()->check()) {
+        $tool = AiTool::find($toolData['id']);
+
+        if (! $tool || ! $tool->is_active || ! $tool->category?->is_active) {
+            abort(404);
+        }
+
+        if ($this->toolAccess->requiresAuth($tool) && ! auth()->check()) {
             return redirect()->route('login')->with('error', translate('You must be logged in to access this tool.'));
         }
 
-        if ($template->isProRequired() && ! auth()->user()?->isPro()) {
+        if ($tool->isProRequired() && ! auth()->user()?->isPro()) {
             return redirect()->back()->with('error', translate('This tool requires a Pro plan. Please upgrade to continue.'));
         }
 
-        // Get SEO meta + schemas
-        $seo = $this->seoService->getMeta($template);
-        $schemas = $this->seoService->getSchemas($template);
+        $seo = $this->seoService->getMeta($tool);
+        $schemas = $this->seoService->getSchemas($tool);
 
-        // Get related tools
-        $relatedTools = $template->show_related_tools
-            ? $template->relatedTools(3)->map->only(['name', 'slug', 'description', 'icon', 'color', 'avg_rating'])
+        $relatedTools = $toolData['show_related_tools'] ?? false
+            ? $tool->relatedTools(3)->map->only(['name', 'slug', 'description', 'icon', 'color', 'avg_rating'])
             : [];
 
-        // Get approved reviews (first page)
-        $reviews = $template->show_reviews
-            ? $template->approvedReviews()
+        $reviews = $toolData['show_reviews'] ?? false
+            ? $tool->approvedReviews()
                 ->with('user:id,name,avatar')
                 ->orderByDesc('helpful_count')
                 ->orderByDesc('created_at')
                 ->paginate(10)
             : null;
 
-        // User's review (if authenticated)
         $userReview = auth()->check()
-            ? $template->reviews()->where('user_id', auth()->id())->first()
+            ? $tool->reviews()->where('user_id', auth()->id())->first()
             : null;
 
-        // Cost estimate
         $estimatedCredits = null;
         $showCreditCosts = (bool) settings('show_tool_credit_costs', true);
         if ($showCreditCosts && auth()->check()) {
-            $model = $template->model_override ?? settings('default_ai_model', 'gpt-4o-mini');
+            $model = $tool->model_override ?? settings('default_ai_model', 'gpt-4o-mini');
             $promptBuilder = app(PromptBuilder::class);
-            $estimatedCredits = $promptBuilder->estimateCost($template, $model);
+            $estimatedCredits = $promptBuilder->estimateCost($tool, $model);
         }
 
-        $safeTemplate = $this->toolCatalog->toolBySlug($template->slug);
-        $safeTemplate['toolCategory'] = $safeTemplate['category'];
-        $safeTemplate['category'] = $safeTemplate['category_key'];
-        $safeTemplate['favorites_count'] = $template->favorites_count;
-        $safeTemplate['is_favorited'] = auth()->check()
-            ? $template->favorites()->where('user_id', auth()->id())->exists()
+        $toolData['favorites_count'] = $tool->favorites()->count();
+        $toolData['is_favorited'] = auth()->check()
+            ? $tool->favorites()->where('user_id', auth()->id())->exists()
             : false;
 
         return Inertia::render('AI/ToolPage', [
-            'template' => $safeTemplate,
+            'tool' => $toolData,
             'seo' => $seo,
             'schemas' => $schemas,
             'relatedTools' => $relatedTools,
@@ -148,7 +111,7 @@ class TemplateController extends Controller
                 'last_page' => $reviews->lastPage(),
                 'next_page_url' => $reviews->nextPageUrl(),
             ] : null,
-            'reviewStats' => $this->reviewStats($template),
+            'reviewStats' => $this->reviewStats($tool),
             'userReview' => $userReview,
             'estimatedCredits' => $estimatedCredits,
             'showCreditCosts' => $showCreditCosts,
@@ -161,14 +124,11 @@ class TemplateController extends Controller
             'canReview' => auth()->check() && AiUsageLog::where('user_id', auth()->id())
                 ->where('type', 'template')
                 ->where('status', 'completed')
-                ->where('metadata->template_slug', $template->slug)
+                ->where('metadata->tool_slug', $tool->slug)
                 ->exists(),
         ]);
     }
 
-    /**
-     * Category page — list all tools in a category.
-     */
     public function category(string $slug)
     {
         $category = $this->toolCatalog->activeCategories()
@@ -182,9 +142,9 @@ class TemplateController extends Controller
         ]);
     }
 
-    private function reviewStats(AiTemplate $template): array
+    private function reviewStats(AiTool $tool): array
     {
-        $counts = $template->approvedReviews()
+        $counts = $tool->approvedReviews()
             ->selectRaw('rating, COUNT(*) as total')
             ->groupBy('rating')
             ->pluck('total', 'rating');

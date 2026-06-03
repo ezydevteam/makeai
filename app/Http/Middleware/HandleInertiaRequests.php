@@ -3,8 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\AffiliateProgram;
-use App\Models\AiTemplate;
-use App\Models\AiToolCategory;
+use App\Models\AiTool;
+use App\Models\Category;
 use App\Models\Announcement;
 use App\Models\BlogPost;
 use App\Models\Comment;
@@ -94,6 +94,7 @@ class HandleInertiaRequests extends Middleware
                 'decimals' => (int) settings('currency_decimals', 2),
             ],
             'isProAvailable' => fn () => isProAvailable(),
+            'socialLoginProviders' => fn () => $this->getSocialLoginProviders(),
 
             'app' => [
                 'demo' => config('app.demo'),
@@ -321,7 +322,7 @@ class HandleInertiaRequests extends Middleware
                         'slug' => $post->slug,
                         'published_at' => $post->published_at?->toDateString(),
                     ]),
-                'aiCategories' => AiToolCategory::active()
+                'aiCategories' => Category::aiTools()->active()
                     ->orderBy('sort_order')
                     ->orderBy('name')
                     ->limit(12)
@@ -339,14 +340,16 @@ class HandleInertiaRequests extends Middleware
             ]),
 
             'sidebarData' => [
-                'toolCategories' => fn () => AiTemplate::select('category')->distinct()->pluck('category')->map(function ($cat) {
-                    return [
-                        'name' => ucfirst($cat),
-                        'slug' => $cat,
-                        'count' => AiTemplate::where('category', $cat)->count(),
-                    ];
-                }),
-                'recentTools' => fn () => AiTemplate::latest()->limit(5)->get(['id', 'name', 'slug', 'description', 'color', 'icon']),
+                'toolCategories' => fn () => Category::aiTools()->active()
+                    ->withCount('activeTools')
+                    ->orderBy('sort_order')
+                    ->get(['id', 'name', 'slug'])
+                    ->map(fn (Category $cat) => [
+                        'name' => $cat->name,
+                        'slug' => $cat->slug,
+                        'count' => $cat->active_tools_count ?? $cat->tools_count,
+                    ]),
+                'recentTools' => fn () => AiTool::latest()->limit(5)->get(['id', 'name', 'slug', 'description', 'color', 'icon']),
             ],
 
             'globalMenus' => fn () => Menu::with(['items' => function ($q) {
@@ -355,6 +358,30 @@ class HandleInertiaRequests extends Middleware
 
             'affiliateEnabled' => fn () => isProAvailable() && (bool) AffiliateProgram::current()->is_active,
         ];
+    }
+
+    /**
+     * Get enabled social login providers for guest auth pages.
+     */
+    private function getSocialLoginProviders(): array
+    {
+        return collect([
+            'google' => 'Google',
+            'github' => 'GitHub',
+            'facebook' => 'Facebook',
+            'reddit' => 'Reddit',
+            'twitter' => 'Twitter',
+        ])
+            ->filter(fn (string $label, string $provider) => (bool) settings("social_login_{$provider}_enabled", false)
+                && filled(settings("social_login_{$provider}_client_id", ''))
+                && filled(settings("social_login_{$provider}_client_secret", '')))
+            ->map(fn (string $label, string $provider) => [
+                'provider' => $provider,
+                'label' => $label,
+                'url' => route('social.redirect', $provider),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -383,7 +410,6 @@ class HandleInertiaRequests extends Middleware
 
         return [
             'user' => [
-                'id' => $user->id,
                 'ulid' => $user->ulid,
                 'name' => $user->name,
                 'email' => $user->email,

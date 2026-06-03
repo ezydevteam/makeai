@@ -108,8 +108,8 @@
                             </thead>
                             <tbody>
                                 <tr
-                                    v-for="template in templates.data"
-                                    :key="template.id"
+                                    v-for="tool in tools.data"
+                                    :key="tool.id"
                                     class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                                 >
                                     <td class="w-4 p-4">
@@ -117,32 +117,32 @@
                                             <input
                                                 type="checkbox"
                                                 v-model="selectedIds"
-                                                :value="template.id"
+                                                :value="tool.id"
                                                 class="w-4 h-4 bg-gray-50 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                                             />
                                         </div>
                                     </td>
                                     <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
-                                        {{ template.name }}
+                                        {{ tool.name }}
                                     </th>
                                     <td class="px-6 py-4">
-                                        {{ template.tool_category?.name || t('Uncategorized') }}
+                                        {{ tool.category?.name || t('Uncategorized') }}
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getAccessLevelBadgeClass(template.access_level)">
-                                            {{ getAccessLevelLabel(template.access_level) }}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getAccessLevelBadgeClass(tool.access_level)">
+                                            {{ getAccessLevelLabel(tool.access_level) }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-right">
                                         <Link
-                                            :href="route('admin.ai.templates.edit', template.id)"
+                                            :href="route('admin.ai.tools.edit', tool.id)"
                                             class="font-medium text-primary-600 dark:text-primary-500 hover:underline"
                                         >
                                             {{ t('Edit') }}
                                         </Link>
                                     </td>
                                 </tr>
-                                <tr v-if="templates.data.length === 0">
+                                <tr v-if="tools.data.length === 0">
                                     <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         {{ t('No tools found.') }}
                                     </td>
@@ -153,8 +153,8 @@
                 </div>
                 
                 <!-- Pagination -->
-                <div class="mt-4" v-if="templates.links && templates.links.length > 3">
-                    <Pagination :links="templates.links" />
+                <div class="mt-4" v-if="tools.links && tools.links.length > 3">
+                    <Pagination :links="tools.links" />
                 </div>
 
             </div>
@@ -172,7 +172,7 @@ import { useTranslate } from '@/Composables/useTranslate';
 const { t } = useTranslate();
 
 const props = defineProps({
-    templates: Object,
+    tools: Object,
     categories: Array,
     filters: Object,
     globalDefault: String,
@@ -195,12 +195,12 @@ const accessLevels = [
 ];
 
 const isAllSelected = computed(() => {
-    return props.templates.data.length > 0 && selectedIds.value.length === props.templates.data.length;
+    return props.tools.data.length > 0 && selectedIds.value.length === props.tools.data.length;
 });
 
 const toggleAll = (e) => {
     if (e.target.checked) {
-        selectedIds.value = props.templates.data.map(t => t.id);
+        selectedIds.value = props.tools.data.map(t => t.id);
     } else {
         selectedIds.value = [];
     }
@@ -243,7 +243,7 @@ const applyBulkUpdate = () => {
 
     if (confirm(t('Update access level to ":level" for :count tools?', { level: getAccessLevelLabel(bulkAction.value), count: selectedIds.value.length }))) {
         router.post(route('admin.ai.access.bulk'), {
-            template_ids: selectedIds.value,
+            tool_ids: selectedIds.value,
             access_level: bulkAction.value
         }, {
             preserveScroll: true,

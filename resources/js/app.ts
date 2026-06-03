@@ -7,6 +7,7 @@ import { ZiggyVue } from 'ziggy-js'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
 const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
+const templates = import.meta.glob<{ default: DefineComponent }>('./Templates/**/*.vue')
 
 function syncDocumentLocale(locale: unknown) {
     const localeInfo = (locale ?? {}) as { code?: string; is_rtl?: boolean | number | string }
@@ -23,6 +24,12 @@ createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: async (name) => {
         const page = pages[`./Pages/${name}.vue`]
+
+            ?? (
+                name.startsWith('Templates/')
+                ? templates[`./Templates/${name.slice('Templates/'.length)}.vue`]
+                : null
+            )
 
         if (!page) {
             throw new Error(`Page not found: ${name}`)

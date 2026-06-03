@@ -14,7 +14,7 @@ MakeAI is engineered on a modern, decoupled architecture designed to deliver ext
 | **Frontend Framework** | Vue 3 (Composition API) + TypeScript | Type-safe, reactive components for an ultra-smooth UX. |
 | **SSR / Routing** | Inertia.js (Node SSR Enabled) | Fast client-side routing combined with SEO-friendly Server-Side Rendering. |
 | **Design / Styling** | Tailwind CSS v4 | Cutting-edge, utility-first styling for rich dark-modes and dynamic animations. |
-| **AI Framework** | LLPhant Engine | Powering advanced Retrieval-Augmented Generation (RAG) and Agentic structures. |
+| **AI Framework** | Laravel AI SDK (`laravel/ai`) | Powering advanced Retrieval-Augmented Generation (RAG) and Agentic structures. |
 | **WebSockets** | Laravel Reverb + Laravel Echo | Zero-config, first-party, high-performance real-time communication. |
 | **Queues / Caching** | Redis + Laravel Horizon | Seamless job execution, background streaming, and high-throughput caching. |
 | **Payments** | Stripe, PayPal, Razorpay, Paddle, CoinGate, SSLCommerz | Comprehensive multi-gateway monetization out of the box. |
@@ -26,7 +26,7 @@ MakeAI is engineered on a modern, decoupled architecture designed to deliver ext
 ### ⚡ White-Label & Custom Branding
 Every brand asset—app name, tagline, description, light/dark mode logo, favicon, primary theme colors, copyright details, and SEO metadata—is dynamic and fully controllable from the Admin Panel. Zero hardcoded assets.
 
-### 🤖 LLPhant-Powered AI Core
+### 🤖 Laravel AI SDK Core
 - **RAG & Vector Storage**: Native support for semantic search and document indexing.
 - **Multiple Providers**: Pre-integrated with OpenAI, Anthropic, Gemini, and local LLMs.
 - **250+ AI Templates**: Ready-to-go templates covering text, images, video, speech-to-text, TTS, and conversational AI.

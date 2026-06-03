@@ -7,7 +7,7 @@ use App\Exceptions\AI\GlobalBudgetExceededException;
 use App\Exceptions\AI\InsufficientCreditsException;
 use App\Http\Controllers\Controller;
 use App\Models\AiChat;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Services\AI\AiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -51,7 +51,7 @@ class AiController extends Controller
     /**
      * POST /api/v1/ai/template/{template} — run a template.
      */
-    public function runTemplate(Request $request, AiTemplate $template): JsonResponse
+    public function runTemplate(Request $request, AiTool $template): JsonResponse
     {
         if (! $template->is_active) {
             return response()->json(['success' => false, 'message' => translate('Template is inactive')], 404);
@@ -156,10 +156,11 @@ class AiController extends Controller
      */
     public function listTemplates(): JsonResponse
     {
-        $templates = AiTemplate::active()
+        $templates = AiTool::active()
+            ->with('category:id,name,slug')
             ->orderBy('sort_order')
             ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'description', 'category', 'icon', 'color', 'is_premium', 'fields']);
+            ->get(['id', 'name', 'slug', 'description', 'category_id', 'icon', 'color', 'access_level', 'fields']);
 
         return response()->json(['success' => true, 'data' => $templates]);
     }

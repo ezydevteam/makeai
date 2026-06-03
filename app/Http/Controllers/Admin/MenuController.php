@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\MenuItemRequest;
 use App\Http\Requests\Admin\MenuItemsReorderRequest;
 use App\Http\Requests\Admin\MenuRequest;
-use App\Models\AiToolCategory;
 use App\Models\BlogCategory;
+use App\Models\Category;
 use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\Page;
@@ -29,8 +29,7 @@ class MenuController extends Controller
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']),
-            'aiCategories' => AiToolCategory::query()
-                ->active()
+            'aiCategories' => Category::aiTools()->active()
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']),

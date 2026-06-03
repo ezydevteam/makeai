@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
-use App\Models\AiTemplate;
+use App\Models\AiTool;
 use App\Models\Document;
 use App\Models\User;
 use App\Services\AI\PromptBuilder;
@@ -44,7 +44,7 @@ class GenerateController extends Controller
         ]);
 
         $user = $this->currentUser();
-        $template = AiTemplate::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
+        $template = AiTool::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
 
         // Access control check
         $this->checkToolAccess($template, $user);
@@ -212,7 +212,7 @@ class GenerateController extends Controller
         ]);
 
         $user = $this->currentUser();
-        $template = AiTemplate::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
+        $template = AiTool::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
 
         // Access control check
         $this->checkToolAccess($template, $user);
@@ -307,7 +307,7 @@ class GenerateController extends Controller
             'model' => 'nullable|string|max:100',
         ]);
 
-        $template = AiTemplate::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
+        $template = AiTool::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
         $model = $validated['model'] ?? $template->model_override ?? settings('default_ai_model', 'gpt-4o-mini');
 
         $estimate = $this->promptBuilder->estimateCost($template, $model);
@@ -325,12 +325,12 @@ class GenerateController extends Controller
     /**
      * Check tool access level (P13 — Part 35).
      */
-    private function checkToolAccess(AiTemplate $template, $user): void
+    private function checkToolAccess(AiTool $template, $user): void
     {
         $this->toolAccess->assertCanUse($template, $user);
     }
 
-    private function saveGeneratedDocument(AiTemplate $template, User $user, string $content): Document
+    private function saveGeneratedDocument(AiTool $template, User $user, string $content): Document
     {
         $document = Document::create([
             'user_id' => $user->id,
