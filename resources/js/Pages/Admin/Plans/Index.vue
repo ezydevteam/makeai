@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
 interface Country {
     code: string
@@ -68,6 +69,7 @@ const props = defineProps<{
     settings: PricingSettings
 }>()
 
+const { t } = useTranslate()
 const selectedPlanId = ref<number | null>(props.plans[0]?.id ?? null)
 const settingsOpen = ref(false)
 const selectedPlan = computed(() => props.plans.find((plan) => plan.id === selectedPlanId.value) ?? props.plans[0])
@@ -261,26 +263,26 @@ const submitSettings = () => {
 </script>
 
 <template>
-    <Head :title="$t('Plans & Pricing')" />
+    <Head :title="t('Plans & Pricing')" />
 
     <AdminLayout>
         <div class="py-8">
             <div class="mx-auto max-w-7xl px-6">
                 <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                     <div>
-                        <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">Plans & Pricing</h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage plan prices, country overrides, labels, and display settings.</p>
+                        <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">{{ t('Plans & Pricing') }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage plan prices, country overrides, labels, and display settings.') }}</p>
                     </div>
                     <button type="button" @click="settingsOpen = true" class="rounded-lg border border-primary-500 px-4 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 dark:text-primary-300">
-                        Pricing settings
+                        {{ t('Pricing settings') }}
                     </button>
                 </div>
                 <div v-if="plans.length === 0" class="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">No plans found.</p>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ t('No plans found.') }}</p>
                 </div>
 
                 <div v-else class="min-w-0 space-y-6">
-                    <nav class="max-w-full overflow-x-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900" aria-label="Plan tabs">
+                    <nav class="max-w-full overflow-x-auto rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900" :aria-label="t('Plan tabs')">
                         <div class="flex min-w-max gap-2">
                         <button
                             v-for="plan in plans"
@@ -292,7 +294,7 @@ const submitSettings = () => {
                         >
                             <span>
                                 <span class="whitespace-nowrap text-sm font-semibold">{{ plan.name }}</span>
-                                <span class="mt-1 block whitespace-nowrap text-xs text-gray-500">{{ plan.country_prices.length }} country prices</span>
+                                <span class="mt-1 block whitespace-nowrap text-xs text-gray-500">{{ t(':count country prices', { count: plan.country_prices.length }) }}</span>
                             </span>
                             <span v-if="plan.is_featured" class="rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-violet-700">{{ settings.pricing_featured_label_text }}</span>
                         </button>
@@ -303,87 +305,87 @@ const submitSettings = () => {
                         <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                             <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Plan controls</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Default prices apply when country pricing is blank.</p>
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Plan controls') }}</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Default prices apply when country pricing is blank.') }}</p>
                                 </div>
                                 <button type="submit" :disabled="form.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:opacity-60">
-                                    {{ form.processing ? 'Saving...' : 'Save plan' }}
+                                    {{ form.processing ? t('Saving...') : t('Save plan') }}
                                 </button>
                             </div>
 
                             <div class="mb-6 grid gap-3 md:grid-cols-3">
                                 <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
-                                    Show plan
+                                    {{ t('Show plan') }}
                                     <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                 </label>
                                 <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
-                                    Featured
+                                    {{ t('Featured') }}
                                     <input v-model="form.is_featured" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                 </label>
                                 <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
-                                    Trial all countries
+                                    {{ t('Trial all countries') }}
                                     <input v-model="form.trial_all_countries" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                 </label>
                             </div>
 
                             <div class="grid gap-4 md:grid-cols-2">
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Plan name</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Plan name') }}</span>
                                     <input v-model="form.name" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
 
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default trial days</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Default trial days') }}</span>
                                     <input v-model="form.trial_days" type="number" min="0" step="1" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
 
                                 <label class="block md:col-span-2">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Description</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</span>
                                     <textarea v-model="form.description" rows="2" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
 
                                 <label class="block md:col-span-2">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Plan bottom info text</span>
-                                    <input v-model="form.bottom_info_text" type="text" placeholder="e.g. Cancel anytime" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Plan bottom info text') }}</span>
+                                    <input v-model="form.bottom_info_text" type="text" :placeholder="t('e.g. Cancel anytime')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
 
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Plan monthly credits</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Plan monthly credits') }}</span>
                                     <input v-model="form.credits" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
 
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">VAT %</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('VAT %') }}</span>
                                     <input v-model="form.vat_percentage" type="number" min="0" max="100" step="0.01" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                             </div>
                         </section>
 
                         <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                            <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Default original and discounted prices</h3>
+                            <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{{ t('Default original and discounted prices') }}</h3>
                             <div class="grid gap-4 md:grid-cols-2">
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Monthly original</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Monthly original') }}</span>
                                     <input v-model="form.original_price_monthly" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Monthly discounted</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Monthly discounted') }}</span>
                                     <input v-model="form.price_monthly" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Yearly original</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Yearly original') }}</span>
                                     <input v-model="form.original_price_yearly" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Yearly discounted</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Yearly discounted') }}</span>
                                     <input v-model="form.price_yearly" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Lifetime original</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Lifetime original') }}</span>
                                     <input v-model="form.original_price_lifetime" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Lifetime discounted</span>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Lifetime discounted') }}</span>
                                     <input v-model="form.price_lifetime" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                 </label>
                             </div>
@@ -391,14 +393,14 @@ const submitSettings = () => {
 
                         <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                             <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Plan features</h3>
-                                <button type="button" @click="addFeature" class="rounded-lg border border-primary-500 px-4 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 dark:text-primary-300">Add feature</button>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Plan features') }}</h3>
+                                <button type="button" @click="addFeature" class="rounded-lg border border-primary-500 px-4 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 dark:text-primary-300">{{ t('Add feature') }}</button>
                             </div>
                             <div class="space-y-3">
-                                <div v-if="form.features.length === 0" class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">No features added.</div>
+                                <div v-if="form.features.length === 0" class="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">{{ t('No features added.') }}</div>
                                 <div v-for="(feature, index) in form.features" :key="index" class="flex gap-3">
                                     <input v-model="form.features[index]" type="text" class="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                    <button type="button" @click="removeFeature(index)" class="rounded-lg px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50">Remove</button>
+                                    <button type="button" @click="removeFeature(index)" class="rounded-lg px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50">{{ t('Remove') }}</button>
                                 </div>
                             </div>
                         </section>
@@ -406,11 +408,11 @@ const submitSettings = () => {
                         <section class="min-w-0 overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                             <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
                                 <div>
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Country pricing</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Blank fields inherit defaults. Use Start trial toggles to enable country trials.</p>
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Country pricing') }}</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Blank fields inherit defaults. Use Start trial toggles to enable country trials.') }}</p>
                                 </div>
                                 <button type="button" @click="addCountryPrice" class="rounded-lg border border-primary-500 px-4 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 dark:text-primary-300">
-                                    Add country
+                                    {{ t('Add country') }}
                                 </button>
                             </div>
 
@@ -418,19 +420,19 @@ const submitSettings = () => {
                                 <table class="min-w-[1180px] divide-y divide-gray-200 text-sm dark:divide-gray-800">
                                     <thead class="bg-gray-50 dark:bg-gray-950">
                                         <tr>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Country</th>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Currency</th>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Monthly</th>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Yearly</th>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Lifetime</th>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">VAT %</th>
-                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">Active</th>
-                                            <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">Action</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Country') }}</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Currency') }}</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Monthly') }}</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Yearly') }}</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Lifetime') }}</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('VAT %') }}</th>
+                                            <th class="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Active') }}</th>
+                                            <th class="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">{{ t('Action') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900">
                                         <tr v-if="visibleCountryPrices.length === 0">
-                                            <td colspan="8" class="px-4 py-10 text-center text-sm text-gray-500">No country pricing yet.</td>
+                                            <td colspan="8" class="px-4 py-10 text-center text-sm text-gray-500">{{ t('No country pricing yet.') }}</td>
                                         </tr>
                                         <tr v-for="(row, index) in visibleCountryPrices" :key="row.id ?? index" class="align-top">
                                             <td class="px-3 py-3">
@@ -445,41 +447,41 @@ const submitSettings = () => {
                                                 </select>
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.original_price_monthly" type="number" min="0" step="0.01" :placeholder="$t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <input v-model="row.price_monthly" type="number" min="0" step="0.01" :placeholder="$t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.original_price_monthly" type="number" min="0" step="0.01" :placeholder="t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.price_monthly" type="number" min="0" step="0.01" :placeholder="t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                                 <label class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     <input v-model="row.trial_monthly_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                                                    Start trial
+                                                    {{ t('Start trial') }}
                                                 </label>
-                                                <input v-if="row.trial_monthly_enabled" v-model="row.trial_monthly_days" type="number" min="1" step="1" placeholder="30 days" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
+                                                <input v-if="row.trial_monthly_enabled" v-model="row.trial_monthly_days" type="number" min="1" step="1" :placeholder="t('30 days')" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.original_price_yearly" type="number" min="0" step="0.01" :placeholder="$t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <input v-model="row.price_yearly" type="number" min="0" step="0.01" :placeholder="$t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.original_price_yearly" type="number" min="0" step="0.01" :placeholder="t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.price_yearly" type="number" min="0" step="0.01" :placeholder="t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                                 <label class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     <input v-model="row.trial_yearly_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                                                    Start trial
+                                                    {{ t('Start trial') }}
                                                 </label>
-                                                <input v-if="row.trial_yearly_enabled" v-model="row.trial_yearly_days" type="number" min="1" step="1" placeholder="360 days" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
+                                                <input v-if="row.trial_yearly_enabled" v-model="row.trial_yearly_days" type="number" min="1" step="1" :placeholder="t('360 days')" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.original_price_lifetime" type="number" min="0" step="0.01" :placeholder="$t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
-                                                <input v-model="row.price_lifetime" type="number" min="0" step="0.01" :placeholder="$t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.original_price_lifetime" type="number" min="0" step="0.01" :placeholder="t('Original')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.price_lifetime" type="number" min="0" step="0.01" :placeholder="t('Discount')" class="mb-2 w-28 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                                 <label class="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
                                                     <input v-model="row.trial_lifetime_enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                                                    Start trial
+                                                    {{ t('Start trial') }}
                                                 </label>
-                                                <input v-if="row.trial_lifetime_enabled" v-model="row.trial_lifetime_days" type="number" min="1" step="1" placeholder="30 days" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
+                                                <input v-if="row.trial_lifetime_enabled" v-model="row.trial_lifetime_days" type="number" min="1" step="1" :placeholder="t('30 days')" class="w-28 rounded-lg border border-primary-200 px-3 py-2 text-xs dark:border-primary-800 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
-                                                <input v-model="row.vat_percentage" type="number" min="0" max="100" step="0.01" :placeholder="$t('Default')" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
+                                                <input v-model="row.vat_percentage" type="number" min="0" max="100" step="0.01" :placeholder="t('Default')" class="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                                             </td>
                                             <td class="px-3 py-3">
                                                 <input v-model="row.is_active" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                             </td>
                                             <td class="px-3 py-3 text-right">
                                                 <button type="button" @click="removeCountryPrice(index)" class="rounded-lg px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50">
-                                                    Remove
+                                                    {{ t('Remove') }}
                                                 </button>
                                             </td>
                                         </tr>
@@ -495,49 +497,49 @@ const submitSettings = () => {
         <div v-if="settingsOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm" @click.self="settingsOpen = false">
             <form class="w-full max-w-xl rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900" @submit.prevent="submitSettings">
                 <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Pricing display settings</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Control visible billing cycles and frontend button labels.</p>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Pricing display settings') }}</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control visible billing cycles and frontend button labels.') }}</p>
                 </div>
                 <div class="space-y-5 px-6 py-5">
                     <div class="grid gap-3 md:grid-cols-3">
                         <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm dark:border-gray-700 dark:text-gray-300">
-                            Monthly
+                            {{ t('Monthly') }}
                             <input v-model="settingsForm.pricing_show_monthly" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                         </label>
                         <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm dark:border-gray-700 dark:text-gray-300">
-                            Yearly
+                            {{ t('Yearly') }}
                             <input v-model="settingsForm.pricing_show_yearly" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                         </label>
                         <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm dark:border-gray-700 dark:text-gray-300">
-                            Lifetime
+                            {{ t('Lifetime') }}
                             <input v-model="settingsForm.pricing_show_lifetime" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                         </label>
                     </div>
 
                     <label class="block">
-                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Default plan currency</span>
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Default plan currency') }}</span>
                         <select v-model="settingsForm.pricing_currency_code" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white">
                             <option v-for="currency in currencies" :key="currency" :value="currency">{{ currency }}</option>
                         </select>
                     </label>
 
                     <label class="block">
-                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Trial button text</span>
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Trial button text') }}</span>
                         <input v-model="settingsForm.pricing_trial_button_text" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                     </label>
                     <label class="block">
-                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Featured label text</span>
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Featured label text') }}</span>
                         <input v-model="settingsForm.pricing_featured_label_text" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                     </label>
                     <label class="block">
-                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Checkout button text</span>
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Checkout button text') }}</span>
                         <input v-model="settingsForm.pricing_checkout_button_text" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950 dark:text-white" />
                     </label>
                 </div>
                 <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-950">
-                    <button type="button" @click="settingsOpen = false" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">Cancel</button>
+                    <button type="button" @click="settingsOpen = false" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">{{ t('Cancel') }}</button>
                     <button type="submit" :disabled="settingsForm.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-primary-500 disabled:opacity-60">
-                        {{ settingsForm.processing ? 'Saving...' : 'Save settings' }}
+                        {{ settingsForm.processing ? t('Saving...') : t('Save settings') }}
                     </button>
                 </div>
             </form>

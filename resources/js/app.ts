@@ -4,6 +4,9 @@ import type { DefineComponent } from 'vue'
 import { createInertiaApp, Link, Head, router } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
 import { ZiggyVue } from 'ziggy-js'
+import AppSelect from './Components/AppSelect.vue'
+import AppColorPicker from './Components/AppColorPicker.vue'
+import ToastContainer from './Components/ToastContainer.vue'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
 const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
@@ -42,7 +45,9 @@ createInertiaApp({
         router.on('navigate', (event) => syncDocumentLocale(event.detail.page.props.locale))
 
         const pinia = createPinia()
-        const vueApp = createApp({ render: () => h(App, props) })
+        const vueApp = createApp({
+            render: () => [h(App, props), h(ToastContainer)],
+        })
 
         vueApp
             .use(plugin)
@@ -50,6 +55,8 @@ createInertiaApp({
             .use(ZiggyVue)
             .component('Link', Link)
             .component('Head', Head)
+            .component('AppSelect', AppSelect)
+            .component('AppColorPicker', AppColorPicker)
         vueApp.config.globalProperties.$t = function (this: any, key: string, replace?: Record<string, string | number>) {
             const translations = (this.$page?.props?.translations ?? {}) as Record<string, string>
             let text = translations[key] ?? key

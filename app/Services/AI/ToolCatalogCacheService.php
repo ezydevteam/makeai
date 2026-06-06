@@ -36,6 +36,7 @@ class ToolCatalogCacheService
                     'icon',
                     'color',
                     'requires_pro',
+                    'requires_login',
                     'sort_order',
                     'tools_count',
                 ])
@@ -59,7 +60,7 @@ class ToolCatalogCacheService
                         $q->active()->ofType('ai_tool')->where('slug', $categorySlug);
                     });
                 })
-                ->with(['category:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
+                ->with(['category:id,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get()
@@ -75,7 +76,7 @@ class ToolCatalogCacheService
                 ->active()
                 ->where('slug', $slug)
                 ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
-                ->with(['category:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
+                ->with(['category:id,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
                 ->firstOrFail();
 
             return array_merge($this->serializeTool($tool, true), [
@@ -207,7 +208,7 @@ class ToolCatalogCacheService
             ->where('id', '!=', $tool->id)
             ->where('category_id', $tool->category_id)
             ->whereHas('category', fn ($query) => $query->active()->ofType('ai_tool'))
-            ->with(['category:id,name,slug,description,icon,color,requires_pro,sort_order,tools_count'])
+            ->with(['category:id,name,slug,description,icon,color,requires_pro,requires_login,sort_order,tools_count'])
             ->orderByDesc('usage_count')
             ->orderBy('name')
             ->limit(6)
@@ -232,6 +233,7 @@ class ToolCatalogCacheService
             'access_level' => $tool->access_level,
             'is_featured' => (bool) $tool->is_featured,
             'requires_pro' => (bool) $tool->requires_pro,
+            'requires_login' => (bool) ($tool->category?->requires_login ?? false),
             'supports_brand_voice' => (bool) $tool->supports_brand_voice,
             'sort_order' => $tool->sort_order,
             'usage_count' => (int) $tool->usage_count,
@@ -275,6 +277,7 @@ class ToolCatalogCacheService
             'icon' => $category->icon,
             'color' => $category->color,
             'requires_pro' => (bool) $category->requires_pro,
+            'requires_login' => (bool) $category->requires_login,
             'sort_order' => $category->sort_order,
             'tools_count' => (int) $category->tools_count,
             'active_tools_count' => (int) ($category->active_tools_count ?? $category->tools_count),

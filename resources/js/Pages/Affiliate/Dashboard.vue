@@ -4,6 +4,7 @@ import { Head, useForm } from '@inertiajs/vue3'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
+import AppSelect from '@/Components/AppSelect.vue'
 
 interface Program {
     commission_type: 'percentage' | 'fixed'
@@ -182,9 +183,11 @@ const normalizeAlias = () => {
                                 </label>
                                 <label class="block">
                                     <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('Payout method') }}</span>
-                                    <select v-model="selectedMethod" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                                        <option v-for="method in program.payout_methods" :key="method" :value="method">{{ t(method.replace('_', ' ')) }}</option>
-                                    </select>
+                                <AppSelect
+                                    v-model="selectedMethod"
+                                    :options="program.payout_methods.map((m: string) => ({ value: m, label: t(m.replace('_', ' ')) }))"
+                                    :label="t('Payout method')"
+                                />
                                 </label>
                                 <label v-if="selectedMethod === 'paypal'" class="block">
                                     <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('PayPal email') }}</span>

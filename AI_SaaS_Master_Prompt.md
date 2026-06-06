@@ -1,6 +1,6 @@
 # MakeAI — Complete Development Master Prompt
 
-> **Version 3.0** — Reorganized & Deduplicated
+> **Version 4.1** — Reorganized & Deduplicated
 > Stack: PHP 8.3+ · Laravel 12+ · Laravel AI SDK Engine · Inertia SSR · Vue 3 · Tailwind v4 · MySQL · Redis · Horizon · **Laravel Reverb**
 
 ---
@@ -19,7 +19,7 @@
   `P07` ADDITIONAL MIGRATIONS (Tool Page Features)
 
 **🔷 LAYER 2 — AUTH & USERS**
-  `P08` AUTH SYSTEM: OTP-ONLY
+  `P08` AUTH SYSTEM: Password + OTP 2FA
   `P09` USER MODEL
   `P10` ADMIN MODEL & RBAC
 
@@ -28,6 +28,8 @@
   `P12` AI INTEGRATIONS & CREDENTIALS
   `P13` AI TOOL ACCESS CONTROL
   `P14` AI TOOLS & TEMPLATES (255 Templates)
+  `P14B` SITE TEMPLATES (Full-Page Experiences)
+  `P14B.10` CHATBOT SITE TEMPLATE (claude.ai / ChatGPT-style)
   `P15` AI TOOLS DEVELOPMENT GUIDELINES
 
 **🔷 LAYER 4 — CONTENT & CMS**
@@ -86,6 +88,19 @@
   `P50` TESTING STRATEGY (PestPHP)
   `P51` DATABASE OPTIMIZATION
 
+**🔷 LAYER 14 — CORE FEATURE ENHANCEMENTS**
+  `P53` AI PLAYGROUND (Model Sandbox)
+  `P54` PROMPT VERSIONING & HISTORY
+  `P55` QUICK TOOL CHAINING
+  `P56` USER USAGE DASHBOARD
+  `P57` AI TOOL FAVORITES & COLLECTIONS
+  `P58` AI OUTPUT RATING SYSTEM
+  `P59` VARIANT GENERATION
+  `P60` AI TOOL EMBED WIDGET
+  `P61` SMART CREDIT TOP-UP ALERTS
+  `P62` COMMAND PALETTE ENHANCEMENTS
+  `P63` EXPORT CENTER (Excel & PDF)
+
 **🔷 FINAL STATS**
   `P52` FINAL COMPLETE STATS
 
@@ -100,7 +115,7 @@
 
 ## 🔷 LAYER 0 — PROJECT IDENTITY
 
-## PART 01 — PROJECT OVERVIEW & TECH STACK
+## PART 01 — PROJECT OVERVIEW & TECH STACK ✅
 
 **Product Name:** MakeAI
 **Tagline:** "One platform. Every AI tool."
@@ -111,8 +126,8 @@
 | Layer | Technology |
 |-------|-----------|
 | Language | PHP 8.3+ |
-| Framework | Laravel 12+ |
-| AI Framework | Laravel AI SDK (laravel/ai) � text, embeddings, images, audio, RAG, Agents |
+| Framework | Laravel 13+ |
+| AI Framework | Laravel AI SDK (laravel/ai)  text, embeddings, images, audio, RAG, Agents |
 | Frontend | Vue 3 Composition API + TypeScript |
 | SSR | Inertia.js with SSR (Node.js server) |
 | Styling | Tailwind CSS v4 |
@@ -125,49 +140,49 @@
 | Charts | Chart.js |
 | State | Pinia |
 | Icons | Tabler Icons |
-| Payments | Stripe, PayPal, SSLCommerz, Razorpay, Paddle, CoinGate |
+| Payments | Stripe (laravel cashier), PayPal, SSLCommerz, Razorpay, Paddle (laravel cashier), CoinGate |
 
 ### Key Architectural Principles
 1. **Zero hardcoded strings** — app name, logo, tagline all from `settings` table
 2. **License-gated features** — `isProAvailable()` gates subscription UI at every layer
 3. **Separate admin auth** — Admin model/guard completely isolated from user auth
-4. **OTP-only auth** — no magic links anywhere, 6-box digit input throughout
+4. **Password + optional OTP 2FA** — email/password login, optional 6-digit OTP via authenticator app after password if user enables 2FA
 5. **SDK-native AI** — real RAG + agents, not raw API calls
 6. **Queue everything** — no AI/email/media job blocks HTTP response
 7. **Laravel Reverb** — first-party WebSocket, no paid external service needed
 8. **ULID public IDs** — never expose auto-increment integers in URLs/API
+9. **For Stripe & paddle payment gateway** - use laravel cashier package and for others use custom
 
-## PART 02 — BRANDING & WHITE-LABEL SYSTEM
+## PART 02 — BRANDING & WHITE-LABEL SYSTEM  ✅
 
-### 26.1 App Identity (Never Hardcoded)
+### 26.1 Site Identity (Never Hardcoded)
+
 
 Every brand element stored in `settings` table under group `branding`. Zero hardcoded text anywhere in codebase — all references use `settings()` helper or Vue shared props.
 
 **Branding settings:**
 ```
-app_name              varchar     -- "MakeAI" (default, fully replaceable)
-app_tagline           varchar     -- "One platform. Every AI tool."
-app_description       text        -- used in meta tags and footer
-app_logo_light        file        -- logo for light mode (SVG/PNG, recommended 200×50px)
-app_logo_dark         file        -- logo for dark mode
-app_logo_icon         file        -- square icon/favicon source (512×512px)
-app_favicon_ico       file        -- auto-generated from icon or manual upload
-app_favicon_png       file        -- 192×192 and 512×512 for PWA manifest
-app_og_image          file        -- default Open Graph image (1200×630px)
-app_primary_color     color       -- used in emails, PWA theme-color
-app_copyright_text    varchar     -- "{app_name} © {year}. All rights reserved."
-app_support_email     varchar
-app_support_url       varchar
-app_terms_url         varchar     -- defaults to /terms-of-service
-app_privacy_url       varchar     -- defaults to /privacy-policy
+site_name              varchar     -- "MakeAI" (default, fully replaceable)
+site_tagline           varchar     -- "One platform. Every AI tool."
+site_description       text        -- used in meta tags and footer
+site_logo_light        file        -- logo for light mode (SVG/PNG, recommended 200×50px)
+site_logo_dark         file        -- logo for dark mode
+site_favicon_ico       file        -- auto-generated from icon or manual upload
+site_favicon_png       file        -- 192×192 and 512×512 for PWA manifest
+site_og_image          file        -- default Open Graph image (1200×630px)
+site_copyright_text    varchar     -- "{site_name} © {year}. All rights reserved."
+site_support_email     varchar
+site_support_url       varchar
+site_terms_url         varchar     -- defaults to /terms-of-service
+site_privacy_url       varchar     -- defaults to /privacy-policy
 ```
 
-**Admin → Settings → Branding:**
+**Admin → Settings → general:**
 - Upload fields for each logo/favicon with live preview
 - Auto-generates all favicon sizes from uploaded icon (using GD/Imagick): 16×16, 32×32, 180×180 (apple-touch), 192×192, 512×512
 - App name field → updates `<title>` tag, email headers, all UI references
 - Tagline field → updates homepage hero, meta description
-- Copyright text → supports `{app_name}` and `{year}` variables
+- Copyright text → supports `{site_name}` and `{year}` variables
 - PWA manifest auto-generated at `/manifest.json` from branding settings
 
 **In Vue/Inertia:**
@@ -178,29 +193,20 @@ const { appName, appLogo, appTagline } = usePage().props.branding
 
 **In Blade (emails, maintenance page):**
 ```php
-{{ settings('app_name') }}
-{{ asset(settings('app_logo_light')) }}
+{{ settings('site_name') }}
+{{ asset(settings('site_logo_light')) }}
 ```
-
----
-
-
----
-
-
----
-
 
 ---
 
 ## 🔷 LAYER 1 — FOUNDATION
 
-## PART 03 — ENVATO LICENSE SYSTEM
+## PART 03 — ENVATO LICENSE SYSTEM ✅
 
 ### 1.1 License Types
 Envato issues two license types:
 - **Regular License** — single end product, end users not charged → enables all core features
-- **Extended License** — end users can be charged → enables subscription/billing system
+- **Extended License** — end users can be charged → enables subscription/billing system (handle using isProAvaiable())
 
 ### 1.2 License Verification Architecture
 
@@ -243,22 +249,25 @@ function get_license_buyer(): string        // buyer username from Envato
 **Anti-nulling protection:**
 - License hash stored in `settings` table (encrypted with APP_KEY)
 - Re-verified against Envato API every 7 days (configurable)
-- If verification fails: grace period 72h, then subscription features deactivated (not the whole app)
+- If verification fails: grace period 72h, then show a banner in frontend to buy license / verify and stop frontend all functions/features
 - No offline bypass possible — API call is mandatory on first install
 - License tied to domain — domain mismatch triggers warning in admin
 - `LicenseMiddleware` applied on every admin and API route
 
 ### 1.3 Installation Wizard
 
+***Make a beautiful installation wizard with step indicators, main color scheme is royal blue***
+
 Route: `/install` — only accessible when `INSTALLED=false` in `.env`
 
 **Steps:**
-1. **System requirements check** — PHP version, extensions (curl, zip, gd, mbstring, redis), writable dirs
+1. **System requirements check** — PHP version, extensions (curl, zip, gd, mbstring, redis, and other necessary...), writable dirs
 2. **Database configuration** — host, port, db name, user, password → test connection
-3. **Application setup** — app name, URL, timezone, mail driver
+3. **Site setup** — site name, URL, timezone, mail driver
 4. **License activation** — purchase code input → Envato API verify → store result
 5. **Admin account creation** — name, email, password, confirm password
-6. **Final setup** — run migrations, seed defaults, generate APP_KEY, set `INSTALLED=true`
+6. **One click/manual demo install** - first try one click, if not success then manual upload demo.sql file. for one click demo thumnail with preview & install button shows via seed.
+6. **Final setup** — run migrations (fix conflicts with demo.sql file if needed), generate APP_KEY, set `INSTALLED=true`
 7. **Done** — redirect to admin dashboard
 
 After installation, `/install` must return 404.
@@ -267,7 +276,7 @@ After installation, `/install` must return 404.
 
 ## PART 04 — FOUNDATION LAYER
 
-### 2.1 Settings Model
+### 2.1 Settings Model ✅
 
 **Table: `settings`**
 
@@ -305,7 +314,7 @@ function settings_set(string $key, mixed $value, string $type = 'string'): void
 - Subscriptions (only visible if `is_extended_license()`)
 - Advanced (cache, queue, debug, cron status)
 
-### 2.2 Theme & Addon System
+### 2.2 Theme & Addon System ✅
 
 **Directory structure:**
 ```
@@ -342,7 +351,7 @@ addons/
   "description": "Modern dark dashboard theme",
   "requires_license": 1,
   "settings": [
-    { "key": "primary_color", "type": "color", "default": "#6366f1", "label": "Primary color" },
+    { "key": "primary_color", "type": "color", "default": "#1F75FE", "label": "Primary color" },
     { "key": "sidebar_collapsed", "type": "boolean", "default": false, "label": "Collapse sidebar by default" }
   ]
 }
@@ -366,9 +375,9 @@ addons/
 
 **`app/Services/AddonService.php`** — scans `addons/` directory, registers enabled addons, auto-loads their ServiceProviders.
 
-Admin panel: Themes page (activate/deactivate, configure per-theme settings), Addons page (same), with license gating where `requires_license: 2`.
+Admin panel: Themes page (activate/deactivate, configure per-theme settings), Addons page (same), with license gating where `requires_license: 2` themes/ adons must verify license during installation, envato purchase code verification must pass to successfully install or in first time activation.
 
-### 2.3 Helper Functions
+### 2.3 Helper Functions ✅
 
 **`app/Helpers/helpers.php`** — auto-loaded via `composer.json`:
 
@@ -439,7 +448,7 @@ export function useToastr() {
 
 **Root layout (`app.vue`)** watches `$page.props.flash` and fires toastr on change.
 
-### 2.5 Multi-Language (Translation System)
+### 2.5 Multi-Language (Translation System) ✅
 
 **Table: `languages`**
 ```sql
@@ -454,23 +463,13 @@ id, language_id FK, key (text hash or slug), value (translated text), created_at
 The `translate()` helper:
 1. Checks `translations` table (cached per language)
 2. Falls back to English original string
-3. Admin panel has Translation Manager: list all keys, edit translations, import/export JSON, auto-translate via AI (GPT) with one click
+3. Admin panel has Translation Manager: list all keys, edit translations, import/export JSON, auto-translate via AI with one click
 4. RTL support: if active language `is_rtl = true`, inject `dir="rtl"` on `<html>` via Inertia shared props
 
-### 2.6 Multi-Currency
-
-**Table: `currencies`**
-```sql
-id, code (USD/BDT/EUR), symbol ($, ৳, €), name, exchange_rate (relative to USD), decimal_places, is_default boolean, is_active boolean
-```
-
-Admin can: add/remove currencies, set default, manually update exchange rates, or enable auto-update (via fixer.io or exchangerate-api.com — stored API key in settings).
-
-`format_currency()` and `convert_currency()` helpers use this table.
 
 ---
 
-## PART 05 — RATE LIMITING STRATEGY (DETAILED)
+## PART 05 — RATE LIMITING STRATEGY (DETAILED) ✅
 
 ### 5.1 Architecture: Sliding Window Rate Limiting
 
@@ -838,11 +837,11 @@ avg_latency_ms (int null)   -- updated after each generation for slow-tool detec
 
 ---
 
-## 🔷 LAYER 2 — AUTH & USERS
+## 🔷 LAYER 2 — AUTH & USERS ✅
 
-## PART 08 — AUTH SYSTEM: OTP-ONLY
+## PART 08 — AUTH SYSTEM: Password + OTP 2FA
 
-No magic links or verification URLs. All email verification and password reset uses **numeric OTP only**.
+Password-based login with optional OTP 2FA via authenticator app (TOTP) or email OTP. Email verification and password reset use numeric OTP codes.
 
 ### 31.1 Email Verification Flow
 
@@ -913,7 +912,7 @@ Used in: email verification, password reset, login 2FA, admin login 2FA.
 
 ## PART 09 — USER MODEL
 
-### 4.1 Users Table
+### 4.1 Users Table ✅
 
 ```sql
 id                      bigint PK
@@ -982,27 +981,31 @@ created_at, updated_at, deleted_at
 
 `login_history` — id, user_id, ip, user_agent, country, city, success boolean, created_at
 
-### 4.2 User Auth Flow
+### 4.2 User Auth Flow ✅
 
-- Registration: email/password or social (Google, GitHub, Facebook via Socialite)
+- Registration: email/password or social (Google, GitHub, Facebook, Reddit, Twitter X via Socialite)
 - Email verification (queue-based)
 - Login: email + password → optional 2FA (TOTP or email OTP)
-- Password reset via email
+- Password reset via email otp
 - Referral: `/register?ref=CODE` → stores `referred_by` on new user, awards referral credits on first purchase (if enabled in settings)
 
-### 4.3 User Dashboard
+### 4.3 User Dashboard ✅
 
 User sees their own overview:
 - Credit balance + usage chart (Chart.js — last 7 days)
 - Quick access to all AI tools
 - Recent documents/generations
-- Active plan details (if `isProAvailable()`)
+- Active plan details (if `isProAvailable()`), cancel subscription, upgrade plan
 - Referral link + earnings
 - Recent transactions
+- Payout history/request/settings
+- Support tickets
+- Account settings
+- Security settings (password change, 2fa)
 
 ---
 
-## PART 10 — ADMIN MODEL & RBAC
+## PART 10 — ADMIN MODEL & RBAC ✅
 
 ### 3.1 Separate Admin Auth
 
@@ -1076,6 +1079,7 @@ Pre-seeded permissions organized by group:
 - `themes.*` — activate, configure
 - `translations.*` — manage languages and translations
 - `reports.*` — view all reports and exports
+**check others features if excluded from here**
 
 **`app/Http/Middleware/AdminPermission.php`** — checks `auth('admin')->user()->hasPermission('slug')`.
 
@@ -1089,20 +1093,34 @@ Built with **Chart.js** (loaded via npm). Dashboard cards and charts:
 - Total users / new today / new this month
 - Total revenue / revenue today / MRR (if subscriptions enabled)
 - Total AI requests / tokens used today / estimated cost today
+- Total credits / credits used today / estimated credits cost today
 - Active subscriptions count (if `isProAvailable()`)
 
 **Charts:**
-- User signups — line chart (last 30 days)
-- Revenue — bar chart (last 12 months)
-- AI usage by tool — doughnut chart
-- Token cost breakdown by AI provider — bar chart
-- Top users by credit usage — horizontal bar
+- User signups — line chart (7days, this month, 90 days)
+- Revenue — bar chart (7days, this month, 90 days)
+- AI usage by tool — doughnut chart (7days, this month, 90 days)
+- Token cost breakdown by AI provider — bar chart (7days, this month, 90 days)
+- Revenue vs Cost — bar chart / line chart (7days, this month, 90 days)
+- Pro subscriptions (if `isProAvailable()`) - line chart (7days, this month, 90 days)
+- Usage location - Geo chart (7days, this month, 90 days)
+
+**List style**
+- Traffic sources (direct, social media, referal, ads, others..)
+- Top AI tools used (max 6) - (by user usage count, by cost, by token usage)
+- Top AI models used (max 6) - (by user usage count, by cost, by token usage)
+- Recently registered users (max 6)
+
 
 **Quick actions:**
 - Send announcement to all users
-- Maintenance mode toggle
-- Clear cache button
 - View latest support tickets
+- Add AI tools
+- Make a note (in admin note section will be shows as my notes with upcoming agenda, note will be created with modal)
+- Maintenance mode toggle
+
+**Export Dashboard Reports**
+- Using `PART 63 — EXPORT CENTER (EXCEL/CSV & PDF)` for all export reports
 
 ### 3.4 Admin Panel Sections (Full)
 
@@ -1162,7 +1180,7 @@ Built with **Chart.js** (loaded via npm). Dashboard cards and charts:
 
 ---
 
-## 🔷 LAYER 3 — AI CORE
+## 🔷 LAYER 3 — AI CORE ✅
 
 ## PART 11 — AI ENGINE ("Laravel AI SDK" Core)
 
@@ -1337,7 +1355,7 @@ Each module is a dedicated Service class + Controller + Vue page:
 
 ---
 
-## PART 12 — AI INTEGRATIONS & CREDENTIALS
+## PART 12 — AI INTEGRATIONS & CREDENTIALS ✅
 
 All third-party API integrations manageable from Admin → Settings → Integrations. Credentials stored encrypted in `settings` table.
 
@@ -1472,7 +1490,7 @@ Integrations are lazy-loaded in tabs to avoid page performance issues:
 ---
 
 
-## PART 13 — AI TOOL ACCESS CONTROL
+## PART 13 — AI TOOL ACCESS CONTROL ✅
 
 Admin → AI Tools → Access Settings
 
@@ -1533,9 +1551,9 @@ When a free user tries a `pro_plan` tool:
 
 ---
 
-All templates stored in `ai_tools` table and seeded via `database/seeders/AiToolSeeder.php`. Each template belongs to a category, has a unique `slug`, system prompt, user input fields definition (JSON), and can be enabled/disabled from admin panel.
+All tools stored in `ai_tools` table and seeded via `database/seeders/AiToolSeeder.php`. Each template belongs to a category, has a unique `slug`, system prompt, user input fields definition (JSON), and can be enabled/disabled from admin panel.
 
-### Template Table Structure
+### Tools Table Structure
 
 ```sql
 ai_tools
@@ -1983,37 +2001,37 @@ ai_tools
 
 ---
 
-### Template Admin Management
+### Tool Admin Management
 
-Admin → AI Tools → Templates:
-- List all templates with category filter, active/inactive toggle, featured toggle
+Admin → AI Tools → Tools:
+- List all Tools with category filter, active/inactive toggle, featured toggle
 - Edit any template: name, description, system prompt, user prompt, fields, model override
-- Create custom templates (admin-created, same structure)
+- Create custom Tool (admin-created, same structure)
 - Duplicate existing template as starting point
 - Reorder within category via drag-and-drop
 - Bulk enable/disable by category
-- Import/export templates as JSON (for sharing between installs)
+- Import/export Tools as JSON (for sharing between installs)
 - Usage statistics per template (total uses, uses today, uses this month)
-- Most popular templates widget on admin dashboard
+- Most popular Tools widget on admin dashboard
 
 Admin → AI Tools → Categories:
 - Create/edit/delete categories
 - Each category: name, slug, icon, color, description, sort order, is_active
 - Assign `requires_pro` at category level (all tools in that category become pro-only)
 
-### User-side Template UX
+### User-side Tool UX
 
 - `/ai-tools` — grid of all active tools, filterable by category, searchable
-- Featured templates shown first (configurable from admin)
+- Featured Tools shown first (configurable from admin)
 - Each tool card: icon, name, short description, category badge, "Try it" button
 - Recently used tools section on user dashboard (last 6)
 - Favorite tools (bookmark) per user
 - Usage count shown on card (social proof): "Used 12,483 times"
-- New badge on templates created within last 30 days
+- New badge on Tools created within last 30 days
 
 ---
 
-## PART 14 — AI TOOLS, TEMPLATES & CATEGORIES
+## PART 14 — AI TOOLS, TEMPLATES & CATEGORIES ✅
 
 ---
 
@@ -2042,7 +2060,7 @@ These terms have distinct meanings. They are NOT interchangeable:
 
 ---
 
-### 14.2 Categories — Fully Dynamic, Admin-Controlled
+### 14.2 Categories — Fully Dynamic, Admin-Controlled ✅
 
 **RULE: Categories are NEVER hardcoded in PHP or Vue files.**
 
@@ -2124,7 +2142,7 @@ const categories = ['blog-content', 'social-media']
 
 ---
 
-### 14.3 Tools / Templates — Structure ✅
+### 14.3 Tools  — Structure ✅
 
 Each row in `ai_tools` is one AI tool. Here is the complete field reference:
 
@@ -2375,20 +2393,19 @@ GET /api/v1/tools?category=blog-content → filter by category slug
 - Cannot delete a category if it has tools — must reassign tools first (or bulk move)
 - System categories (seeded) can be edited but have a lock icon indicating "predefined"
 
-**Admin → AI Tools → Templates:**
+**Admin → AI Tools → Tools:**
 - Lists all tools, grouped by category (with category filter)
 - Each row: icon, name, category badge, output_type badge, access_level badge, usage count, active toggle
 - Active/inactive toggle per tool (hides from users without deleting)
 - Featured toggle (tool appears first in listing)
-- Click to open full template editor (5 tabs: Basic, Prompts, Fields, Page Content, SEO)
-- "+ New Template" → admin can create custom tools with same structure as seeded ones
+- Click to open full Tool editor (5 tabs: Basic, Prompts, Fields, Page Content, SEO)
+- "+ New Tool" → admin can create custom tools with same structure as seeded ones
 - Duplicate any existing tool as starting point
 - Bulk actions: enable, disable, change category, change access_level, delete
 
 **Key admin behaviors:**
 - Disabling a tool hides it from users immediately (cached invalidated)
 - Disabling a category hides ALL its tools immediately
-- Admin-created tools (`is_system = false`) can be deleted; seeded tools cannot
 - Tool `slug` is set once on creation and never auto-changes (stable URLs)
 
 ---
@@ -2459,7 +2476,7 @@ $categories = Category::where('type','ai_tool')->where('is_active',true)->get();
 
 ---
 
-### 14.9 Access Control Per Tool
+### 14.9 Access Control Per Tool ✅
 
 Each tool has an `access_level` field. Resolution order:
 
@@ -2530,7 +2547,7 @@ They are server-side only. The frontend only receives the `fields` array and dis
 
 ---
 
-### 14.11 Checklist — Categories & Tools
+### 14.11 Checklist — Categories & Tools ✅
 
 - [ ] `category_id` is always a FK integer — never a hardcoded string category name in `ai_tools`
 - [ ] Frontend never has a hardcoded array of category names — always reads from DB via API/props
@@ -2562,7 +2579,7 @@ They are server-side only. The frontend only receives the `fields` array and dis
 
 ---
 
-### 14B.1 What Is a Site Template?
+### 14B.1 What Is a Site Template? ✅
 
 A Site Template is a **complete page experience** — it has its own layout, color scheme, navigation, and bundles a curated set of AI tools together under a specific use case.
 
@@ -2814,7 +2831,7 @@ const cssVars = computed(() => ({
 
 ---
 
-### 14B.7 `SiteTemplateResource` — What Admin Edits Are Exposed to Frontend
+### 14B.7 `SiteTemplateResource` — What Admin Edits Are Exposed to Frontend ✅
 
 ```php
 // app/Http/Resources/SiteTemplateResource.php
@@ -2855,7 +2872,7 @@ return [
 
 ---
 
-### 14B.8 Caching
+### 14B.8 Caching ✅
 
 ```php
 // Cache keys for site templates
@@ -2866,7 +2883,7 @@ return [
 
 ---
 
-### 14B.9 Checklist: Site Templates
+### 14B.9 Checklist: Site Templates ✅
 
 - [ ] Admin can edit all 5 tabs (Appearance, Content, Custom Code, SEO, Tools) for every template
 - [ ] Admin CANNOT create new templates — "+ New Template" button does not exist anywhere
@@ -2890,683 +2907,530 @@ return [
 
 ---
 
-## 14C.1 Laravel AI SDK
-
-IMPORTANT:
-This project was originally designed around Laravel AI SDK.
-
-I have decided to REMOVE Laravel AI SDK Engine completely.
-
-This is NOT a compatibility migration.
-
-This is a FULL migration to Laravel AI SDK.
-
-There should be NO Laravel AI SDK Engine dependency, NO AiService, NO Laravel AI SDK Engine wrapper, NO Laravel AI SDK Engine adapter, and NO Laravel AI SDK Engine fallback.
-
-Laravel AI SDK is now the only AI engine used in the application.
-
-==================================================
-PROJECT RULES (NON-NEGOTIABLE)
-==================================================
-
-1. isProAvailable() is the gate for ALL subscription features.
-
-Every subscription-related:
-- UI
-- menu
-- route
-- API
-- email
-- billing action
-
-must be wrapped by:
-
-isProAvailable()
-
-If false:
-Pro functionality must be completely hidden.
-
-Never disabled.
-Never locked.
-Never shown.
-
-==================================================
-
-2. Configuration
-
-Use:
-
-settings('key')
-
-for everything.
-
-Never hardcode:
-
-- API keys
-- provider names
-- model names
-- app name
-- branding
-- subscription configuration
-
-==================================================
-
-3. Authentication
-
-OTP only.
-
-No magic links.
-
-OTP must:
-
-- be numeric
-- hashed in database
-- use reusable 6-box OTP component
-- support paste
-- support auto submit
-- support cooldown
-- support lockout
-
-==================================================
-
-4. Streaming
-
-DO NOT use EventSource.
-
-Streaming must use:
-
-POST + fetch() + ReadableStream
-
-Backend streaming responses must include:
-
-X-Accel-Buffering: no
-
-==================================================
-
-5. Frontend
-
-Vue 3
-TypeScript
-<script setup>
-
-Inertia SSR
-
-Tailwind CSS v4
-
-==================================================
-
-6. Database
-
-Never expose users.id
-
-Use ULID publicly.
-
-==================================================
-
-7. AI Usage Tracking
-
-Every AI request must be logged.
-
-Success or failure.
-
-All requests go through TokenGuard.
-
-Before request:
-check limits
-
-After request:
-deduct credits
-calculate cost
-store usage logs
-
-==================================================
-CURRENT STATE
-==================================================
-
-The project currently contains SDK-based architecture.
-
-Search entire codebase for:
-
-Laravel AI SDK
-AiService
-ragQuery
-runAgent
-ingestDocument
-embedText
-embedBatch
-
-and identify all references.
-
-==================================================
-GOAL
-==================================================
-
-Remove Laravel AI SDK Engine completely.
-
-Replace entire AI layer with Laravel AI SDK.
-
-Create a clean enterprise architecture.
-
-Controllers must NEVER call Laravel AI SDK directly.
-
-Controllers must ONLY call:
-
-AiService
-
-==================================================
-TARGET ARCHITECTURE
-==================================================
-
-app/Services/AI/
-
-AiService.php
-
-Contracts/
-  AiDriverInterface.php
-
-Drivers/
-  LaravelAiDriver.php
-
-DTO/
-  CompletionRequest.php
-  CompletionResponse.php
-  StreamChunk.php
-  EmbeddingResult.php
-  RagResult.php
-
-Rag/
-  TextExtractionService.php
-  ChunkingService.php
-  VectorStoreService.php
-  DocumentIngestionService.php
-  KnowledgeBaseSearchService.php
-
-Agents/
-  AgentService.php
-
-==================================================
-REMOVE COMPLETELY
-==================================================
-
-Delete:
-
-- AiService
-- AI config
-- AI imports
-- AI providers
-- AI drivers
-- Laravel AI SDK dependency
-
-Composer:
-
-composer remove laravel/ai
-
-No compatibility wrappers.
-
-No legacy drivers.
-
-No deprecated classes.
-
-==================================================
-AISERVICE CONTRACT
-==================================================
-
-AiService must expose:
-
-complete()
-
-stream()
-
-embedText()
-
-embedBatch()
-
-generateImage()
-
-generateAudio()
-
-generateVideo()
-
-searchKnowledgeBase()
-
-answerWithKnowledgeBase()
-
-runAgent()
-
-summarizeDocument()
-
-extractStructuredData()
-
-All controllers use AiService only.
-
-==================================================
-LARAVEL AI SDK
-==================================================
-
-Use Laravel AI SDK as the only AI implementation.
-
-LaravelAiDriver must support:
-
-- chat completion
-- streaming
-- embeddings
-- image generation
-- audio generation
-- structured output
-- tool calling
-- agent execution
-- vector search
-
-Read provider configuration from settings().
-
-Never hardcode providers.
-
-==================================================
-RAG REQUIREMENTS
-==================================================
-
-Implement a complete production RAG pipeline.
-
-Process:
-
-Upload PDF/DOCX/TXT/CSV
-
-↓
-
-Extract text
-
-↓
-
-Normalize text
-
-↓
-
-Chunk text
-
-↓
-
-Create embeddings
-
-↓
-
-Store vectors
-
-↓
-
-Semantic search
-
-↓
-
-Inject context
-
-↓
-
-Generate answer
-
-↓
-
-Stream answer
-
-==================================================
-DOCUMENT INGESTION
-==================================================
-
-DocumentIngestionService:
-
-Supported:
-
-PDF
-DOCX
-TXT
-CSV
-Markdown
-
-Workflow:
-
-1. upload document
-2. extract text
-3. normalize text
-4. split chunks
-5. create embeddings
-6. save chunks
-7. save vectors
-8. store metadata
-
-==================================================
-CHUNKING RULES
-==================================================
-
-Chunk size:
-
-settings('ai_chunk_size')
-
-Overlap:
-
-settings('ai_chunk_overlap')
-
-No hardcoded values.
-
-==================================================
-VECTOR STORAGE
-==================================================
-
-Review current database.
-
-Create missing migrations if needed.
-
-Support:
-
-knowledge_bases
-knowledge_base_documents
-knowledge_base_chunks
-vector_embeddings
-
-Store:
-
-knowledge_base_id
-document_id
-chunk_id
-user_id
-embedding
-metadata
-
-Do not destroy existing data.
-
-Use safe migrations only.
-
-==================================================
-KNOWLEDGEBASE SEARCH
-==================================================
-
-KnowledgeBaseSearchService
-
-Must:
-
-retrieve top chunks
-
-rank by similarity
-
-return contextual matches
-
-support filters
-
-support multiple knowledge bases
-
-==================================================
-PROMPT BUILDER
-==================================================
-
-Keep existing prompt architecture.
-
-Continue supporting:
-
-ai_templates.prompt_system
-
-ai_templates.prompt_user
-
-fields JSON
-
-brand voice
-
-language
-
-tone
-
-length
-
-knowledgebase context injection
-
-==================================================
-STREAMING
-==================================================
-
-Replace all EventSource implementations.
-
-Frontend must use:
-
-fetch()
-
-ReadableStream
-
-POST requests
-
-Backend response headers:
-
-Content-Type: text/event-stream
-
-Cache-Control: no-cache
-
-X-Accel-Buffering: no
-
-==================================================
-TOKEN GUARD
-==================================================
-
-Before generation:
-
-TokenGuard::before()
-
-After generation:
-
-TokenGuard::after()
-
-Must execute for:
-
-chat
-text
-image
-audio
-video
-agents
-knowledgebase
-
-==================================================
-AI USAGE LOGGING
-==================================================
-
-Log every request.
-
-Store:
-
-provider
-
-model
-
-input_tokens
-
-output_tokens
-
-cost
-
-credits
-
-tool
-
-status
-
-request_id
-
-response_time
-
-Success and failure both logged.
-
-==================================================
-SETTINGS REQUIRED
-==================================================
-
-Create or verify:
-
-ai_default_provider
-
-ai_default_model
-
-ai_embedding_provider
-
-ai_embedding_model
-
-ai_chunk_size
-
-ai_chunk_overlap
-
-ai_max_context_chunks
-
-ai_vector_store_driver
-
-All provider API keys encrypted.
-
-==================================================
-ADMIN PANEL
-==================================================
-
-Update AI settings panel.
-
-Show:
-
-Default provider
-
-Default model
-
-Embedding provider
-
-Embedding model
-
-Chunk size
-
-Chunk overlap
-
-Vector store settings
-
-Test connection
-
-All settings must save via settings().
-
-==================================================
-SEARCH ENTIRE PROJECT
-==================================================
-
-First perform a complete scan.
-
-Find:
-
-- Laravel AI SDK references
-- AI services
-- Controllers
-- Streaming composables
-- Knowledgebase code
-- Embedding code
-- Agent code
-
-List all affected files.
-
-==================================================
-IMPLEMENTATION ORDER
-==================================================
-
-STEP 1
-Create AiService architecture.
-
-STEP 2
-Install and configure Laravel AI SDK.
-
-STEP 3
-Create LaravelAiDriver.
-
-STEP 4
-Migrate text generation.
-
-STEP 5
-Migrate streaming.
-
-STEP 6
-Migrate embeddings.
-
-STEP 7
-Migrate knowledgebase.
-
-STEP 8
-Migrate document ingestion.
-
-STEP 9
-Migrate agents.
-
-STEP 10
-Update admin settings.
-
-STEP 11
-Remove Laravel AI SDK Engine entirely.
-
-STEP 12
-Add tests.
-
-==================================================
-TESTS REQUIRED
-==================================================
-
-Verify:
-
-1. AiService used everywhere.
-
-2. No Laravel AI SDK references remain.
-
-3. Streaming uses POST.
-
-4. Streaming includes X-Accel-Buffering: no.
-
-5. TokenGuard executes.
-
-6. Usage logs created.
-
-7. PDF ingestion works.
-
-8. Embeddings generated.
-
-9. Knowledgebase retrieval works.
-
-10. Agent execution works.
-
-11. Provider settings loaded from settings().
-
-12. No hardcoded provider keys.
-
-==================================================
-OUTPUT FORMAT
-==================================================
-
-Before modifying code:
-
-Show:
-
-1. Laravel AI SDK references found
-2. Files affected
-3. Migration plan
-
-Then implement step by step.
-
-After implementation show:
-
-- changed files
-- removed files
-- new migrations
-- composer changes
-- tests added
-- commands to run
-
-Do not make unrelated UI changes.
-
-Do not introduce EventSource.
-
-Do not introduce magic links.
-
-Do not bypass TokenGuard.
-
-Do not bypass isProAvailable().
-
-Do not hardcode MakeAI in source code.
-
-The final architecture must be Laravel AI SDK only.
+## PART 14B.10 — CHATBOT SITE TEMPLATE (claude.ai / ChatGPT-style) ✅
+
+> This is a dedicated site template (`slug: ai-chat`) that turns the entire site into a
+> ChatGPT / Claude-style conversational AI experience.
+> It uses the same Site Template architecture as all other templates (Part 14B),
+> but has a completely unique layout and a rich set of chatbot-specific settings.
 
 ---
 
+### 14B.10.1 Template Identity
+
+```
+Slug:             ai-chat
+Name:             AI Chat
+Vue Component:    AiChatTemplate.vue  (resources/js/Templates/AiChatTemplate.vue)
+Layout:           claude.ai / ChatGPT — persistent left sidebar + main chat area
+Footer:           HIDDEN — never shown, even if footer builder has content
+Header:           Site default header (from Header Builder) — 60px fixed top
+```
+
+---
+
+### 14B.10.2 Layout Structure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Site Default Header (60px, from Header Builder)                │
+├────────────────────┬────────────────────────────────────────────┤
+│  Chat Sidebar      │  Main Chat Area                            │
+│  260px · fixed     │  flex-1                                    │
+│                    │                                            │
+│  [+ New Chat]      │  STATE A — Welcome Screen                  │
+│  [⊞ Projects]  Pro │    Greeting heading                        │
+│  ─────────────    │    8 Product cards (3+3+2 grid)            │
+│  Today             │    Suggested prompts row (chips)           │
+│  • Chat title      │                                            │
+│  • Chat title      │  STATE B — Active Conversation             │
+│  Yesterday         │    Chat messages (streaming)               │
+│  • Chat title      │    Token usage indicator                   │
+│  ─────────────    │                                            │
+│  [Products] ←      │  Message input bar (always visible)        │
+│    2 pinned +      │    Model selector · Attach · Send          │
+│    [more ▾]        │                                            │
+│  ─────────────    │                                            │
+│  [User menu]       │                                            │
+└────────────────────┴────────────────────────────────────────────┘
+```
+
+**Height calculation:**
+```css
+.chat-template-wrapper { height: calc(100vh - 60px); display: flex; overflow: hidden; }
+/* 60px = site header height */
+/* Footer display: none — always, regardless of footer builder settings */
+```
+
+---
+
+### 14B.10.3 Chat Sidebar — Detailed Spec
+
+**New Chat button:**
+```
+[+ New Chat]   ← primary color button, full width, top of sidebar
+```
+- Clears main area → shows Welcome Screen (State A)
+- Resets selected product to none
+- Keyboard shortcut: `Ctrl+Shift+O` / `Cmd+Shift+O`
+
+**Projects section (Pro only — hidden if `!isProAvailable()`):**
+```
+⊞ Projects
+  • Project Alpha        ← click → filters chat history to this project
+  • Client Work
+  [+ New Project]
+```
+- Project = named group of conversations
+- User creates projects from "+" button or from chat context menu (right-click / ⋯)
+- Each conversation can belong to one project (optional)
+- Projects sorted by last activity
+
+**Recent Chats list:**
+```
+Today
+  • Write a landing page copy     [⋯]  ← hover shows context menu
+  • Fix React useState bug        [⋯]
+Yesterday
+  • Instagram caption ideas       [⋯]
+  • Email to client               [⋯]
+Last 7 Days
+  • Python CSV parser             [⋯]
+Older
+  • Marketing plan outline        [⋯]
+```
+- Shows last 50 conversations, grouped by recency
+- Each item: truncated title (first user message, max 40 chars)
+- Hover → shows `[⋯]` context menu: Rename, Move to Project, Delete
+- Active conversation: highlighted with primary color left border
+- Title is auto-generated from first user message (or AI can name it after first exchange)
+
+**Products section in sidebar (shown ONLY during active conversation):**
+```
+Products
+  [💻 Code]  [✍️ Write]  [more ▾]
+```
+- Shows ONLY 2 product chips inline when a conversation is active
+- `[more ▾]` toggle → expands to show all 8 products in a small popover/dropdown
+- Clicking a product chip during a conversation: switches system prompt from next message onward
+  - Shows a subtle divider in chat: "— Switched to Code mode —"
+- Collapsed by default (2 visible) to save sidebar space
+- The 2 pinned products are the 2 with highest `sort_order` (admin-configurable)
+- During Welcome Screen (no active chat): products shown in main area grid, NOT in sidebar
+
+**User menu (sidebar bottom):**
+```
+[Avatar] User Name
+         Plan badge (Free / Pro)
+         ─────────────
+         ⚙ Settings
+         💳 Billing  (if isProAvailable())
+         🚪 Sign out
+```
+
+---
+
+### 14B.10.4 Welcome Screen — State A
+
+Shown when no conversation is active (fresh page load or after "New Chat").
+
+```
+What can I help with?
+Choose a product or start typing below
+
+┌─────────┐ ┌─────────┐ ┌─────────┐
+│ 💻 Code │ │ ✍️ Write │ │ 🎨 Design│
+│ Write,  │ │ Blogs,  │ │ UI briefs│
+│ fix &   │ │ emails  │ │ brand &  │
+│ debug   │ │ & essays│ │ creative │
+└─────────┘ └─────────┘ └─────────┘
+┌─────────┐ ┌─────────┐ ┌─────────┐
+│📣 Market│ │📱 Social│ │📊 Analyze│
+│ Ads,    │ │Captions,│ │ Data &  │
+│ funnels │ │ threads │ │ insights│
+└─────────┘ └─────────┘ └─────────┘
+┌─────────┐ ┌─────────┐
+│🖼️ Image │ │🌐 Research│
+│Generate │ │Web-aware│
+│ & edit  │ │answers  │
+└─────────┘ └─────────┘
+
+Suggested prompts:
+[Fix a bug in my code] [Write a cold email] [Create Instagram captions]
+[Analyze this data]    [Generate an image]  [Research this topic]
+```
+
+- Clicking a product card: sets that product as active → moves focus to input bar
+- Selected product card gets highlighted border
+- Suggested prompts change dynamically based on selected product
+- Keyboard: Tab through products, Enter to select
+
+---
+
+### 14B.10.5 The 8 Chat Products
+
+```sql
+-- chatbot_products table
+id, slug, name, icon, color_hex, system_prompt (text), default_model (varchar),
+starter_prompts (json), sort_order (int), is_active (bool), created_at, updated_at
+```
+
+| # | Slug | Name | Icon (Tabler) | Color | Default Model | Purpose |
+|---|------|------|---------------|-------|---------------|---------|
+| 1 | `chat-code` | Code | `ti-code` | `#1F75FE` | deepseek-v3 OR gpt-4o | Write, fix, explain, document code in 50+ languages. Syntax highlighting on output. |
+| 2 | `chat-write` | Write | `ti-pencil` | `#16a34a` | gpt-4o OR claude-sonnet | Blogs, emails, essays, reports, creative fiction, copywriting. |
+| 3 | `chat-design` | Design | `ti-palette` | `#9333ea` | claude-sonnet | UI/UX briefs, brand guidelines, design feedback, component specs, Figma prompts. |
+| 4 | `chat-marketing` | Marketing | `ti-speakerphone` | `#ea580c` | gpt-4o | Ad copy, funnels, GTM strategy, positioning, competitor analysis, SEO content. |
+| 5 | `chat-social` | Social Media | `ti-brand-instagram` | `#db2777` | gpt-4o-mini OR claude-haiku | Platform-aware captions, threads, hooks, hashtags, content calendars. |
+| 6 | `chat-analyze` | Analyze | `ti-chart-bar` | `#ca8a04` | gpt-4o | Data interpretation, report summarization, research, comparisons, insights. |
+| 7 | `chat-image` | Image | `ti-photo` | `#0891b2` | dall-e-3 OR flux-pro | AI image generation. Clicking this product switches input to image mode (prompt → image). |
+| 8 | `chat-research` | Research | `ti-world-search` | `#4f46e5` | perplexity-sonar OR gpt-4o+serpapi | Web-aware answers with cited sources. Auto-enables web search tool. |
+
+**Starter prompts per product (stored in `starter_prompts` JSON column):**
+```json
+{
+  "chat-code":       ["Fix a bug in my code", "Write a Python script", "Explain this regex", "Add TypeScript types", "Write unit tests for this"],
+  "chat-write":      ["Write a blog post about...", "Improve my email draft", "Write a product description", "Summarize this text", "Proofread and fix grammar"],
+  "chat-design":     ["Review my UI design", "Create a brand color palette", "Write a design brief", "Suggest UI improvements", "Generate Figma component ideas"],
+  "chat-marketing":  ["Write Facebook ad copy", "Create a go-to-market plan", "Write a value proposition", "Plan a product launch", "Analyze this landing page"],
+  "chat-social":     ["Write 5 Instagram captions", "Create a Twitter thread", "Suggest trending hashtags", "Write a LinkedIn post", "Create a content calendar"],
+  "chat-analyze":    ["Analyze this data", "Summarize this report", "Compare these two options", "Explain this concept simply", "Extract key insights"],
+  "chat-image":      ["Generate a product banner", "Create a logo concept", "Design a social media graphic", "Illustrate this scene", "Create a thumbnail"],
+  "chat-research":   ["Latest news about...", "Research competitors in...", "Find statistics on...", "Summarize recent developments in...", "What is the current status of..."]
+}
+```
+
+---
+
+### 14B.10.6 Automatic Model Selection per Product
+
+When user selects a product (or starts a new chat with a product), the system auto-selects the **best available model** for that product's purpose.
+
+**Resolution order:**
+```
+1. User's personal API key for the preferred provider (if set in User Settings → API Keys)
+   → Use their key, no credits charged
+2. Admin has configured preferred model for this product in chatbot settings
+   → Use admin-configured model
+3. Auto-select from enabled providers based on product's preferred_providers list
+   → First enabled provider in preference order
+4. Fallback: settings('default_chat_model') — admin-set global default
+5. Last resort: first enabled model in ProviderRegistry
+```
+
+**Preferred provider order per product (seeded defaults, admin-overridable):**
+```php
+'chat-code'      => ['deepseek-v3', 'gpt-4o', 'claude-sonnet-4-5', 'gemini-2-0-flash'],
+'chat-write'     => ['gpt-4o', 'claude-sonnet-4-5', 'gemini-2-5-pro', 'mistral-large'],
+'chat-design'    => ['claude-sonnet-4-5', 'gpt-4o', 'gemini-2-5-pro'],
+'chat-marketing' => ['gpt-4o', 'claude-sonnet-4-5', 'gemini-2-5-pro'],
+'chat-social'    => ['gpt-4o-mini', 'claude-haiku-4-5', 'gemini-2-0-flash'],
+'chat-analyze'   => ['gpt-4o', 'claude-sonnet-4-5', 'gemini-2-5-pro'],
+'chat-image'     => ['dall-e-3', 'flux-pro', 'ideogram', 'stability-sd3'],
+'chat-research'  => ['perplexity-sonar', 'gpt-4o', 'gemini-2-5-pro'],
+// perplexity-sonar auto-enables web_search tool
+// dall-e-3/flux-pro switches UI to image generation mode
+```
+
+**UI behavior on auto-select:**
+- Model badge in input bar updates immediately: `[GPT-4o ▾]` → `[DeepSeek V3 ▾]`
+- Only show ai model that are configured by admin
+- User can override by clicking model badge → dropdown of all enabled models
+- If no model available for preferred providers: fallback applies silently
+- If NO models configured at all: show inline warning in input bar: "⚠ No AI model configured. Please ask the administrator to add an API key."
+
+---
+
+### 14B.10.7 Active Conversation — State B
+
+**Message display:**
+- User messages: right-aligned, rounded bubble, primary-50 background
+- AI messages: left-aligned, no bubble background, full width, markdown rendered
+- Code blocks: syntax highlighted (highlight.js), copy button top-right
+- Streaming: blinking cursor `▋` appended to last token during generation
+- Images (chat-image product): displayed inline in message bubble
+
+**Token usage indicator (shown below AI message after completion):**
+```
+[i] 847 tokens used · 2.1 credits charged · gpt-4o
+```
+- Shows: input tokens + output tokens combined, credits deducted, model used
+- Collapsed by default — click `[i]` to expand token breakdown
+- Color: gray-400, font-size: 11px — unobtrusive
+- If user's plan has credit limit: shows remaining credits inline: `· 341 credits left`
+
+**Per-message token breakdown (expanded on click):**
+```
+Input:  623 tokens
+Output: 224 tokens
+Total:  847 tokens
+Model:  gpt-4o
+Cost:   $0.0042 (shown only to admin in reports, NOT to users)
+Credits used: 2.1
+Credits remaining: 341.2
+```
+
+**Access control gating in chat (all will be controlled by admin from settings -):**
+```
+Guest (not logged in):
+  → Can send 3 messages (IP-limited, settings-configurable)
+  → After limit: "Create a free account to continue"
+  → All messages visible but input disabled with login CTA
+
+Free user:
+  → Credit-gated per settings('chat_credits_per_message')
+  → Model limited to settings('chat_free_plan_models') — e.g. only gpt-4o-mini
+  → Token limit per message: settings('chat_max_tokens_free') — e.g. 2000
+  → No Projects feature
+  → Chat history: last 30 conversations only
+
+Pro user:
+  → Full credit allocation per plan
+  → All models available (those admin has configured)
+  → Token limit per message: settings('chat_max_tokens_pro') — e.g. 8000
+  → Projects feature enabled
+  → Unlimited chat history
+  → File attachment enabled (PDF, image, CSV)
+```
+
+---
+
+### 14B.10.8 Message Input Bar
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📎  Ask anything...                    [GPT-4o ▾]  [↑ Send] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Elements:**
+- `📎` Attach button (left): opens file picker — PDF, image (PNG/JPG), CSV, TXT — max 10MB
+  - File attached: shows filename chip inside input bar with `✕` to remove
+  - Only available when current model supports file input (vision/document capable)
+  - If model doesn't support files: shows tooltip "Switch to a model that supports attachments"
+- Text input: `textarea` auto-grows (1 row → max 6 rows), Enter to send, Shift+Enter for newline
+- Model selector badge `[GPT-4o ▾]`: click → dropdown of all enabled models grouped by provider
+  - Selected model persists per conversation (stored in `conversations.model`)
+  - Changes for next message only — does not regenerate previous messages
+- Send button: arrow-up icon, primary color, disabled while streaming
+  - During streaming: changes to Stop button `[■ Stop]` — cancels the SSE stream
+
+**Keyboard shortcuts:**
+```
+Enter          → Send message
+Shift+Enter    → Newline in input
+Escape         → Cancel/close any open dropdown
+Ctrl+K / Cmd+K → Open command palette (search conversations)
+Ctrl+Q   → New chat
+```
+
+---
+
+### 14B.10.9 Token Usage & Access Control Settings
+
+**Admin → Appearance → Site Templates → AI Chat → Tab: Access & Limits**
+
+```
+Chat Access Settings
+─────────────────────────────────────────────────────
+Guest (not logged in)
+  [ ] Allow guest messages (no login required)
+  [3] Max messages per guest session (IP-tracked, sliding window)
+  Model for guests: [gpt-4o-mini ▾]  (only fast/cheap models)
+  Max tokens per guest message: [500 ___]
+
+Free Plan Users
+  [✓] Credits per chat message: [1.0 ___] credits
+  Model access: [gpt-4o-mini, gemini-flash ___] (multi-select)
+  Max tokens per message: [2000 ___]
+  Max chat history stored: [30 ___] conversations
+  [✓] Allow file attachments
+  Max file size for free: [5 ___] MB
+
+Pro Plan Users  (shown only if isProAvailable())
+  [✓] Credits per chat message: [0.5 ___] credits  (discounted vs free)
+  Model access: [All enabled models ▾]
+  Max tokens per message: [8000 ___]
+  Unlimited chat history: [✓]
+  [✓] Allow file attachments
+  Max file size for pro: [20 ___] MB
+  [✓] Enable Projects feature
+  Max projects per user: [unlimited / 10 ___]
+
+Token Tracking
+  [✓] Show token usage below each AI message
+  [✓] Show credits charged below each AI message
+  [✓] Show remaining credits (when < 100 credits left: always show)
+  [ ] Show cost in USD (only for admin users — never show cost to regular users)
+```
+
+All values stored in `settings` table, group: `chatbot`. Editable without redeploy.
+
+---
+
+---
+
+### 14B.10.11 DB Tables for Chatbot Template
+
+```sql
+-- chatbot_products (the 8 product modes)
+CREATE TABLE chatbot_products (
+    id               bigint UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    slug             varchar(100) NOT NULL UNIQUE,
+    name             varchar(100) NOT NULL,
+    icon             varchar(100) NOT NULL,        -- Tabler icon class e.g. 'ti-code'
+    color_hex        varchar(7)   NOT NULL,        -- e.g. '#1F75FE'
+    system_prompt    text         NOT NULL,        -- sent as system message on every chat
+    preferred_models json         NOT NULL,        -- ordered array of model slugs
+    default_model    varchar(150) NULL,            -- resolved model slug (cached)
+    starter_prompts  json         NOT NULL,        -- array of 5 strings
+    sort_order       int          DEFAULT 0,
+    is_active        boolean      DEFAULT true,
+    created_at       timestamp,
+    updated_at       timestamp
+);
+
+-- conversations (each chat session)
+CREATE TABLE conversations (
+    id               bigint UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    ulid             char(26)     NOT NULL UNIQUE,
+    user_id          bigint UNSIGNED NOT NULL,
+    project_id       bigint UNSIGNED NULL,         -- FK → chat_projects.id
+    product_slug     varchar(100) NULL,            -- FK → chatbot_products.slug
+    title            varchar(255) NULL,            -- auto-generated or user-renamed
+    model            varchar(150) NULL,            -- model used for this conversation
+    total_tokens     int          DEFAULT 0,       -- running total
+    total_credits    decimal(10,4) DEFAULT 0,
+    message_count    int          DEFAULT 0,
+    last_message_at  timestamp    NULL,
+    created_at       timestamp,
+    updated_at       timestamp,
+
+    INDEX idx_user_updated (user_id, updated_at DESC)
+);
+
+-- conversation_messages
+CREATE TABLE conversation_messages (
+    id               bigint UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    conversation_id  bigint UNSIGNED NOT NULL,
+    role             enum('user','assistant','system') NOT NULL,
+    content          text         NOT NULL,        -- markdown for assistant, plain for user
+    model            varchar(150) NULL,            -- which model generated this (assistant only)
+    input_tokens     int          DEFAULT 0,
+    output_tokens    int          DEFAULT 0,
+    credits_charged  decimal(10,4) DEFAULT 0,
+    attachments      json         NULL,            -- [{type,name,url,size}]
+    product_switch   varchar(100) NULL,            -- if non-null: this message triggered a product switch
+    created_at       timestamp,
+
+    INDEX idx_conversation (conversation_id, created_at ASC)
+);
+
+-- chat_projects (Pro only)
+CREATE TABLE chat_projects (
+    id               bigint UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id          bigint UNSIGNED NOT NULL,
+    name             varchar(255) NOT NULL,
+    description      text         NULL,
+    color_hex        varchar(7)   NULL,            -- project color dot in sidebar
+    created_at       timestamp,
+    updated_at       timestamp
+);
+```
+
+---
+
+### 14B.10.12 API Routes for Chat Template
+
+```
+-- Conversations
+GET    /api/v1/chat                         list conversations (paginated, grouped by date)
+POST   /api/v1/chat                         create new conversation { product_slug?, model? }
+GET    /api/v1/chat/{ulid}                  get conversation + messages
+DELETE /api/v1/chat/{ulid}                  delete conversation
+PUT    /api/v1/chat/{ulid}                  update { title, project_id, model }
+
+-- Messages (streaming)
+POST   /api/v1/chat/{ulid}/message          send message → SSE stream
+                                            body: { content, product_slug?, attachments? }
+                                            Response: text/event-stream
+                                            Headers: X-Accel-Buffering: no
+
+-- Projects (Pro only — gated by isProAvailable())
+GET    /api/v1/chat/projects                list user's projects
+POST   /api/v1/chat/projects                create project { name, description?, color_hex? }
+PUT    /api/v1/chat/projects/{id}           update project
+DELETE /api/v1/chat/projects/{id}           delete project (conversations move to no-project)
+
+-- Products
+GET    /api/v1/chat/products                list active products (public — used to render product cards)
+```
+
+**SSE stream format (POST `/api/v1/chat/{ulid}/message`):**
+```
+data: {"type":"token","content":"Hello"}
+data: {"type":"token","content":" there"}
+data: {"type":"usage","input_tokens":45,"output_tokens":120,"credits":0.8,"model":"gpt-4o"}
+data: {"type":"done"}
+```
+
+---
+
+### 14B.10.13 Inertia Pages for Chat Template
+
+```
+resources/js/Pages/Chat/
+  Index.vue        → GET /chat          (welcome screen → no active conversation)
+  Show.vue         → GET /chat/{ulid}   (active conversation)
+
+resources/js/Templates/
+  AiChatTemplate.vue  → shared layout wrapper (sidebar + header + main slot)
+
+resources/js/Components/Chat/
+  ChatSidebar.vue       → left panel (new chat, projects, recent chats, pinned products)
+  ChatWelcome.vue       → welcome screen with product grid + starter prompts
+  ChatMessages.vue      → message list with streaming
+  ChatMessage.vue       → single message (user/assistant) with token usage
+  ChatInput.vue         → input bar (textarea, model selector, attach, send/stop)
+  ProductCard.vue       → product card for welcome grid
+  ProductChip.vue       → mini product chip for sidebar (during active chat)
+  ModelSelector.vue     → dropdown for model switching
+  TokenUsage.vue        → token/credits display below assistant message
+  ChatContextMenu.vue   → right-click menu for chat list items (rename, move, delete)
+```
+
+---
+
+### 14B.10.14 Checklist: Chatbot Template
+
+- [ ] `AiChatTemplate.vue` layout: header shown, footer hidden, `height: calc(100vh - 60px)`
+- [ ] Left sidebar: new chat button, projects (Pro-gated), recent chats grouped by date, products section
+- [ ] Products section in sidebar: shows only 2 chips, `[more ▾]` expands all 8 in popover
+- [ ] Welcome screen: 8 product cards in 3+3+2 grid, starter prompts update on product select
+- [ ] Clicking product card: auto-selects best available model per preferred_models order
+- [ ] Model badge in input bar updates immediately on product selection
+- [ ] Model selector dropdown: shows all admin-enabled models, grouped by provider
+- [ ] If no model configured: inline warning "No AI model configured" in input bar
+- [ ] Chat messages: user right, AI left, markdown rendered, code blocks with syntax highlight + copy
+- [ ] Streaming: blinking cursor during generation, Stop button replaces Send
+- [ ] Token usage indicator below each AI message (collapsed by default, expand on click)
+- [ ] Token indicator shows: tokens used, credits charged, model name, credits remaining (when low)
+- [ ] Guest limit: IP-tracked message count, login CTA after limit reached
+- [ ] Free user model restriction: only models in `chatbot.chat_free_plan_models` setting
+- [ ] Pro user: all enabled models, projects, unlimited history, higher token limits
+- [ ] File attachment: only when model supports it, tooltip when unsupported
+- [ ] Settings: guest limits, free plan limits, pro limits — all in `settings` table, admin-editable
+- [ ] `conversations` table indexed on `(user_id, updated_at DESC)` — list query uses index
+- [ ] `conversation_messages` indexed on `(conversation_id, created_at ASC)` — message load uses index
+- [ ] SSE route has `X-Accel-Buffering: no` header + Nginx `proxy_read_timeout 120s`
+- [ ] POST + ReadableStream (NOT EventSource) on frontend for streaming
+- [ ] Projects feature: create, rename, delete, move conversations — Pro-gated throughout
+- [ ] All 8 products seeded with system prompts, starter prompts, preferred models
+- [ ] `chatbot_products` table: admin can edit name/icon/color/system_prompt via admin panel
+- [ ] Chat history: free users capped at last 30 conversations (older auto-archived, not deleted)
+- [ ] ULID used in all conversation URLs — never expose auto-increment `id`
+
+---
 
 ## PART 15 — AI TOOLS DEVELOPMENT GUIDELINES
 
@@ -4669,7 +4533,7 @@ Admin → AI Tools → Overview:
 
 ## 🔷 LAYER 4 — CONTENT & CMS
 
-## PART 16 — BLOG SYSTEM
+## PART 16 — BLOG SYSTEM ✅
 
 ### 41.1 Blog Post Table
 
@@ -4882,7 +4746,7 @@ blog_sidebar_position   enum    right / left
 
 ## PART 17 — CUSTOM PAGES & CMS
 
-### 18.1 Custom Page Builder
+### 18.1 Custom Page Builder ✅
 
 **Table: `pages`**
 ```sql
@@ -4963,7 +4827,7 @@ Admin → Messages: list, mark read, reply via email (reply form in admin, sends
 
 ## PART 18 — CATEGORIES & ORGANIZATION
 
-### 19.1 Category System
+### 19.1 Category System ✅
 
 **Table: `categories`**
 ```sql
@@ -5001,7 +4865,7 @@ Frontend:
 
 ## PART 19 — TESTIMONIALS & FAQS
 
-### 28.1 Testimonials
+### 28.1 Testimonials ✅
 
 **Table: `testimonials`**
 ```sql
@@ -5022,7 +4886,7 @@ Admin → Content → Testimonials:
 - Bulk import from CSV
 - AI Generate button: inputs company type + tone → AI generates realistic testimonials for demo/seeding purposes
 
-### 28.2 FAQs
+### 28.2 FAQs ✅
 
 **Table: `faqs`**
 ```sql
@@ -5047,7 +4911,7 @@ Admin → Content → FAQs:
 
 ---
 
-## PART 20 — RICH TEXT EDITOR (Full Tiptap)
+## PART 20 — RICH TEXT EDITOR (Full Tiptap) ✅
 
 The AI Editor and all rich text areas use **Tiptap v2** with a comprehensive extension set. No feature cut — full word-processor capability.
 
@@ -5182,7 +5046,7 @@ Configured via `variant` prop: `<RichTextEditor variant="full" v-model="content"
 
 ## 🔷 LAYER 5 — COMMUNICATION
 
-## PART 21 — MAIL SYSTEM
+## PART 21 — MAIL SYSTEM ✅
 
 ### 22.1 Mail Configuration (Admin → Mail → Configuration)
 
@@ -5419,7 +5283,7 @@ Admin can view mail logs, resend failed emails, search by recipient/template/dat
 
 ---
 
-## PART 22 — NEWSLETTER SYSTEM
+## PART 22 — NEWSLETTER SYSTEM ✅
 
 Extends Part 16 with Mailchimp sync and popup functionality.
 
@@ -5485,7 +5349,7 @@ Admin can place the newsletter section via Homepage Builder (see Part 31) and Si
 ---
 
 
-## PART 23 — IN-APP NOTIFICATIONS (Reverb)
+## PART 23 — IN-APP NOTIFICATIONS (Reverb) ✅
 
 ### 30.1 Architecture
 
@@ -6184,13 +6048,13 @@ app.config.globalProperties.$t = t
 When `locale.is_rtl === true` (Arabic, Persian, Urdu, Hebrew):
 
 **`app.vue` root layout:**
-```vue
+
 <html
   :lang="$page.props.locale.code"
   :dir="$page.props.locale.is_rtl ? 'rtl' : 'ltr'"
   :class="{ rtl: $page.props.locale.is_rtl }"
 >
-```
+
 
 **Tailwind RTL classes** — use `rtl:` variant throughout:
 ```html
@@ -7840,7 +7704,7 @@ When demo mode is active:
 - [ ] 5 wrong attempts → 10-minute lockout activates
 - [ ] Email masked on OTP page (`j***@gmail.com`)
 - [ ] Password reset: OTP → new password on same page with transition (no mid-flow redirect)
-- [ ] No verification links anywhere — only OTP codes
+- [ ] No verification links anywhere — only OTP codes for email verification and password reset
 
 ### Rich Text Editor (Tiptap)
 - [ ] All toolbar actions functional (formatting, lists, tables, media, code, links)
@@ -8738,6 +8602,1871 @@ makeai:tool_related:{slug}         TTL: 24h
 - [ ] User credit reads always from Redis (not DB direct query)
 - [ ] Admin user list with 10,000 users loads under 200ms
 
+
+---
+
+---
+
+## 🔷 LAYER 14 — CORE FEATURE ENHANCEMENTS
+
+> These 10 features are built into the MakeAI core (not addons). They extend the base platform with
+> high-value UX improvements that increase retention, plan upgrades, and perceived product quality.
+> All follow the same architectural rules as the rest of the codebase.
+
+---
+
+## PART 53 — AI PLAYGROUND (MODEL SANDBOX)
+
+### 53.1 Overview
+
+A raw model testing sandbox available to every logged-in user. Two side-by-side panels, each with
+independent provider + model selection and parameter controls. A single shared user message fires
+both simultaneously. No tool templates — direct prompt access for power users.
+
+**User-facing URL:** `/playground`
+**Sidebar location:** Under "Tools" group, labelled "AI Playground" with icon `ti-flask`
+
+### 53.2 Database
+
+No new DB tables. Session history stored in Pinia + `localStorage` only (last 20 prompts).
+Share snapshots stored in Redis only (TTL 7 days, no DB row):
+
+```
+Redis key: makeai:playground_share:{uuid}   TTL: 604800s
+Value:     JSON { prompt, params_left, params_right, output_left, output_right, created_at }
+```
+
+### 53.3 Backend
+
+**`app/Http/Controllers/PlaygroundController.php`**
+
+```php
+// GET /playground
+public function index(): Response
+    // Return Inertia 'Playground/Index'
+    // Pass: available providers + models from ProviderRegistry (no API keys exposed)
+
+// POST /playground/run   — streaming
+public function run(Request $request): StreamedResponse
+    // Validate: provider, model, messages[], temperature (0–2), max_tokens, top_p
+    // TokenGuard::before() — check credit limit (estimate from input length)
+    // $this->ai->stream(new CompletionRequest(...))
+    // Stream with: Content-Type: text/event-stream, X-Accel-Buffering: no
+    // After stream complete: TokenGuard::after() with actual token count
+
+// POST /playground/share
+public function share(Request $request): JsonResponse
+    // Validate payload (max 10k chars combined)
+    // Store in Redis with uuid key, TTL 604800
+    // Return { url: '/playground/s/{uuid}' }
+
+// GET /playground/s/{uuid}   — public, no auth
+public function showShare(string $uuid): Response
+    // Redis::get("makeai:playground_share:{$uuid}") or abort(404)
+    // Inertia 'Playground/Share' — read-only view
+```
+
+### 53.4 Routes
+
+```php
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/playground', [PlaygroundController::class, 'index'])->name('playground.index');
+    Route::post('/playground/run', [PlaygroundController::class, 'run'])->name('playground.run');
+    Route::post('/playground/share', [PlaygroundController::class, 'share'])->name('playground.share');
+});
+Route::get('/playground/s/{uuid}', [PlaygroundController::class, 'showShare'])->name('playground.share.show');
+```
+
+### 53.5 Vue — `resources/js/Pages/Playground/Index.vue`
+
+```
+Layout: AppLayout
+Two-column grid (each col ~50%), divider between them
+
+LEFT PANEL & RIGHT PANEL (identical structure):
+  ┌─────────────────────────────────────────────┐
+  │ [Provider ▾]  [Model ▾]  [⟳ Sync]           │
+  │ ─── Parameters (collapsible) ───────────── │
+  │  Temp [──●──] 0.7   Max Tokens [____1000]  │
+  │  Top P [──●──] 1.0  Presence P [____0.0]   │
+  ├─────────────────────────────────────────────┤
+  │ System Prompt (collapsible textarea)        │
+  ├─────────────────────────────────────────────┤
+  │ OUTPUT (streaming text area)                │
+  │                                             │
+  │ Tokens: 312 in / 487 out  ~$0.0003  [Copy] │
+  └─────────────────────────────────────────────┘
+
+SHARED AREA (between panels, full width):
+  [User message textarea                      ]
+  [Run Both ↗]  [History ▾]  [Clear]
+  [Save as AI Tool ↗]  [Share Snapshot]
+
+Pinia store: usePlaygroundStore
+  State: leftPanel{provider,model,systemPrompt,params,output,tokens,cost,streaming}
+         rightPanel{same}  sharedMessage  syncPanels  history[]
+  Actions: runPanel(side) — fires independent fetch() streams, NOT sequential
+  Persistence: history[] saved to localStorage via pinia-plugin-persistedstate
+```
+
+**Key implementation rules:**
+- Both panels fire two **independent** `fetch()` calls simultaneously — never `await` one before the other
+- `syncPanels` toggle: writing either system prompt textarea updates both (Vue `watch`)
+- Token count parsed from `usage` object in final SSE chunk
+- "Save as AI Tool" navigates to `/admin/ai-tools/create?system_prompt={encoded}` — pre-fills, does NOT auto-create
+- Share snapshot truncates each output to 5,000 chars before storing in Redis
+
+### 53.6 Checklist
+
+- [ ] Two panels stream simultaneously (two independent `fetch()` calls)
+- [ ] Streaming uses POST + `ReadableStream` + `X-Accel-Buffering: no` (no EventSource)
+- [ ] TokenGuard runs on every `/playground/run` call
+- [ ] Credit estimate shown before run; actual deducted after stream completes
+- [ ] Share URL returns 404 after 7-day TTL (Redis key expired)
+- [ ] History survives page reload (localStorage via Pinia persist plugin)
+- [ ] No DB writes during playground session — only Redis for shares
+
+---
+
+## PART 54 — PROMPT VERSIONING & HISTORY
+
+### 54.1 Overview
+
+Every AI generation saves a versioned snapshot of the exact prompt + settings used. Users can
+browse generation history, diff versions, restore old prompts, and mark favorites.
+Stored in a new `generation_history` table.
+
+### 54.2 Database
+
+```sql
+generation_history
+  id              ulid PRIMARY KEY
+  user_id         bigint FK → users.id
+  tool_slug       varchar(100)          -- which AI tool was used
+  document_id     ulid FK → documents.id NULL  -- if saved to doc
+  prompt_system   text                  -- resolved system prompt (after brand voice injection)
+  prompt_user     text                  -- resolved user prompt (with field values substituted)
+  field_values    json                  -- raw form inputs { topic: "...", tone: "..." }
+  model           varchar(100)
+  provider        varchar(50)
+  temperature     decimal(3,2)
+  max_tokens      int
+  output_preview  text                  -- first 500 chars of output (for list display)
+  tokens_input    int
+  tokens_output   int
+  is_favorited    boolean DEFAULT false
+  label           varchar(100) NULL     -- user can label a version e.g. "Best version"
+  created_at      timestamp
+  INDEX (user_id, tool_slug, created_at)
+  INDEX (user_id, is_favorited)
+```
+
+### 54.3 Service — `app/Services/GenerationHistoryService.php`
+
+```php
+// Called automatically after every successful AI generation
+public function record(User $user, array $data): GenerationHistory
+    // $data = [tool_slug, document_id, prompt_system, prompt_user, field_values,
+    //           model, provider, temperature, max_tokens, output_preview, tokens_in, tokens_out]
+    // Create GenerationHistory record
+    // Prune: keep latest 200 records per user (delete oldest beyond 200)
+
+public function getHistory(User $user, ?string $toolSlug = null, int $perPage = 20): LengthAwarePaginator
+    // Query with optional tool_slug filter, ordered by created_at DESC
+
+public function restore(GenerationHistory $history): array
+    // Return field_values + model + provider + temperature + max_tokens
+    // Frontend uses this to re-fill tool form
+
+public function diff(GenerationHistory $a, GenerationHistory $b): array
+    // Return word-level diff of prompt_user strings
+    // Use PHP diff library or simple explode+compare
+    // Return [{ word: string, status: 'added'|'removed'|'unchanged' }]
+
+public function toggleFavorite(GenerationHistory $history): void
+    // Flip is_favorited boolean
+```
+
+### 54.4 Integration Point
+
+In `GenerateTextController` (or wherever AI tool generation completes), after streaming finishes:
+
+```php
+// Record to history (non-blocking — dispatch a job)
+dispatch(new RecordGenerationHistoryJob($user, [
+    'tool_slug'      => $toolSlug,
+    'document_id'    => $savedDocument?->id,
+    'prompt_system'  => $resolvedSystemPrompt,
+    'prompt_user'    => $resolvedUserPrompt,
+    'field_values'   => $request->validated(),
+    'model'          => $modelUsed,
+    'provider'       => $providerUsed,
+    'temperature'    => $temperature,
+    'max_tokens'     => $maxTokens,
+    'output_preview' => Str::limit($output, 500),
+    'tokens_input'   => $usage['input_tokens'],
+    'tokens_output'  => $usage['output_tokens'],
+]));
+```
+
+### 54.5 Routes & Controller
+
+```php
+Route::middleware(['auth'])->prefix('history')->name('history.')->group(function () {
+    Route::get('/',                                  [HistoryController::class, 'index'])->name('index');
+    Route::get('/tool/{toolSlug}',                   [HistoryController::class, 'byTool'])->name('by-tool');
+    Route::post('/{history}/restore',                [HistoryController::class, 'restore'])->name('restore');
+    Route::post('/{history}/favorite',               [HistoryController::class, 'favorite'])->name('favorite');
+    Route::post('/{historyA}/diff/{historyB}',       [HistoryController::class, 'diff'])->name('diff');
+    Route::put('/{history}/label',                   [HistoryController::class, 'label'])->name('label');
+    Route::delete('/{history}',                      [HistoryController::class, 'destroy'])->name('destroy');
+});
+```
+
+### 54.6 Vue — History Panel (in-tool sidebar)
+
+On every AI tool page, the output section gets a **"History" tab** beside the "Output" tab.
+
+```
+Output  |  History
+─────────────────────────────────────────────
+[★ Favorites only] [Filter: this tool / all]
+─────────────────────────────────────────────
+● v5 — 2 hours ago — "Write a blog about..."
+  Topic: Laravel · Tone: Professional · ★
+  [Restore] [Diff with current] [Label] [×]
+
+● v4 — Yesterday — "Write a blog about..."
+  Topic: Vue 3 · Tone: Casual
+  [Restore] [Diff with current] [Label] [×]
+─────────────────────────────────────────────
+```
+
+**Diff modal:** Word-level diff displayed inline — green for added words, red strikethrough for removed. Shown when user clicks "Diff with current" (compares selected history entry vs. the current form state).
+
+**Restore:** Clicking "Restore" fills the tool form with the saved `field_values` + `model` + `provider` + `temperature`. User can then re-run or tweak.
+
+### 54.7 Checklist
+
+- [ ] `RecordGenerationHistoryJob` dispatched on `'ai'` queue — never blocks HTTP response
+- [ ] Auto-prune to 200 records per user enforced in job (delete oldest)
+- [ ] History only accessible by the owning user (query always scoped: `where('user_id', auth()->id())`)
+- [ ] Restore correctly fills ALL form fields including model/provider selectors
+- [ ] Diff view shows word-level changes, not just character-level
+- [ ] Favorited history persists; unfavoriting works without page reload
+
+---
+
+## PART 55 — QUICK TOOL CHAINING
+
+### 55.1 Overview
+
+Users can connect up to 5 AI tools in sequence. Output of Tool A becomes input of Tool B.
+This is a lightweight "Quick Chain" — not the full Workflow Builder addon. No branching, no
+conditionals. Linear pipe only. Designed for common patterns like:
+`Blog Outline → Blog Article → SEO Meta Tags`
+
+**User-facing URL:** `/chains` and `/chains/{chain}/run`
+**Sidebar location:** Under "Tools" group, labelled "Quick Chains" with icon `ti-link`
+
+### 55.2 Database
+
+```sql
+tool_chains
+  id              ulid PRIMARY KEY
+  user_id         bigint FK → users.id
+  name            varchar(100)
+  steps           json    -- [ { tool_slug, field_map, static_inputs } ]
+                          -- field_map: { "content": "{{previous_output}}" }
+                          -- static_inputs: { "tone": "professional" }
+  last_run_at     timestamp NULL
+  run_count       int DEFAULT 0
+  created_at      timestamp
+  updated_at      timestamp
+
+tool_chain_runs
+  id              ulid PRIMARY KEY
+  chain_id        ulid FK → tool_chains.id
+  user_id         bigint FK → users.id
+  status          enum('running','completed','failed') DEFAULT 'running'
+  step_outputs    json    -- [ { step: 1, tool_slug, output, tokens } ]
+  total_tokens    int DEFAULT 0
+  total_credits   int DEFAULT 0
+  started_at      timestamp
+  completed_at    timestamp NULL
+  INDEX (user_id, created_at)
+```
+
+**`steps` JSON structure:**
+```json
+[
+  {
+    "step": 1,
+    "tool_slug": "blog-outline",
+    "static_inputs": { "topic": "Laravel 12 new features", "tone": "professional" },
+    "field_map": {}
+  },
+  {
+    "step": 2,
+    "tool_slug": "blog-article",
+    "static_inputs": { "tone": "professional" },
+    "field_map": { "outline": "{{step_1_output}}" }
+  },
+  {
+    "step": 3,
+    "tool_slug": "seo-meta-tags",
+    "static_inputs": {},
+    "field_map": { "content": "{{step_2_output}}" }
+  }
+]
+```
+
+### 55.3 Service — `app/Services/ToolChainService.php`
+
+```php
+public function runChain(ToolChain $chain, array $initialInputs, User $user): ToolChainRun
+    // Create ToolChainRun record with status=running
+    // Dispatch RunToolChainJob
+    // Return run (frontend polls or listens on Reverb)
+
+public function executeStep(array $step, string $previousOutput, array $initialInputs): string
+    // Resolve inputs: merge static_inputs + field_map (replace {{step_N_output}} placeholders)
+    // Resolve tool's prompt_system + prompt_user using same PromptBuilder as normal tool execution
+    // Call $this->ai->complete(new CompletionRequest(...))
+    // Return output text
+
+public function buildFieldMap(string $template, array $stepOutputs): string
+    // Replace {{step_1_output}}, {{step_2_output}}, {{previous_output}} with actual values
+```
+
+### 55.4 Job — `RunToolChainJob` (queue: `'ai'`)
+
+```php
+public function handle(): void
+    foreach ($this->chain->steps as $step) {
+        $output = $this->chainService->executeStep($step, $previousOutput, $this->initialInputs);
+        $stepOutputs[] = ['step' => $step['step'], 'tool_slug' => $step['tool_slug'], 'output' => $output];
+        $previousOutput = $output;
+
+        // Broadcast progress to user's private Reverb channel:
+        // ChainStepCompleted { run_id, step_number, total_steps, output_preview }
+    }
+    // Set run status=completed, save step_outputs, completed_at
+    // Broadcast ChainCompleted { run_id }
+    // Deduct total credits, log to ai_usage_logs per step
+```
+
+### 55.5 Vue — `resources/js/Pages/Chains/Index.vue` & `Builder.vue`
+
+**Chain Builder (`/chains/create`):**
+```
+┌─────────────────────────────────────────────────────┐
+│  Chain Name: [________________________]              │
+│                                                     │
+│  STEP 1  [Blog Outline ▾]                           │
+│  Inputs:  Topic [_________________]                 │
+│           Tone  [Professional ▾]                    │
+│                          ↓ output flows down        │
+│  STEP 2  [Blog Article ▾]                           │
+│  Inputs:  Outline → {{step_1_output}} (auto-mapped) │
+│           Tone    [Professional ▾]                  │
+│                          ↓                          │
+│  STEP 3  [SEO Meta Tags ▾]                          │
+│  Inputs:  Content → {{step_2_output}} (auto-mapped) │
+│                                                     │
+│  [+ Add Step]  (max 5)          [Save Chain]        │
+└─────────────────────────────────────────────────────┘
+```
+
+Auto-mapping logic: when a step is selected, find the first text/textarea field in the tool's
+`fields` JSON and pre-fill its `field_map` with `{{previous_output}}`.
+
+**Chain Runner (`/chains/{chain}/run`):**
+- Shows initial inputs form (only Step 1's unfilled static_inputs)
+- "Run Chain" button → dispatches job → shows live progress:
+  ```
+  Step 1/3: Blog Outline    [✓ Done]
+  Step 2/3: Blog Article    [⟳ Running...]
+  Step 3/3: SEO Meta Tags   [○ Waiting]
+  ```
+- Each completed step shows collapsible output preview
+- Final step: "Save All as Documents" button (saves each step output as separate document)
+
+### 55.6 Checklist
+
+- [ ] Each step calls TokenGuard — total credits checked before chain starts (estimate per step)
+- [ ] If any step fails: chain marked failed, all completed steps still saved in `step_outputs`
+- [ ] `{{previous_output}}` and `{{step_N_output}}` placeholders resolved correctly
+- [ ] Max 5 steps enforced in builder UI and in job validation
+- [ ] Reverb broadcasts per-step progress — frontend shows live step completion
+- [ ] Chain run history visible per chain (`/chains/{chain}/runs`)
+
+---
+
+## PART 56 — USER USAGE DASHBOARD
+
+### 56.1 Overview
+
+Every user gets a personal analytics page showing their own AI usage: credits, top tools, generation
+history stats. Currently only admin sees usage data. This gives users visibility into their own
+activity — increasing perceived value of higher credit plans.
+
+**User-facing URL:** `/usage`
+**Sidebar location:** Under user account section, labelled "My Usage" with icon `ti-chart-bar`
+
+### 56.2 Data Sources
+
+No new tables needed. All data read from existing tables:
+
+| Metric | Source |
+|--------|--------|
+| Credits used today | `users.credits_used_today` (Redis cached) |
+| Credits used this month | `users.credits_used_month` (Redis cached) |
+| Credits remaining | `users.credits` (Redis) |
+| Daily usage last 30 days | `ai_usage_logs` GROUP BY DATE(created_at) |
+| Top 5 tools used | `ai_usage_logs` GROUP BY tool ORDER BY COUNT DESC LIMIT 5 |
+| Total generations | COUNT `ai_usage_logs` WHERE user_id |
+| Total tokens consumed | SUM `ai_usage_logs.tokens_input + tokens_output` |
+| Most used model | `ai_usage_logs` GROUP BY model ORDER BY COUNT DESC LIMIT 1 |
+| Peak usage hour | `ai_usage_logs` GROUP BY HOUR(created_at) |
+| Recent generations | `generation_history` ORDER BY created_at DESC LIMIT 10 |
+
+### 56.3 Controller — `UsageDashboardController`
+
+```php
+// GET /usage  — Inertia page
+public function index(): Response
+    $user = auth()->user();
+    $stats = Cache::remember("usage_stats_{$user->id}", 300, function () use ($user) {
+        return [
+            'credits_remaining'    => $user->credits,
+            'credits_used_today'   => $user->credits_used_today,
+            'credits_used_month'   => $user->credits_used_month,
+            'plan_credit_limit'    => $user->plan?->credits ?? settings('free_credits_monthly'),
+            'total_generations'    => AiUsageLog::where('user_id', $user->id)->count(),
+            'total_tokens'         => AiUsageLog::where('user_id', $user->id)
+                                        ->sum(DB::raw('tokens_input + tokens_output')),
+            'daily_usage'          => $this->getDailyUsage($user, 30),    // array of {date, credits}
+            'top_tools'            => $this->getTopTools($user, 5),        // array of {tool_slug, count}
+            'most_used_model'      => $this->getMostUsedModel($user),
+            'peak_hour'            => $this->getPeakHour($user),
+            'recent_history'       => GenerationHistory::where('user_id', $user->id)
+                                        ->latest()->limit(10)->get(['tool_slug','output_preview','created_at']),
+        ];
+    });
+    return Inertia::render('Usage/Index', compact('stats'));
+
+// POST /usage/export  — download CSV
+public function export(): StreamedResponse
+    // Stream CSV of user's ai_usage_logs last 90 days
+    // Columns: date, tool, model, provider, tokens_input, tokens_output, credits_used
+```
+
+### 56.4 Vue — `resources/js/Pages/Usage/Index.vue`
+
+```
+┌── Stat Cards (4 across) ──────────────────────────────────────┐
+│  Credits Left    Used Today    Used This Month   Total Gens   │
+│  1,240           48            892               2,341         │
+└───────────────────────────────────────────────────────────────┘
+
+┌── Daily Usage (last 30 days) — Chart.js bar chart ────────────┐
+│  Credits per day sparkline, hover tooltip with date + amount   │
+└───────────────────────────────────────────────────────────────┘
+
+┌── Top Tools ──────────────────┐  ┌── Insights ──────────────┐
+│  1. Blog Article      412 runs│  │  Most used model: GPT-4o  │
+│  2. Instagram Caption 287 runs│  │  Peak hour: 2pm–3pm       │
+│  3. Email Writer      198 runs│  │  Avg tokens/gen: 842      │
+│  4. Code Generator    145 runs│  │  Most active day: Tuesday │
+│  5. SEO Meta Tags      89 runs│  └──────────────────────────┘
+└───────────────────────────────┘
+
+┌── Recent Generations ──────────────────────────────────────────┐
+│  Blog Article     "Laravel 12 new features..."    2 hours ago  │
+│  Email Writer     "Follow-up after no response..." Yesterday   │
+│  ...                                                           │
+│                                  [Export CSV]                  │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Chart.js usage:** Import `Chart` from `chart.js/auto` in the component. Bar chart for daily usage.
+Use `var(--color-text-secondary)` for axis labels to respect dark mode.
+
+**Credit limit bar:** If user has a plan with credit limit: show progress bar
+`credits_used_month / plan_credit_limit` with color: green < 60%, amber < 90%, red ≥ 90%.
+
+### 56.5 Checklist
+
+- [ ] Stats cached per-user in Redis for 5 minutes (cache key: `usage_stats_{user_id}`, TTL 300)
+- [ ] Cache cleared when `ai_usage_logs` row inserted for this user
+- [ ] Daily usage query uses `DATE(created_at)` with index on `(user_id, created_at)` (already in P51)
+- [ ] CSV export streams without loading all rows into memory (`LazyCollection`)
+- [ ] `isProAvailable()` check only needed for plan limit display — base usage stats available to all
+- [ ] Page loads under 200ms (cached stats + indexed queries)
+
+---
+
+## PART 57 — AI TOOL FAVORITES & COLLECTIONS
+
+### 57.1 Overview
+
+Users star AI tools and organize them into named personal collections (like playlists). Collections
+appear in the sidebar for quick access. Admin can create "Featured Collections" visible to all users.
+
+### 57.2 Database
+
+```sql
+user_tool_favorites
+  id           ulid PRIMARY KEY
+  user_id      bigint FK → users.id
+  tool_slug    varchar(100) FK → ai_tools.slug
+  created_at   timestamp
+  UNIQUE (user_id, tool_slug)
+  INDEX (user_id)
+
+user_collections
+  id           ulid PRIMARY KEY
+  user_id      bigint FK → users.id NULL   -- NULL = admin-created featured collection
+  name         varchar(100)
+  description  text NULL
+  icon         varchar(50) NULL            -- Tabler icon name e.g. 'ti-fire'
+  color        varchar(7) NULL             -- hex color e.g. '#10b981'
+  is_featured  boolean DEFAULT false       -- admin-created collections shown to all users
+  sort_order   tinyint DEFAULT 0
+  created_at   timestamp
+  updated_at   timestamp
+
+user_collection_tools
+  id             ulid PRIMARY KEY
+  collection_id  ulid FK → user_collections.id
+  tool_slug      varchar(100)
+  sort_order     tinyint DEFAULT 0
+  added_at       timestamp
+  UNIQUE (collection_id, tool_slug)
+```
+
+### 57.3 Service — `app/Services/FavoritesService.php`
+
+```php
+public function toggleFavorite(User $user, string $toolSlug): bool
+    // Toggle: create if not exists, delete if exists
+    // Clear user's favorites cache: Redis::del("user_favorites_{$user->id}")
+    // Return: true = now favorited, false = unfavorited
+
+public function getFavorites(User $user): Collection
+    // Redis::remember("user_favorites_{$user->id}", 3600, fn() =>
+    //   UserToolFavorite::where('user_id', $user->id)->pluck('tool_slug'))
+
+public function isFavorited(User $user, string $toolSlug): bool
+    // Read from cached favorites collection
+
+// Collections
+public function getUserCollections(User $user): Collection
+    // User's own + featured collections (is_featured=true)
+    // Eager load: collection_tools count
+
+public function addToCollection(string $collectionId, string $toolSlug, User $user): void
+public function removeFromCollection(string $collectionId, string $toolSlug, User $user): void
+public function reorderCollection(string $collectionId, array $orderedSlugs, User $user): void
+    // Uses vue-draggable-plus reorder → PATCH endpoint
+```
+
+### 57.4 Routes & Controllers
+
+```php
+// Favorites (simple toggle — no dedicated page needed)
+Route::post('/tools/{toolSlug}/favorite', [FavoriteController::class, 'toggle'])->name('tools.favorite');
+// Returns JSON { favorited: bool }
+
+// Collections
+Route::prefix('collections')->name('collections.')->group(function () {
+    Route::get('/',                              [CollectionController::class, 'index'])->name('index');
+    Route::post('/',                             [CollectionController::class, 'store'])->name('store');
+    Route::get('/{collection}',                  [CollectionController::class, 'show'])->name('show');
+    Route::put('/{collection}',                  [CollectionController::class, 'update'])->name('update');
+    Route::delete('/{collection}',               [CollectionController::class, 'destroy'])->name('destroy');
+    Route::post('/{collection}/tools',           [CollectionController::class, 'addTool'])->name('tools.add');
+    Route::delete('/{collection}/tools/{slug}',  [CollectionController::class, 'removeTool'])->name('tools.remove');
+    Route::patch('/{collection}/reorder',        [CollectionController::class, 'reorder'])->name('reorder');
+});
+
+// Admin — Featured Collections
+Route::middleware('auth:admin')->prefix('admin/collections')->group(function () {
+    Route::get('/',       [AdminCollectionController::class, 'index']);
+    Route::post('/',      [AdminCollectionController::class, 'store']);
+    Route::put('/{id}',   [AdminCollectionController::class, 'update']);
+    Route::delete('/{id}',[AdminCollectionController::class, 'destroy']);
+});
+```
+
+### 57.5 UI Integration Points
+
+**On every AI tool card (tool grid + tool page header):**
+```html
+<button @click="toggleFavorite(tool.slug)"
+        :class="isFavorited(tool.slug) ? 'text-amber-500' : 'text-gray-400'">
+  <i class="ti ti-star-filled" v-if="isFavorited(tool.slug)"></i>
+  <i class="ti ti-star" v-else></i>
+</button>
+```
+
+**Sidebar:** Under "Tools" group, show user's collections as collapsible items.
+Each collection shows its icon + name + tool count badge.
+
+**Collections page (`/collections`):**
+- List of user's collections (cards with name, tool count, color accent)
+- "Favorites" virtual collection always first (auto-populated from `user_tool_favorites`)
+- Create collection button: name + icon picker + color picker
+- Inside collection: tool grid (reorderable with vue-draggable-plus)
+
+### 57.6 Checklist
+
+- [ ] Star toggle is optimistic (UI updates instantly, API call fires async)
+- [ ] Favorites cached in Redis per-user, cleared on toggle
+- [ ] "Favorites" collection is virtual — computed from `user_tool_favorites`, not a DB collection row
+- [ ] Admin featured collections visible to ALL users (not just the creator)
+- [ ] Collection tool reorder persists via PATCH `/collections/{id}/reorder`
+- [ ] Deleting a collection does NOT delete the tools — only the collection record + junction rows
+
+---
+
+## PART 58 — AI OUTPUT RATING SYSTEM
+
+### 58.1 Overview
+
+Users rate each AI generation with thumbs up / thumbs down immediately after output completes.
+Admin sees aggregate ratings per tool — low-rated tools surface as an alert.
+Different from the existing `tool_reviews` system (that is public star ratings with comments).
+This is quick per-generation feedback, private to admin analytics.
+
+### 58.2 Database
+
+```sql
+ai_output_ratings
+  id              ulid PRIMARY KEY
+  user_id         bigint FK → users.id
+  tool_slug       varchar(100)
+  document_id     ulid FK → documents.id NULL
+  generation_history_id ulid FK → generation_history.id NULL
+  rating          tinyint    -- 1 = thumbs up, 0 = thumbs down
+  feedback_text   varchar(500) NULL  -- optional short note (shown after thumbs down)
+  model           varchar(100)
+  provider        varchar(50)
+  created_at      timestamp
+  INDEX (tool_slug, rating, created_at)
+  INDEX (user_id)
+```
+
+### 58.3 Aggregation
+
+Admin dashboard shows a **Tool Quality widget**:
+
+```sql
+-- Cached in Redis: makeai:tool_quality_scores   TTL: 1h
+SELECT
+  tool_slug,
+  COUNT(*) as total_ratings,
+  SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as positive,
+  ROUND(SUM(rating) / COUNT(*) * 100, 1) as satisfaction_pct
+FROM ai_output_ratings
+WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+GROUP BY tool_slug
+ORDER BY satisfaction_pct ASC
+```
+
+**Admin alert trigger:** If any tool drops below 60% satisfaction (min 10 ratings in 30 days),
+add it to the admin notification panel: "⚠️ Blog Article tool has 54% satisfaction rate this month."
+
+### 58.4 Controller & Route
+
+```php
+// POST /ratings  — no auth requirement for POST but user must own the generation
+Route::post('/ratings', [OutputRatingController::class, 'store'])->middleware('auth')->name('ratings.store');
+// Body: { tool_slug, document_id?, generation_history_id?, rating (0|1), feedback_text? }
+// Returns 204 No Content
+
+// Admin stats
+Route::get('/admin/ratings', [AdminRatingController::class, 'index']); // table of tool scores
+Route::get('/admin/ratings/{toolSlug}', [AdminRatingController::class, 'show']); // breakdown
+```
+
+### 58.5 Vue — Output Rating Component
+
+Placed in `ToolOutputSection.vue` immediately after generation completes:
+
+```
+Generated output text...
+─────────────────────────────────────────────
+Was this output helpful?  [👍] [👎]
+```
+
+After rating:
+- Thumbs up: shows green "Thanks for your feedback!" — disappears after 2s
+- Thumbs down: shows small textarea "What was wrong? (optional)" + "Submit" button
+
+```typescript
+// In useToolOutput composable (already exists for managing streaming output)
+const submitRating = async (rating: 0 | 1, feedback?: string) => {
+    await axios.post('/ratings', {
+        tool_slug: props.toolSlug,
+        document_id: savedDocumentId.value,
+        generation_history_id: historyId.value,
+        rating,
+        feedback_text: feedback,
+    })
+    rated.value = true
+}
+```
+
+Rating component hidden if:
+- Generation failed / empty output
+- User already rated this generation (`rated` ref = true)
+- Output is older than 24h (don't show for restored history)
+
+### 58.6 Checklist
+
+- [ ] Rating only submittable once per generation (frontend: `rated` ref; backend: unique check on `generation_history_id`)
+- [ ] Thumbs down feedback is optional — never blocks dismissal
+- [ ] Admin quality widget cached in Redis, recalculated hourly via scheduled job
+- [ ] Alert fires only when tool has ≥ 10 ratings in 30 days (prevents false positives from new tools)
+- [ ] `ai_output_ratings` table partitioned by month (same as `ai_usage_logs`) — add to P06 migrations
+
+---
+
+## PART 59 — VARIANT GENERATION
+
+### 59.1 Overview
+
+On any AI tool, the user can optionally request 2 or 3 output variants in a single generation.
+Variants are displayed in tabs. User picks the best one and can save it. Credits deducted per variant.
+
+### 59.2 Config
+
+No new DB table. Variant count stored as a generation option. The variant count choice is persisted
+in `users.preferences json` under key `default_variant_count` (default: 1).
+
+Admin can configure per-tool in `ai_tools` table — new column:
+
+```sql
+ALTER TABLE ai_tools ADD COLUMN max_variants tinyint DEFAULT 3;
+-- 1 = variants disabled for this tool (e.g. image tools handle this differently)
+-- 2 or 3 = user can choose up to this many variants
+```
+
+### 59.3 Backend — Variant Execution
+
+```php
+// In GenerateTextController::stream() — modify to handle variants
+
+if ($variantCount > 1) {
+    // Fire $variantCount parallel streams
+    // Each stream: same prompt, temperature += 0.1 per variant to ensure diversity
+    //   variant 1: temperature = $base
+    //   variant 2: temperature = min($base + 0.15, 1.5)
+    //   variant 3: temperature = min($base + 0.30, 2.0)
+    // Return SSE stream with event prefix: "variant_1:", "variant_2:", "variant_3:"
+    // Frontend listens and routes chunks to correct tab
+    // Credits deducted: variantCount × base credit cost
+}
+```
+
+**SSE variant format:**
+```
+data: {"variant": 1, "chunk": "Laravel 12 introduces..."}
+data: {"variant": 2, "chunk": "The newest release of Laravel..."}
+data: {"variant": 3, "chunk": "With the launch of Laravel 12..."}
+data: {"event": "done", "variants": 3, "tokens": [312, 298, 334]}
+```
+
+Note: All variants stream concurrently using PHP fibers or multiple `$this->ai->stream()` calls
+yielded in round-robin fashion. Use `array_map` with Generators and yield chunks as they arrive.
+
+### 59.4 Vue — Variant Tabs
+
+In `ToolOutputSection.vue`, when `variantCount > 1`:
+
+```
+[Variant 1]  [Variant 2]  [Variant 3]      ← tabs, streaming independently
+──────────────────────────────────────────────
+  Output text of selected variant...
+
+  [Use This Version]  [Copy]  [Save to Docs]
+```
+
+- Each tab streams independently — user can switch tabs while both are still generating
+- "Use This Version" marks the chosen variant and saves it (discards others)
+- Unselected variants are kept in memory for the session (not saved to DB unless user picks them)
+- Variant selector: small pill tabs, not full-width tabs (avoid visual clutter on short outputs)
+
+**Variant count selector** (shown before generation):
+```
+Variants: [1]  [2]  [3]    (pill toggle, only shown if tool.max_variants > 1)
+Estimated credits: 3 × 2 = 6 credits
+```
+
+### 59.5 Checklist
+
+- [ ] Credits deducted for ALL variants regardless of which one user picks
+- [ ] `max_variants = 1` on tool disables the variant selector entirely for that tool
+- [ ] Temperature offset logic: variant 1 = base temp, 2 = base+0.15, 3 = base+0.30 (capped at 2.0)
+- [ ] SSE events correctly prefixed per variant — frontend routes chunks to correct tab
+- [ ] Only the user-selected variant is saved to documents / generation history
+- [ ] `default_variant_count` pref stored in `users.preferences` — persists between sessions
+
+---
+
+## PART 60 — AI TOOL EMBED WIDGET
+
+### 60.1 Overview
+
+Any AI tool can be embedded as an `<iframe>` on an external website. The embed renders the tool's
+input form and streams output back — full functionality in an embeddable widget.
+Admin controls which tools are embeddable. Users get a unique embed code per tool.
+
+### 60.2 Database
+
+```sql
+tool_embeds
+  id              ulid PRIMARY KEY
+  user_id         bigint FK → users.id
+  tool_slug       varchar(100)
+  token           varchar(64) UNIQUE    -- random 64-char token, part of embed URL
+  label           varchar(100) NULL     -- user-facing name e.g. "Blog Writer on MyBlog.com"
+  allowed_origins json NULL             -- ["https://myblog.com"] — CORS whitelist; null = any origin
+  password_hash   varchar(255) NULL     -- bcrypt hash; null = no password protection
+  theme           enum('light','dark','auto') DEFAULT 'auto'
+  primary_color   varchar(7) NULL       -- override embed accent color e.g. '#3b82f6'
+  show_branding   boolean DEFAULT true  -- "Powered by {app_name}" footer
+  usage_count     int DEFAULT 0
+  last_used_at    timestamp NULL
+  is_active       boolean DEFAULT true
+  created_at      timestamp
+  updated_at      timestamp
+  INDEX (user_id, tool_slug)
+```
+
+### 60.3 Embed URL & Rendering
+
+**Embed URL:** `GET /embed/{token}` — renders a minimal HTML page (not Inertia, plain Blade):
+
+```php
+// EmbedController.php
+public function show(string $token): Response
+    $embed = ToolEmbed::where('token', $token)->where('is_active', true)->firstOrFail();
+
+    // CORS: check Origin header against allowed_origins (if set)
+    // Password: if password_hash set, show password gate first
+
+    // Render: resources/views/embed/tool.blade.php
+    // Passes: embed config, tool fields JSON, branding settings
+    // No AppLayout — minimal CSS (Tailwind CDN), no sidebar, no nav
+    // Increments usage_count asynchronously (Redis INCR, synced hourly)
+
+public function run(Request $request, string $token): StreamedResponse
+    // Same TokenGuard + AiService streaming as normal tool execution
+    // Credits deducted from the EMBED OWNER's account (not the visitor)
+    // Response: SSE stream
+```
+
+**`embed/tool.blade.php`** — standalone HTML page:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3/dist/tailwind.min.css">
+  <style>/* embed-specific minimal styles, respect --embed-primary-color */</style>
+</head>
+<body class="bg-white dark:bg-gray-900 p-4">
+  <!-- Tool input form (rendered from tool.fields JSON) -->
+  <!-- Vanilla JS for form submission + SSE stream rendering -->
+  <!-- No Vue, no Inertia — must work as standalone iframe -->
+  <!-- Powered by {app_name} footer (if show_branding=true) -->
+</body>
+</html>
+```
+
+> **Important:** Embed pages use **vanilla JS only** — no Vue, no Inertia.
+> They must function as a fully self-contained iframe.
+
+### 60.4 Routes
+
+```php
+// Public embed routes (no auth)
+Route::get('/embed/{token}',          [EmbedController::class, 'show'])->name('embed.show');
+Route::post('/embed/{token}/run',     [EmbedController::class, 'run'])->name('embed.run');
+Route::post('/embed/{token}/unlock',  [EmbedController::class, 'unlock'])->name('embed.unlock');
+
+// Authenticated embed management
+Route::middleware('auth')->prefix('tool-embeds')->name('embeds.')->group(function () {
+    Route::get('/',            [ToolEmbedController::class, 'index'])->name('index');
+    Route::post('/',           [ToolEmbedController::class, 'store'])->name('store');
+    Route::put('/{embed}',     [ToolEmbedController::class, 'update'])->name('update');
+    Route::delete('/{embed}',  [ToolEmbedController::class, 'destroy'])->name('destroy');
+    Route::post('/{embed}/regenerate-token', [ToolEmbedController::class, 'regenerateToken'])->name('regen');
+});
+
+// Admin — toggle tool embeddability
+Route::middleware('auth:admin')->post('/admin/ai-tools/{slug}/embeddable',
+    [AdminToolController::class, 'toggleEmbeddable']);
+```
+
+### 60.5 Vue — Embed Management Page
+
+**`/tool-embeds`** in user dashboard:
+
+```
+My Tool Embeds
+──────────────────────────────────────────────────────────────────────
+[+ Create Embed]
+
+Tool              Label              Uses    Status    Actions
+Blog Article      MyBlog.com Widget   142    Active    [Edit] [Copy Code] [Delete]
+Email Writer      —                    23    Active    [Edit] [Copy Code] [Delete]
+──────────────────────────────────────────────────────────────────────
+
+Create / Edit Embed modal:
+  Tool: [Blog Article ▾]
+  Label: [MyBlog.com Widget__________]
+  Allowed Origins: [https://myblog.com    ] [+ Add]
+  Password: [____________] (optional)
+  Theme: [Auto ●] [Light ○] [Dark ○]
+  Primary Color: [#3b82f6 ⬛]
+  Show Branding: [✓]
+  [Save]
+
+Embed Code (shown after save):
+  <iframe src="https://yourdomain.com/embed/abc123xyz"
+          width="100%" height="600" frameborder="0"></iframe>
+  [Copy Code]
+```
+
+### 60.6 Admin Control
+
+In `ai_tools` table, add column: `is_embeddable boolean DEFAULT true`
+Admin can toggle per-tool from the AI Tools admin list.
+If `is_embeddable = false`, users cannot create embeds for that tool.
+
+### 60.7 Checklist
+
+- [ ] Credits deducted from embed OWNER's account — visitor has no MakeAI account needed
+- [ ] Embed owner must have sufficient credits; if not: embed shows "Service temporarily unavailable"
+- [ ] CORS check: if `allowed_origins` is set, reject requests from unlisted origins (403)
+- [ ] Password gate: rendered server-side in Blade, unlock via POST before showing form
+- [ ] Embed iframe uses `postMessage` to parent for dynamic height resizing
+- [ ] No Vue/Inertia in embed — fully vanilla JS + Tailwind CDN
+- [ ] `is_embeddable = false` blocks embed creation and returns 403 on existing embed URLs for that tool
+- [ ] Usage count tracked in Redis (INCR), synced to DB hourly via scheduled job
+
+---
+
+## PART 61 — SMART CREDIT TOP-UP ALERTS
+
+### 61.1 Overview
+
+When a user's credits drop below a configurable threshold, MakeAI automatically:
+1. Shows an in-app banner on the dashboard
+2. Sends a single email alert
+
+This is a passive upsell mechanism — no human intervention needed.
+Only active when `isProAvailable()` is true (subscription system enabled).
+
+### 61.2 Config
+
+Admin settings (in the Billing / Credits settings tab):
+
+```php
+settings('credit_alert_threshold')     // default: 100 (credits remaining)
+settings('credit_alert_cooldown_days') // default: 7 (days between repeat emails for same user)
+```
+
+### 61.3 Trigger Point
+
+In `TokenGuard::after()`, after every credit deduction:
+
+```php
+// After deducting credits, check if user just crossed the threshold
+if (isProAvailable() && $user->credits <= settings('credit_alert_threshold')) {
+    $cacheKey = "credit_alert_sent_{$user->id}";
+    if (!Cache::has($cacheKey)) {
+        dispatch(new SendCreditAlertJob($user));
+        Cache::put($cacheKey, true, now()->addDays(settings('credit_alert_cooldown_days', 7)));
+    }
+}
+```
+
+### 61.4 Job — `SendCreditAlertJob` (queue: `'mail'`)
+
+```php
+public function handle(): void
+    // Send mail: LowCreditsAlert mail template (existing mail template system — add to P21)
+    // Mail vars: user name, credits_remaining, top_up_url = /billing/credits
+    // Create in-app notification: NotificationType::LOW_CREDITS
+    //   title: "Your credits are running low"
+    //   body:  "You have {credits} credits left. Top up to keep generating."
+    //   action_url: /billing/credits
+    //   icon: ti-battery-1
+```
+
+### 61.5 In-App Banner
+
+In `AppLayout.vue` (already wraps all user pages), add a `CreditAlertBanner` component:
+
+```vue
+<!-- Shown when: isProAvailable AND user.credits <= threshold AND user hasn't dismissed -->
+<CreditAlertBanner v-if="showCreditAlert" @dismiss="dismissAlert" />
+```
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ ⚡ Your credits are running low — 84 remaining.                 │
+│ Top up now to keep generating without interruption.  [Top Up →] │
+│                                                           [×]   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Dismiss stores in `users.preferences.credit_alert_dismissed_at`. Banner reappears after 24h
+(not the full cooldown period — banner is less intrusive than email).
+
+### 61.6 Mail Template
+
+Add `LowCreditsAlert` to the mail template system (P21):
+
+```
+Template key: low_credits_alert
+Subject:      "⚡ Your {app_name} credits are running low"
+Variables:    {user_name}, {credits_remaining}, {top_up_url}, {app_name}, {app_logo_url}
+```
+
+### 61.7 Checklist
+
+- [ ] `isProAvailable()` checked before ANY credit alert logic — no alerts on non-billing installs
+- [ ] Cooldown cache key ensures max 1 email per user per `credit_alert_cooldown_days` setting
+- [ ] Alert does NOT fire if user has auto-recharge enabled (future feature — skip if `users.auto_recharge = true`)
+- [ ] Banner dismissed state stored in `users.preferences` (survives logout)
+- [ ] `low_credits_alert` mail template editable from admin mail templates panel
+
+---
+
+## PART 62 — COMMAND PALETTE ENHANCEMENTS
+
+### 62.1 Overview
+
+The existing command palette (P48) covers tools, documents, and navigation. These enhancements
+add: recent generations, favorite tools quick-access, "copy last output" shortcut, "new generation"
+shortcut for any tool, and a "switch model" quick command.
+
+### 62.2 New Command Categories
+
+Extend `useCommandPalette` composable to include these new item groups:
+
+**Group: Recents** (new — shown when palette opens with empty query)
+```
+Recently generated:
+  ⚡ Blog Article — "Laravel 12 new features..."   2h ago
+  ⚡ Email Writer — "Follow-up email..."           Yesterday
+  ⚡ SEO Meta Tags — "10 best practices..."        2 days ago
+```
+Source: last 5 from `generation_history` (loaded into Pinia on app boot, refreshed on generation).
+
+**Group: Favorites** (new — appears as pinned top section)
+```
+★ Starred Tools:
+  Blog Article · Instagram Caption · Email Writer
+```
+Source: `user_tool_favorites` (loaded into Pinia on app boot, same as existing favorites system).
+If user has no favorites, this group is hidden.
+
+**Group: Quick Actions** (additions to existing "Actions" group)
+
+| Command | Shortcut | Action |
+|---------|----------|--------|
+| `Copy last output` | `Ctrl+Shift+L` | Copies the most recent generation to clipboard |
+| `New generation: {tool}` | — | Navigates to tool and focuses the first input |
+| `Switch model` | — | Opens model picker overlay on current tool page |
+| `Clear history` | — | Prompts confirmation, then clears generation history |
+
+### 62.3 Implementation
+
+**`useCommandPalette.ts`** — extend existing composable:
+
+```typescript
+// New state
+const recentGenerations = computed(() => historyStore.recent.slice(0, 5).map(h => ({
+    id:       `recent_${h.id}`,
+    group:    'Recents',
+    label:    aiToolsStore.getBySlug(h.tool_slug)?.name ?? h.tool_slug,
+    sublabel: Str.limit(h.output_preview, 60),
+    meta:     timeAgo(h.created_at),
+    icon:     'ti-history',
+    action:   () => router.visit(route('tools.show', h.tool_slug)),
+})))
+
+const favoriteTools = computed(() => favoritesStore.slugs.map(slug => ({
+    id:     `fav_${slug}`,
+    group:  'Favorites',
+    label:  aiToolsStore.getBySlug(slug)?.name ?? slug,
+    icon:   'ti-star-filled',
+    action: () => router.visit(route('tools.show', slug)),
+})))
+
+// New quick actions
+const copyLastOutput = {
+    id:     'copy_last_output',
+    group:  'Quick Actions',
+    label:  'Copy last output',
+    icon:   'ti-clipboard',
+    kbd:    'Ctrl+Shift+L',
+    action: () => {
+        const last = historyStore.recent[0]
+        if (last) { navigator.clipboard.writeText(last.output_preview); toast.success('Copied!') }
+    }
+}
+```
+
+**Updated palette result order** (when empty query):
+1. Favorites (if any)
+2. Recents (last 5 generations)
+3. All Tools
+4. Documents
+5. Navigation
+6. Quick Actions
+
+**Updated palette result order** (when query typed):
+1. Tools (fuzzy match on name + category)
+2. Documents (fuzzy match on title)
+3. Recents (fuzzy match on tool name + output preview)
+4. Navigation
+5. Quick Actions
+
+### 62.4 Keyboard Shortcut Addition
+
+```typescript
+// In useKeyboardShortcuts composable (app.vue)
+// Add to existing shortcuts:
+{ keys: ['ctrl', 'shift', 'l'], action: copyLastOutput, description: 'Copy last output' }
+```
+
+Add `Ctrl+Shift+L` to the keyboard shortcut reference modal (`?` key).
+
+### 62.5 Checklist
+
+- [ ] Favorite tools group hidden when user has no favorites (not shown as empty section)
+- [ ] Recents group hidden when user has no generation history
+- [ ] `Ctrl+Shift+L` copies full output (not just the 500-char preview stored in history) — reads from current page output if available, else falls back to preview
+- [ ] All new palette items are keyboard-navigable (arrow keys + Enter)
+- [ ] Palette search correctly fuzzy-matches new groups alongside existing
+- [ ] Updated shortcut modal (`?`) lists `Ctrl+Shift+L` with description
+
+---
+
+
+---
+
+## PART 63 — EXPORT CENTER (EXCEL/CSV & PDF)
+
+> **Packages (non-negotiable):**
+> - Excel/CSV: `maatwebsite/excel` — queued, chunked, styled xlsx + csv
+> - PDF: `mpdf/mpdf` — pure PHP, shared-hosting safe, RTL + Unicode support
+> - No `barryvdh/laravel-snappy` or `wkhtmltopdf` — requires server binary, breaks shared hosting installs
+
+```bash
+composer require maatwebsite/excel mpdf/mpdf
+```
+
+---
+
+### 63.1 ExportService (Central Entry Point)
+
+**`app/Services/ExportService.php`**
+
+All controllers call ExportService — never call `Excel::` or `Mpdf` directly in controllers.
+
+```php
+namespace App\Services;
+
+use Maatwebsite\Excel\Facades\Excel;
+use Mpdf\Mpdf;
+use Illuminate\Http\Response;
+use Illuminate\Support\LazyCollection;
+
+class ExportService
+{
+    // --- EXCEL / CSV ---
+
+    // Immediate download (small datasets < 5,000 rows)
+    public function downloadExcel(string $exportClass, string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
+        return Excel::download(new $exportClass, $filename . '.xlsx');
+
+    // Queued export for large datasets (> 5,000 rows)
+    // Stores file in storage/exports/{admin_id}/{filename}
+    // Notifies admin via in-app notification when ready
+    public function queueExcel(string $exportClass, string $filename, int $adminId): void
+        $path = 'exports/' . $adminId . '/' . $filename . '-' . now()->format('Y-m-d-His') . '.xlsx';
+        Excel::queue(new $exportClass, $path, 'local')
+            ->chain([new NotifyExportReadyJob($adminId, $path, $filename)]);
+
+    // Simple CSV — streams directly without PhpSpreadsheet overhead
+    // Use for very large datasets (100k+ rows) — memory safe
+    public function streamCsv(string $filename, array $headers, LazyCollection $rows, callable $mapper): Response
+        return response()->stream(function () use ($headers, $rows, $mapper) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, $headers);
+            $rows->each(fn($row) => fputcsv($handle, $mapper($row)));
+            fclose($handle);
+        }, 200, [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+            'X-Accel-Buffering'   => 'no',
+        ]);
+
+    // --- PDF ---
+
+    // Render a Blade view to PDF and stream as download
+    public function downloadPdf(string $view, array $data, string $filename, array $options = []): Response
+        $mpdf = new Mpdf(array_merge([
+            'mode'        => 'utf-8',
+            'format'      => 'A4',
+            'margin_top'  => 20,
+            'margin_bottom' => 20,
+            'margin_left' => 15,
+            'margin_right' => 15,
+        ], $options));
+        $mpdf->SetTitle($filename);
+        $mpdf->WriteHTML(view($view, $data)->render());
+        return response($mpdf->Output('', 'S'), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '.pdf"',
+        ]);
+}
+```
+
+---
+
+### 63.2 Export Classes (maatwebsite/excel)
+
+Each export class lives in `app/Exports/Admin/`. All implement at minimum:
+`FromQuery` (memory-safe chunk fetching) + `WithHeadings` + `WithMapping`.
+Large exports also implement `ShouldQueue` + `WithChunkReading`.
+
+---
+
+#### `UsersExport`
+
+```php
+// app/Exports/Admin/UsersExport.php
+use Maatwebsite\Excel\Concerns\{FromQuery, WithHeadings, WithMapping, ShouldQueue, WithChunkReading, Exportable};
+
+class UsersExport implements FromQuery, WithHeadings, WithMapping, ShouldQueue, WithChunkReading
+{
+    use Exportable;
+    public int $chunkSize = 500;
+
+    public function __construct(
+        private ?string $status = null,
+        private ?string $planId = null,
+        private ?string $dateFrom = null,
+        private ?string $dateTo = null,
+    ) {}
+
+    public function query(): Builder
+        return User::query()
+            ->with('plan')
+            ->when($this->status, fn($q) => $q->where('status', $this->status))
+            ->when($this->planId, fn($q) => $q->where('plan_id', $this->planId))
+            ->when($this->dateFrom, fn($q) => $q->whereDate('created_at', '>=', $this->dateFrom))
+            ->when($this->dateTo, fn($q) => $q->whereDate('created_at', '<=', $this->dateTo))
+            ->select(['id','name','email','status','credits','credits_used_month','plan_id','created_at','last_active_at']);
+
+    public function headings(): array
+        return ['Name','Email','Status','Plan','Credits Remaining','Credits Used (Month)','Joined','Last Active'];
+
+    public function map($user): array
+        return [
+            $user->name,
+            $user->email,
+            ucfirst($user->status),
+            $user->plan?->name ?? 'Free',
+            $user->credits,
+            $user->credits_used_month,
+            $user->created_at->format('Y-m-d'),
+            $user->last_active_at?->format('Y-m-d') ?? 'Never',
+        ];
+}
+```
+
+---
+
+#### `AiUsageExport`
+
+```php
+// app/Exports/Admin/AiUsageExport.php
+class AiUsageExport implements FromQuery, WithHeadings, WithMapping, ShouldQueue, WithChunkReading
+{
+    use Exportable;
+    public int $chunkSize = 1000;
+
+    public function __construct(
+        private ?string $userId = null,
+        private ?string $toolSlug = null,
+        private ?string $provider = null,
+        private string $dateFrom = '',
+        private string $dateTo = '',
+    ) {}
+
+    public function query(): Builder
+        return AiUsageLog::query()
+            ->with('user:id,name,email')
+            ->when($this->userId,   fn($q) => $q->where('user_id', $this->userId))
+            ->when($this->toolSlug, fn($q) => $q->where('tool', $this->toolSlug))
+            ->when($this->provider, fn($q) => $q->where('provider', $this->provider))
+            ->whereBetween('created_at', [$this->dateFrom, $this->dateTo])
+            ->select(['id','user_id','tool','model','provider','tokens_input','tokens_output','cost_usd','credits_used','status','response_time_ms','created_at'])
+            ->orderBy('created_at', 'desc');
+
+    public function headings(): array
+        return ['Date','User','Tool','Model','Provider','Input Tokens','Output Tokens','Cost (USD)','Credits Used','Status','Response Time (ms)'];
+
+    public function map($log): array
+        return [
+            $log->created_at->format('Y-m-d H:i'),
+            $log->user ? $log->user->name . ' (' . $log->user->email . ')' : 'Deleted User',
+            $log->tool,
+            $log->model,
+            ucfirst($log->provider),
+            $log->tokens_input,
+            $log->tokens_output,
+            number_format($log->cost_usd, 6),
+            $log->credits_used,
+            ucfirst($log->status),
+            $log->response_time_ms,
+        ];
+}
+```
+
+---
+
+#### `RevenueExport`
+
+```php
+// app/Exports/Admin/RevenueExport.php
+// Only registered when isProAvailable()
+
+class RevenueExport implements FromQuery, WithHeadings, WithMapping, ShouldQueue, WithChunkReading
+{
+    use Exportable;
+    public int $chunkSize = 500;
+
+    public function __construct(
+        private string $dateFrom,
+        private string $dateTo,
+        private ?string $gateway = null,
+        private ?string $status = null,
+    ) {}
+
+    public function query(): Builder
+        return Payment::query()
+            ->with('user:id,name,email', 'plan:id,name')
+            ->when($this->gateway, fn($q) => $q->where('gateway', $this->gateway))
+            ->when($this->status,  fn($q) => $q->where('status', $this->status))
+            ->whereBetween('created_at', [$this->dateFrom, $this->dateTo])
+            ->orderBy('created_at', 'desc');
+
+    public function headings(): array
+        return ['Date','Transaction ID','User','Plan','Amount','Currency','Gateway','Status','Invoice #'];
+
+    public function map($payment): array
+        return [
+            $payment->created_at->format('Y-m-d H:i'),
+            $payment->transaction_id,
+            $payment->user?->name . ' (' . $payment->user?->email . ')',
+            $payment->plan?->name ?? '—',
+            number_format($payment->amount, 2),
+            strtoupper($payment->currency),
+            ucfirst($payment->gateway),
+            ucfirst($payment->status),
+            $payment->invoice_number ?? '—',
+        ];
+}
+```
+
+---
+
+#### `AffiliateCommissionsExport`
+
+```php
+// app/Exports/Admin/AffiliateCommissionsExport.php
+class AffiliateCommissionsExport implements FromQuery, WithHeadings, WithMapping
+{
+    use Exportable;
+
+    public function query(): Builder
+        return AffiliateCommission::query()
+            ->with('referrer:id,name,email', 'referredUser:id,name,email')
+            ->orderBy('created_at', 'desc');
+
+    public function headings(): array
+        return ['Date','Referrer','Referred User','Order Amount','Commission','Rate %','Status','Paid At'];
+
+    public function map($c): array
+        return [
+            $c->created_at->format('Y-m-d'),
+            $c->referrer->name . ' (' . $c->referrer->email . ')',
+            $c->referredUser->name,
+            number_format($c->order_amount, 2),
+            number_format($c->commission_amount, 2),
+            $c->commission_rate . '%',
+            ucfirst($c->status),
+            $c->paid_at?->format('Y-m-d') ?? '—',
+        ];
+}
+```
+
+---
+
+### 63.3 PDF Report Views (mPDF Blade Templates)
+
+All PDF templates live in `resources/views/admin/reports/pdf/`.
+Each template receives its data array and uses inline CSS only (mPDF does not support external stylesheets).
+
+**Base layout shared by all PDF reports** — `resources/views/admin/reports/pdf/layout.blade.php`:
+
+```blade
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DejaVu Sans', sans-serif; font-size: 11px; color: #1a1a1a; }
+  .header { border-bottom: 2px solid #10b981; padding-bottom: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .header-logo { font-size: 18px; font-weight: bold; color: #10b981; }
+  .header-meta { font-size: 10px; color: #6b7280; text-align: right; }
+  .report-title { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+  .report-subtitle { font-size: 11px; color: #6b7280; margin-bottom: 20px; }
+  .stats-row { display: flex; gap: 12px; margin-bottom: 20px; }
+  .stat-box { flex: 1; background: #f3f4f6; border-radius: 6px; padding: 10px 12px; }
+  .stat-label { font-size: 9px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 18px; font-weight: bold; color: #111827; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  th { background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; font-size: 10px; font-weight: 600; color: #374151; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { border-bottom: 1px solid #f3f4f6; padding: 7px 10px; font-size: 10px; color: #374151; }
+  tr:last-child td { border-bottom: none; }
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+  .badge-green  { background: #d1fae5; color: #065f46; }
+  .badge-red    { background: #fee2e2; color: #991b1b; }
+  .badge-amber  { background: #fef3c7; color: #92400e; }
+  .badge-gray   { background: #f3f4f6; color: #374151; }
+  .footer { border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 24px; font-size: 9px; color: #9ca3af; display: flex; justify-content: space-between; }
+  .page-break { page-break-after: always; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-logo">{{ settings('app_name') }}</div>
+  <div class="header-meta">
+    Generated: {{ now()->format('M d, Y H:i') }}<br>
+    By: {{ auth('admin')->user()->name }}
+  </div>
+</div>
+@yield('content')
+<div class="footer">
+  <span>{{ settings('app_name') }} — Admin Report</span>
+  <span>Page {PAGENO} of {nbpg}</span>
+</div>
+</body>
+</html>
+```
+
+---
+
+**AI Usage Report PDF** — `resources/views/admin/reports/pdf/ai-usage.blade.php`:
+
+```blade
+@extends('admin.reports.pdf.layout')
+@section('content')
+<div class="report-title">AI Usage Report</div>
+<div class="report-subtitle">{{ $dateFrom }} — {{ $dateTo }}  ·  {{ $totalRows }} records</div>
+
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-label">Total Requests</div>
+    <div class="stat-value">{{ number_format($stats['total_requests']) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Total Tokens</div>
+    <div class="stat-value">{{ number_format($stats['total_tokens']) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Total Cost (USD)</div>
+    <div class="stat-value">${{ number_format($stats['total_cost'], 2) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Unique Users</div>
+    <div class="stat-value">{{ number_format($stats['unique_users']) }}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Date</th><th>User</th><th>Tool</th><th>Model</th>
+      <th>Tokens In</th><th>Tokens Out</th><th>Cost (USD)</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    @foreach($rows as $row)
+    <tr>
+      <td>{{ $row->created_at->format('Y-m-d H:i') }}</td>
+      <td>{{ $row->user?->name ?? 'Deleted' }}</td>
+      <td>{{ $row->tool }}</td>
+      <td>{{ $row->model }}</td>
+      <td>{{ number_format($row->tokens_input) }}</td>
+      <td>{{ number_format($row->tokens_output) }}</td>
+      <td>${{ number_format($row->cost_usd, 6) }}</td>
+      <td>
+        <span class="badge {{ $row->status === 'success' ? 'badge-green' : 'badge-red' }}">
+          {{ ucfirst($row->status) }}
+        </span>
+      </td>
+    </tr>
+    @endforeach
+  </tbody>
+</table>
+@endsection
+```
+
+---
+
+**Revenue Report PDF** — `resources/views/admin/reports/pdf/revenue.blade.php`:
+
+```blade
+@extends('admin.reports.pdf.layout')
+@section('content')
+<div class="report-title">Revenue Report</div>
+<div class="report-subtitle">{{ $dateFrom }} — {{ $dateTo }}</div>
+
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-label">Total Revenue</div>
+    <div class="stat-value">${{ number_format($stats['total_revenue'], 2) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Transactions</div>
+    <div class="stat-value">{{ number_format($stats['transaction_count']) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Avg. Transaction</div>
+    <div class="stat-value">${{ number_format($stats['avg_transaction'], 2) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Refunds</div>
+    <div class="stat-value">${{ number_format($stats['total_refunds'], 2) }}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Date</th><th>Transaction ID</th><th>User</th><th>Plan</th>
+      <th>Amount</th><th>Gateway</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    @foreach($rows as $row)
+    <tr>
+      <td>{{ $row->created_at->format('Y-m-d') }}</td>
+      <td style="font-family: monospace; font-size: 9px;">{{ $row->transaction_id }}</td>
+      <td>{{ $row->user?->name ?? '—' }}</td>
+      <td>{{ $row->plan?->name ?? '—' }}</td>
+      <td>${{ number_format($row->amount, 2) }} {{ strtoupper($row->currency) }}</td>
+      <td>{{ ucfirst($row->gateway) }}</td>
+      <td>
+        <span class="badge {{ match($row->status) { 'paid' => 'badge-green', 'refunded' => 'badge-red', 'pending' => 'badge-amber', default => 'badge-gray' } }}">
+          {{ ucfirst($row->status) }}
+        </span>
+      </td>
+    </tr>
+    @endforeach
+  </tbody>
+</table>
+@endsection
+```
+
+---
+
+**User Report PDF** — `resources/views/admin/reports/pdf/users.blade.php`:
+
+```blade
+@extends('admin.reports.pdf.layout')
+@section('content')
+<div class="report-title">User Report</div>
+<div class="report-subtitle">{{ $dateFrom }} — {{ $dateTo }}</div>
+
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-label">Total Users</div>
+    <div class="stat-value">{{ number_format($stats['total']) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">New This Period</div>
+    <div class="stat-value">{{ number_format($stats['new']) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Active (30d)</div>
+    <div class="stat-value">{{ number_format($stats['active']) }}</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Pro Subscribers</div>
+    <div class="stat-value">{{ number_format($stats['pro']) }}</div>
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr><th>Name</th><th>Email</th><th>Plan</th><th>Credits</th><th>Status</th><th>Joined</th></tr>
+  </thead>
+  <tbody>
+    @foreach($rows as $row)
+    <tr>
+      <td>{{ $row->name }}</td>
+      <td>{{ $row->email }}</td>
+      <td>{{ $row->plan?->name ?? 'Free' }}</td>
+      <td>{{ number_format($row->credits) }}</td>
+      <td>
+        <span class="badge {{ $row->status === 'active' ? 'badge-green' : 'badge-red' }}">
+          {{ ucfirst($row->status) }}
+        </span>
+      </td>
+      <td>{{ $row->created_at->format('Y-m-d') }}</td>
+    </tr>
+    @endforeach
+  </tbody>
+</table>
+@endsection
+```
+
+---
+
+### 63.4 Export Center Controller
+
+**`app/Http/Controllers/Admin/ExportCenterController.php`**
+
+```php
+// Admin → Reports → Export Center
+// GET /admin/reports/export-center
+public function index(): Response
+    // Inertia 'Admin/Reports/ExportCenter'
+    // Pass: available export types, recent queued exports list (stored files in storage/exports/{admin_id}/)
+
+// POST /admin/reports/export
+public function export(Request $request): JsonResponse|BinaryFileResponse|Response
+    $request->validate([
+        'type'      => 'required|in:users,ai-usage,revenue,affiliates,audit-log',
+        'format'    => 'required|in:xlsx,csv,pdf',
+        'date_from' => 'nullable|date',
+        'date_to'   => 'nullable|date',
+        // type-specific filters passed as extra fields
+    ]);
+
+    $type     = $request->type;
+    $format   = $request->format;
+    $dateFrom = $request->date_from ?? now()->subDays(30)->toDateString();
+    $dateTo   = $request->date_to   ?? now()->toDateString();
+    $filename = $type . '-' . $dateFrom . '-to-' . $dateTo;
+
+    // Route to correct export class / PDF view
+    return match ([$type, $format]) {
+
+        // XLSX — queue if > 5000 rows, immediate if small
+        ['users',    'xlsx'] => $this->smartExcel(new UsersExport(...$request->only(['status','plan_id','date_from','date_to'])), $filename),
+        ['ai-usage', 'xlsx'] => $this->smartExcel(new AiUsageExport(...$request->only(['user_id','tool_slug','provider','date_from','date_to'])), $filename),
+        ['revenue',  'xlsx'] => $this->smartExcel(new RevenueExport($dateFrom, $dateTo, $request->gateway, $request->status), $filename),
+        ['affiliates','xlsx'] => $this->exportService->downloadExcel(AffiliateCommissionsExport::class, $filename),
+
+        // CSV — always stream (memory safe)
+        ['users',    'csv']  => $this->exportService->streamCsv($filename, [...], User::lazy(), fn($u) => [...]),
+        ['ai-usage', 'csv']  => $this->exportService->streamCsv($filename, [...], AiUsageLog::lazy()->where(...), fn($l) => [...]),
+        ['revenue',  'csv']  => $this->exportService->streamCsv($filename, [...], Payment::lazy()->where(...), fn($p) => [...]),
+
+        // PDF
+        ['users',    'pdf']  => $this->exportService->downloadPdf('admin.reports.pdf.users',   $this->getUsersPdfData($request),    $filename),
+        ['ai-usage', 'pdf']  => $this->exportService->downloadPdf('admin.reports.pdf.ai-usage', $this->getAiUsagePdfData($request),   $filename),
+        ['revenue',  'pdf']  => $this->exportService->downloadPdf('admin.reports.pdf.revenue',  $this->getRevenuePdfData($request),   $filename),
+
+        default => response()->json(['message' => 'Unsupported export type/format'], 422),
+    };
+
+// Decide: immediate download vs queued based on estimated row count
+private function smartExcel(object $exportClass, string $filename): mixed
+    $estimatedRows = $exportClass->query()->count();
+    if ($estimatedRows > 5000) {
+        $this->exportService->queueExcel(get_class($exportClass), $filename, auth('admin')->id());
+        return response()->json(['message' => 'Export queued. You will be notified when it's ready.', 'queued' => true]);
+    }
+    return $this->exportService->downloadExcel(get_class($exportClass), $filename);
+
+// PDF data helpers — fetch summarized data for PDF header stats + paginated rows
+private function getUsersPdfData(Request $request): array
+    // Returns: stats[], rows (paginated — max 5000 rows for PDF)
+
+private function getAiUsagePdfData(Request $request): array
+    // Returns: stats[], rows, dateFrom, dateTo, totalRows
+
+private function getRevenuePdfData(Request $request): array
+    // Returns: stats[], rows, dateFrom, dateTo
+```
+
+---
+
+### 63.5 Export Center Vue Page
+
+**`resources/js/Pages/Admin/Reports/ExportCenter.vue`**
+
+```
+Admin → Reports → Export Center
+──────────────────────────────────────────────────────────────────
+
+┌── Export Builder ────────────────────────────────────────────────┐
+│                                                                  │
+│  Data type:  [Users ▾]  [AI Usage ▾]  [Revenue ▾]  [More ▾]     │
+│                                                                  │
+│  Date range: [From ____/____/____]  [To ____/____/____]         │
+│              [Last 7d] [Last 30d] [This month] [Custom]         │
+│                                                                  │
+│  Filters: (change based on selected type)                        │
+│    Users:     Status [All ▾]  Plan [All ▾]                       │
+│    AI Usage:  Tool [All ▾]  Provider [All ▾]  Model [All ▾]      │
+│    Revenue:   Gateway [All ▾]  Status [All ▾]                    │
+│                                                                  │
+│  Format:  [XLSX]  [CSV]  [PDF]                                   │
+│                                                                  │
+│  [Export Now ↓]                                                  │
+│   ↳ If large dataset: "Queued — we'll notify you when ready"     │
+└──────────────────────────────────────────────────────────────────┘
+
+┌── Recent Exports ────────────────────────────────────────────────┐
+│  Filename                      Size    Date         Actions      │
+│  users-2025-01-01-to-2025-01-31.xlsx  234KB  2 min ago  [↓] [×] │
+│  ai-usage-2025-01-01-...pdf          182KB  1 hour ago  [↓] [×] │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Format selector logic:**
+- XLSX: always available
+- CSV: always available — recommended for very large exports
+- PDF: available for all types but limited to latest 5,000 rows (show note: "PDF limited to 5,000 rows. Use XLSX/CSV for full data.")
+
+**Queued export flow:**
+- POST returns `{ queued: true, message: "..." }`
+- Frontend shows toast: "Export queued — you'll get a notification when it's ready"
+- Admin receives in-app notification with download link when job completes
+- File stored in `storage/app/exports/{admin_id}/` — accessible via authenticated download route
+
+**Inline export buttons** (on other admin pages like Users list, Transactions, etc.):
+These trigger the same endpoint with pre-filled parameters:
+```vue
+<!-- In UsersIndex.vue toolbar -->
+<ExportButton type="users" :filters="activeFilters" />
+```
+`ExportButton` is a shared component that opens a small dropdown: `[XLSX] [CSV] [PDF]`
+and calls POST `/admin/reports/export` with current page filters pre-applied.
+
+---
+
+### 63.6 Routes
+
+```php
+Route::middleware(['auth:admin', 'admin.permission:reports.export'])->group(function () {
+    Route::get('/admin/reports/export-center',   [ExportCenterController::class, 'index'])->name('admin.reports.export-center');
+    Route::post('/admin/reports/export',          [ExportCenterController::class, 'export'])->name('admin.reports.export');
+    Route::get('/admin/reports/exports/{file}',   [ExportCenterController::class, 'download'])->name('admin.reports.export.download');
+    Route::delete('/admin/reports/exports/{file}', [ExportCenterController::class, 'deleteFile'])->name('admin.reports.export.delete');
+});
+```
+
+---
+
+### 63.7 Job — `NotifyExportReadyJob` (queue: `mail`)
+
+```php
+// app/Jobs/NotifyExportReadyJob.php
+class NotifyExportReadyJob implements ShouldQueue
+{
+    public function __construct(
+        private int $adminId,
+        private string $filePath,   // relative to storage/app/
+        private string $filename,
+    ) {}
+
+    public function handle(): void
+        $admin = Admin::find($this->adminId);
+
+        // Create in-app notification
+        AdminNotification::create([
+            'admin_id'   => $this->adminId,
+            'type'       => 'export_ready',
+            'title'      => 'Export ready: ' . $this->filename,
+            'body'       => 'Your export is ready to download.',
+            'action_url' => route('admin.reports.export.download', ['file' => basename($this->filePath)]),
+            'icon'       => 'ti-download',
+        ]);
+
+        // Broadcast via Reverb to admin's private channel
+        broadcast(new AdminNotificationEvent($this->adminId, 'export_ready', $this->filename));
+
+        // Auto-delete exported file after 24h
+        dispatch(new DeleteExportFileJob($this->filePath))->delay(now()->addHours(24));
+}
+```
+
+---
+
+### 63.8 Scheduled Cleanup
+
+```php
+// In routes/console.php — add to existing scheduled tasks:
+Schedule::command('exports:cleanup')->daily();
+// Deletes all files in storage/app/exports/ older than 24 hours
+```
+
+```php
+// app/Console/Commands/CleanupExports.php
+public function handle(): void
+    $files = Storage::files('exports');
+    foreach ($files as $file) {
+        if (Storage::lastModified($file) < now()->subHours(24)->timestamp) {
+            Storage::delete($file);
+        }
+    }
+    $this->info('Export files cleaned.');
+```
+
+---
+
+### 63.9 Checklist
+
+- [ ] `composer require maatwebsite/excel mpdf/mpdf` added to project dependencies
+- [ ] `ExportService` is the only class that calls `Excel::` or `Mpdf` — no direct calls in controllers
+- [ ] All Excel exports implement `ShouldQueue` + `WithChunkReading` — never load all rows into memory
+- [ ] `smartExcel()`: count rows first — queue if > 5,000, immediate download if ≤ 5,000
+- [ ] CSV exports use `LazyCollection` + `fputcsv` streaming — no `->get()` on full table
+- [ ] PDF exports capped at 5,000 rows — clearly communicated to admin in UI
+- [ ] PDF Blade templates use `DejaVu Sans` font (bundled with mPDF) for full Unicode/RTL support
+- [ ] `{PAGENO}` and `{nbpg}` in PDF footer are mPDF placeholders — NOT PHP variables
+- [ ] `settings('app_name')` used in PDF header — never hardcoded "MakeAI"
+- [ ] Exported files stored in `storage/app/exports/{admin_id}/` — not public disk
+- [ ] Download route streams file via `Storage::download()` — never exposes raw path
+- [ ] `admin.permission:reports.export` middleware gates all export routes
+- [ ] `NotifyExportReadyJob` auto-schedules `DeleteExportFileJob` 24h after creation
+- [ ] `exports:cleanup` artisan command registered in scheduler (daily)
+- [ ] `ExportButton` shared component reused across all admin list pages (Users, Transactions, etc.)
+- [ ] Queued export failure: job `failed()` method sends error notification to admin
+- [ ] `isProAvailable()` checked before rendering Revenue export options (no revenue without billing)
+
+
 ---
 
 ---
@@ -8750,17 +10479,17 @@ makeai:tool_related:{slug}         TTL: 24h
 
 | Metric | Count |
 |--------|-------|
-| Version | 4.0 |
-| Total Parts | 50 |
+| Version | 4.1 |
+| Total Parts | 63 |
 | AI Templates | 255 |
 | Mail Templates | 23 |
 | API Endpoints | 80+ |
-| Queue Jobs | 45+ |
+| Queue Jobs | 48+ |
 | Scheduled Tasks | 13 |
 | Integrations | 60+ |
 | Test Cases | 50+ |
 | Admin Menu Items | 60+ |
-| Checklist Items | 200+ |
-| Total Lines | ~5,800 |
+| Checklist Items | 300+ |
+| Total Lines | ~11,500 |
 
 ---

@@ -1,6 +1,12 @@
 import { usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
+type TranslationReplacements = Record<string, string | number>
+
+interface TranslateComposable {
+    t: (key: string, replace?: TranslationReplacements) => string
+}
+
 /**
  * Translation composable — uses translations shared via Inertia.
  *
@@ -8,14 +14,14 @@ import { computed } from 'vue'
  * const { t } = useTranslate()
  * t('Welcome back, :name', { name: user.name })
  */
-export function useTranslate() {
+export function useTranslate(): TranslateComposable {
     const page = usePage()
 
     const translations = computed(() => {
         return (page.props.translations ?? {}) as Record<string, string>
     })
 
-    const t = (key: string, replace?: Record<string, string | number>): string => {
+    const t: TranslateComposable['t'] = (key, replace) => {
         let text = translations.value[key] ?? key
 
         if (replace) {

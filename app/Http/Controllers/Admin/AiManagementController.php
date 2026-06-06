@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\AiKey;
 use App\Models\AiModel;
 use App\Models\Setting;
+use App\Services\AI\ProviderRegistry;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Inertia\Inertia;
+use Throwable;
 
 class AiManagementController extends Controller
 {
@@ -109,6 +112,59 @@ class AiManagementController extends Controller
     }
 
     /**
+     * Test connection to an AI provider using the configured API key.
+     */
+    public function testConnection(Request $request, string $slug): JsonResponse
+    {
+        $providerInfo = config("ai.providers.{$slug}");
+        if (! $providerInfo) {
+            return response()->json(['success' => false, 'error' => translate('Unknown provider.')], 404);
+        }
+
+        $keyRecord = null;
+        $apiKey = null;
+
+        if ($request->has('api_key') && $request->api_key !== '') {
+            $apiKey = $request->api_key;
+        } else {
+            $keyRecord = AiKey::forProvider($slug)->available()->first();
+            if ($keyRecord) {
+                $apiKey = $keyRecord->api_key;
+            }
+        }
+
+        if (! $apiKey) {
+            return response()->json([
+                'success' => false,
+                'error' => translate('No API key configured. Add a key and try again.'),
+            ], 422);
+        }
+
+        try {
+            $driver = ProviderRegistry::resolveWithKey($slug, $apiKey);
+            $modelList = $providerInfo['models'] ?? [];
+            $testModel = $modelList[0] ?? 'gpt-4o-mini';
+
+            $result = $driver->chatCompletion([
+                ['role' => 'user', 'content' => 'Respond with exactly: OK'],
+            ], $testModel, ['timeout' => 15]);
+
+            $success = ! empty($result['content']);
+
+            return response()->json([
+                'success' => $success,
+                'model' => $testModel,
+                'message' => translate('Connection successful.'),
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 200);
+        }
+    }
+
+    /**
      * Update model settings.
      */
     public function updateModel(Request $request, AiModel $model)
@@ -129,17 +185,68 @@ class AiManagementController extends Controller
     /**
      * Manage non-LLM external API integrations for special tools.
      */
-    public function externalApis()
+    public function integrations()
     {
-        return Inertia::render('Admin/AI/ExternalApis', [
-            'integrations' => $this->externalIntegrationPayload(),
+        $defaultProvider = settings('default_ai_provider', config('ai.default_provider'));
+        $aiProviders = config('ai.providers', []);
+        $activeKeys = AiKey::available()->get()->groupBy('provider');
+
+        $configuredModels = [];
+        foreach ($aiProviders as $slug => $info) {
+            if ($activeKeys->has($slug)) {
+                $configuredModels[$slug] = [
+                    'name' => $info['name'],
+                    'key_count' => $activeKeys->get($slug)->count(),
+                ];
+            }
+        }
+
+        return Inertia::render('Admin/AI/Integrations', [
+            'integrations' => $this->integrationPayload(),
+            'defaultAiProvider' => $defaultProvider,
+            'configuredAiProviders' => $configuredModels,
         ]);
+    }
+
+    /**
+     * Test connection to an external API integration.
+     */
+    public function testIntegrationConnection(Request $request, string $integration): JsonResponse
+    {
+        $catalog = config('external-tools.integrations', []);
+        $integrationConfig = $catalog[$integration] ?? null;
+
+        if (! $integrationConfig) {
+            return response()->json(['success' => false, 'error' => translate('Unknown integration.')], 404);
+        }
+
+        $serviceClass = $integrationConfig['service'] ?? null;
+        if (! $serviceClass) {
+            return response()->json(['success' => false, 'error' => translate('No service class defined for this integration.')], 422);
+        }
+
+        $fqcn = "\\App\\Services\\{$serviceClass}";
+        if (! class_exists($fqcn) || ! method_exists($fqcn, 'testConnection')) {
+            return response()->json(['success' => false, 'error' => translate('Service class does not support connection testing.')], 422);
+        }
+
+        try {
+            $instance = $fqcn::fromSettings();
+            $result = $instance->testConnection();
+
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
      * Update non-LLM external API integrations.
      */
-    public function updateExternalApis(Request $request)
+    public function updateIntegrations(Request $request)
     {
         $catalog = config('external-tools.integrations', []);
         $incoming = $request->input('integrations', []);
@@ -158,7 +265,13 @@ class AiManagementController extends Controller
 
             $providers = array_keys($integration['providers'] ?? []);
             $selectedProvider = Arr::get($payload, 'provider', $providers[0] ?? null);
-            if (! in_array($selectedProvider, $providers, true)) {
+            if ($selectedProvider === '__default_ai__') {
+                if ($integration['ai_fallback'] ?? true) {
+                    $selectedProvider = '__default_ai__';
+                } else {
+                    $selectedProvider = $providers[0] ?? null;
+                }
+            } elseif (! in_array($selectedProvider, $providers, true)) {
                 $selectedProvider = $providers[0] ?? null;
             }
 
@@ -201,14 +314,26 @@ class AiManagementController extends Controller
             }
         }
 
-        return back()->with('success', translate('External API settings updated successfully.'));
+        return back()->with('success', translate('Integration settings updated successfully.'));
     }
 
-    private function externalIntegrationPayload(): array
+    private function integrationPayload(): array
     {
         $catalog = config('external-tools.integrations', []);
 
         return collect($catalog)->mapWithKeys(function (array $integration, string $integrationSlug) {
+            $providerKeys = array_keys($integration['providers'] ?? []);
+            $firstProvider = $providerKeys[0] ?? null;
+            $storedProvider = settings("external_{$integrationSlug}_provider", $firstProvider);
+
+            if ($storedProvider === '__default_ai__') {
+                if (!($integration['ai_fallback'] ?? true)) {
+                    $storedProvider = $firstProvider;
+                }
+                // Keep the sentinel — frontend handles display
+            } elseif (!in_array($storedProvider, $providerKeys, true) && $firstProvider) {
+                $storedProvider = $firstProvider;
+            }
             $providers = collect($integration['providers'] ?? [])->mapWithKeys(function (array $provider, string $providerSlug) use ($integrationSlug) {
                 $secrets = collect($provider['secrets'] ?? [])->mapWithKeys(function (string $secretKey) use ($integrationSlug, $providerSlug) {
                     $stored = settings("external_{$integrationSlug}_{$providerSlug}_{$secretKey}");
@@ -234,9 +359,12 @@ class AiManagementController extends Controller
                 'name' => $integration['name'],
                 'service' => $integration['service'],
                 'enabled' => (bool) settings("external_{$integrationSlug}_enabled", false),
-                'provider' => settings("external_{$integrationSlug}_provider", array_key_first($integration['providers'] ?? [])),
+                'provider' => $storedProvider,
                 'timeout' => (int) settings("external_{$integrationSlug}_timeout", 30),
                 'fixed_credit_cost' => settings("external_{$integrationSlug}_fixed_credit_cost", '0'),
+                'tab' => $integration['tab'] ?? 'utilities',
+                'doc_url' => $integration['doc_url'] ?? null,
+                'ai_fallback' => $integration['ai_fallback'] ?? true,
                 'providers' => $providers,
             ]];
         })->toArray();

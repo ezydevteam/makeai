@@ -123,7 +123,7 @@ class DocumentIngestionService
         $text = $this->extractor->extractFromUrl($url);
 
         // Save as temp file for the pipeline
-        $tempPath = 'temp/ingest_url_' . md5($url) . '.txt';
+        $tempPath = 'temp/ingest_url_'.md5($url).'.txt';
         \Storage::put($tempPath, $text);
 
         $filePath = storage_path("app/{$tempPath}");

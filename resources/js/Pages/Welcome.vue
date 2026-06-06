@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import Layout from '@/Layouts/AppLayout.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
 type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'integrations' | 'custom_html'
 type SectionItem = Record<string, string | number | boolean>
@@ -72,6 +73,9 @@ const props = defineProps<{
     faqs: Faq[]
 }>()
 
+const { t } = useTranslate()
+const appName = computed(() => String(usePage().props.branding?.site_name || t('Application')))
+
 const defaultHomepage: HomepageConfig = {
     sections: [
         {
@@ -81,21 +85,21 @@ const defaultHomepage: HomepageConfig = {
             core: true,
             config: {
                 layout: 'centered',
-                headline: 'One Platform. Every AI Tool.',
-                subheadline: 'Unleash your creativity with the world’s most powerful AI models. From high-quality content to stunning images and precise code, MakeAI has you covered.',
-                primary_cta_text: 'Get Started for Free',
+                headline: t('One Platform. Every AI Tool.'),
+                subheadline: t('Unleash your creativity with the world’s most powerful AI models. From high-quality content to stunning images and precise code, :app has you covered.', { app: appName.value }),
+                primary_cta_text: t('Get Started for Free'),
                 primary_cta_link: '/register',
                 primary_cta_style: 'filled',
-                secondary_cta_text: 'View Pricing',
+                secondary_cta_text: t('View Pricing'),
                 secondary_cta_link: '/pricing',
                 secondary_cta_style: 'outline',
                 show_trust_badges: true,
-                trust_badge_text: 'Next-Gen AI Technology',
+                trust_badge_text: t('Next-Gen AI Technology'),
                 stats: [
-                    { number: '50K+', label: 'Users Trusted' },
-                    { number: '10M+', label: 'Assets Generated' },
-                    { number: '99.9%', label: 'Uptime SLA' },
-                    { number: '24/7', label: 'Expert Support' },
+                    { number: '50K+', label: t('Users Trusted') },
+                    { number: '10M+', label: t('Assets Generated') },
+                    { number: '99.9%', label: t('Uptime SLA') },
+                    { number: '24/7', label: t('Expert Support') },
                 ],
                 hero_media_url: '',
             },
@@ -106,14 +110,14 @@ const defaultHomepage: HomepageConfig = {
             enabled: true,
             core: true,
             config: {
-                title: 'Supercharge your workflow',
-                subtitle: 'Everything you need to build the future, powered by AI.',
+                title: t('Supercharge your workflow'),
+                subtitle: t('Everything you need to build the future, powered by AI.'),
                 layout: '3-column',
                 items: [
-                    { icon: 'pencil', title: 'AI Writer', description: 'Generate blogs, ads, and emails in seconds with our advanced copywriting models.', image_url: '' },
-                    { icon: 'photo', title: 'AI Images', description: 'Turn text into masterpiece. High-resolution images for any project or brand.', image_url: '' },
-                    { icon: 'chat', title: 'AI Chat', description: 'Smart, contextual assistants ready to help you with research or customer support.', image_url: '' },
-                    { icon: 'code', title: 'AI Code', description: 'From debugging to writing entire functions. Code faster with AI companionship.', image_url: '' },
+                    { icon: 'pencil', title: t('AI Writer'), description: t('Generate blogs, ads, and emails in seconds with our advanced copywriting models.'), image_url: '' },
+                    { icon: 'photo', title: t('AI Images'), description: t('Turn text into masterpiece. High-resolution images for any project or brand.'), image_url: '' },
+                    { icon: 'chat', title: t('AI Chat'), description: t('Smart, contextual assistants ready to help you with research or customer support.'), image_url: '' },
+                    { icon: 'code', title: t('AI Code'), description: t('From debugging to writing entire functions. Code faster with AI companionship.'), image_url: '' },
                 ],
                 cta_text: '',
                 cta_link: '',
@@ -122,8 +126,8 @@ const defaultHomepage: HomepageConfig = {
     ],
     settings: {
         seo: {
-            meta_title: 'MakeAI — The Ultimate AI Platform',
-            meta_description: 'Create content, images, chat responses, and code with one powerful AI platform.',
+            meta_title: t(':app — The Ultimate AI Platform', { app: appName.value }),
+            meta_description: t('Create content, images, chat responses, and code with one powerful AI platform.'),
             og_image: '',
         },
         preloader: {
@@ -137,8 +141,8 @@ const defaultHomepage: HomepageConfig = {
         },
         cookie_consent: {
             enabled: false,
-            message: 'We use cookies to improve your experience.',
-            accept_text: 'Accept',
+            message: t('We use cookies to improve your experience.'),
+            accept_text: t('Accept'),
             policy_url: '/privacy-policy',
         },
         chat_widget_embed: '',
@@ -177,7 +181,7 @@ const resolveMediaUrl = (path?: string | null): string => {
 const asString = (value: SectionConfigValue | undefined, fallback = ''): string => typeof value === 'string' || typeof value === 'number' ? String(value) : fallback
 const asBoolean = (value: SectionConfigValue | undefined, fallback = false): boolean => typeof value === 'boolean' ? value : fallback
 const asItems = (value: SectionConfigValue | undefined): SectionItem[] => Array.isArray(value) && value.every((item) => typeof item !== 'string') ? value : []
-const replaceVariables = (value: string): string => value.replaceAll('{app_name}', 'MakeAI')
+const replaceVariables = (value: string): string => value.replaceAll('{app_name}', appName.value)
 
 const headingParts = (headline: string): [string, string] => {
     const parts = replaceVariables(headline).split('. ')
@@ -218,14 +222,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Head :title="homepageConfig.settings.seo.meta_title || 'MakeAI — The Ultimate AI Platform'">
+    <Head :title="homepageConfig.settings.seo.meta_title || appName + ' — ' + t('The Ultimate AI Platform')">
         <meta v-if="homepageConfig.settings.seo.meta_description" name="description" :content="homepageConfig.settings.seo.meta_description">
         <meta v-if="homepageConfig.settings.seo.og_image" property="og:image" :content="homepageConfig.settings.seo.og_image">
     </Head>
 
     <Layout>
         <div v-if="homepageConfig.settings.preloader.enabled" class="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-surface-950">
-            <img v-if="homepageConfig.settings.preloader.animation_url" :src="homepageConfig.settings.preloader.animation_url" alt="Loading" class="w-20 h-20 object-contain">
+            <img v-if="homepageConfig.settings.preloader.animation_url" :src="homepageConfig.settings.preloader.animation_url" :alt="t('Loading')" class="w-20 h-20 object-contain">
             <div v-else class="w-12 h-12 rounded-full border-4 border-primary-100 border-t-primary-600 animate-spin"></div>
         </div>
 
@@ -272,7 +276,7 @@ onUnmounted(() => {
             <section v-else-if="section.type === 'features'" class="py-24 bg-gray-50 dark:bg-surface-900 transition-colors duration-300">
                 <div class="max-w-7xl mx-auto px-6">
                     <div class="text-center mb-20">
-                        <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, 'Supercharge your workflow') }}</h2>
+                        <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, t('Supercharge your workflow')) }}</h2>
                         <p v-if="sectionSubtitle(section)" class="text-gray-500 dark:text-gray-400 font-medium">{{ sectionSubtitle(section) }}</p>
                     </div>
                     <div :class="asString(section.config.layout) === '2-column' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'" class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -303,7 +307,7 @@ onUnmounted(() => {
             <section v-else-if="section.type === 'cta_banner'" class="py-24 bg-white dark:bg-surface-950">
                 <div :class="asString(section.config.width) === 'full' ? 'max-w-none rounded-none' : 'max-w-6xl rounded-[2.5rem]'" class="mx-auto px-6">
                     <div class="bg-gradient-to-r from-primary-600 to-accent-600 p-10 md:p-16 text-center shadow-2xl shadow-primary-600/20" :class="asString(section.config.width) === 'full' ? '' : 'rounded-[2.5rem]'">
-                        <h2 class="text-3xl md:text-5xl font-black text-white mb-4">{{ asString(section.config.headline, sectionTitle(section, 'Ready to build with AI?')) }}</h2>
+                        <h2 class="text-3xl md:text-5xl font-black text-white mb-4">{{ asString(section.config.headline, sectionTitle(section, t('Ready to build with AI?'))) }}</h2>
                         <p v-if="asString(section.config.subheadline)" class="text-white/80 max-w-2xl mx-auto mb-8">{{ asString(section.config.subheadline) }}</p>
                         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link v-if="asString(section.config.primary_text)" :href="asString(section.config.primary_link, '/register')" class="w-full sm:w-auto bg-white text-gray-900 px-8 py-4 rounded-2xl font-black hover:bg-gray-100 transition-colors">{{ asString(section.config.primary_text) }}</Link>
@@ -317,7 +321,7 @@ onUnmounted(() => {
             <section v-else-if="section.type === 'testimonials'" class="py-24 bg-gray-50 dark:bg-surface-900 transition-colors duration-300">
                 <div class="max-w-7xl mx-auto px-6">
                     <div class="text-center mb-16">
-                        <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, 'What Our Users Say') }}</h2>
+                        <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, t('What Our Users Say')) }}</h2>
                         <p v-if="sectionSubtitle(section)" class="text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto">{{ sectionSubtitle(section) }}</p>
                     </div>
                     <!-- Live DB testimonials -->
@@ -353,7 +357,7 @@ onUnmounted(() => {
                     <!-- Empty state (no DB entries yet) -->
                     <div v-else class="text-center py-16 text-gray-400 dark:text-gray-600">
                         <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-                        <p class="font-medium">No testimonials yet. Add some from the admin panel.</p>
+                        <p class="font-medium">{{ t('No testimonials yet. Add some from the admin panel.') }}</p>
                     </div>
                 </div>
             </section>
@@ -362,7 +366,7 @@ onUnmounted(() => {
             <section v-else-if="section.type === 'faq'" class="py-24 bg-white dark:bg-surface-950 transition-colors duration-300">
                 <div class="max-w-3xl mx-auto px-6">
                     <div class="text-center mb-16">
-                        <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, 'Frequently Asked Questions') }}</h2>
+                        <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, t('Frequently Asked Questions')) }}</h2>
                         <p v-if="sectionSubtitle(section)" class="text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto">{{ sectionSubtitle(section) }}</p>
                     </div>
                     <!-- Live DB FAQs -->
@@ -394,7 +398,7 @@ onUnmounted(() => {
                     <!-- Empty state -->
                     <div v-else class="text-center py-16 text-gray-400 dark:text-gray-600">
                         <svg class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <p class="font-medium">No FAQs yet. Add some from the admin panel.</p>
+                        <p class="font-medium">{{ t('No FAQs yet. Add some from the admin panel.') }}</p>
                     </div>
                 </div>
             </section>
@@ -402,7 +406,7 @@ onUnmounted(() => {
             <!-- ═══ Other sections (newsletter, pricing, etc.) ═══ -->
             <section v-else-if="section.type === 'how_it_works' || section.type === 'tools_showcase' || section.type === 'pricing' || section.type === 'latest_posts' || section.type === 'newsletter' || section.type === 'integrations'" class="py-24 bg-gray-50 dark:bg-surface-900">
                 <div class="max-w-7xl mx-auto px-6 text-center">
-                    <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, 'Homepage Section') }}</h2>
+                    <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">{{ sectionTitle(section, t('Homepage Section')) }}</h2>
                     <p v-if="sectionSubtitle(section)" class="text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto mb-10">{{ sectionSubtitle(section) }}</p>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div v-for="item in asItems(section.config.items).slice(0, Number(asString(section.config.max_items, '6')))" :key="`${item.title}_${item.label}`" class="bg-white dark:bg-surface-800 rounded-3xl border border-gray-100 dark:border-surface-700 p-8 text-left">
@@ -411,8 +415,8 @@ onUnmounted(() => {
                         </div>
                     </div>
                     <form v-if="section.type === 'newsletter'" method="post" action="/newsletter/subscribe" class="max-w-xl mx-auto mt-10 flex flex-col sm:flex-row gap-3">
-                        <input name="email" type="email" required placeholder="Enter your email" class="flex-1 bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-2xl px-5 py-4 text-gray-900 dark:text-white">
-                        <button type="submit" class="bg-primary-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-primary-500 transition-colors">Subscribe</button>
+                        <input name="email" type="email" required :placeholder="t('Enter your email')" class="flex-1 bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-2xl px-5 py-4 text-gray-900 dark:text-white">
+                        <button type="submit" class="bg-primary-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-primary-500 transition-colors">{{ t('Subscribe') }}</button>
                     </form>
                 </div>
             </section>
@@ -425,7 +429,7 @@ onUnmounted(() => {
         <div v-if="homepageConfig.settings.cookie_consent.enabled && !cookieAccepted" class="fixed left-6 right-6 bottom-6 z-50 max-w-4xl mx-auto bg-white dark:bg-surface-900 border border-gray-100 dark:border-surface-700 rounded-2xl p-5 shadow-2xl flex flex-col md:flex-row md:items-center gap-4">
             <p class="flex-1 text-sm text-gray-600 dark:text-gray-300">{{ homepageConfig.settings.cookie_consent.message }}</p>
             <div class="flex items-center gap-3">
-                <Link :href="homepageConfig.settings.cookie_consent.policy_url" class="text-sm font-bold text-primary-600 dark:text-primary-400">Learn more</Link>
+                <Link :href="homepageConfig.settings.cookie_consent.policy_url" class="text-sm font-bold text-primary-600 dark:text-primary-400">{{ t('Learn more') }}</Link>
                 <button @click="acceptCookies" type="button" class="px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-500 transition-colors">{{ homepageConfig.settings.cookie_consent.accept_text }}</button>
             </div>
         </div>

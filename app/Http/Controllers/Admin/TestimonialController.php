@@ -103,7 +103,7 @@ class TestimonialController extends Controller
             }
             $data = array_combine($header, $row);
             Testimonial::create([
-                'name' => $data['name'] ?? 'Unknown',
+                'name' => $data['name'] ?? translate('Unknown'),
                 'role' => $data['role'] ?? null,
                 'company' => $data['company'] ?? null,
                 'content' => $data['content'] ?? $data['review'] ?? '',

@@ -11,18 +11,18 @@
 
 /* Custom Theme Variables */
 @theme {
-    /* Primary palette — Indigo-based */
-    --color-primary-50: #eef2ff;
-    --color-primary-100: #e0e7ff;
-    --color-primary-200: #c7d2fe;
-    --color-primary-300: #a5b4fc;
-    --color-primary-400: #818cf8;
-    --color-primary-500: #6366f1;
-    --color-primary-600: #4f46e5;
-    --color-primary-700: #4338ca;
-    --color-primary-800: #3730a3;
-    --color-primary-900: #312e81;
-    --color-primary-950: #1e1b4b;
+    /* Primary palette — Blue-based */
+    --color-primary-50: #eff6ff;
+    --color-primary-100: #dbeafe;
+    --color-primary-200: #bfdbfe;
+    --color-primary-300: #93c5fd;
+    --color-primary-400: #60a5fa;
+    --color-primary-500: #1f75fe;
+    --color-primary-600: #1d4ed8;
+    --color-primary-700: #1e40af;
+    --color-primary-800: #1e3a8a;
+    --color-primary-900: #172554;
+    --color-primary-950: #0f172a;
 
     /* Accent — Violet */
     --color-accent-400: #a78bfa;
@@ -114,6 +114,34 @@ body {
 .dark body {
     background-color: var(--color-surface-950) !important;
     color: #ffffff !important;
+}
+
+/* Interactive controls */
+button,
+a,
+summary,
+label,
+select,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="checkbox"],
+input[type="radio"],
+[role="button"],
+[data-clickable="true"] {
+    cursor: pointer;
+}
+
+button:disabled,
+input[type="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="reset"]:disabled,
+select:disabled,
+input[type="checkbox"]:disabled,
+input[type="radio"]:disabled,
+[role="button"][aria-disabled="true"],
+[data-clickable="true"][aria-disabled="true"] {
+    cursor: not-allowed;
 }
 
 
@@ -230,69 +258,38 @@ body {
 }
 
 /* =============================================
-   Toast Notifications
+   Toast Notifications (Vue TransitionGroup)
    ============================================= */
-#toast-container {
-    position: fixed;
-    top: 1rem;
-    right: 1rem;
-    z-index: 99999;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 380px;
-}
 
-.toast-notification {
-    padding: 0.875rem 1.25rem;
-    border-radius: 0.75rem;
-    color: #fff;
-    font-size: 0.875rem;
-    line-height: 1.4;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+/* Enter: slide in from right + fade */
+.toast-container-enter-active {
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-container-enter-from {
     opacity: 0;
-    transform: translateX(100%);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
+    transform: translateX(120%) scale(0.92);
 }
 
-.toast-notification.toast-visible {
-    opacity: 1;
-    transform: translateX(0);
-}
-
-.toast-notification.toast-hiding {
-    opacity: 0;
-    transform: translateX(100%);
-}
-
-.toast-success { background: rgba(22, 163, 74, 0.9); }
-.toast-error { background: rgba(220, 38, 38, 0.9); }
-.toast-warning { background: rgba(217, 119, 6, 0.9); }
-.toast-info { background: rgba(79, 70, 229, 0.9); }
-
-.toast-title {
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-}
-
-.toast-close {
+/* Leave: slide out to right + fade + shrink */
+.toast-container-leave-active {
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     position: absolute;
-    top: 0.5rem;
-    right: 0.75rem;
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 1.125rem;
-    cursor: pointer;
-    line-height: 1;
-    padding: 0;
+}
+.toast-container-leave-to {
+    opacity: 0;
+    transform: translateX(120%) scale(0.85);
 }
 
-.toast-close:hover {
-    color: #fff;
+/* Move: smooth re-order when toasts above are removed */
+.toast-move {
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Manual exit class for progress-bar-driven dismissal */
+.toast-exit {
+    opacity: 0;
+    transform: translateX(120%) scale(0.85);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* =============================================
@@ -370,12 +367,19 @@ body {
 .auth-input::placeholder { color: #9ca3af; }
 .auth-input:focus {
     background: #fff;
-    border-color: #6366f1;
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 12%, transparent);
 }
 
 .dark .auth-input:focus {
     background: var(--color-surface-800);
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus,
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus-visible {
+    border-color: var(--color-primary-500) !important;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 12%, transparent) !important;
+    outline: none !important;
 }
 
 .auth-btn {

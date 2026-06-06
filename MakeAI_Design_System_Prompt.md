@@ -8,13 +8,13 @@
 ## DESIGN PHILOSOPHY
 
 MakeAI's visual identity is **modern, trustworthy, and energetic** — not generic SaaS gray.
-The palette centers on **emerald green + ocean blue**, with clean cards, subtle glass effects,
+The palette centers on **royal blue (#1F75FE) + charcoal black (#111)**, with clean cards, subtle glass effects,
 and a premium feel that justifies the price point on Envato.
 
 Key principles:
-- **Green = success, AI action, positive states** (primary brand color)
-- **Blue = information, links, data, secondary actions**
-- **Dark sidebar** with light content area (admin panel)
+- **Blue = trust, AI action, primary brand** (#1F75FE)
+- **Black = strength, secondary actions** (#111111)
+- **White sidebar** with light content area (admin panel)
 - **Clean white cards** with subtle shadows — not flat, not neumorphic, just crisp
 - Generous whitespace, consistent 8px grid
 - Rounded corners throughout (12px cards, 8px inputs, 6px badges)
@@ -27,29 +27,29 @@ Key principles:
 
 ```css
 :root {
-  /* === PRIMARY — Emerald Green === */
-  --color-primary-50:  #ecfdf5;
-  --color-primary-100: #d1fae5;
-  --color-primary-200: #a7f3d0;
-  --color-primary-300: #6ee7b7;
-  --color-primary-400: #34d399;
-  --color-primary-500: #10b981;   /* main brand green */
-  --color-primary-600: #059669;   /* buttons, active states */
-  --color-primary-700: #047857;   /* hover */
-  --color-primary-800: #065f46;
-  --color-primary-900: #064e3b;
+  /* === PRIMARY — Royal Blue === */
+  --color-primary-50:  #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #1F75FE;   /* main brand blue */
+  --color-primary-600: #1a65e0;   /* buttons, active states */
+  --color-primary-700: #1554c0;   /* hover */
+  --color-primary-800: #1044a0;
+  --color-primary-900: #0a3480;
 
-  /* === SECONDARY — Ocean Blue === */
-  --color-secondary-50:  #eff6ff;
-  --color-secondary-100: #dbeafe;
-  --color-secondary-200: #bfdbfe;
-  --color-secondary-300: #93c5fd;
-  --color-secondary-400: #60a5fa;
-  --color-secondary-500: #3b82f6;   /* links, info, charts */
-  --color-secondary-600: #2563eb;   /* secondary buttons */
-  --color-secondary-700: #1d4ed8;
-  --color-secondary-800: #1e40af;
-  --color-secondary-900: #1e3a8a;
+  /* === SECONDARY — Charcoal Black === */
+  --color-secondary-50:  #f8f8f8;
+  --color-secondary-100: #e8e8e8;
+  --color-secondary-200: #c8c8c8;
+  --color-secondary-300: #a0a0a0;
+  --color-secondary-400: #707070;
+  --color-secondary-500: #444444;
+  --color-secondary-600: #2a2a2a;   /* secondary buttons */
+  --color-secondary-700: #1a1a1a;
+  --color-secondary-800: #111111;   /* main secondary — #111 */
+  --color-secondary-900: #050505;
 
   /* === ACCENT — Violet (AI/premium indicator) === */
   --color-accent-400: #a78bfa;
@@ -69,16 +69,16 @@ Key principles:
   --color-gray-900: #111827;
 
   /* === SEMANTIC === */
-  --color-success: #10b981;
+  --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-danger:  #ef4444;
-  --color-info:    #3b82f6;
+  --color-info:    #1F75FE;
 
   /* === SURFACES (light mode) === */
-  --surface-bg:       #f0fdf8;    /* very light green tint on page bg */
+  --surface-bg:       #f5f6fa;    /* light neutral page background */
   --surface-card:     #ffffff;
   --surface-input:    #ffffff;
-  --surface-sidebar:  #0f1f17;   /* very dark green-black */
+  --surface-sidebar:  #ffffff;   /* white sidebar (light mode) */
   --surface-header:   #ffffff;
   --surface-modal:    #ffffff;
 
@@ -101,15 +101,15 @@ Key principles:
   --shadow-md:  0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
-  --shadow-glow-green: 0 0 20px rgb(16 185 129 / 0.25);
-  --shadow-glow-blue:  0 0 20px rgb(59 130 246 / 0.20);
+  --shadow-glow-primary: 0 0 20px rgb(31 117 254 / 0.25);
+  --shadow-glow-dark:    0 0 20px rgb(17 17 17 / 0.15);
 }
 
 .dark {
   --surface-bg:      #0d1117;
   --surface-card:    #161b22;
   --surface-input:   #1c2333;
-  --surface-sidebar: #080d0a;
+  --surface-sidebar: #1a1a2e;
   --surface-header:  #161b22;
   --border-color:    #30363d;
 }
@@ -165,15 +165,15 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
 }
 .card.hoverable:hover {
   box-shadow: var(--shadow-lg);
-  border-color: var(--color-primary-200);
+  border-color: var(--color-primary-300);
 }
-/* Green accent left border variant */
-.card.accent-green {
+/* Blue accent left border variant */
+.card.accent-primary {
   border-left: 3px solid var(--color-primary-500);
 }
-/* Blue accent variant */
-.card.accent-blue {
-  border-left: 3px solid var(--color-secondary-500);
+/* Dark accent variant */
+.card.accent-dark {
+  border-left: 3px solid var(--color-secondary-800);
 }
 /* Glass card (for hero sections) */
 .card.glass {
@@ -199,9 +199,9 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
 ```vue
 <!-- BaseButton.vue — variants: primary | secondary | outline | ghost | danger -->
 
-/* PRIMARY — Green gradient */
+/* PRIMARY — Royal Blue */
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  background: var(--color-primary-500);   /* #1F75FE */
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -214,8 +214,8 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   cursor: pointer;
 }
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
-  box-shadow: var(--shadow-glow-green), 0 2px 4px rgb(0 0 0 / 0.15);
+  background: var(--color-primary-600);
+  box-shadow: var(--shadow-glow-primary), 0 2px 4px rgb(0 0 0 / 0.15);
   transform: translateY(-1px);
 }
 .btn-primary:active {
@@ -223,17 +223,29 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   box-shadow: none;
 }
 
-/* SECONDARY — Blue */
+/* SECONDARY — Charcoal Black */
 .btn-secondary {
-  background: linear-gradient(135deg, var(--color-secondary-500), var(--color-secondary-600));
-  /* same structure as primary */
+  background: var(--color-secondary-800);   /* #111111 */
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1.25rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-family: var(--font-body);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background: var(--color-secondary-700);
+  transform: translateY(-1px);
 }
 
-/* OUTLINE — Green border, transparent bg */
+/* OUTLINE — Blue border, transparent bg */
 .btn-outline {
   background: transparent;
   border: 1.5px solid var(--color-primary-500);
-  color: var(--color-primary-600);
+  color: var(--color-primary-500);
   border-radius: var(--radius-md);
   padding: 0.5rem 1.25rem;
 }
@@ -299,8 +311,8 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   color: var(--color-gray-400);
 }
 .input:focus {
-  border-color: var(--color-primary-400);
-  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.12);  /* green ring */
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgb(31 117 254 / 0.12);  /* blue ring */
 }
 .input.error {
   border-color: var(--color-danger);
@@ -397,7 +409,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
 }
 
 /* Color variants */
-.badge-green   { background: var(--color-primary-100);   color: var(--color-primary-700); }
+.badge-primary { background: var(--color-primary-100);   color: var(--color-primary-700); }
 .badge-blue    { background: var(--color-secondary-100); color: var(--color-secondary-700); }
 .badge-violet  { background: #ede9fe;                    color: #5b21b6; }
 .badge-amber   { background: #fef3c7;                    color: #92400e; }
@@ -406,7 +418,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
 
 /* Pro badge */
 .badge-pro {
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-500));
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-800));
   color: white;
   font-size: 10px;
   font-weight: 700;
@@ -433,7 +445,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
 .admin-sidebar {
   width: 260px;
   min-height: 100vh;
-  background: var(--surface-sidebar);   /* #0f1f17 — very dark green-black */
+  background: var(--surface-sidebar);   /* #ffffff — white sidebar */
   display: flex;
   flex-direction: column;
   transition: width 0.25s ease;
@@ -451,7 +463,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   display: flex;
   align-items: center;
   padding: 0 1.25rem;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid var(--border-color);
 }
 
 /* Nav group label */
@@ -460,7 +472,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.3);
+  color: var(--color-gray-400);
   padding: 1rem 1.25rem 0.375rem;
 }
 
@@ -470,7 +482,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1.25rem;
-  color: rgba(255,255,255,0.6);
+  color: var(--color-gray-600);
   font-size: var(--text-sm);
   font-weight: 450;
   border-radius: 0;
@@ -480,20 +492,20 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   position: relative;
 }
 .sidebar-item:hover {
-  color: rgba(255,255,255,0.9);
-  background: rgba(255,255,255,0.05);
+  color: var(--color-gray-900);
+  background: var(--color-gray-100);
 }
-/* Active state — green left bar + green tint */
+/* Active state — blue left bar + blue tint */
 .sidebar-item.active {
-  color: var(--color-primary-400);
-  background: rgba(16, 185, 129, 0.12);
+  color: var(--color-primary-500);
+  background: rgba(31, 117, 254, 0.08);
 }
 .sidebar-item.active::before {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 3px;
-  background: var(--color-primary-400);
+  background: var(--color-primary-500);
   border-radius: 0 2px 2px 0;
 }
 
@@ -503,7 +515,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   flex-shrink: 0;
   opacity: 0.8;
 }
-.sidebar-item.active .sidebar-icon { opacity: 1; color: var(--color-primary-400); }
+.sidebar-item.active .sidebar-icon { opacity: 1; color: var(--color-primary-500); }
 
 /* Chevron */
 .sidebar-chevron {
@@ -527,13 +539,13 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   align-items: center;
   gap: 0.5rem;
   padding: 0.375rem 1.25rem 0.375rem 3.25rem;  /* indented */
-  color: rgba(255,255,255,0.5);
+  color: var(--color-gray-500);
   font-size: var(--text-xs);
   cursor: pointer;
   transition: color 0.15s;
 }
-.sidebar-subitem:hover  { color: rgba(255,255,255,0.85); }
-.sidebar-subitem.active { color: var(--color-primary-400); }
+.sidebar-subitem:hover  { color: var(--color-gray-900); }
+.sidebar-subitem.active { color: var(--color-primary-500); }
 .sidebar-subitem::before {
   content: '';
   width: 4px; height: 4px;
@@ -578,7 +590,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   white-space: nowrap;
 }
 .data-table th.sortable { cursor: pointer; }
-.data-table th.sortable:hover { color: var(--color-primary-600); }
+.data-table th.sortable:hover { color: var(--color-primary-500); }
 
 .data-table td {
   padding: 0.875rem 1rem;
@@ -588,10 +600,10 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
 }
 
 .data-table tbody tr:last-child td { border-bottom: none; }
-.data-table tbody tr:hover td     { background: var(--color-primary-50); }
+.data-table tbody tr:hover td     { background: #eff6ff; }   /* blue-50 */
 
 /* Selected row */
-.data-table tbody tr.selected td { background: #ecfdf5; }
+.data-table tbody tr.selected td { background: #dbeafe; }   /* blue-100 */
 
 /* Checkbox column */
 .data-table .col-check { width: 40px; text-align: center; }
@@ -704,14 +716,14 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-500));
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-secondary-800));
   opacity: 0;
   transition: opacity 0.2s;
   pointer-events: none;
 }
 .tool-card:hover {
-  border-color: var(--color-primary-400);
-  box-shadow: var(--shadow-md), var(--shadow-glow-green);
+  border-color: var(--color-primary-500);
+  box-shadow: var(--shadow-md), var(--shadow-glow-primary);
   transform: translateY(-2px);
 }
 .tool-icon-wrap {
@@ -806,7 +818,7 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-full);
 }
-.stat-trend.up   { background: #d1fae5; color: #065f46; }
+.stat-trend.up   { background: #dcfce7; color: #15803d; }
 .stat-trend.down { background: #fee2e2; color: #991b1b; }
 ```
 
@@ -826,8 +838,8 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   backdrop-filter: blur(8px);
 }
 #toast-container .toast-success {
-  background: rgba(16, 185, 129, 0.95) !important;
-  border-left: 4px solid #065f46 !important;
+  background: rgba(34, 197, 94, 0.95) !important;
+  border-left: 4px solid #15803d !important;
 }
 #toast-container .toast-error {
   background: rgba(239, 68, 68, 0.95) !important;
@@ -838,8 +850,8 @@ Standard white card used everywhere: dashboard stats, tool cards, settings panel
   border-left: 4px solid #92400e !important;
 }
 #toast-container .toast-info {
-  background: rgba(59, 130, 246, 0.95) !important;
-  border-left: 4px solid #1e40af !important;
+  background: rgba(31, 117, 254, 0.95) !important;
+  border-left: 4px solid #1a65e0 !important;
 }
 ```
 
@@ -854,13 +866,13 @@ All dark mode styles applied via `.dark` class on `<html>`:
 .dark .input           { background: #1c2333; border-color: #30363d; color: #e6edf3; }
 .dark .data-table thead{ background: #0d1117; }
 .dark .data-table td   { border-color: #21262d; color: #8b949e; }
-.dark .data-table tbody tr:hover td { background: rgba(16,185,129,0.05); }
+.dark .data-table tbody tr:hover td { background: rgba(31,117,254,0.07); }
 .dark .modal           { background: #161b22; border-color: #30363d; }
 .dark .modal-footer    { background: #0d1117; }
 .dark .stat-value      { color: #e6edf3; }
 .dark .tool-name       { color: #e6edf3; }
 .dark .label           { color: #8b949e; }
-.dark .sidebar-group-label { color: rgba(255,255,255,0.25); }
+.dark .sidebar-group-label { color: rgba(255,255,255,0.3); }
 ```
 
 ---
@@ -892,7 +904,7 @@ All dark mode styles applied via `.dark` class on `<html>`:
 .page-loader {
   position: fixed; top: 0; left: 0; right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--color-primary-500), var(--color-secondary-500));
+  background: linear-gradient(90deg, var(--color-primary-500), var(--color-secondary-800));
   z-index: 9999;
   animation: page-load 1.2s ease infinite;
 }
@@ -930,7 +942,7 @@ All dark mode styles applied via `.dark` class on `<html>`:
 }
 .otp-box:focus {
   border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.15);
+  box-shadow: 0 0 0 3px rgb(31 117 254 / 0.15);
 }
 .otp-box.filled {
   border-color: var(--color-primary-400);
@@ -975,7 +987,7 @@ All dark mode styles applied via `.dark` class on `<html>`:
 ### 15. GENERAL LAYOUT RULES
 
 ```
-Page background:    var(--surface-bg)      — #f0fdf8 (very light green tint)
+Page background:    var(--surface-bg)      — #f5f6fa (light neutral)
 Content max-width:  1280px (xl)            — centered with mx-auto px-6
 Admin layout:       260px sidebar + flex-1 content
 Content padding:    1.5rem (24px)
@@ -994,21 +1006,22 @@ Mobile breakpoint:  1024px (lg) — below this sidebar becomes drawer
 ## QUICK REFERENCE — TAILWIND CLASS MAPPING
 
 ```
-Primary green:   bg-emerald-500  text-emerald-600  border-emerald-400  ring-emerald-500/20
-Secondary blue:  bg-blue-500     text-blue-600     border-blue-400
+Primary blue:    bg-[#1F75FE]  text-[#1F75FE]  border-[#1F75FE]  ring-[#1F75FE]/20
+Secondary dark:  bg-[#111111]  text-[#111111]  border-[#111111]
 Accent violet:   bg-violet-500   text-violet-600
-Success:         text-emerald-600  bg-emerald-50
+Success:         text-green-600    bg-green-50
 Warning:         text-amber-600    bg-amber-50
 Danger:          text-red-600      bg-red-50
 Info:            text-blue-600     bg-blue-50
 
 Card:            bg-white border border-gray-200 rounded-xl shadow-sm
-Input focus:     focus:border-emerald-400 focus:ring-2 focus:ring-emerald-500/10
-Button primary:  bg-gradient-to-br from-emerald-500 to-emerald-600 text-white
-Sidebar bg:      bg-[#0f1f17]
-Active item:     text-emerald-400 bg-emerald-500/10 border-l-2 border-emerald-400
+Input focus:     focus:border-[#1F75FE] focus:ring-2 focus:ring-[#1F75FE]/10
+Button primary:  bg-[#1F75FE] text-white hover:bg-[#1a65e0]
+Button secondary: bg-[#111111] text-white hover:bg-[#1a1a1a]
+Sidebar bg:      bg-white border-r border-gray-200
+Active item:     text-[#1F75FE] bg-[#1F75FE]/8 border-l-2 border-[#1F75FE]
 ```
 
 ---
 
-*MakeAI Design System v1.0 — Green/Blue palette, card-first, dark sidebar*
+*MakeAI Design System v2.0 — Blue/Black palette (#1F75FE / #111), card-first, white sidebar, light default*

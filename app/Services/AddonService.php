@@ -192,6 +192,10 @@ class AddonService
      */
     private function checkLicenseRequirement(array $config): bool
     {
+        if (! license_verified()) {
+            return false;
+        }
+
         $required = $config['requires_license'] ?? 1;
 
         return get_license_type() >= $required;

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import AppSelect from '@/Components/AppSelect.vue'
 
 defineOptions({ layout: UserLayout })
 
@@ -45,6 +46,12 @@ const { t } = useTranslate()
 const search = ref(props.filters.search ?? '')
 const sort = ref(props.filters.sort ?? 'latest')
 
+const sortOptions = computed(() => [
+    { value: 'latest', label: t('Latest') },
+    { value: 'popular', label: t('Most Popular') },
+    { value: 'commented', label: t('Most Commented') },
+])
+
 const applyFilters = () => {
     router.get(window.location.pathname, { search: search.value || undefined, sort: sort.value === 'latest' ? undefined : sort.value }, {
         preserveState: true,
@@ -80,11 +87,7 @@ const formatDate = (value: string | null) => {
                         <label class="sr-only" for="blog-search">{{ t('Search') }}</label>
                         <input id="blog-search" v-model="search" @keyup.enter="applyFilters" type="search" :placeholder="t('Search articles')" class="flex-1 rounded-lg border border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:border-primary-400 focus:ring-primary-400">
                         <label class="sr-only" for="blog-sort">{{ t('Sort') }}</label>
-                        <select id="blog-sort" v-model="sort" @change="applyFilters" class="rounded-lg border border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                            <option value="latest">{{ t('Latest') }}</option>
-                            <option value="popular">{{ t('Most Popular') }}</option>
-                            <option value="commented">{{ t('Most Commented') }}</option>
-                        </select>
+                        <AppSelect id="blog-sort" v-model="sort" :options="sortOptions" @update:model-value="applyFilters" />
                         <button @click="applyFilters" type="button" class="rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-500 transition-colors">
                             {{ t('Filter') }}
                         </button>

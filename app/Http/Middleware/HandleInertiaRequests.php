@@ -4,9 +4,9 @@ namespace App\Http\Middleware;
 
 use App\Models\AffiliateProgram;
 use App\Models\AiTool;
-use App\Models\Category;
 use App\Models\Announcement;
 use App\Models\BlogPost;
+use App\Models\Category;
 use App\Models\Comment;
 use App\Models\Coupon;
 use App\Models\Language;
@@ -19,6 +19,7 @@ use App\Support\CountryCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -51,6 +52,23 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // During installation, provide minimal props — no DB is available
+        if ($request->is('install', 'install/*')) {
+            return [
+                ...parent::share($request),
+                'appName' => translate('Installation'),
+                'locale' => ['code' => 'en', 'name' => 'English', 'flag' => null, 'is_rtl' => false],
+                'translations' => [],
+                'languages' => [],
+                'flash' => [
+                    'success' => fn () => $request->session()->get('success'),
+                    'error' => fn () => $request->session()->get('error'),
+                    'warning' => fn () => $request->session()->get('warning'),
+                    'info' => fn () => $request->session()->get('info'),
+                ],
+            ];
+        }
+
         $defaultLocale = settings('default_language', 'en');
         $requestedLocale = session('locale_manually_selected')
             ? session('locale', $defaultLocale)
@@ -61,14 +79,35 @@ class HandleInertiaRequests extends Middleware
             ->where('is_active', true)
             ->first() ?: Language::getDefault();
         $locale = $language?->code ?? settings('default_language', 'en');
+        $siteName = settings('site_name', translate('Application'));
+        $copyrightText = settings('site_copyright_text', '') ?: translate('© {year} :app. All rights reserved.', ['app' => $siteName]);
+
+        $resolveImage = fn (?string $path) => $path ? (str_starts_with($path, 'http') ? $path : Storage::disk('public')->url($path)) : '';
 
         return [
             ...parent::share($request),
 
-            'appName' => settings('app_name', 'MakeAI'),
+            'appName' => $siteName,
+
+            'branding' => [
+                'site_name'          => $siteName,
+                'site_tagline'       => settings('site_tagline', ''),
+                'site_description'   => settings('site_description', ''),
+                'site_logo_light'    => $resolveImage(settings('site_logo_light', '')),
+                'site_logo_dark'     => $resolveImage(settings('site_logo_dark', '')),
+                'site_favicon_ico'   => $resolveImage(settings('site_favicon_ico', '')),
+                'site_favicon_png'   => $resolveImage(settings('site_favicon_png', '')),
+                'site_og_image'      => $resolveImage(settings('site_og_image', '')),
+                'site_copyright_text'=> settings('site_copyright_text', ''),
+                'site_support_email' => settings('site_support_email', ''),
+                'site_support_url'   => settings('site_support_url', ''),
+                'site_terms_url'     => settings('site_terms_url', ''),
+                'site_privacy_url'   => settings('site_privacy_url', ''),
+            ],
+
             'locale' => [
                 'code' => $locale,
-                'name' => $language?->name ?? 'English',
+                'name' => $language?->name ?? translate('English'),
                 'flag' => $language?->flag,
                 'is_rtl' => (bool) ($language?->is_rtl ?? false),
                 'date_format' => $language?->date_format ?? 'MMM D, YYYY',
@@ -94,11 +133,12 @@ class HandleInertiaRequests extends Middleware
                 'decimals' => (int) settings('currency_decimals', 2),
             ],
             'isProAvailable' => fn () => isProAvailable(),
+            'licenseBlocked' => fn () => $this->isLicenseBlocked(),
             'socialLoginProviders' => fn () => $this->getSocialLoginProviders(),
 
             'app' => [
                 'demo' => config('app.demo'),
-                'name' => settings('app_name', 'MakeAI'),
+                'name' => $siteName,
             ],
 
             'auth' => fn () => $this->getAuthProps($request),
@@ -175,7 +215,7 @@ class HandleInertiaRequests extends Middleware
                     'shadow' => false,
                     'progressbar' => false,
                     'blocks' => [
-                        ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => null, 'alt' => settings('app_name', 'MakeAI'), 'link' => '/', 'show_text' => true, 'text' => settings('app_name', 'MakeAI')]],
+                        ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
                         ['id' => 'nav', 'type' => 'navigation', 'enabled' => true, 'config' => ['menu_slug' => 'main', 'alignment' => 'center', 'text_color' => '', 'hover_color' => '', 'hover_style' => 'underline', 'submenu_bg_color' => '', 'submenu_text_color' => '']],
                         ['id' => 'search', 'type' => 'search', 'enabled' => false, 'config' => ['compact' => false, 'search_style' => 'box', 'enable_live_search' => true, 'show_suggestions' => true, 'icon_class' => 'ti ti-search', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                         ['id' => 'lang', 'type' => 'language_switcher', 'enabled' => false, 'config' => []],
@@ -203,7 +243,7 @@ class HandleInertiaRequests extends Middleware
                     'progressbar' => false,
                     'blocks' => [
                         ['id' => 'mobile_hamburger', 'type' => 'hamburger', 'enabled' => true, 'config' => ['menu_slug' => 'mobile', 'label' => translate('Menu'), 'icon_class' => 'ti ti-menu-2', 'show_label' => true, 'drawer_title' => '', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
-                        ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => null, 'alt' => settings('app_name', 'MakeAI'), 'link' => '/', 'show_text' => true, 'text' => settings('app_name', 'MakeAI')]],
+                        ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
                         ['id' => 'mobile_notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => []],
                         ['id' => 'mobile_dark', 'type' => 'dark_mode', 'enabled' => true, 'config' => ['label' => translate('Theme'), 'icon_class' => '', 'show_label' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                     ],
@@ -273,7 +313,7 @@ class HandleInertiaRequests extends Middleware
                     ],
                 ],
                 'bottom_blocks' => [
-                    ['id' => 'bottom_copyright', 'type' => 'copyright_text', 'enabled' => true, 'config' => ['text' => translate('© {year} :app. All rights reserved.', ['app' => settings('app_name', 'MakeAI')])]],
+                    ['id' => 'bottom_copyright', 'type' => 'copyright_text', 'enabled' => true, 'config' => ['text' => $copyrightText]],
                     ['id' => 'bottom_payment_icons', 'type' => 'payment_icons', 'enabled' => true, 'config' => ['icons' => ['visa', 'mastercard', 'paypal', 'stripe']]],
                     ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => true, 'config' => ['label' => translate('Back to top')]],
                 ],
@@ -282,7 +322,7 @@ class HandleInertiaRequests extends Middleware
                         'id' => 'left',
                         'title' => translate('Left Column'),
                         'blocks' => [
-                            ['id' => 'bottom_copyright', 'type' => 'copyright_text', 'enabled' => true, 'config' => ['text' => translate('© {year} :app. All rights reserved.', ['app' => settings('app_name', 'MakeAI')])]],
+                            ['id' => 'bottom_copyright', 'type' => 'copyright_text', 'enabled' => true, 'config' => ['text' => $copyrightText]],
                         ],
                     ],
                     [
@@ -295,7 +335,7 @@ class HandleInertiaRequests extends Middleware
                     ],
                 ],
                 'bottom_bar' => [
-                    'copyright_text' => translate('© {year} :app. All rights reserved.', ['app' => settings('app_name', 'MakeAI')]),
+                    'copyright_text' => $copyrightText,
                     'menu_slug' => null,
                     'show_payment_icons' => true,
                     'payment_icons' => ['visa', 'mastercard', 'paypal', 'stripe'],
@@ -331,9 +371,9 @@ class HandleInertiaRequests extends Middleware
 
             'sidebarConfig' => fn () => Setting::getValue('sidebar_config', [
                 'blocks' => [
-                    ['id' => 'b1', 'type' => 'search_box', 'config' => ['title' => 'Search', 'placeholder' => 'Search articles...']],
-                    ['id' => 'b2', 'type' => 'categories_list', 'config' => ['title' => 'Categories', 'show_count' => true]],
-                    ['id' => 'b3', 'type' => 'recent_posts', 'config' => ['title' => 'Recent Posts', 'count' => 3]],
+                    ['id' => 'b1', 'type' => 'search_box', 'config' => ['title' => translate('Search'), 'placeholder' => translate('Search articles...')]],
+                    ['id' => 'b2', 'type' => 'categories_list', 'config' => ['title' => translate('Categories'), 'show_count' => true]],
+                    ['id' => 'b3', 'type' => 'recent_posts', 'config' => ['title' => translate('Recent Posts'), 'count' => 3]],
                 ],
                 'position' => 'right',
                 'sticky' => true,
@@ -366,11 +406,11 @@ class HandleInertiaRequests extends Middleware
     private function getSocialLoginProviders(): array
     {
         return collect([
-            'google' => 'Google',
-            'github' => 'GitHub',
-            'facebook' => 'Facebook',
-            'reddit' => 'Reddit',
-            'twitter' => 'Twitter',
+            'google' => translate('Google'),
+            'github' => translate('GitHub'),
+            'facebook' => translate('Facebook'),
+            'reddit' => translate('Reddit'),
+            'twitter' => translate('Twitter'),
         ])
             ->filter(fn (string $label, string $provider) => (bool) settings("social_login_{$provider}_enabled", false)
                 && filled(settings("social_login_{$provider}_client_id", ''))
@@ -421,6 +461,9 @@ class HandleInertiaRequests extends Middleware
                 'trial_ends_at' => $user->trial_ends_at?->toISOString(),
                 'subscription_features' => $features,
                 'referral_code' => $user->referral_code,
+                'referral_earnings' => (float) $user->referral_earnings,
+                'referral_count' => (int) $user->referral_count,
+                'referral_link' => $user->referral_code ? url('/ref/'.$user->referral_code) : null,
                 'affiliate_custom_slug' => $user->affiliate_custom_slug,
                 'theme_preference' => $user->theme_preference,
                 'isImpersonating' => $request->session()->has('admin_impersonator_id'),
@@ -544,6 +587,43 @@ class HandleInertiaRequests extends Middleware
             'is_configured' => $isConfigured,
             'last_run_at' => $lastRunAt?->toDateTimeString(),
             'setup_url' => route('admin.system.index').'#cron-jobs',
+        ];
+    }
+
+    /**
+     * Determine if the license is invalid and should block the frontend.
+     * Returns null if license is fine, or an array with status details for the blocking banner.
+     */
+    private function isLicenseBlocked(): ?array
+    {
+        if (license_verified()) {
+            return null;
+        }
+
+        $graceStart = settings('license_grace_start');
+
+        if (filled($graceStart)) {
+            $graceHours = config('license.grace_period', 72);
+            $startedAt = Carbon::parse($graceStart);
+            $expiresAt = $startedAt->copy()->addHours($graceHours);
+
+            if (! now()->greaterThan($expiresAt)) {
+                // In grace period — don't block, but the admin page will show a warning
+                return null;
+            }
+        }
+
+        // Grace expired or never activated — block everything
+        $startedAt = filled($graceStart) ? Carbon::parse($graceStart) : null;
+
+        return [
+            'blocked' => true,
+            'reason' => 'license_invalid',
+            'message' => translate('License verification is required. Please activate your license to restore all features.'),
+            'action_url' => route('admin.license.settings'),
+            'action_text' => translate('Activate License'),
+            'grace_expired' => filled($graceStart),
+            'blocked_since' => $startedAt?->toISOString(),
         ];
     }
 }

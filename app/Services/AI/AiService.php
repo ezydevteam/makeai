@@ -5,6 +5,7 @@ namespace App\Services\AI;
 use App\DTO\CompletionResponse;
 use App\DTO\EmbeddingResult;
 use App\DTO\RagResult;
+use App\Exceptions\AI\IntegrationNotConfiguredException;
 use App\Models\AiChat;
 use App\Models\AiChatMessage;
 use App\Models\AiTool;
@@ -13,6 +14,8 @@ use App\Services\AI\Agents\AgentService;
 use App\Services\AI\Rag\DocumentIngestionService;
 use App\Services\AI\Rag\KnowledgeBaseSearchService;
 use Illuminate\Support\Str;
+use Laravel\Ai\AiManager;
+use Laravel\Ai\Contracts\Files\TranscribableAudio;
 use Throwable;
 
 /**
@@ -29,10 +32,86 @@ class AiService
         private PromptBuilder $promptBuilder,
     ) {}
 
+    /**
+     * Execute a callable with automatic API key failover.
+     *
+     * On retryable errors (429, 5xx, timeouts), marks the key as failed
+     * and rotates to the next available key for the same provider.
+     */
+    private function executeWithFailover(
+        callable $callable,
+        User $user,
+        string $providerName,
+        string $modelName,
+        string $toolType,
+        array $context = []
+    ): mixed {
+        $currentKeyId = null;
+        $adapter = ProviderRegistry::resolveWithFailover($providerName, $currentKeyId);
+
+        if (! $adapter) {
+            throw new IntegrationNotConfiguredException($providerName);
+        }
+
+        $lastException = null;
+
+        while ($adapter) {
+            try {
+                return $callable($adapter, $currentKeyId);
+            } catch (Throwable $e) {
+                $lastException = $e;
+
+                if (! $this->isRetryableError($e)) {
+                    TokenGuard::recordFailure($user, $providerName, $modelName, $toolType, 0, 0,
+                        array_merge($context, ['error' => $e->getMessage(), 'failover' => false])
+                    );
+                    throw $e;
+                }
+
+                $adapter = ProviderRegistry::markFailedAndRotate($providerName, $currentKeyId, $currentKeyId);
+            }
+        }
+
+        TokenGuard::recordFailure($user, $providerName, $modelName, $toolType, 0, 0,
+            array_merge($context, [
+                'error' => $lastException->getMessage(),
+                'failover' => true,
+                'all_keys_exhausted' => true,
+            ])
+        );
+
+        throw new IntegrationNotConfiguredException($providerName, $lastException);
+    }
+
+    /**
+     * Determine if an error is retryable (warrants trying a different API key).
+     */
+    private function isRetryableError(Throwable $e): bool
+    {
+        $message = $e->getMessage();
+        $code = (int) $e->getCode();
+
+        if ($code === 429 || $code === 403 || ($code >= 500 && $code < 600)) {
+            return true;
+        }
+
+        $retryable = ['rate limit', 'too many requests', 'quota exceeded', 'insufficient_quota',
+            'timeout', 'timed out', 'connection refused', 'connection reset',
+            'service unavailable', 'internal server error', 'bad gateway', 'gateway timeout'];
+
+        foreach ($retryable as $keyword) {
+            if (stripos($message, $keyword) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     // ─── Core: Text Completions ───────────────────────────────────
 
     /**
-     * Run a chat completion (stateless — no history).
+     * Run a chat completion (stateless — no history) with automatic key failover.
      */
     public function complete(
         User $user,
@@ -44,7 +123,6 @@ class AiService
     ): CompletionResponse {
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
         $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
-        $adapter = ProviderRegistry::resolve($providerName);
 
         try {
             TokenGuard::before($user, null, $modelName);
@@ -61,7 +139,7 @@ class AiService
         }
         $messages[] = ['role' => 'user', 'content' => $prompt];
 
-        try {
+        return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options) {
             $result = $adapter->chatCompletion($messages, $modelName, $options);
 
             TokenGuard::after(
@@ -79,12 +157,7 @@ class AiService
                 outputTokens: $result['output_tokens'],
                 model: $result['model'],
             );
-        } catch (Throwable $e) {
-            TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
-        }
+        }, $user, $providerName, $modelName, 'chat');
     }
 
     /**
@@ -170,8 +243,6 @@ class AiService
             throw $e;
         }
 
-        $adapter = ProviderRegistry::resolve($providerName);
-
         $userMessage = $chat->messages()->create([
             'role' => 'user',
             'content' => $message,
@@ -179,7 +250,7 @@ class AiService
 
         $messages = $chat->getMessagesForApi();
 
-        try {
+        $result = $this->executeWithFailover(function ($adapter, $keyId) use ($user, $providerName, $modelName, $chat, $messages) {
             $result = $adapter->chatCompletion($messages, $modelName);
 
             $assistantMessage = $chat->messages()->create([
@@ -199,13 +270,9 @@ class AiService
                 'chat',
                 ['chat_id' => $chat->id]
             );
-        } catch (Throwable $e) {
-            TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
-                'chat_id' => $chat->id,
-                'error' => $e->getMessage(),
-            ]);
-            throw $e;
-        }
+
+            return $assistantMessage;
+        }, $user, $providerName, $modelName, 'chat', ['chat_id' => $chat->id]);
 
         if ($chat->messages()->count() <= 2 && $chat->title === 'New Chat') {
             $chat->update(['title' => Str::limit($message, 60)]);
@@ -215,7 +282,7 @@ class AiService
             $chat->update(['model' => $modelName]);
         }
 
-        return $assistantMessage;
+        return $result;
     }
 
     /**
@@ -252,7 +319,11 @@ class AiService
                 if (is_string($chunk)) {
                     yield $chunk;
                 } elseif (is_array($chunk)) {
-                    $usageStats = $chunk;
+                    if (isset($chunk['reasoning_start']) || isset($chunk['reasoning_end']) || isset($chunk['reasoning'])) {
+                        yield $chunk;
+                    } else {
+                        $usageStats = $chunk;
+                    }
                 }
             }
 
@@ -273,6 +344,7 @@ class AiService
                     'usage' => [
                         'input_tokens' => $usageStats['input_tokens'],
                         'output_tokens' => $usageStats['output_tokens'],
+                        'reasoning_tokens' => $usageStats['reasoning_tokens'] ?? 0,
                         'credits_used' => $creditsUsed,
                     ],
                 ];
@@ -323,7 +395,11 @@ class AiService
                 if (is_string($chunk)) {
                     yield $chunk;
                 } elseif (is_array($chunk)) {
-                    $usageStats = $chunk;
+                    if (isset($chunk['reasoning_start']) || isset($chunk['reasoning_end']) || isset($chunk['reasoning'])) {
+                        yield $chunk;
+                    } else {
+                        $usageStats = $chunk;
+                    }
                 }
             }
 
@@ -406,7 +482,7 @@ class AiService
         ?string $quality = null,
     ): array {
         $providerName = $provider ?? settings('ai_image_provider', config('ai.default_for_images', 'openai'));
-        $provider = app(\Laravel\Ai\AiManager::class)->imageProvider($providerName);
+        $provider = app(AiManager::class)->imageProvider($providerName);
 
         $response = $provider->image(
             prompt: $prompt,
@@ -437,7 +513,7 @@ class AiService
     ): array {
         $providerName = $provider ?? settings('ai_audio_provider', config('ai.default_for_audio', 'openai'));
 
-        $provider = app(\Laravel\Ai\AiManager::class)->audioProvider($providerName);
+        $provider = app(AiManager::class)->audioProvider($providerName);
 
         $response = $provider->audio(
             text: $text,
@@ -456,7 +532,7 @@ class AiService
      * Transcribe audio to text.
      */
     public function generateTranscription(
-        \Laravel\Ai\Contracts\Files\TranscribableAudio $audio,
+        TranscribableAudio $audio,
         ?string $language = null,
         bool $diarize = false,
         ?string $provider = null,
@@ -464,7 +540,7 @@ class AiService
     ): array {
         $providerName = $provider ?? settings('ai_transcription_provider', config('ai.default_for_transcription', 'openai'));
 
-        $provider = app(\Laravel\Ai\AiManager::class)->transcriptionProvider($providerName);
+        $provider = app(AiManager::class)->transcriptionProvider($providerName);
 
         $response = $provider->transcribe(
             audio: $audio,
@@ -591,7 +667,7 @@ class AiService
         ?string $provider = null,
         ?string $model = null,
     ): CompletionResponse {
-        $prompt = "Please provide a concise summary of the following content.";
+        $prompt = 'Please provide a concise summary of the following content.';
 
         if ($maxLength) {
             $prompt .= " Keep the summary to approximately {$maxLength} words.";

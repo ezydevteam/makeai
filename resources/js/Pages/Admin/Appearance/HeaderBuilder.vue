@@ -111,7 +111,7 @@ const iconBgStyleOptions = [
     { value: 'light', label: 'Light Surface' },
     { value: 'transparent', label: 'Transparent' },
     { value: 'filled', label: 'Filled Primary' },
-    { value: 'custom', label: 'Custom Color' },
+    { value: 'custom', label: t('Custom Color') },
 ]
 
 const inferStickyBehavior = (section: Partial<HeaderSection>): HeaderStickyBehavior => {

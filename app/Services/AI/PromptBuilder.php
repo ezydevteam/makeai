@@ -127,15 +127,17 @@ class PromptBuilder
      */
     private function resolveApiKey(string $model, ?User $user): ?string
     {
-        $provider = $this->resolveProvider($model);
-
-        // Check if user has a personal API key for this provider
-        $personalKeys = $user?->personal_api_keys ?? [];
-        if (! empty($personalKeys[$provider])) {
-            return $personalKeys[$provider];
+        if (! $user) {
+            return null;
         }
 
-        // Return null — ProviderRegistry will handle admin key pool
+        $provider = $this->resolveProvider($model);
+
+        $key = $user->apiKeys()->where('provider', $provider)->active()->first();
+        if ($key) {
+            return $key->api_key;
+        }
+
         return null;
     }
 

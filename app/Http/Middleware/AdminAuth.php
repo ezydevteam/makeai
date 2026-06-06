@@ -19,7 +19,7 @@ class AdminAuth
 
         if (! $admin) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'Unauthenticated.'], 401);
+                return response()->json(['message' => translate('Unauthenticated.')], 401);
             }
 
             return redirect()->route('admin.login');
@@ -30,11 +30,19 @@ class AdminAuth
             $request->session()->invalidate();
 
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'Account deactivated.'], 403);
+                return response()->json(['message' => translate('Account deactivated.')], 403);
             }
 
             return redirect()->route('admin.login')
                 ->with('error', translate('Your admin account has been deactivated.'));
+        }
+
+        if ($admin->must_change_password && ! $request->routeIs('admin.password.change*', 'admin.logout')) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => translate('Password change required.')], 403);
+            }
+
+            return redirect()->route('admin.password.change');
         }
 
         return $next($request);

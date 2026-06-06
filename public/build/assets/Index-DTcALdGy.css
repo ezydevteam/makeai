@@ -1,0 +1,1 @@
+main{flex:1!important;min-height:0!important;position:relative!important;overflow:hidden!important}.chat-layout{color:#1a1a1a;background:#f6f5f4;display:flex;position:absolute;inset:0;overflow:hidden}.dark .chat-layout{color:#e8e6e3;background:#1a1a1a}.chat-main{flex-direction:column;flex:1;min-width:0;display:flex;position:relative}.chat-main-full{max-width:100%}

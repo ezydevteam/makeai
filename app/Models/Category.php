@@ -16,7 +16,7 @@ class Category extends Model
     protected $fillable = [
         'name', 'slug', 'description', 'icon', 'color',
         'type', 'parent_id',
-        'is_active', 'is_system', 'requires_pro',
+        'is_active', 'is_system', 'requires_pro', 'requires_login',
         'sort_order', 'tools_count',
         'meta_title', 'meta_description',
     ];
@@ -27,6 +27,7 @@ class Category extends Model
             'is_active' => 'boolean',
             'is_system' => 'boolean',
             'requires_pro' => 'boolean',
+            'requires_login' => 'boolean',
         ];
     }
 
@@ -39,7 +40,13 @@ class Category extends Model
         });
 
         static::saved(function (Category $category) {
-            ToolCatalogCacheService::invalidateForCategory($category);
+            if ($category->wasRecentlyCreated || $category->wasChanged([
+                'name', 'slug', 'description', 'icon', 'color',
+                'is_active', 'requires_pro', 'requires_login',
+                'sort_order', 'parent_id',
+            ])) {
+                ToolCatalogCacheService::invalidateForCategory($category);
+            }
         });
 
         static::deleted(function (Category $category) {
@@ -101,6 +108,9 @@ class Category extends Model
     public function updateToolsCount(): void
     {
         $this->update(['tools_count' => $this->activeTools()->count()]);
+
+        ToolCatalogCacheService::forgetCategories();
+        ToolCatalogCacheService::forgetToolLists($this->slug);
     }
 
     public function hasTools(): bool

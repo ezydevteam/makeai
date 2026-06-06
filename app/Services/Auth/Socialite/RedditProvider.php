@@ -60,6 +60,6 @@ class RedditProvider extends AbstractProvider implements ProviderInterface
 
     private function userAgent(): string
     {
-        return str_replace(' ', '-', settings('app_name', 'Application')).' Social Login';
+        return str_replace(' ', '-', settings('app_name', translate('Application'))).' '.translate('Social Login');
     }
 }

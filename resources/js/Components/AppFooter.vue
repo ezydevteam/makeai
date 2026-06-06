@@ -142,7 +142,7 @@ const enabledBottomBlocks = computed(() => {
             id: 'legacy_back_to_top',
             type: 'back_to_top' as const,
             enabled: footerConfig.value?.bottom_bar?.show_back_to_top ?? true,
-            config: { label: 'Back to top' },
+            config: { label: t('Back to top') },
         },
     ]
 })
@@ -239,10 +239,10 @@ const scrollToTop = () => {
 }
 
 const legalLinks = [
-    { key: 'privacy', label: 'Privacy Policy', href: '/privacy-policy' },
-    { key: 'terms', label: 'Terms of Service', href: '/terms' },
-    { key: 'refund', label: 'Refund Policy', href: '/refund-policy' },
-    { key: 'contact', label: 'Contact', href: '/contact' },
+    { key: 'privacy', label: t('Privacy Policy'), href: '/privacy-policy' },
+    { key: 'terms', label: t('Terms of Service'), href: '/terms' },
+    { key: 'refund', label: t('Refund Policy'), href: '/refund-policy' },
+    { key: 'contact', label: t('Contact'), href: '/contact' },
 ]
 
 const enabledLegalLinks = (links: ConfigValue) => {

@@ -7,9 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 class AiUsageLog extends Model
 {
     protected $fillable = [
-        'user_id', 'provider', 'model', 'type',
+        'user_id', 'provider', 'model', 'type', 'tool_slug',
         'input_tokens', 'output_tokens', 'cost_usd',
-        'credits_used', 'status', 'metadata',
+        'credits_used', 'request_id', 'response_time_ms',
+        'status', 'metadata',
     ];
 
     protected function casts(): array

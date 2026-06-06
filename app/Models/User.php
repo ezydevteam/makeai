@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
 use Throwable;
 
 /**
@@ -22,16 +23,16 @@ use Throwable;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes, Billable;
 
     protected $fillable = [
         'name', 'email', 'password', 'ulid', 'avatar',
         'credits', 'credits_used_today', 'credits_used_month',
         'daily_limit', 'monthly_limit',
-        'plan_id', 'subscription_status', 'subscription_ends_at', 'trial_ends_at',
+        'plan_id', 'subscription_status', 'subscription_ends_at',
         'referral_code', 'affiliate_custom_slug', 'referred_by', 'referral_earnings', 'referral_count',
         'theme_preference', 'locale', 'timezone',
-        'personal_api_keys', 'brand_voice',
+        'brand_voice',
         'is_active', 'is_banned', 'ban_reason',
         'otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until',
         'two_factor_secret', 'two_factor_enabled', 'two_factor_confirmed_at', 'two_factor_recovery_codes',
@@ -41,7 +42,7 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     protected $hidden = [
-        'password', 'remember_token', 'otp_code', 'two_factor_secret', 'two_factor_recovery_codes', 'personal_api_keys',
+        'password', 'remember_token', 'otp_code', 'two_factor_secret', 'two_factor_recovery_codes',
     ];
 
     protected function casts(): array
@@ -67,7 +68,6 @@ class User extends Authenticatable implements MustVerifyEmail
             'trial_ends_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
             'locked_until' => 'datetime',
-            'personal_api_keys' => 'encrypted:array',
         ];
     }
 
@@ -96,24 +96,14 @@ class User extends Authenticatable implements MustVerifyEmail
 
     // ─── Relationships ──────────────────────────
 
-    public function plan()
-    {
-        return $this->belongsTo(Plan::class);
-    }
-
-    public function subscriptions()
-    {
-        return $this->hasMany(Subscription::class);
-    }
-
-    public function activeSubscription()
-    {
-        return $this->hasOne(Subscription::class)->where('status', 'active')->latest();
-    }
-
     public function creditTransactions()
     {
         return $this->hasMany(CreditTransaction::class);
+    }
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
     }
 
     public function loginHistory()
@@ -394,7 +384,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function isSubscribed(): bool
     {
-        return in_array($this->subscription_status, ['active', 'trialing']);
+        return $this->subscribed();
     }
 
     public function isOnTrial(): bool
@@ -402,9 +392,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->subscription_status === 'trialing' && $this->trial_ends_at?->isFuture();
     }
 
+    // ─── Pro Status ───────────────────────────
+
     public function isPro(): bool
     {
-        if ($this->isSubscribed()) {
+        if ($this->subscribed()) {
             return true;
         }
 
@@ -430,6 +422,16 @@ class User extends Authenticatable implements MustVerifyEmail
         }
     }
 
+    public function apiKeys()
+    {
+        return $this->hasMany(UserApiKey::class);
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(Document::class);
+    }
+
     public function comments()
     {
         return $this->hasMany(Comment::class);
@@ -438,5 +440,15 @@ class User extends Authenticatable implements MustVerifyEmail
     public function favorites()
     {
         return $this->hasMany(Favorite::class);
+    }
+
+    public function conversations()
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    public function chatProjects()
+    {
+        return $this->hasMany(ChatProject::class);
     }
 }

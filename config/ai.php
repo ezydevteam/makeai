@@ -104,7 +104,13 @@ return [
             'driver' => 'openrouter',
             'key' => env('OPENROUTER_API_KEY'),
             'url' => env('OPENROUTER_URL', 'https://openrouter.ai/api/v1'),
-            'models' => [], // dynamic, loaded from API
+            'models' => [
+                'openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o3-mini',
+                'anthropic/claude-sonnet-4-20250514', 'anthropic/claude-haiku-20250514',
+                'google/gemini-2.5-pro', 'google/gemini-2.0-flash',
+                'meta-llama/llama-4-maverick', 'meta-llama/llama-4-scout',
+                'deepseek/deepseek-v3', 'deepseek/deepseek-r1',
+            ],
         ],
 
         'groq' => [
@@ -126,18 +132,7 @@ return [
             'driver' => 'ollama',
             'key' => env('OLLAMA_API_KEY', ''),
             'url' => env('OLLAMA_URL', 'http://localhost:11434'),
-            'models' => [],
-        ],
-
-        'azure' => [
-            'name' => 'Azure OpenAI',
-            'driver' => 'azure',
-            'key' => env('AZURE_OPENAI_API_KEY'),
-            'url' => env('AZURE_OPENAI_URL'),
-            'api_version' => env('AZURE_OPENAI_API_VERSION', '2025-04-01-preview'),
-            'deployment' => env('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o'),
-            'embedding_deployment' => env('AZURE_OPENAI_EMBEDDING_DEPLOYMENT', 'text-embedding-3-small'),
-            'image_deployment' => env('AZURE_OPENAI_IMAGE_DEPLOYMENT', 'gpt-image-1'),
+            'models' => ['llama3.2', 'mistral', 'gemma2'],
         ],
 
         'bedrock' => [
@@ -149,30 +144,74 @@ return [
             'secret_access_key' => env('AWS_SECRET_ACCESS_KEY'),
             'session_token' => env('AWS_SESSION_TOKEN'),
             'use_default_credential_provider' => env('AWS_USE_DEFAULT_CREDENTIALS', true),
+            'models' => [
+                'anthropic.claude-sonnet-4-20250514-v1:0',
+                'anthropic.claude-haiku-20250514-v1:0',
+                'meta.llama4-maverick-17b-instruct-v1:0',
+            ],
         ],
 
         'cohere' => [
             'name' => 'Cohere',
             'driver' => 'cohere',
             'key' => env('COHERE_API_KEY'),
+            'models' => ['command-r-plus', 'embed-v4.0', 'rerank-v3.5'],
         ],
 
         'eleven' => [
             'name' => 'ElevenLabs',
             'driver' => 'eleven',
             'key' => env('ELEVENLABS_API_KEY'),
+            'models' => ['eleven_multilingual_v2', 'eleven_turbo_v2_5', 'eleven_flash_v2_5'],
         ],
 
         'jina' => [
             'name' => 'Jina AI',
             'driver' => 'jina',
             'key' => env('JINA_API_KEY'),
+            'models' => ['jina-embeddings-v3'],
         ],
 
         'voyageai' => [
             'name' => 'Voyage AI',
             'driver' => 'voyageai',
             'key' => env('VOYAGEAI_API_KEY'),
+            'models' => ['voyage-3', 'voyage-3-lite'],
+        ],
+
+        'perplexity' => [
+            'name' => 'Perplexity',
+            'driver' => 'perplexity',
+            'key' => env('PERPLEXITY_API_KEY'),
+            'url' => env('PERPLEXITY_URL', 'https://api.perplexity.ai'),
+            'models' => ['sonar', 'sonar-pro', 'sonar-reasoning', 'sonar-deep-research'],
+        ],
+
+        'together' => [
+            'name' => 'Together AI',
+            'driver' => 'together',
+            'key' => env('TOGETHER_API_KEY'),
+            'url' => env('TOGETHER_URL', 'https://api.together.xyz/v1'),
+            'models' => [
+                'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
+                'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+                'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo',
+                'mistralai/Mixtral-8x7B-Instruct-v0.1',
+                'deepseek-ai/DeepSeek-V3',
+            ],
+        ],
+
+        'replicate' => [
+            'name' => 'Replicate',
+            'driver' => 'replicate',
+            'key' => env('REPLICATE_API_TOKEN'),
+            'url' => env('REPLICATE_URL', 'https://api.replicate.com/v1'),
+            'models' => [
+                'meta/meta-llama-3.3-70b-instruct',
+                'mistralai/mixtral-8x7b-instruct-v0.1',
+                'stability-ai/stable-diffusion-3.5-large',
+                'black-forest-labs/flux-1.1-pro',
+            ],
         ],
     ],
 

@@ -33,7 +33,7 @@ class AdminTwoFactorController extends Controller
             }
 
             $provisioningUri = $totp->provisioningUri(
-                settings('app_name', 'Application'),
+                settings('app_name', translate('Application')),
                 $admin->email,
                 $pendingSecret,
             );

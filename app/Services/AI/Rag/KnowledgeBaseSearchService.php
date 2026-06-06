@@ -5,6 +5,7 @@ namespace App\Services\AI\Rag;
 use App\DTO\RagResult;
 use App\Services\AI\AiService;
 use App\Services\AI\ProviderRegistry;
+use Illuminate\Support\Str;
 
 /**
  * KnowledgeBaseSearchService — semantic search and QA over knowledge bases.
@@ -49,7 +50,7 @@ class KnowledgeBaseSearchService
                     'chunk_id' => $chunk->id,
                     'document_id' => $chunk->document_id,
                     'score' => $match['score'],
-                    'text' => \Illuminate\Support\Str::limit($chunk->text, 200),
+                    'text' => Str::limit($chunk->text, 200),
                 ];
             }
         }

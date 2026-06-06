@@ -2,8 +2,7 @@
 
 namespace App\Services\AI\Rag;
 
-use App\DTO\EmbeddingResult;
-use App\Services\AI\ProviderRegistry;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 /**
@@ -149,7 +148,7 @@ class VectorStoreService
             throw new RuntimeException('Qdrant URL is not configured. Set QDRANT_URL in .env.');
         }
 
-        \Illuminate\Support\Facades\Http::withHeaders([
+        Http::withHeaders([
             'api-key' => $qdrantKey,
         ])->put("{$qdrantUrl}/collections/{$knowledgeBaseId}/points", [
             'points' => [[
@@ -188,7 +187,7 @@ class VectorStoreService
             ];
         }
 
-        $response = \Illuminate\Support\Facades\Http::withHeaders([
+        $response = Http::withHeaders([
             'api-key' => $qdrantKey,
         ])->post("{$qdrantUrl}/collections/{$knowledgeBaseId}/points/search", $payload);
 
@@ -225,7 +224,7 @@ class VectorStoreService
             throw new RuntimeException('Pinecone is not configured.');
         }
 
-        \Illuminate\Support\Facades\Http::withHeaders([
+        Http::withHeaders([
             'Api-Key' => $pineconeKey,
         ])->post("https://{$pineconeHost}/vectors/upsert", [
             'vectors' => [[
@@ -264,7 +263,7 @@ class VectorStoreService
             $payload['filter'] = ['type' => ['$eq' => $filter]];
         }
 
-        $response = \Illuminate\Support\Facades\Http::withHeaders([
+        $response = Http::withHeaders([
             'Api-Key' => $pineconeKey,
         ])->post("https://{$pineconeHost}/query", $payload);
 

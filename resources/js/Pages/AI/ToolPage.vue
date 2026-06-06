@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import { computed, onMounted, ref } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import DynamicForm, { type ToolField } from '@/Components/AI/DynamicForm.vue'
 import OutputPanel from '@/Components/AI/OutputPanel.vue'
 import FavoriteButton from '@/Components/FavoriteButton.vue'
+import LoginPromptModal from '@/Components/AI/LoginPromptModal.vue'
+import UpgradeModal from '@/Components/AI/UpgradeModal.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useStream } from '@/Composables/useStream'
+import { useRateLimit } from '@/Composables/useRateLimit'
 
 defineOptions({ layout: UserLayout })
 
@@ -21,6 +25,7 @@ interface ToolData {
     color?: string
     output_type?: string
     requires_pro?: boolean
+    requires_login?: boolean
     access_level?: string
     fields: ToolField[] | string | Record<string, ToolField>
     about_content?: string
@@ -63,6 +68,19 @@ const reviewComment = ref('')
 const reviewMessage = ref('')
 const reviewSubmitting = ref(false)
 const reviewSort = ref('helpful')
+const sortOptions = computed(() => [
+    { value: 'helpful', label: t('Most Helpful') },
+    { value: 'recent', label: t('Most Recent') },
+    { value: 'highest', label: t('Highest Rated') },
+    { value: 'lowest', label: t('Lowest Rated') },
+])
+const ratingOptions = computed(() => [
+    { value: 5, label: '5 ' + t('stars') },
+    { value: 4, label: '4 ' + t('stars') },
+    { value: 3, label: '3 ' + t('stars') },
+    { value: 2, label: '2 ' + t('stars') },
+    { value: 1, label: '1 ' + t('stars') },
+])
 const reviews = ref<Array<any>>([...props.reviews])
 const reviewsPage = ref(props.reviewsPagination?.current_page || 1)
 const reviewsLastPage = ref(props.reviewsPagination?.last_page || 1)
@@ -70,9 +88,15 @@ const reviewsLoading = ref(false)
 const expandedExamples = ref<Record<number, boolean>>({})
 const reviewStats = ref(props.reviewStats)
 
-const { output, isStreaming, error, usage, savedDocument, generate } = useStream()
+const { output, reasoning, isReasoning, isStreaming, error, usage, savedDocument, generate, onHeaders } = useStream()
 const { t } = useTranslate()
 const toast = useToastr()
+const { isLimited, isNearLimit, remaining, formattedCountdown, parseHeaders } = useRateLimit()
+
+const page = usePage()
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+const showLoginModal = ref(false)
+const showUpgradeModal = ref(false)
 
 const routeTo = (name: string, params?: unknown): string => route(name, params)
 
@@ -115,6 +139,7 @@ const fieldName = (field: ToolField): string => field.name || field.key || field
 
 const canSubmit = computed(() => {
     if (isStreaming.value) return false
+    if (isLimited.value) return false
 
     return fields.value
         .filter((field) => field.required)
@@ -152,6 +177,8 @@ onMounted(() => {
         formValues.value[name] = typeof field.default === 'boolean' ? field.default : (field.default ?? '')
     }
 
+    onHeaders(parseHeaders)
+
     if (hasAbout.value) activeTab.value = 'about'
     else if (hasHowItWorks.value) activeTab.value = 'how'
     else if (hasUsageExamples.value) activeTab.value = 'examples'
@@ -162,10 +189,31 @@ onMounted(() => {
 
 const runGenerate = () => {
     if (!canSubmit.value) return
+
+    const accessLevel = props.tool.access_level || 'inherit'
+
+    if (!props.authUser?.id && accessLevel !== 'public') {
+        showLoginModal.value = true
+        return
+    }
+
+    if (props.tool.requires_login && !props.authUser?.id) {
+        showLoginModal.value = true
+        return
+    }
+
+    if (accessLevel === 'pro_plan' || props.tool.requires_pro) {
+        showUpgradeModal.value = true
+        return
+    }
+
+    const modelField = fields.value.find(f => f.type === 'model_select')
+    const model = modelField ? String(formValues.value[fieldName(modelField)] || '') : ''
+
     generate({
         slug: props.tool.slug,
         fields: formValues.value,
-        model: String(formValues.value.model || ''),
+        model,
     })
 }
 
@@ -320,6 +368,7 @@ const submitReview = async () => {
                                     {{ tool.category.name }}
                                 </span>
                                 <span v-if="tool.requires_pro" class="px-1.5 py-0.5 bg-accent-500/10 text-accent-400 text-[10px] font-bold uppercase rounded border border-accent-500/20">PRO</span>
+                                <span v-else-if="tool.requires_login" class="px-1.5 py-0.5 bg-sky-500/10 text-sky-400 text-[10px] font-bold uppercase rounded border border-sky-500/20">LOGIN</span>
                                 <span v-else class="px-1.5 py-0.5 bg-primary-500/10 text-primary-300 text-[10px] font-bold uppercase rounded border border-primary-500/20">Free</span>
                             </div>
                         </div>
@@ -360,9 +409,18 @@ const submitReview = async () => {
                             class="w-full py-3 mt-2 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold text-sm shadow-lg shadow-primary-500/25 hover:shadow-primary-500/35 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 flex items-center justify-center gap-2"
                         >
                             <svg v-if="isStreaming" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                            <i v-else class="ti-wand"></i>
-                            {{ isStreaming ? 'Generating...' : 'Generate Content' }}
+                            <template v-else-if="isLimited">
+                                <i class="ti-alarm"></i>
+                                Try again in {{ formattedCountdown }}
+                            </template>
+                            <template v-else>
+                                <i class="ti-wand"></i>
+                                {{ isStreaming ? 'Generating...' : 'Generate Content' }}
+                            </template>
                         </button>
+                        <div v-if="isNearLimit && !isLimited" class="mt-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs text-amber-400">
+                            {{ remaining }} requests remaining
+                        </div>
                     </DynamicForm>
                 </div>
             </div>
@@ -370,6 +428,8 @@ const submitReview = async () => {
             <div class="lg:col-span-8">
                 <OutputPanel
                     :output="output"
+                    :reasoning="reasoning"
+                    :is-reasoning="isReasoning"
                     :output-type="tool.output_type || 'markdown'"
                     :loading="isStreaming"
                     :usage="usage"
@@ -462,17 +522,10 @@ const submitReview = async () => {
                             <p class="text-gray-500 text-sm">{{ tool.avg_rating || 0 }}/5 {{ t('from') }} {{ tool.review_count || 0 }} {{ t('reviews') }}</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <select v-model="reviewSort" class="px-3 py-2 bg-white/[0.03] border border-white/10 rounded-xl text-sm text-white" @change="changeReviewSort">
-                                <option value="helpful" class="bg-surface-900">{{ t('Most Helpful') }}</option>
-                                <option value="recent" class="bg-surface-900">{{ t('Most Recent') }}</option>
-                                <option value="highest" class="bg-surface-900">{{ t('Highest Rated') }}</option>
-                                <option value="lowest" class="bg-surface-900">{{ t('Lowest Rated') }}</option>
-                            </select>
+                            <AppSelect v-model="reviewSort" :options="sortOptions" @update:model-value="changeReviewSort" />
                         </div>
                         <div v-if="authUser && canReview" class="flex items-center gap-2">
-                            <select v-model="reviewRating" class="px-3 py-2 bg-white/[0.03] border border-white/10 rounded-xl text-sm text-white">
-                                <option v-for="rating in 5" :key="rating" :value="rating" class="bg-surface-900">{{ rating }} {{ t('stars') }}</option>
-                            </select>
+                            <AppSelect v-model="reviewRating" :options="ratingOptions" />
                         </div>
                     </div>
 
@@ -543,4 +596,14 @@ const submitReview = async () => {
             </div>
         </div>
     </div>
+
+    <LoginPromptModal
+        :open="showLoginModal"
+        @close="showLoginModal = false"
+    />
+
+    <UpgradeModal
+        :open="showUpgradeModal"
+        @close="showUpgradeModal = false"
+    />
 </template>

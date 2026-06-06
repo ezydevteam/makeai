@@ -186,6 +186,8 @@ class AiTool extends Model
     public function incrementUsage(): void
     {
         $this->increment('usage_count');
+
+        ToolCatalogCacheService::forgetTool($this->slug);
     }
 
     public function updateReviewStats(): void

@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\GeneralSettingsRequest;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\SiteTemplate;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class GeneralSettingsController extends Controller
@@ -17,14 +18,29 @@ class GeneralSettingsController extends Controller
 
         return Inertia::render('Admin/Settings/General', [
             'settings' => [
-                'app_name' => settings('app_name', 'Application'),
-                'app_url' => settings('app_url', url('/')),
-                'default_language' => settings('default_language', 'en'),
-                'default_currency' => settings('default_currency', 'USD'),
-                'currency_symbol' => settings('currency_symbol', '$'),
+                // Branding
+                'site_name'          => settings('site_name', translate('Application')),
+                'site_tagline'       => settings('site_tagline', ''),
+                'site_description'   => settings('site_description', ''),
+                'site_logo_light'    => settings('site_logo_light', ''),
+                'site_logo_dark'     => settings('site_logo_dark', ''),
+                'site_favicon_ico'   => settings('site_favicon_ico', ''),
+                'site_favicon_png'   => settings('site_favicon_png', ''),
+                'site_og_image'      => settings('site_og_image', ''),
+                'site_copyright_text'=> settings('site_copyright_text', ''),
+                'site_support_email' => settings('site_support_email', ''),
+                'site_support_url'   => settings('site_support_url', ''),
+                'site_terms_url'     => settings('site_terms_url', ''),
+                'site_privacy_url'   => settings('site_privacy_url', ''),
+
+                // General
+                'site_url'          => settings('site_url', url('/')),
+                'default_language'  => settings('default_language', 'en'),
+                'default_currency'  => settings('default_currency', 'USD'),
+                'currency_symbol'   => settings('currency_symbol', '$'),
                 'currency_position' => settings('currency_position', 'before'),
                 'currency_decimals' => (int) settings('currency_decimals', 2),
-                'app_timezone' => settings('app_timezone', config('app.timezone', 'UTC')),
+                'app_timezone'      => settings('app_timezone', config('app.timezone', 'UTC')),
                 'homepage_template' => settings('homepage_template', 'default'),
             ],
             'languages' => Language::query()
@@ -53,8 +69,49 @@ class GeneralSettingsController extends Controller
 
     public function update(GeneralSettingsRequest $request)
     {
-        foreach ($request->validated() as $key => $value) {
-            settings_set($key, $value, is_int($value) ? 'integer' : 'string', 'general');
+        $validated = $request->validated();
+
+        // File uploads — store locally and save the relative path
+        $fileFields = [
+            'site_logo_light_file'  => 'site_logo_light',
+            'site_logo_dark_file'   => 'site_logo_dark',
+            'site_favicon_ico_file' => 'site_favicon_ico',
+            'site_favicon_png_file' => 'site_favicon_png',
+            'site_og_image_file'    => 'site_og_image',
+        ];
+
+        foreach ($fileFields as $fileField => $settingKey) {
+            if ($request->hasFile($fileField)) {
+                // Delete the old file if one exists
+                $oldPath = settings($settingKey);
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
+
+                $validated[$settingKey] = $request->file($fileField)->store('branding', 'public');
+            }
+
+            unset($validated[$fileField]);
+        }
+
+        foreach ($validated as $key => $value) {
+            $type = match (true) {
+                is_int($value) => 'integer',
+                is_bool($value) => 'boolean',
+                default => 'string',
+            };
+
+            $brandingKeys = [
+                'site_name', 'site_tagline', 'site_description',
+                'site_logo_light', 'site_logo_dark',
+                'site_favicon_ico', 'site_favicon_png', 'site_og_image',
+                'site_copyright_text',
+                'site_support_email', 'site_support_url',
+                'site_terms_url', 'site_privacy_url',
+            ];
+
+            $group = in_array($key, $brandingKeys) ? 'branding' : 'general';
+            settings_set($key, $value, $type, $group);
         }
 
         return back()->with('success', translate('General settings saved.'));

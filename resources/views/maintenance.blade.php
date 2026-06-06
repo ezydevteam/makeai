@@ -3,7 +3,7 @@
     use Illuminate\Support\Facades\Storage;
     use Illuminate\Support\Str;
 
-    $appName = settings('app_name', 'Application');
+    $appName = settings('app_name', translate('Application'));
     $title = settings('maintenance_title', $appName.' '.translate('Maintenance'));
     $message = strip_tags(
         (string) settings('maintenance_message', '<p>'.translate('We are improving the platform. Please check back soon.').'</p>'),

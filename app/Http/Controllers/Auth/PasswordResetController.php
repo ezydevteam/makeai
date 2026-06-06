@@ -9,8 +9,8 @@ use App\Http\Requests\Auth\VerifyPasswordResetOtpRequest;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
 use App\Services\NotificationEventService;
+use App\Services\RateLimiterService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,17 +25,20 @@ class PasswordResetController extends Controller
     public function sendResetOtp(ForgotPasswordOtpRequest $request)
     {
         $email = strtolower((string) $request->validated('email'));
-        $throttleKey = 'password-email:'.$email.'|'.$request->ip();
+        $rateLimiter = app(RateLimiterService::class);
+        $throttleKey = $email.'|'.$request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
+        $result = $rateLimiter->attempt('otp', $throttleKey, 3, 3600);
+
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'email' => [translate('Too many reset requests. Please try again in :seconds seconds.', [
-                    'seconds' => RateLimiter::availableIn($throttleKey),
+                    'seconds' => $result['retry_after_seconds'],
                 ])],
             ]);
         }
 
-        RateLimiter::hit($throttleKey, 3600);
+        $rateLimiter->hit('otp', $throttleKey, 3600);
 
         $user = User::query()
             ->where('email', $email)
@@ -74,12 +77,15 @@ class PasswordResetController extends Controller
             ]);
         }
 
-        $throttleKey = 'password-reset:'.$email.'|'.$request->ip();
+        $rateLimiter = app(RateLimiterService::class);
+        $throttleKey = $email.'|'.$request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+        $result = $rateLimiter->attempt('otp', $throttleKey, 5, 900);
+
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'code' => [translate('Too many reset attempts. Please try again in :seconds seconds.', [
-                    'seconds' => RateLimiter::availableIn($throttleKey),
+                    'seconds' => $result['retry_after_seconds'],
                 ])],
             ]);
         }
@@ -90,7 +96,7 @@ class PasswordResetController extends Controller
             ->first();
 
         if (! $user) {
-            RateLimiter::hit($throttleKey, 900);
+            $rateLimiter->hit('otp', $throttleKey, 900);
 
             throw ValidationException::withMessages([
                 'code' => [translate('Invalid or expired reset code.')],
@@ -108,7 +114,7 @@ class PasswordResetController extends Controller
         }
 
         if (! $user->verifyOtp((string) $data['code'])) {
-            RateLimiter::hit($throttleKey, 900);
+            $rateLimiter->hit('otp', $throttleKey, 900);
 
             if ($user->isOtpLocked()) {
                 throw ValidationException::withMessages([
@@ -121,7 +127,7 @@ class PasswordResetController extends Controller
             ]);
         }
 
-        RateLimiter::clear($throttleKey);
+        $rateLimiter->clear('otp', $throttleKey);
         $user->clearOtp();
         $request->session()->put('password_reset_email', $email);
         $request->session()->put('password_reset_verified', true);

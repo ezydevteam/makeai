@@ -13,15 +13,17 @@ use InvalidArgumentException;
  * All providers are now backed by LaravelAiDriver, which wraps the
  * official Laravel AI SDK (laravel/ai) behind AiDriverInterface.
  *
- * To add a new provider:
- *   1. Add to config/ai.php 'providers' array
- *   2. Register here in $providers map
- *   3. Add API keys to ai_keys DB table
+ * Key selection: keys ordered by usage_count ascending (least-used first).
+ * This provides true round-robin distribution under normal load.
  */
 class ProviderRegistry
 {
+    private const MAX_ERRORS = 3;
+
+    private const COOLDOWN_MINUTES = 5;
+
     /**
-     * @var array<string, string>  provider name → driver driver name
+     * @var array<string, string> provider name → driver driver name
      */
     private static array $providers = [
         'openai' => 'openai',
@@ -33,6 +35,15 @@ class ProviderRegistry
         'openrouter' => 'openrouter',
         'groq' => 'groq',
         'mistral' => 'mistral',
+        'ollama' => 'ollama',
+        'bedrock' => 'bedrock',
+        'cohere' => 'cohere',
+        'eleven' => 'eleven',
+        'jina' => 'jina',
+        'voyageai' => 'voyageai',
+        'perplexity' => 'perplexity',
+        'together' => 'together',
+        'replicate' => 'replicate',
     ];
 
     /**
@@ -46,7 +57,7 @@ class ProviderRegistry
 
         $keyRecord = AiKey::forProvider($driverName)
             ->available()
-            ->orderBy('last_used_at', 'asc')
+            ->orderBy('usage_count', 'asc')
             ->first();
 
         $apiKey = null;
@@ -58,6 +69,73 @@ class ProviderRegistry
         $driver = new LaravelAiDriver($driverName, $apiKey);
 
         return $driver;
+    }
+
+    /**
+     * Resolve a provider driver with automatic failover.
+     *
+     * Tries each available key for the provider, marking failed keys
+     * and rotating to the next key on errors (429, 5xx, timeouts).
+     * Returns null if all keys are exhausted.
+     */
+    public static function resolveWithFailover(string $name, ?int &$usedKeyId = null): ?AiDriverInterface
+    {
+        $driverName = self::normalizeName($name);
+
+        $keys = AiKey::forProvider($driverName)
+            ->available()
+            ->orderBy('last_used_at', 'asc')
+            ->get();
+
+        if ($keys->isEmpty()) {
+            return null;
+        }
+
+        $keyRecord = $keys->shift();
+        $apiKey = $keyRecord->api_key;
+        $usedKeyId = $keyRecord->id;
+        $keyRecord->update(['last_used_at' => now(), 'usage_count' => $keyRecord->usage_count + 1]);
+
+        return new LaravelAiDriver($driverName, $apiKey);
+    }
+
+    /**
+     * Mark an API key as failed and rotate to the next available key.
+     *
+     * Increments error_count. If exceeded MAX_ERRORS, disables key for COOLDOWN_MINUTES.
+     * Returns the next available driver, or null if all keys exhausted.
+     */
+    public static function markFailedAndRotate(string $name, int $failedKeyId, ?int &$rotationKeyId = null): ?AiDriverInterface
+    {
+        $driverName = self::normalizeName($name);
+
+        $failedKey = AiKey::find($failedKeyId);
+        if ($failedKey) {
+            $newErrorCount = $failedKey->error_count + 1;
+            $updates = ['error_count' => $newErrorCount];
+
+            if ($newErrorCount >= self::MAX_ERRORS) {
+                $updates['disabled_until'] = now()->addMinutes(self::COOLDOWN_MINUTES);
+            }
+
+            $failedKey->update($updates);
+        }
+
+        $nextKey = AiKey::forProvider($driverName)
+            ->available()
+            ->where('id', '!=', $failedKeyId)
+            ->orderBy('last_used_at', 'asc')
+            ->first();
+
+        if (! $nextKey) {
+            return null;
+        }
+
+        $apiKey = $nextKey->api_key;
+        $rotationKeyId = $nextKey->id;
+        $nextKey->update(['last_used_at' => now(), 'usage_count' => $nextKey->usage_count + 1]);
+
+        return new LaravelAiDriver($driverName, $apiKey);
     }
 
     /**
@@ -114,8 +192,8 @@ class ProviderRegistry
         $result = [];
         foreach (self::$providers as $name => $driverName) {
             try {
-                $driver = new LaravelAiDriver($driverName, settings("{$driverName}_api_key"));
-                if ($driver->isConfigured() || AiKey::forProvider($driverName)->available()->exists()) {
+                $driver = new LaravelAiDriver($driverName);
+                if (AiKey::forProvider($driverName)->available()->exists()) {
                     $result[$name] = $driver;
                 }
             } catch (\Throwable) {
@@ -124,6 +202,38 @@ class ProviderRegistry
         }
 
         return $result;
+    }
+
+    /**
+     * Get all enabled providers (those with API keys configured).
+     * Returns provider name => array of model strings.
+     */
+    public static function getEnabledProviders(): array
+    {
+        $result = [];
+        foreach (self::$providers as $name => $driverName) {
+            if (! AiKey::forProvider($driverName)->available()->exists()) {
+                continue;
+            }
+            $models = config("ai.providers.{$name}.models", []);
+            if (empty($models)) continue;
+            $result[$name] = $models;
+        }
+        return $result;
+    }
+
+    /**
+     * Get flat list of available models from configured providers.
+     */
+    public static function availableModels(): array
+    {
+        $models = [];
+        foreach (self::getEnabledProviders() as $providerModels) {
+            foreach ($providerModels as $model) {
+                $models[] = $model;
+            }
+        }
+        return array_unique($models);
     }
 
     /**

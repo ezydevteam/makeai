@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MakeAI Docs</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --sidebar-bg:#0d1f1a;
+    --sidebar-hover:#1a3329;
+    --sidebar-active:#22c55e;
+    --sidebar-text:#a3c4b5;
+    --sidebar-text-active:#fff;
+    --sidebar-border:#1e3028;
+    --accent-green:#22c55e;
+    --accent-blue:#3b82f6;
+    --accent-teal:#14b8a6;
+    --bg:#f8fafc;
+    --surface:#fff;
+    --border:#e2e8f0;
+    --text:#0f172a;
+    --text-muted:#64748b;
+    --text-light:#94a3b8;
+    --code-bg:#f1f5f9;
+    --badge-green-bg:#dcfce7;
+    --badge-green-text:#15803d;
+    --badge-blue-bg:#dbeafe;
+    --badge-blue-text:#1d4ed8;
+    --badge-amber-bg:#fef3c7;
+    --badge-amber-text:#92400e;
+    --step-line:#e2e8f0;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh;overflow:hidden;font-size:15px;line-height:1.6}
+
+  /* SIDEBAR */
+  aside{width:260px;min-width:260px;background:var(--sidebar-bg);display:flex;flex-direction:column;height:100vh;overflow-y:auto;border-right:1px solid var(--sidebar-border)}
+  .logo{padding:20px 20px 16px;border-bottom:1px solid var(--sidebar-border);display:flex;align-items:center;gap:10px}
+  .logo-mark{width:32px;height:32px;background:linear-gradient(135deg,#22c55e,#14b8a6);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;flex-shrink:0}
+  .logo-text{color:#fff;font-weight:600;font-size:15px}
+  .logo-version{font-size:11px;color:var(--sidebar-text);margin-top:1px}
+  .nav-section{padding:20px 12px 8px}
+  .nav-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#4a7060;padding:0 8px;margin-bottom:6px}
+  .nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--sidebar-text);transition:all .15s;user-select:none}
+  .nav-item:hover{background:var(--sidebar-hover);color:#cfe8df}
+  .nav-item.active{background:#173d2a;color:var(--sidebar-text-active)}
+  .nav-item.active .nav-dot{background:var(--accent-green)}
+  .nav-dot{width:6px;height:6px;border-radius:50%;background:#3a5a4a;flex-shrink:0;transition:background .15s}
+  .nav-item:hover .nav-dot{background:#5a9a7a}
+  .nav-sub{padding-left:24px}
+  .nav-sub .nav-item{font-size:13px;padding:5px 10px}
+
+  /* MAIN */
+  main{flex:1;overflow-y:auto;padding:0}
+  .content{max-width:800px;padding:40px 48px;margin:0 auto}
+
+  /* TOP BAR */
+  .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 48px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+  .breadcrumb{font-size:13px;color:var(--text-muted);display:flex;align-items:center;gap:6px}
+  .breadcrumb span{color:var(--text)}
+  .topbar-actions{display:flex;gap:8px}
+  .btn-sm{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+  .btn-sm:hover{background:var(--bg);color:var(--text)}
+  .btn-primary{background:var(--accent-green);color:#fff;border-color:var(--accent-green)}
+  .btn-primary:hover{background:#16a34a;color:#fff}
+
+  /* PAGE HEADER */
+  .page-header{margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border)}
+  .page-tag{display:inline-flex;align-items:center;gap:5px;background:var(--badge-green-bg);color:var(--badge-green-text);font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;margin-bottom:12px;letter-spacing:.03em}
+  h1.page-title{font-size:26px;font-weight:600;line-height:1.3;margin-bottom:8px}
+  .page-desc{font-size:15px;color:var(--text-muted);line-height:1.7;max-width:600px}
+
+  /* CONTENT SECTIONS */
+  h2{font-size:18px;font-weight:600;margin:36px 0 14px;display:flex;align-items:center;gap:8px}
+  h2::before{content:'';display:inline-block;width:3px;height:18px;background:var(--accent-green);border-radius:2px}
+  h3{font-size:15px;font-weight:600;margin:24px 0 10px;color:var(--text)}
+  p{margin-bottom:14px;color:var(--text);line-height:1.75}
+  p:last-child{margin-bottom:0}
+
+  /* CALLOUT */
+  .callout{display:flex;gap:12px;padding:14px 16px;border-radius:8px;margin:20px 0;font-size:13.5px;line-height:1.6}
+  .callout.info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
+  .callout.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+  .callout.success{background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d}
+  .callout.danger{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+  .callout-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+  .callout strong{font-weight:600;display:block;margin-bottom:3px}
+
+  /* STEPS */
+  .steps{margin:20px 0}
+  .step{display:flex;gap:16px;margin-bottom:28px;position:relative}
+  .step:not(:last-child)::before{content:'';position:absolute;left:17px;top:38px;bottom:-10px;width:1.5px;background:var(--step-line)}
+  .step-num{width:34px;height:34px;border-radius:50%;background:var(--accent-green);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;box-shadow:0 0 0 4px rgba(34,197,94,.12)}
+  .step-body{}
+  .step-title{font-weight:600;font-size:14.5px;margin-bottom:5px}
+  .step-desc{font-size:13.5px;color:var(--text-muted);line-height:1.65}
+
+  /* REQUIREMENTS TABLE */
+  .req-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+  .req-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px}
+  .req-icon{font-size:18px;color:var(--accent-green);flex-shrink:0;margin-top:1px}
+  .req-name{font-size:13px;font-weight:600;margin-bottom:2px}
+  .req-val{font-size:12px;color:var(--text-muted)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-green{background:var(--badge-green-bg);color:var(--badge-green-text)}
+  .badge-blue{background:var(--badge-blue-bg);color:var(--badge-blue-text)}
+  .badge-amber{background:var(--badge-amber-bg);color:var(--badge-amber-text)}
+
+  /* CODE BLOCK */
+  .code-block{background:#0d1f1a;border-radius:8px;overflow:hidden;margin:16px 0;font-size:13px}
+  .code-header{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:#122119;border-bottom:1px solid #1e3028}
+  .code-lang{color:#5a9a7a;font-size:11px;font-weight:600;font-family:monospace;text-transform:uppercase;letter-spacing:.05em}
+  .code-copy{font-size:11px;color:#4a7060;cursor:pointer;border:none;background:none;padding:0}
+  pre{padding:16px;overflow-x:auto;color:#a3c4b5;line-height:1.7;font-family:'JetBrains Mono',Consolas,'Courier New',monospace}
+  code{font-family:'JetBrains Mono',Consolas,'Courier New',monospace}
+  .hl-key{color:#22c55e}
+  .hl-val{color:#86efac}
+  .hl-comment{color:#3a6650;font-style:italic}
+  .hl-str{color:#6ee7b7}
+  .hl-cmd{color:#34d399}
+
+  /* CHECKLIST */
+  .checklist{list-style:none;margin:14px 0}
+  .checklist li{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:13.5px;color:var(--text-muted);border-bottom:1px solid var(--border)}
+  .checklist li:last-child{border-bottom:none}
+  .check-icon{color:var(--accent-green);font-size:15px;flex-shrink:0;margin-top:2px}
+  .check-icon.warn{color:#f59e0b}
+
+  /* TABS */
+  .tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin:20px 0 20px}
+  .tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--text-muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;border-radius:6px 6px 0 0;transition:all .15s}
+  .tab:hover{color:var(--text);background:var(--bg)}
+  .tab.active{color:var(--accent-green);border-bottom-color:var(--accent-green);background:#f0fdf4}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+
+  /* PROGRESS BAR */
+  .wizard-progress{display:flex;align-items:center;gap:0;margin:20px 0 28px}
+  .wp-step{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;position:relative}
+  .wp-step:not(:last-child)::after{content:'';position:absolute;top:14px;left:50%;width:100%;height:2px;background:var(--border)}
+  .wp-step.done::after,.wp-step.active::after{background:var(--accent-green)}
+  .wp-circle{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text-muted);z-index:1;transition:all .2s}
+  .wp-step.done .wp-circle{background:var(--accent-green);border-color:var(--accent-green);color:#fff}
+  .wp-step.active .wp-circle{border-color:var(--accent-green);color:var(--accent-green);background:#f0fdf4}
+  .wp-label{font-size:11px;color:var(--text-muted);text-align:center;line-height:1.3;max-width:64px}
+  .wp-step.active .wp-label{color:var(--accent-green);font-weight:600}
+
+  /* INLINE CODE */
+  code.inline{background:var(--code-bg);padding:1px 6px;border-radius:4px;font-size:12.5px;font-family:monospace;color:#0369a1;border:1px solid #e0e7ef}
+
+  /* DIVIDER */
+  hr{border:none;border-top:1px solid var(--border);margin:32px 0}
+
+  /* FOOTER NAV */
+  .doc-nav{display:flex;justify-content:space-between;margin-top:40px;padding-top:24px;border-top:1px solid var(--border)}
+  .doc-nav-btn{display:flex;align-items:center;gap:8px;padding:12px 16px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;color:var(--text-muted);background:var(--surface);text-decoration:none;transition:all .15s;max-width:220px}
+  .doc-nav-btn:hover{border-color:var(--accent-green);color:var(--accent-green)}
+  .doc-nav-btn .dir{font-size:11px;color:var(--text-light);margin-bottom:2px}
+  .doc-nav-btn .lbl{font-weight:600;color:var(--text)}
+
+  /* SCROLLBAR */
+  aside::-webkit-scrollbar{width:4px}
+  aside::-webkit-scrollbar-track{background:transparent}
+  aside::-webkit-scrollbar-thumb{background:#1e3028;border-radius:2px}
+  main::-webkit-scrollbar{width:6px}
+  main::-webkit-scrollbar-track{background:transparent}
+  main::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+
+  .section-visible{display:block}
+  .section-hidden{display:none}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="logo">
+    <div class="logo-mark">M</div>
+    <div>
+      <div class="logo-text">MakeAI Docs</div>
+      <div class="logo-version">v1.0 — Developer Guide</div>
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Getting Started</div>
+    <div class="nav-item active" onclick="showSection('installation')">
+      <span class="nav-dot"></span> Installation Wizard
+    </div>
+    <div class="nav-item" onclick="showSection('requirements')">
+      <span class="nav-dot"></span> Server Requirements
+    </div>
+    <div class="nav-item" onclick="showSection('license')">
+      <span class="nav-dot"></span> License Activation
+    </div>
+    <div class="nav-item" onclick="showSection('config')">
+      <span class="nav-dot"></span> Configuration
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Core Concepts</div>
+    <div class="nav-item" onclick="showSection('architecture')">
+      <span class="nav-dot"></span> Architecture Overview
+    </div>
+    <div class="nav-item" onclick="showSection('license-gate')">
+      <span class="nav-dot"></span> License Gating
+    </div>
+    <div class="nav-item" onclick="showSection('settings')">
+      <span class="nav-dot"></span> Settings System
+    </div>
+    <div class="nav-item" onclick="showSection('queue')">
+      <span class="nav-dot"></span> Queue Architecture
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">AI System</div>
+    <div class="nav-item" onclick="showSection('ai-tools')">
+      <span class="nav-dot"></span> AI Tools (255)
+    </div>
+    <div class="nav-item" onclick="showSection('ai-engine')">
+      <span class="nav-dot"></span> LLPhant Engine
+    </div>
+    <div class="nav-item" onclick="showSection('streaming')">
+      <span class="nav-dot"></span> Streaming (SSE)
+    </div>
+    <div class="nav-item" onclick="showSection('credits')">
+      <span class="nav-dot"></span> Credit System
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Admin Panel</div>
+    <div class="nav-item"><span class="nav-dot"></span> Dashboard</div>
+    <div class="nav-item"><span class="nav-dot"></span> User Management</div>
+    <div class="nav-item"><span class="nav-dot"></span> AI Tool Manager</div>
+    <div class="nav-item"><span class="nav-dot"></span> Appearance</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">API Reference</div>
+    <div class="nav-item"><span class="nav-dot"></span> Authentication</div>
+    <div class="nav-item"><span class="nav-dot"></span> Generate Endpoints</div>
+    <div class="nav-item"><span class="nav-dot"></span> Chat Endpoints</div>
+    <div class="nav-item"><span class="nav-dot"></span> User Endpoints</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Addon Development</div>
+    <div class="nav-item"><span class="nav-dot"></span> Addon Structure</div>
+    <div class="nav-item"><span class="nav-dot"></span> addon.json Manifest</div>
+    <div class="nav-item"><span class="nav-dot"></span> Hook System</div>
+    <div class="nav-item"><span class="nav-dot"></span> Packaging & Upload</div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-label">Deployment</div>
+    <div class="nav-item"><span class="nav-dot"></span> Nginx Config</div>
+    <div class="nav-item"><span class="nav-dot"></span> Supervisor Setup</div>
+    <div class="nav-item"><span class="nav-dot"></span> cPanel Hosting</div>
+    <div class="nav-item"><span class="nav-dot"></span> One-Click Update</div>
+  </div>
+</aside>
+
+<main>
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="breadcrumb">
+      Getting Started <span>›</span> <span>Installation Wizard</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn-sm">📋 Copy link</button>
+      <button class="btn-sm btn-primary">🚀 Live Demo</button>
+    </div>
+  </div>
+
+  <!-- INSTALLATION SECTION -->
+  <div class="content" id="section-installation" class="section-visible">
+
+    <div class="page-header">
+      <div class="page-tag">🚀 Getting Started</div>
+      <h1 class="page-title">Installation Wizard</h1>
+      <p class="page-desc">MakeAI comes with a beautiful 7-step installation wizard. Once complete, the <code class="inline">/install</code> route returns 404 — it can never be re-accessed.</p>
+    </div>
+
+    <!-- WIZARD PROGRESS -->
+    <div class="wizard-progress">
+      <div class="wp-step done">
+        <div class="wp-circle">✓</div>
+        <div class="wp-label">System Check</div>
+      </div>
+      <div class="wp-step done">
+        <div class="wp-circle">✓</div>
+        <div class="wp-label">Database</div>
+      </div>
+      <div class="wp-step done">
+        <div class="wp-circle">✓</div>
+        <div class="wp-label">Site Setup</div>
+      </div>
+      <div class="wp-step active">
+        <div class="wp-circle">4</div>
+        <div class="wp-label">License</div>
+      </div>
+      <div class="wp-step">
+        <div class="wp-circle">5</div>
+        <div class="wp-label">Admin Account</div>
+      </div>
+      <div class="wp-step">
+        <div class="wp-circle">6</div>
+        <div class="wp-label">Demo Data</div>
+      </div>
+      <div class="wp-step">
+        <div class="wp-circle">7</div>
+        <div class="wp-label">Done</div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Before you begin</strong>The installer automatically generates <code class="inline">APP_KEY</code>, runs all migrations, and sets <code class="inline">INSTALLED=true</code> in your <code class="inline">.env</code>. You only need to complete this once.</div>
+    </div>
+
+    <h2>Step-by-step walkthrough</h2>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">System Requirements Check</div>
+          <div class="step-desc">The wizard checks PHP version (8.3+), required extensions (curl, zip, gd, mbstring, redis, pdo_mysql), and writable directories. All checks must be green to proceed. Red items show a fix suggestion.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Database Configuration</div>
+          <div class="step-desc">Enter your MySQL 8+ credentials — host, port, database name, username, password. The wizard tests the connection live before proceeding. A failed connection shows the exact MySQL error.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Site Setup</div>
+          <div class="step-desc">Set your site name, URL, timezone, and mail driver (SMTP/Mailgun/SES). These values populate the <code class="inline">settings</code> table — nothing is hardcoded. You can change them later from Admin → Settings.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">License Activation</div>
+          <div class="step-desc">Enter your Envato purchase code. The wizard calls the Envato Market API to verify, then stores the encrypted license in the <code class="inline">settings</code> table. <strong>Regular license</strong> → core features. <strong>Extended license</strong> → subscription/billing system unlocked.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Admin Account Creation</div>
+          <div class="step-desc">Creates the Super Admin account. This uses the separate <code class="inline">admins</code> table and guard — completely isolated from user auth. Email + password + confirm password required.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">6</div>
+        <div class="step-body">
+          <div class="step-title">Demo Data (Optional)</div>
+          <div class="step-desc">One-click demo install seeds 50 sample users, 200 documents, 30 blog posts, and 12 months of realistic revenue data. If one-click fails, manually upload the included <code class="inline">demo.sql</code> file. Migration conflicts are auto-resolved.</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">7</div>
+        <div class="step-body">
+          <div class="step-title">Final Setup & Launch</div>
+          <div class="step-desc">Runs <code class="inline">php artisan migrate --force</code>, generates APP_KEY, sets <code class="inline">INSTALLED=true</code>, clears all caches. Redirects to admin dashboard on success. The <code class="inline">/install</code> route now returns 404.</div>
+        </div>
+      </div>
+    </div>
+
+    <h2>What the wizard writes to .env</h2>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">.env</span>
+        <button class="code-copy">copy</button>
+      </div>
+      <pre><span class="hl-comment"># Auto-generated by installer</span>
+<span class="hl-key">APP_NAME</span>=<span class="hl-str">"MakeAI"</span>            <span class="hl-comment"># from settings table, not this value</span>
+<span class="hl-key">APP_KEY</span>=<span class="hl-val">base64:xxxxxxxxxxxx</span>   <span class="hl-comment"># auto-generated</span>
+<span class="hl-key">APP_URL</span>=<span class="hl-val">https://yourdomain.com</span>
+<span class="hl-key">INSTALLED</span>=<span class="hl-val">true</span>                <span class="hl-comment"># blocks /install route after completion</span>
+
+<span class="hl-key">DB_HOST</span>=<span class="hl-val">127.0.0.1</span>
+<span class="hl-key">DB_DATABASE</span>=<span class="hl-val">makeai</span>
+<span class="hl-key">DB_USERNAME</span>=<span class="hl-val">makeai_user</span>
+<span class="hl-key">DB_PASSWORD</span>=<span class="hl-val">your_password</span>
+
+<span class="hl-key">CACHE_STORE</span>=<span class="hl-val">redis</span>
+<span class="hl-key">SESSION_DRIVER</span>=<span class="hl-val">redis</span>
+<span class="hl-key">QUEUE_CONNECTION</span>=<span class="hl-val">redis</span>
+
+<span class="hl-comment"># Reverb WebSocket (auto-filled by installer)</span>
+<span class="hl-key">REVERB_APP_ID</span>=<span class="hl-val">makeai</span>
+<span class="hl-key">REVERB_APP_KEY</span>=<span class="hl-val">xxxxxxxxxxxx</span>
+<span class="hl-key">REVERB_APP_SECRET</span>=<span class="hl-val">xxxxxxxxxxxx</span>
+<span class="hl-key">REVERB_HOST</span>=<span class="hl-val">127.0.0.1</span>
+<span class="hl-key">REVERB_PORT</span>=<span class="hl-val">8080</span></pre>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Never commit .env to version control.</strong> The distributed zip includes only <code class="inline">.env.example</code> with all variables documented and placeholder values.</div>
+    </div>
+
+    <h2>Post-install checklist</h2>
+
+    <ul class="checklist">
+      <li><span class="check-icon">✓</span> Set up cron: <code class="inline">* * * * * php artisan schedule:run</code></li>
+      <li><span class="check-icon">✓</span> Start Horizon: <code class="inline">php artisan horizon</code> (via Supervisor)</li>
+      <li><span class="check-icon">✓</span> Start Reverb: <code class="inline">php artisan reverb:start</code> (via Supervisor)</li>
+      <li><span class="check-icon">✓</span> Start SSR: <code class="inline">php artisan inertia:start-ssr</code> (via Supervisor)</li>
+      <li><span class="check-icon">✓</span> Add at least one AI provider API key in Admin → Settings → Integrations</li>
+      <li><span class="check-icon">✓</span> Configure mail driver in Admin → Mail → Configuration</li>
+      <li><span class="check-icon warn">⚠</span> Verify <code class="inline">APP_DEBUG=false</code> in production</li>
+      <li><span class="check-icon warn">⚠</span> Confirm <code class="inline">storage/</code> and <code class="inline">bootstrap/cache/</code> are writable</li>
+    </ul>
+
+    <div class="doc-nav">
+      <div></div>
+      <a class="doc-nav-btn" onclick="showSection('requirements')">
+        <div>
+          <div class="dir">Next →</div>
+          <div class="lbl">Server Requirements</div>
+        </div>
+        <span>›</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- REQUIREMENTS SECTION -->
+  <div class="content section-hidden" id="section-requirements">
+    <div class="page-header">
+      <div class="page-tag">🖥️ Getting Started</div>
+      <h1 class="page-title">Server Requirements</h1>
+      <p class="page-desc">MakeAI runs on any PHP 8.3+ server. Redis is mandatory — file driver is not supported in production.</p>
+    </div>
+
+    <h2>Minimum requirements</h2>
+    <div class="req-grid">
+      <div class="req-card"><div class="req-icon">🐘</div><div><div class="req-name">PHP</div><div class="req-val"><span class="badge badge-green">8.3+</span> (8.4 supported)</div></div></div>
+      <div class="req-card"><div class="req-icon">🗄️</div><div><div class="req-name">MySQL</div><div class="req-val"><span class="badge badge-green">8.0+</span> or MariaDB 10.6+</div></div></div>
+      <div class="req-card"><div class="req-icon">⚡</div><div><div class="req-name">Redis</div><div class="req-val"><span class="badge badge-green">7.0+</span> (cache, queues, sessions)</div></div></div>
+      <div class="req-card"><div class="req-icon">🟢</div><div><div class="req-name">Node.js</div><div class="req-val"><span class="badge badge-blue">18+</span> (for Inertia SSR)</div></div></div>
+      <div class="req-card"><div class="req-icon">💾</div><div><div class="req-name">Storage</div><div class="req-val"><span class="badge badge-amber">2GB+</span> recommended</div></div></div>
+      <div class="req-card"><div class="req-icon">🔌</div><div><div class="req-name">Open Port</div><div class="req-val"><span class="badge badge-blue">8080</span> for Reverb WebSocket</div></div></div>
+    </div>
+
+    <h2>Required PHP extensions</h2>
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">bash</span><button class="code-copy">copy</button></div>
+      <pre><span class="hl-comment"># Check all required extensions</span>
+<span class="hl-cmd">php -m | grep -E</span> <span class="hl-str">'curl|zip|gd|mbstring|redis|pdo_mysql|fileinfo|tokenizer|xml|bcmath|openssl'</span>
+
+<span class="hl-comment"># Required: curl, zip, gd, mbstring, pdo_mysql</span>
+<span class="hl-comment"># Required: redis (phpredis or predis), fileinfo, tokenizer, xml, bcmath, openssl</span></pre>
+    </div>
+
+    <div class="doc-nav">
+      <a class="doc-nav-btn" onclick="showSection('installation')">
+        <span>‹</span>
+        <div><div class="dir">← Previous</div><div class="lbl">Installation Wizard</div></div>
+      </a>
+      <a class="doc-nav-btn" onclick="showSection('license')">
+        <div><div class="dir">Next →</div><div class="lbl">License Activation</div></div>
+        <span>›</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- LICENSE SECTION -->
+  <div class="content section-hidden" id="section-license">
+    <div class="page-header">
+      <div class="page-tag">🔑 Getting Started</div>
+      <h1 class="page-title">License Activation</h1>
+      <p class="page-desc">MakeAI uses Envato's purchase code system. License type determines which features are available — particularly the subscription/billing system.</p>
+    </div>
+
+    <h2>License types</h2>
+
+    <div class="req-grid" style="grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 24px">
+      <div class="req-card" style="flex-direction:column;gap:8px;padding:16px">
+        <div style="display:flex;align-items:center;gap:8px"><div class="req-icon">📄</div><div style="font-weight:600;font-size:14px">Regular License</div></div>
+        <div style="font-size:12.5px;color:var(--text-muted);line-height:1.6"><code class="inline">get_license_type() === 1</code><br>All core AI tools, admin panel, user management, blog, support tickets. Subscription billing system is <strong>hidden</strong>.</div>
+      </div>
+      <div class="req-card" style="flex-direction:column;gap:8px;padding:16px;border-color:#22c55e40">
+        <div style="display:flex;align-items:center;gap:8px"><div class="req-icon">⭐</div><div style="font-weight:600;font-size:14px">Extended License</div></div>
+        <div style="font-size:12.5px;color:var(--text-muted);line-height:1.6"><code class="inline">get_license_type() === 2</code><br>Everything in Regular + subscription plans, payment gateways, billing UI. Unlocks when <code class="inline">isProAvailable()</code> returns <code class="inline">true</code>.</div>
+      </div>
+    </div>
+
+    <div class="callout success">
+      <span class="callout-icon">✅</span>
+      <div><strong>isProAvailable() rule</strong> Returns <code class="inline">true</code> only when: <code class="inline">is_extended_license() === true</code> AND <code class="inline">settings('subscriptions_enabled') === true</code>. Every subscription UI element must be gated behind this — hidden when false, never just disabled.</div>
+    </div>
+
+    <div class="doc-nav">
+      <a class="doc-nav-btn" onclick="showSection('requirements')">
+        <span>‹</span>
+        <div><div class="dir">← Previous</div><div class="lbl">Server Requirements</div></div>
+      </a>
+      <a class="doc-nav-btn" onclick="showSection('config')">
+        <div><div class="dir">Next →</div><div class="lbl">Configuration</div></div>
+        <span>›</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- CONFIG SECTION -->
+  <div class="content section-hidden" id="section-config">
+    <div class="page-header">
+      <div class="page-tag">⚙️ Getting Started</div>
+      <h1 class="page-title">Configuration</h1>
+      <p class="page-desc">All site configuration lives in the <code class="inline">settings</code> table — not in <code class="inline">.env</code>. Use the <code class="inline">settings()</code> helper everywhere.</p>
+    </div>
+
+    <h2>The settings() helper</h2>
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">php</span><button class="code-copy">copy</button></div>
+      <pre><span class="hl-comment">// Read a setting (Redis-cached, never hits DB)</span>
+<span class="hl-key">settings</span>(<span class="hl-str">'site_name'</span>)                    <span class="hl-comment">// → 'MakeAI'</span>
+<span class="hl-key">settings</span>(<span class="hl-str">'openai_key'</span>)                   <span class="hl-comment">// → decrypted API key</span>
+<span class="hl-key">settings</span>(<span class="hl-str">'max_tokens'</span>, 2000)             <span class="hl-comment">// → fallback if null</span>
+
+<span class="hl-comment">// Write a setting (updates DB + clears cache)</span>
+<span class="hl-key">settings_set</span>(<span class="hl-str">'site_name'</span>, <span class="hl-str">'My Platform'</span>)
+<span class="hl-key">settings_set</span>(<span class="hl-str">'openai_key'</span>, <span class="hl-str">'sk-...'</span>, <span class="hl-str">'encrypted'</span>)
+
+<span class="hl-comment">// NEVER hardcode the app name:</span>
+<span class="hl-comment">// ❌ echo 'Welcome to MakeAI';</span>
+<span class="hl-comment">// ✅ echo 'Welcome to ' . settings('site_name');</span></pre>
+    </div>
+
+    <div class="doc-nav">
+      <a class="doc-nav-btn" onclick="showSection('license')">
+        <span>‹</span>
+        <div><div class="dir">← Previous</div><div class="lbl">License Activation</div></div>
+      </a>
+      <a class="doc-nav-btn" onclick="showSection('architecture')">
+        <div><div class="dir">Next →</div><div class="lbl">Architecture Overview</div></div>
+        <span>›</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE SECTION -->
+  <div class="content section-hidden" id="section-architecture">
+    <div class="page-header">
+      <div class="page-tag">🏗️ Core Concepts</div>
+      <h1 class="page-title">Architecture Overview</h1>
+      <p class="page-desc">MakeAI is built on Laravel 13 + Inertia.js SSR + Vue 3. These are the non-negotiable architectural rules.</p>
+    </div>
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <div><strong>Full spec in AI_SaaS_Master_Prompt.md</strong> — Part 01 (Tech Stack) and Part 04 (Foundation Layer). This page is a quick reference summary.</div>
+    </div>
+    <h2>9 named queues</h2>
+    <div class="code-block">
+      <div class="code-header"><span class="code-lang">horizon.php</span></div>
+      <pre><span class="hl-key">otp</span>        <span class="hl-comment">→ 3 workers, 1 retry, 30s timeout (OTP must be instant)</span>
+<span class="hl-key">ai</span>         <span class="hl-comment">→ 5 workers, 2 retries, 120s timeout</span>
+<span class="hl-key">media</span>      <span class="hl-comment">→ 3 workers, 2 retries, 300s timeout (video generation)</span>
+<span class="hl-key">emails</span>     <span class="hl-comment">→ 3 workers, 3 retries, 60s timeout</span>
+<span class="hl-key">webhooks</span>   <span class="hl-comment">→ default workers</span>
+<span class="hl-key">social</span>     <span class="hl-comment">→ default workers</span>
+<span class="hl-key">embeddings</span> <span class="hl-comment">→ default workers</span>
+<span class="hl-key">default</span>    <span class="hl-comment">→ 4 workers</span>
+<span class="hl-key">low</span>        <span class="hl-comment">→ 1 worker (view counts, analytics)</span></pre>
+    </div>
+
+    <div class="doc-nav">
+      <a class="doc-nav-btn" onclick="showSection('config')">
+        <span>‹</span>
+        <div><div class="dir">← Previous</div><div class="lbl">Configuration</div></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- PLACEHOLDER SECTIONS -->
+  <div class="content section-hidden" id="section-license-gate">
+    <div class="page-header">
+      <div class="page-tag">🔒 Core Concepts</div>
+      <h1 class="page-title">License Gating</h1>
+      <p class="page-desc">Coming soon — full documentation for <code class="inline">isProAvailable()</code>, <code class="inline">get_license_type()</code>, and the LicenseMiddleware.</p>
+    </div>
+  </div>
+  <div class="content section-hidden" id="section-settings">
+    <div class="page-header">
+      <div class="page-tag">⚙️ Core Concepts</div>
+      <h1 class="page-title">Settings System</h1>
+      <p class="page-desc">Coming soon — full documentation for the settings table, Redis caching, and the settings() helper.</p>
+    </div>
+  </div>
+  <div class="content section-hidden" id="section-queue">
+    <div class="page-header">
+      <div class="page-tag">⚡ Core Concepts</div>
+      <h1 class="page-title">Queue Architecture</h1>
+      <p class="page-desc">Coming soon — full documentation for Horizon, the 9 named queues, and all 45+ jobs.</p>
+    </div>
+  </div>
+  <div class="content section-hidden" id="section-ai-tools">
+    <div class="page-header">
+      <div class="page-tag">🤖 AI System</div>
+      <h1 class="page-title">AI Tools (255)</h1>
+      <p class="page-desc">Coming soon — full reference for all 255 AI tools, categories, and the DynamicForm field system.</p>
+    </div>
+  </div>
+  <div class="content section-hidden" id="section-ai-engine">
+    <div class="page-header">
+      <div class="page-tag">🤖 AI System</div>
+      <h1 class="page-title">LLPhant Engine</h1>
+      <p class="page-desc">Coming soon — AiService, ProviderRegistry, TokenGuard, and multi-provider failover.</p>
+    </div>
+  </div>
+  <div class="content section-hidden" id="section-streaming">
+    <div class="page-header">
+      <div class="page-tag">📡 AI System</div>
+      <h1 class="page-title">Streaming (SSE)</h1>
+      <p class="page-desc">Coming soon — POST + ReadableStream implementation, Nginx config, and the useStream composable.</p>
+    </div>
+  </div>
+  <div class="content section-hidden" id="section-credits">
+    <div class="page-header">
+      <div class="page-tag">💳 AI System</div>
+      <h1 class="page-title">Credit System</h1>
+      <p class="page-desc">Coming soon — TokenGuard, credit deduction flow, daily/monthly limits, and cost tracking.</p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+function showSection(id) {
+  document.querySelectorAll('[id^="section-"]').forEach(el => {
+    el.classList.add('section-hidden');
+    el.classList.remove('section-visible');
+  });
+  const target = document.getElementById('section-' + id);
+  if (target) {
+    target.classList.remove('section-hidden');
+    target.classList.add('section-visible');
+    document.querySelector('main').scrollTop = 0;
+  }
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const items = document.querySelectorAll('.nav-item');
+  items.forEach(item => {
+    if (item.getAttribute('onclick') && item.getAttribute('onclick').includes("'" + id + "'")) {
+      item.classList.add('active');
+    }
+  });
+}
+
+document.querySelectorAll('.code-copy').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const code = this.closest('.code-block').querySelector('pre').textContent;
+    navigator.clipboard.writeText(code).catch(() => {});
+    this.textContent = 'copied!';
+    this.style.color = '#22c55e';
+    setTimeout(() => { this.textContent = 'copy'; this.style.color = ''; }, 2000);
+  });
+});
+</script>
+</body>
+</html>

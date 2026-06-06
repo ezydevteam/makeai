@@ -3,6 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3'
 import { computed, ref, watch } from 'vue'
 import Layout from '@/Layouts/AppLayout.vue'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
+import { useTranslate } from '@/Composables/useTranslate'
 
 type BillingCycle = 'monthly' | 'yearly' | 'lifetime'
 
@@ -71,12 +72,13 @@ const props = defineProps<{
 
 const page = usePage()
 const { formatCurrency } = useNumberFormat()
+const { t } = useTranslate()
 const billing = ref<BillingCycle>('monthly')
 
 const billingLabels: Record<BillingCycle, string> = {
-    monthly: 'Monthly',
-    yearly: 'Yearly',
-    lifetime: 'Lifetime',
+    monthly: t('Monthly'),
+    yearly: t('Yearly'),
+    lifetime: t('Lifetime'),
 }
 
 const billingCycles = computed<BillingCycle[]>(() => {
@@ -103,7 +105,7 @@ const displayPrice = (plan: Plan) => {
     const cycle = activeCycle(plan)
 
     if (plan.is_free && cycle.subtotal_amount === 0) {
-        return 'Free'
+        return t('Free')
     }
 
     return cycle.subtotal_formatted
@@ -117,11 +119,11 @@ const priceSuffix = (plan: Plan) => {
     }
 
     if (billing.value === 'monthly') {
-        return '/month'
+        return t('/month')
     }
 
     if (billing.value === 'yearly') {
-        return '/year'
+        return t('/year')
     }
 
     return ''
@@ -136,21 +138,21 @@ const savingsText = (plan: Plan) => {
     if (billing.value === 'yearly' && monthly > 0 && yearly > 0) {
         const savings = monthly * 12 - yearly
 
-        return savings > 0 ? `Save ${formatCurrency(savings, currency)}` : ''
+        return savings > 0 ? t('Save :amount', { amount: formatCurrency(savings, currency) }) : ''
     }
 
     if (billing.value === 'lifetime' && lifetime > 0) {
         const originalLifetime = plan.pricing.lifetime.original_amount ?? 0
 
         if (originalLifetime > lifetime) {
-            return `Save ${formatCurrency(originalLifetime - lifetime, currency)}`
+            return t('Save :amount', { amount: formatCurrency(originalLifetime - lifetime, currency) })
         }
 
         const yearlySavings = yearly > lifetime ? yearly - lifetime : 0
         const monthlySavings = monthly > 0 && monthly * 12 > lifetime ? monthly * 12 - lifetime : 0
         const savings = Math.max(yearlySavings, monthlySavings)
 
-        return savings > 0 ? `Save ${formatCurrency(savings, currency)}` : ''
+        return savings > 0 ? t('Save :amount', { amount: formatCurrency(savings, currency) }) : ''
     }
 
     return ''
@@ -159,14 +161,14 @@ const savingsText = (plan: Plan) => {
 const pricingCountryLabel = computed(() => {
     const countryName = props.plans.find((plan) => plan.pricing.country_name)?.pricing.country_name
 
-    return countryName || props.pricingCountry || 'default'
+    return countryName || props.pricingCountry || t('default')
 })
 
 const planFeatures = (plan: Plan) => {
     const features = [...plan.features]
 
     if (Number(plan.credits) > 0) {
-        features.push(`${Number(plan.credits).toLocaleString()} credits`)
+        features.push(t(':count credits', { count: Number(plan.credits).toLocaleString() }))
     }
 
     return features
@@ -184,15 +186,15 @@ const planActionUrl = (plan: Plan) => {
 </script>
 
 <template>
-    <Head title="Pricing" />
+    <Head :title="t('Pricing')" />
 
     <Layout>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16">
             <div class="text-center mb-16">
                 <h1 class="text-4xl sm:text-5xl font-black text-gray-900 mb-4 tracking-tight">
-                    Simple, transparent <span class="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">pricing</span>
+                    {{ t('Simple, transparent') }} <span class="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">{{ t('pricing') }}</span>
                 </h1>
-                <p class="text-gray-500 text-lg max-w-2xl mx-auto font-medium">Choose the plan that fits your needs. Prices are shown for {{ pricingCountryLabel }} when available.</p>
+                <p class="text-gray-500 text-lg max-w-2xl mx-auto font-medium">{{ t('Choose the plan that fits your needs. Prices are shown for :country when available.', { country: pricingCountryLabel }) }}</p>
 
                 <div v-if="billingCycles.length > 1" class="inline-flex items-center justify-center gap-1 mt-10 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
                     <button
@@ -233,15 +235,15 @@ const planActionUrl = (plan: Plan) => {
                             <span v-if="priceSuffix(plan)" class="text-sm text-gray-400 font-bold mb-1">{{ priceSuffix(plan) }}</span>
                         </div>
                         <p v-if="activeCycle(plan).is_trial" class="text-xs text-primary-600 font-bold mt-1">
-                            {{ activeCycle(plan).trial_days }} days trial, then renews at {{ activeCycle(plan).formatted }}
+                            {{ t(':days days trial, then renews at :price', { days: String(activeCycle(plan).trial_days ?? 0), price: activeCycle(plan).formatted }) }}
                         </p>
                         <p v-else-if="billing === 'yearly' && savingsText(plan)" class="text-xs text-primary-600 font-bold mt-1">{{ savingsText(plan) }}</p>
-                        <p v-else-if="billing === 'lifetime'" class="text-xs text-primary-600 font-bold mt-1">One-time lifetime access</p>
+                        <p v-else-if="billing === 'lifetime'" class="text-xs text-primary-600 font-bold mt-1">{{ t('One-time lifetime access') }}</p>
                         <p v-if="billing === 'lifetime' && savingsText(plan)" class="text-xs text-primary-600 font-bold mt-1">{{ savingsText(plan) }}</p>
                         <p v-if="activeCycle(plan).vat_percentage > 0" class="text-xs text-gray-500 font-semibold mt-1">
-                            Includes {{ activeCycle(plan).vat_percentage }}% VAT ({{ activeCycle(plan).vat_formatted }})
+                            {{ t('Includes :percentage% VAT (:amount)', { percentage: String(activeCycle(plan).vat_percentage), amount: activeCycle(plan).vat_formatted }) }}
                         </p>
-                        <p v-if="plan.pricing.source === 'country'" class="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">Country price</p>
+                        <p v-if="plan.pricing.source === 'country'" class="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">{{ t('Country price') }}</p>
                     </div>
 
                     <ul class="space-y-3.5 flex-1 mb-8">
@@ -262,15 +264,15 @@ const planActionUrl = (plan: Plan) => {
             </div>
 
             <div class="text-center mb-12">
-                <h2 class="text-3xl font-black text-gray-900 mb-3">Need more power?</h2>
-                <p class="text-gray-500 font-medium">Top up your credits instantly with our one-time packs.</p>
+                <h2 class="text-3xl font-black text-gray-900 mb-3">{{ t('Need more power?') }}</h2>
+                <p class="text-gray-500 font-medium">{{ t('Top up your credits instantly with our one-time packs.') }}</p>
             </div>
 
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
                 <div v-for="pack in creditPacks" :key="pack.id" :class="[pack.is_popular ? 'border-primary-200 bg-primary-50/30' : 'border-gray-100 bg-white shadow-sm']" class="relative border rounded-3xl p-6 text-center hover:border-primary-300 transition-all group">
-                    <div v-if="pack.is_popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">Popular</div>
+                    <div v-if="pack.is_popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">{{ t('Popular') }}</div>
                     <p class="text-3xl font-black text-gray-900 mb-1 group-hover:scale-110 transition-transform">{{ pack.credits.toLocaleString() }}</p>
-                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4">credits</p>
+                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4">{{ t('credits') }}</p>
                     <p class="text-xl font-black text-primary-600">{{ pack.formatted_price }}</p>
                 </div>
             </div>

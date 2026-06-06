@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -38,6 +39,17 @@ const form = useForm({
     message: '',
     attachments: [] as File[],
 })
+
+const departmentOptions = computed(() => props.departments.map(d => ({ value: d.id, label: d.name })))
+const priorityOptions = [{ value: 'low', label: t('Low') }, { value: 'medium', label: t('Medium') }, { value: 'high', label: t('High') }]
+const statusOptions = [
+    { value: '', label: t('All statuses') },
+    { value: 'open', label: t('Open') },
+    { value: 'in_progress', label: t('In Progress') },
+    { value: 'waiting_user', label: t('Waiting User') },
+    { value: 'resolved', label: t('Resolved') },
+    { value: 'closed', label: t('Closed') },
+]
 
 const filter = () => {
     router.get(route('support.index'), { status: status.value }, { preserveState: true, replace: true })
@@ -93,17 +105,11 @@ const badgeClass = (value: string) => ({
                 </label>
                 <label class="block">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Department') }}</span>
-                    <select v-model="form.department_id" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                        <option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option>
-                    </select>
+                    <AppSelect v-model="form.department_id" :options="departmentOptions" :label="t('Department')" :error="form.errors.department_id" />
                 </label>
                 <label class="block">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Priority') }}</span>
-                    <select v-model="form.priority" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                        <option value="low">{{ t('Low') }}</option>
-                        <option value="medium">{{ t('Medium') }}</option>
-                        <option value="high">{{ t('High') }}</option>
-                    </select>
+                    <AppSelect v-model="form.priority" :options="priorityOptions" :label="t('Priority')" :error="form.errors.priority" />
                 </label>
                 <label class="block">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Attachments') }}</span>
@@ -125,14 +131,7 @@ const badgeClass = (value: string) => ({
 
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="flex flex-col gap-3 border-b border-gray-100 p-4 md:flex-row md:items-center dark:border-surface-800">
-                <select v-model="status" @change="filter" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    <option value="">{{ t('All statuses') }}</option>
-                    <option value="open">{{ t('Open') }}</option>
-                    <option value="in_progress">{{ t('In Progress') }}</option>
-                    <option value="waiting_user">{{ t('Waiting User') }}</option>
-                    <option value="resolved">{{ t('Resolved') }}</option>
-                    <option value="closed">{{ t('Closed') }}</option>
-                </select>
+                <AppSelect v-model="status" :options="statusOptions" @update:model-value="filter" />
             </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-100 dark:divide-surface-800">

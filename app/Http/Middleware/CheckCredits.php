@@ -12,7 +12,6 @@ use App\Services\AI\ToolAccessService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
 
 /**
  * CheckCredits — pre-flight credit check middleware.
@@ -37,6 +36,13 @@ class CheckCredits
 
         $accessLevel = $template ? $access->effectiveLevel($template) : 'login_required';
 
+        if ($user && $user->is_banned) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Your account has been suspended. Please contact support.'),
+            ], 403);
+        }
+
         if ($template && $access->requiresAuth($template) && ! $user) {
             return response()->json([
                 'success' => false,
@@ -51,27 +57,18 @@ class CheckCredits
             ], 403);
         }
 
+        if ($template && $template->isProRequired() && ! isProAvailable()) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Premium features are not available on this installation.'),
+            ], 404);
+        }
+
         if ($template && $template->isProRequired() && $user && ! $user->isPro()) {
             return response()->json([
                 'success' => false,
                 'message' => translate('Upgrade to Pro to unlock this tool.'),
             ], 403);
-        }
-
-        if ($accessLevel === 'public' && ! $user && ! $template?->isProRequired()) {
-            $limit = (int) settings('public_tool_rate_limit_per_hour', 5);
-            $key = 'public_tool_rate:'.$request->ip().':'.($template?->slug ?? 'unknown');
-            $attempts = (int) Cache::get($key, 0);
-
-            if ($limit > 0 && $attempts >= $limit) {
-                return response()->json([
-                    'success' => false,
-                    'message' => translate('Public preview limit reached. Please sign in to continue.'),
-                    'type' => 'PublicRateLimit',
-                ], 429);
-            }
-
-            Cache::put($key, $attempts + 1, now()->addHour());
         }
 
         $model = $request->input('model')
@@ -107,7 +104,6 @@ class CheckCredits
 
         $response = $next($request);
 
-        // Attach credit warning header if set by TokenGuard
         $warning = $request->attributes->get('credit_warning');
         if ($warning && method_exists($response, 'header')) {
             $response->header('X-Credit-Warning', $warning);
@@ -134,6 +130,4 @@ class CheckCredits
             default => 422,
         };
     }
-}
-}
 }

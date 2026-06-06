@@ -66,7 +66,7 @@ class ContactMessageController extends Controller
             $validated['subject'],
             $validated['message'],
             settings('mail_from_address'),
-            settings('mail_from_name', settings('app_name', 'MakeAI'))
+            settings('mail_from_name', settings('app_name', translate('Application')))
         ));
 
         $message->update([

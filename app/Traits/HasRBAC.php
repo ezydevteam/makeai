@@ -12,6 +12,12 @@ use App\Models\AdminRole;
  */
 trait HasRBAC
 {
+    /** @var string[]|null Cached permission slugs for this request. */
+    protected ?array $cachedPermissionSlugs = null;
+
+    /** @var bool|null Cached super-admin status. */
+    protected ?bool $cachedIsSuperAdmin = null;
+
     /**
      * Get the admin's role.
      */
@@ -27,15 +33,11 @@ trait HasRBAC
      */
     public function hasPermission(string $slug): bool
     {
-        // Super Admin bypass — has all permissions
         if ($this->isSuperAdmin()) {
             return true;
         }
 
-        return $this->role
-            ->permissions()
-            ->where('slug', $slug)
-            ->exists();
+        return in_array($slug, $this->getAllPermissions(), true);
     }
 
     /**
@@ -49,10 +51,7 @@ trait HasRBAC
             return true;
         }
 
-        return $this->role
-            ->permissions()
-            ->whereIn('slug', $slugs)
-            ->exists();
+        return ! empty(array_intersect($slugs, $this->getAllPermissions()));
     }
 
     /**
@@ -64,12 +63,7 @@ trait HasRBAC
             return true;
         }
 
-        $count = $this->role
-            ->permissions()
-            ->whereIn('slug', $slugs)
-            ->count();
-
-        return $count === count($slugs);
+        return empty(array_diff($slugs, $this->getAllPermissions()));
     }
 
     /**
@@ -77,21 +71,46 @@ trait HasRBAC
      */
     public function isSuperAdmin(): bool
     {
-        return $this->role && $this->role->slug === 'super-admin';
+        if ($this->cachedIsSuperAdmin !== null) {
+            return $this->cachedIsSuperAdmin;
+        }
+
+        if (! $this->role) {
+            return $this->cachedIsSuperAdmin = false;
+        }
+
+        return $this->cachedIsSuperAdmin = ($this->role->slug === config('auth.providers.admins.super_admin_slug', 'super-admin'));
     }
 
     /**
-     * Get all permission slugs for this admin.
+     * Get all permission slugs for this admin, cached for the request lifetime.
      */
     public function getAllPermissions(): array
     {
-        if ($this->isSuperAdmin()) {
-            return AdminPermission::pluck('slug')->toArray();
+        if ($this->cachedPermissionSlugs !== null) {
+            return $this->cachedPermissionSlugs;
         }
 
-        return $this->role
+        if (! $this->role) {
+            return $this->cachedPermissionSlugs = [];
+        }
+
+        if ($this->isSuperAdmin()) {
+            return $this->cachedPermissionSlugs = AdminPermission::pluck('slug')->toArray();
+        }
+
+        return $this->cachedPermissionSlugs = $this->role
             ->permissions()
             ->pluck('slug')
             ->toArray();
+    }
+
+    /**
+     * Clear the permission cache. Call after role/permission changes.
+     */
+    public function clearPermissionCache(): void
+    {
+        $this->cachedPermissionSlugs = null;
+        $this->cachedIsSuperAdmin = null;
     }
 }

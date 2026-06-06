@@ -7,10 +7,13 @@ use App\Http\Requests\Auth\DisableTwoFactorRequest;
 use App\Http\Requests\Auth\EnableTwoFactorRequest;
 use App\Http\Requests\Auth\RegenerateRecoveryCodesRequest;
 use App\Models\User;
+use App\Models\UserApiKey;
 use App\Services\Security\TotpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,7 +36,7 @@ class SettingsController extends Controller
             }
 
             $provisioningUri = $totp->provisioningUri(
-                settings('app_name', 'Application'),
+                settings('app_name', translate('Application')),
                 $user->email,
                 $pendingSecret,
             );
@@ -50,6 +53,122 @@ class SettingsController extends Controller
             'recoveryCodes' => $request->session()->pull('user_plain_recovery_codes', []),
         ]);
     }
+
+    // ─── Profile ───────────────────────────────
+
+    public function updateProfile(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+        ]);
+
+        $emailChanged = $validated['email'] !== $user->email;
+
+        $user->update($validated);
+
+        if ($emailChanged) {
+            $user->email_verified_at = null;
+            $user->save();
+            $user->sendEmailVerificationNotification();
+
+            return back()->with('success', translate('Profile updated. Please verify your new email address.'));
+        }
+
+        return back()->with('success', translate('Profile updated successfully.'));
+    }
+
+    public function updatePassword(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (! Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => [translate('The current password is incorrect.')],
+            ]);
+        }
+
+        $user->update(['password' => $validated['password']]);
+
+        return back()->with('success', translate('Password changed successfully.'));
+    }
+
+    public function updateAvatar(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $request->validate([
+            'avatar' => ['required', 'image', 'max:2048'],
+        ]);
+
+        $path = $request->file('avatar')->store('avatars', 'public');
+
+        if ($user->avatar) {
+            Storage::disk('public')->delete($user->avatar);
+        }
+
+        $user->update(['avatar' => $path]);
+
+        return back()->with('success', translate('Avatar updated successfully.'));
+    }
+
+    // ─── API Keys ──────────────────────────────
+
+    public function apiKeys(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('User/ApiKeys', [
+            'apiKeys' => $user->apiKeys()->latest()->get()->map(fn (UserApiKey $key) => [
+                'id' => $key->id,
+                'provider' => $key->provider,
+                'is_active' => $key->is_active,
+                'created_at' => $key->created_at?->toISOString(),
+            ]),
+        ]);
+    }
+
+    public function storeApiKey(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'provider' => ['required', 'string', 'max:50'],
+            'api_key' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $user->apiKeys()->create($validated);
+
+        return back()->with('success', translate('API key added successfully.'));
+    }
+
+    public function destroyApiKey(Request $request, UserApiKey $key): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($key->user_id !== $user->id) {
+            abort(403);
+        }
+
+        $key->delete();
+
+        return back()->with('success', translate('API key removed.'));
+    }
+
+    // ─── 2FA ───────────────────────────────────
 
     public function enableTwoFactor(EnableTwoFactorRequest $request, TotpService $totp): RedirectResponse
     {
@@ -97,6 +216,8 @@ class SettingsController extends Controller
             ->route('user.settings')
             ->with('success', translate('Recovery codes regenerated successfully.'));
     }
+
+    // ─── Helpers ───────────────────────────────
 
     private function ensurePasswordMatches(User $user, string $password): void
     {

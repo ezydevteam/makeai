@@ -7,8 +7,8 @@ use App\Models\AffiliatePayout;
 use App\Models\AiTool;
 use App\Models\Comment;
 use App\Models\Document;
+use App\Models\GatewaySubscription;
 use App\Models\Payment;
-use App\Models\Subscription;
 use App\Models\User;
 use App\Support\CountryCatalog;
 use Illuminate\Support\Facades\Cache;
@@ -71,7 +71,7 @@ class NotificationEventService
         }
     }
 
-    public function subscriptionStarted(Subscription $subscription): void
+    public function subscriptionStarted(GatewaySubscription $subscription): void
     {
         $subscription->loadMissing(['user', 'plan']);
 
@@ -92,7 +92,26 @@ class NotificationEventService
         ]);
     }
 
-    public function subscriptionRenewingSoon(Subscription $subscription): void
+    public function subscriptionConfirmed(User $user, GatewaySubscription $subscription): void
+    {
+        if (! $user || ! isProAvailable()) {
+            return;
+        }
+
+        $this->notifications->send($user, [
+            'title' => translate('Subscription confirmed'),
+            'message' => translate('Your :plan subscription is now active.', [
+                'plan' => $subscription->plan?->name ?? translate('your plan'),
+            ]),
+            'level' => 'success',
+            'category' => 'subscription',
+            'action_url' => route('user.dashboard'),
+            'action_label' => translate('View dashboard'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+    }
+
+    public function subscriptionCanceled(GatewaySubscription $subscription): void
     {
         $subscription->loadMissing(['user', 'plan']);
 
@@ -100,24 +119,20 @@ class NotificationEventService
             return;
         }
 
-        $days = max(1, now()->diffInDays($subscription->current_period_end, false));
-        $this->sendOnce("subscription-renewing:{$subscription->id}:".$subscription->current_period_end?->toDateString(), function () use ($subscription, $days) {
-            $this->notifications->send($subscription->user, [
-                'title' => translate('Subscription renews soon'),
-                'message' => translate('Your :plan subscription renews in :days days.', [
-                    'plan' => $subscription->plan?->name ?? translate('plan'),
-                    'days' => $days,
-                ]),
-                'level' => 'info',
-                'category' => 'subscription',
-                'action_url' => route('user.dashboard'),
-                'action_label' => translate('View subscription'),
-                'meta' => ['subscription_id' => $subscription->id],
-            ]);
-        });
+        $this->notifications->send($subscription->user, [
+            'title' => translate('Subscription canceled'),
+            'message' => translate('Your :plan subscription was canceled. Access remains until the current period ends.', [
+                'plan' => $subscription->plan?->name ?? translate('plan'),
+            ]),
+            'level' => 'warning',
+            'category' => 'subscription',
+            'action_url' => route('user.dashboard'),
+            'action_label' => translate('View subscription'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
     }
 
-    public function subscriptionExpired(Subscription $subscription): void
+    public function subscriptionExpired(GatewaySubscription $subscription): void
     {
         $subscription->loadMissing(['user', 'plan']);
 
@@ -138,27 +153,6 @@ class NotificationEventService
                 'meta' => ['subscription_id' => $subscription->id],
             ]);
         });
-    }
-
-    public function subscriptionCanceled(Subscription $subscription): void
-    {
-        $subscription->loadMissing(['user', 'plan']);
-
-        if (! $subscription->user || ! isProAvailable()) {
-            return;
-        }
-
-        $this->notifications->send($subscription->user, [
-            'title' => translate('Subscription canceled'),
-            'message' => translate('Your :plan subscription was canceled. Access remains until the current period ends.', [
-                'plan' => $subscription->plan?->name ?? translate('plan'),
-            ]),
-            'level' => 'warning',
-            'category' => 'subscription',
-            'action_url' => route('user.dashboard'),
-            'action_label' => translate('View subscription'),
-            'meta' => ['subscription_id' => $subscription->id],
-        ]);
     }
 
     public function paymentSuccessful(Payment $payment): void
@@ -527,7 +521,7 @@ class NotificationEventService
         $this->notifications->notifyAdmins([
             'title' => translate('Update available'),
             'message' => translate(':app v:version is available. Update now.', [
-                'app' => settings('app_name', 'Application'),
+                'app' => settings('app_name', translate('Application')),
                 'version' => $version,
             ]),
             'level' => 'info',
@@ -569,13 +563,21 @@ class NotificationEventService
         }
 
         $count = 0;
-        Subscription::query()
-            ->with(['user', 'plan'])
-            ->where('status', 'active')
-            ->whereBetween('current_period_end', [now()->addDays(3)->startOfDay(), now()->addDays(3)->endOfDay()])
-            ->chunkById(100, function ($subscriptions) use (&$count) {
-                foreach ($subscriptions as $subscription) {
-                    $this->subscriptionRenewingSoon($subscription);
+        User::query()
+            ->where('subscription_status', 'active')
+            ->whereBetween('subscription_ends_at', [now()->addDays(3)->startOfDay(), now()->addDays(3)->endOfDay()])
+            ->chunkById(100, function ($users) use (&$count) {
+                foreach ($users as $user) {
+                    $this->notifyUser($user, [
+                        'title' => translate('Subscription renewing soon'),
+                        'body' => translate(':plan_name renews in 3 days. Make sure your payment method is up to date.', [
+                            'plan_name' => $user->plan?->name ?? translate('Your plan'),
+                        ]),
+                        'level' => 'info',
+                        'category' => 'billing',
+                        'action_url' => route('billing.portal'),
+                        'action_label' => translate('Manage billing'),
+                    ]);
                     $count++;
                 }
             });

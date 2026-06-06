@@ -3,33 +3,25 @@
 namespace App\Services\Payment;
 
 use App\Models\PaymentGateway;
-use Illuminate\Database\Eloquent\Collection;
 
 class PaymentGatewayManager
 {
-    /**
-     * @return Collection<int, PaymentGateway>
-     */
-    public function enabled(): Collection
+    public function enabled()
     {
-        return PaymentGateway::query()
-            ->where('is_enabled', true)
+        return PaymentGateway::where('is_enabled', true)
             ->orderBy('sort_order')
-            ->orderBy('name')
             ->get();
     }
 
     public function processingFee(PaymentGateway $gateway, float $amount): float
     {
-        if ($gateway->processing_fee_type === 'percentage') {
-            return round($amount * ((float) $gateway->processing_fee_value / 100), 2);
+        if (! $gateway->processing_fee_type || ! $gateway->processing_fee_value) {
+            return 0;
         }
 
-        if ($gateway->processing_fee_type === 'fixed') {
-            return round((float) $gateway->processing_fee_value, 2);
-        }
-
-        return 0.0;
+        return $gateway->processing_fee_type === 'percentage'
+            ? round($amount * ((float) $gateway->processing_fee_value / 100), 2)
+            : (float) $gateway->processing_fee_value;
     }
 
     public function totalWithFee(PaymentGateway $gateway, float $amount): float

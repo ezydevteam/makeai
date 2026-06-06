@@ -6,6 +6,9 @@ use App\Http\Controllers\AI\DocumentController;
 use App\Http\Controllers\AI\GenerateController;
 use App\Http\Controllers\AI\ToolCatalogController;
 use App\Http\Controllers\AI\ToolReviewController;
+use App\Http\Controllers\API\ChatController;
+use App\Http\Controllers\API\ChatProductController;
+use App\Http\Controllers\API\ChatProjectController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,11 +35,11 @@ Route::prefix('v1')->group(function () {
     });
 
     // ─── Generation Endpoints (credits check handles auth for non-public) ─────
-    Route::middleware(['throttle:ai_text_gen', 'check.credits'])->prefix('generate')->group(function () {
+    Route::middleware(['throttle:text_gen', 'check.credits'])->prefix('generate')->group(function () {
         Route::post('stream', [GenerateController::class, 'stream']);    // SSE streaming
         Route::post('text', [GenerateController::class, 'text']);       // Sync JSON
     });
-    Route::middleware('throttle:ai_text_gen')->prefix('generate')->group(function () {
+    Route::middleware('throttle:text_gen')->prefix('generate')->group(function () {
         Route::get('estimate', [GenerateController::class, 'estimate']); // Cost estimate
     });
 
@@ -62,5 +65,21 @@ Route::prefix('v1')->group(function () {
         Route::get('commissions', [AffiliateController::class, 'commissionsApi']);
         Route::get('payouts', [AffiliateController::class, 'payoutsApi']);
         Route::post('payouts', [AffiliateController::class, 'storePayout']);
+    });
+
+    // ─── Chat Endpoints ─────
+    Route::get('/chat/products', [ChatProductController::class, 'index']);
+
+    Route::middleware(['web', 'auth'])->prefix('chat')->group(function () {
+        Route::get('/', [ChatController::class, 'index']);
+        Route::post('/', [ChatController::class, 'store']);
+        Route::get('/projects', [ChatProjectController::class, 'index']);
+        Route::post('/projects', [ChatProjectController::class, 'store']);
+        Route::put('/projects/{project}', [ChatProjectController::class, 'update']);
+        Route::delete('/projects/{project}', [ChatProjectController::class, 'destroy']);
+        Route::get('/{ulid}', [ChatController::class, 'show']);
+        Route::post('/{ulid}/message', [ChatController::class, 'sendMessage']);
+        Route::put('/{ulid}', [ChatController::class, 'update']);
+        Route::delete('/{ulid}', [ChatController::class, 'destroy']);
     });
 });

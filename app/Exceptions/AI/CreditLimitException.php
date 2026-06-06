@@ -11,9 +11,13 @@ class CreditLimitException extends RuntimeException
 {
     public readonly string $limitType;
 
-    public function __construct(string $limitType = 'daily')
+    public readonly float $remaining;
+
+    public function __construct(string $limitType = 'daily', float $remaining = 0)
     {
         $this->limitType = $limitType;
+        $this->remaining = $remaining;
+
         $message = $limitType === 'daily'
             ? translate('Daily credit limit reached. Please try again tomorrow.')
             : translate('Monthly credit limit reached. Please wait until next month or upgrade your plan.');

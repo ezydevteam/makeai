@@ -34,7 +34,16 @@ return [
     |--------------------------------------------------------------------------
     | Grace Period (hours)
     |--------------------------------------------------------------------------
-    | After verification fails, subscription features stay active for this long.
+    | After verification fails, frontend stays active for this long.
     */
     'grace_period' => 72,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Require License Verification
+    |--------------------------------------------------------------------------
+    | When true, the LicenseMiddleware blocks all admin/api/frontend routes
+    | unless a valid license is active. Set to false to bypass (emergency use only).
+    */
+    'require_verified' => env('LICENSE_REQUIRE_VERIFIED', true),
 ];

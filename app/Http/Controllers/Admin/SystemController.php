@@ -25,7 +25,7 @@ class SystemController extends Controller
             'stats' => [
                 'php_version' => PHP_VERSION,
                 'laravel_version' => app()->version(),
-                'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? 'N/A',
+                'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? translate('N/A'),
                 'database_version' => $this->getDatabaseVersion(),
                 'disk_free' => $this->getDiskSpace(),
                 'memory_usage' => $this->getMemoryUsage(),
@@ -130,7 +130,7 @@ class SystemController extends Controller
 
             return $results[0]->version;
         } catch (\Exception $e) {
-            return 'Unknown';
+            return translate('Unknown');
         }
     }
 
@@ -179,7 +179,7 @@ class SystemController extends Controller
         $restorationTime = settings('maintenance_estimated_restoration_time');
 
         return [
-            'maintenance_title' => settings('maintenance_title', settings('app_name', 'Application').' '.translate('Maintenance')),
+            'maintenance_title' => settings('maintenance_title', settings('app_name', translate('Application')).' '.translate('Maintenance')),
             'maintenance_message' => settings('maintenance_message', '<p>'.translate('We are improving the platform. Please check back soon.').'</p>'),
             'maintenance_estimated_restoration_time' => $restorationTime ? date('Y-m-d\TH:i', strtotime((string) $restorationTime)) : null,
             'maintenance_allowed_ips' => settings('maintenance_allowed_ips', ''),
@@ -207,7 +207,7 @@ class SystemController extends Controller
                 return [
                     ...$task,
                     'last_run_at' => $lastRun,
-                    'next_run' => $this->nextRunLabel($task['frequency']),
+                    'next_run' => $this->nextRunLabel($task['frequency_key'] ?? $task['frequency']),
                 ];
             })->values()->all(),
         ];
@@ -218,34 +218,38 @@ class SystemController extends Controller
         return [
             [
                 'key' => 'ai-reset-usage-counters',
-                'name' => 'Reset AI usage counters',
+                'name' => translate('Reset AI usage counters'),
                 'command' => 'ai:reset-usage-counters',
-                'frequency' => 'Daily at 00:05',
-                'description' => 'Resets daily AI credit counters and monthly counters on month start.',
+                'frequency_key' => 'Daily at 00:05',
+                'frequency' => translate('Daily at 00:05'),
+                'description' => translate('Resets daily AI credit counters and monthly counters on month start.'),
                 'runnable' => true,
             ],
             [
                 'key' => 'notifications-subscription-reminders',
-                'name' => 'Subscription renewal reminders',
+                'name' => translate('Subscription renewal reminders'),
                 'command' => 'notifications:subscription-reminders',
-                'frequency' => 'Daily at 09:00',
-                'description' => 'Sends in-app subscription renewal reminders.',
+                'frequency_key' => 'Daily at 09:00',
+                'frequency' => translate('Daily at 09:00'),
+                'description' => translate('Sends in-app subscription renewal reminders.'),
                 'runnable' => true,
             ],
             [
                 'key' => 'subscriptions-expire-past-due',
-                'name' => 'Expire past-due subscriptions',
+                'name' => translate('Expire past-due subscriptions'),
                 'command' => 'subscriptions:expire-past-due',
-                'frequency' => 'Hourly',
-                'description' => 'Expires past-due subscriptions and notifies affected users.',
+                'frequency_key' => 'Hourly',
+                'frequency' => translate('Hourly'),
+                'description' => translate('Expires past-due subscriptions and notifies affected users.'),
                 'runnable' => true,
             ],
             [
                 'key' => 'scheduler-heartbeat',
-                'name' => 'Scheduler heartbeat',
+                'name' => translate('Scheduler heartbeat'),
                 'command' => 'scheduler-heartbeat',
-                'frequency' => 'Every minute',
-                'description' => 'Updates the scheduler health timestamp used by admin warnings.',
+                'frequency_key' => 'Every minute',
+                'frequency' => translate('Every minute'),
+                'description' => translate('Updates the scheduler health timestamp used by admin warnings.'),
                 'runnable' => true,
             ],
         ];
@@ -298,7 +302,7 @@ class SystemController extends Controller
     private function ensureMaintenanceDefaults(): void
     {
         if (! settings('maintenance_title')) {
-            settings_set('maintenance_title', settings('app_name', 'Application').' '.translate('Maintenance'), 'string', 'maintenance');
+            settings_set('maintenance_title', settings('app_name', translate('Application')).' '.translate('Maintenance'), 'string', 'maintenance');
         }
 
         if (! settings('maintenance_message')) {

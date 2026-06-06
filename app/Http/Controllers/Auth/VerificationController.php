@@ -74,7 +74,7 @@ class VerificationController extends Controller
     {
         SendTemplatedEmail::dispatch('email_verify_otp', $user->email, [
             'user_name' => $user->name,
-            'site_name' => settings('app_name', 'Application'),
+            'site_name' => settings('app_name', translate('Application')),
             'otp_code' => $otp,
         ])->onQueue('otp');
     }

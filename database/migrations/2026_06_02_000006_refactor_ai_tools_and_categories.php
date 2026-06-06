@@ -4,6 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -99,7 +100,7 @@ return new class extends Migration
         // 7. Populate ulid for existing rows
         DB::table('ai_tools')->whereNull('ulid')->eachById(function ($row) {
             DB::table('ai_tools')->where('id', $row->id)->update([
-                'ulid' => (string) \Illuminate\Support\Str::ulid(),
+                'ulid' => (string) Str::ulid(),
             ]);
         }, 100, 'id');
 

@@ -51,6 +51,13 @@ class AdminController extends Controller
             'is_active' => 'boolean',
         ]);
 
+        // Prevent non-super-admins from assigning the super-admin role
+        $superRoleId = AdminRole::where('slug', config('auth.providers.admins.super_admin_slug', 'super-admin'))->value('id');
+
+        if ((int) $validated['role_id'] === $superRoleId && ! auth('admin')->user()->isSuperAdmin()) {
+            return back()->with('error', translate('Only a Super Admin can assign the Super Admin role.'));
+        }
+
         $validated['password'] = Hash::make($validated['password']);
         $validated['is_active'] = $request->input('is_active', true);
 
@@ -66,8 +73,10 @@ class AdminController extends Controller
     {
         abort_unless(auth('admin')->user()->hasPermission('admins.edit'), 403);
 
+        $currentAdmin = auth('admin')->user();
+
         // Prevent super-admin modification by non-super-admins
-        if ($admin->isSuperAdmin() && ! auth('admin')->user()->isSuperAdmin()) {
+        if ($admin->isSuperAdmin() && ! $currentAdmin->isSuperAdmin()) {
             return back()->with('error', translate('You cannot modify a Super Admin.'));
         }
 
@@ -85,10 +94,24 @@ class AdminController extends Controller
             unset($validated['password']);
         }
 
+        // Prevent self-demotion: super admin can't change their own role
+        if ($currentAdmin->id === $admin->id && $admin->isSuperAdmin()) {
+            $superRoleId = AdminRole::where('slug', config('auth.providers.admins.super_admin_slug', 'super-admin'))->value('id');
+
+            if ((int) $validated['role_id'] !== $superRoleId) {
+                return back()->with('error', translate('You cannot change your own Super Admin role.'));
+            }
+
+            // Prevent self-deactivation
+            if (empty($validated['is_active'])) {
+                return back()->with('error', translate('You cannot deactivate your own account.'));
+            }
+        }
+
         // Prevent deactivating or changing role of the last super admin
-        if ($admin->isSuperAdmin() && ($validated['role_id'] != $admin->role_id || empty($validated['is_active']))) {
+        if ($admin->isSuperAdmin() && ((int) $validated['role_id'] !== $admin->role_id || empty($validated['is_active']))) {
             $superAdminCount = Admin::whereHas('role', function ($q) {
-                $q->where('slug', 'super-admin');
+                $q->where('slug', config('auth.providers.admins.super_admin_slug', 'super-admin'));
             })->where('is_active', true)->count();
 
             if ($superAdminCount <= 1) {

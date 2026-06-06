@@ -47,6 +47,7 @@ class AdminSeeder extends Seeder
             ['slug' => 'dashboard.analytics', 'name' => 'View Analytics', 'group' => 'dashboard'],
 
             // Users
+            ['slug' => 'users.manage', 'name' => 'Manage Users & Community', 'group' => 'users'],
             ['slug' => 'users.view', 'name' => 'View Users', 'group' => 'users'],
             ['slug' => 'users.create', 'name' => 'Create Users', 'group' => 'users'],
             ['slug' => 'users.edit', 'name' => 'Edit Users', 'group' => 'users'],
@@ -67,6 +68,7 @@ class AdminSeeder extends Seeder
             ['slug' => 'roles.delete', 'name' => 'Delete Roles', 'group' => 'roles'],
 
             // Settings
+            ['slug' => 'settings.manage', 'name' => 'Manage All Settings', 'group' => 'settings'],
             ['slug' => 'settings.general', 'name' => 'General Settings', 'group' => 'settings'],
             ['slug' => 'settings.ai', 'name' => 'AI Settings', 'group' => 'settings'],
             ['slug' => 'settings.payment', 'name' => 'Payment Settings', 'group' => 'settings'],
@@ -75,6 +77,7 @@ class AdminSeeder extends Seeder
             ['slug' => 'settings.license', 'name' => 'License Settings', 'group' => 'settings'],
 
             // AI Management
+            ['slug' => 'ai.tools', 'name' => 'Manage AI Tools & Access', 'group' => 'ai'],
             ['slug' => 'ai.templates', 'name' => 'Manage AI Templates', 'group' => 'ai'],
             ['slug' => 'ai.models', 'name' => 'Manage AI Models', 'group' => 'ai'],
             ['slug' => 'ai.providers', 'name' => 'Manage AI Providers', 'group' => 'ai'],
@@ -109,6 +112,7 @@ class AdminSeeder extends Seeder
             ['slug' => 'themes.customize', 'name' => 'Customize Themes', 'group' => 'themes'],
 
             // Translations
+            ['slug' => 'translations.manage', 'name' => 'Manage Languages & Translations', 'group' => 'translations'],
             ['slug' => 'translations.view', 'name' => 'View Translations', 'group' => 'translations'],
             ['slug' => 'translations.edit', 'name' => 'Edit Translations', 'group' => 'translations'],
             ['slug' => 'translations.languages', 'name' => 'Manage Languages', 'group' => 'translations'],
@@ -144,13 +148,13 @@ class AdminSeeder extends Seeder
         // Manager — everything except admin/role management and license
         $manager->syncPermissionsBySlug([
             'dashboard.view', 'dashboard.analytics',
-            'users.view', 'users.create', 'users.edit', 'users.credits',
-            'settings.general', 'settings.ai', 'settings.payment', 'settings.mail',
-            'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
+            'users.view', 'users.create', 'users.edit', 'users.credits', 'users.manage',
+            'settings.manage', 'settings.general', 'settings.ai', 'settings.payment', 'settings.mail',
+            'ai.tools', 'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
             'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
             'plans.view', 'plans.create', 'plans.edit',
             'payments.view', 'payments.gateways',
-            'translations.view', 'translations.edit',
+            'translations.manage', 'translations.view', 'translations.edit',
             'reports.revenue', 'reports.usage', 'reports.export',
             'support.tickets', 'support.respond', 'support.departments', 'support.canned',
         ]);
@@ -166,7 +170,7 @@ class AdminSeeder extends Seeder
         // Content Manager
         $contentManager->syncPermissionsBySlug([
             'dashboard.view',
-            'ai.templates',
+            'ai.tools', 'ai.templates',
             'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
             'translations.view', 'translations.edit',
         ]);
@@ -181,6 +185,7 @@ class AdminSeeder extends Seeder
                 'password' => Hash::make('admin123'),
                 'role_id' => $superAdmin->id,
                 'is_active' => true,
+                'must_change_password' => true,
             ]
         );
     }

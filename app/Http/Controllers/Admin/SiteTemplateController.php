@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\SiteTemplateResource;
 use App\Models\AiTool;
+use App\Models\Setting;
 use App\Models\SiteTemplate;
 use App\Services\AI\SiteTemplateCacheService;
 use Illuminate\Http\Request;
@@ -54,12 +54,28 @@ class SiteTemplateController extends Controller
 
         $missingSlugs = array_diff($slugs, $bundledTools->pluck('slug')->all());
 
+        $chatbotSettings = null;
+        if ($template->slug === 'ai-chatbot') {
+            $chatbotSettings = Setting::getByGroup('chatbot');
+        }
+
+        $chatModels = [];
+        $providerRegistry = app(\App\Services\AI\ProviderRegistry::class);
+        foreach ($providerRegistry->getEnabledProviders() as $name => $models) {
+            $label = config("ai.providers.{$name}.name", ucfirst($name));
+            foreach ($models as $model) {
+                $chatModels[$model] = $label . ' — ' . $model;
+            }
+        }
+
         return Inertia::render('Admin/Appearance/SiteTemplateEditor', [
             'template' => array_merge($template->toArray(), [
                 'bundled_tool_slugs' => $slugs,
             ]),
             'bundled_tools' => $bundledTools,
             'missing_tool_slugs' => array_values($missingSlugs),
+            'chatbotSettings' => $chatbotSettings,
+            'chatModels' => $chatModels,
         ]);
     }
 
@@ -117,6 +133,40 @@ class SiteTemplateController extends Controller
         ]);
 
         return back()->with('success', translate('Appearance reset to global defaults.'));
+    }
+
+    public function saveChatbotSettings(Request $request, SiteTemplate $template)
+    {
+        if ($template->slug !== 'ai-chatbot') {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'hide_site_header' => 'boolean',
+            'hide_site_footer' => 'boolean',
+            'allow_guest_messages' => 'boolean',
+            'guest_max_messages' => 'integer|min:0|max:100',
+            'guest_max_tokens' => 'integer|min:100|max:8000',
+            'free_credits_per_message' => 'numeric|min:0',
+            'free_max_tokens' => 'integer|min:100|max:16000',
+            'free_max_chat_history' => 'integer|min:1|max:500',
+            'free_max_file_size_mb' => 'integer|min:0|max:50',
+            'pro_credits_per_message' => 'numeric|min:0',
+            'pro_max_tokens' => 'integer|min:100|max:16000',
+            'pro_max_file_size_mb' => 'integer|min:0|max:100',
+            'pro_unlimited_history' => 'boolean',
+            'show_token_usage' => 'boolean',
+            'show_credits_charged' => 'boolean',
+            'allow_model_select' => 'boolean',
+            'show_friendly_model_names' => 'boolean',
+            'default_chat_model' => 'nullable|string|max:100',
+        ]);
+
+        foreach ($validated as $key => $value) {
+            settings_set($key, $value, is_bool($value) ? 'boolean' : (is_int($value) ? 'integer' : 'string'), 'chatbot');
+        }
+
+        return back()->with('success', translate('Chatbot settings saved.'));
     }
 
     private function resolveBundledSlugs(SiteTemplate $template): array

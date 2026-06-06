@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use Throwable;
+
+class ImageGenerationService
+{
+    private ?string $provider;
+    private ?string $apiKey;
+
+    public function __construct(?string $provider = null, ?string $apiKey = null)
+    {
+        $this->provider = $provider;
+        $this->apiKey = $apiKey;
+    }
+
+    public static function fromSettings(): self
+    {
+        $provider = settings('external_image_generation_provider', 'openai_dalle');
+        $apiKey = settings("external_image_generation_{$provider}_api_key");
+
+        return new self($provider, $apiKey);
+    }
+
+    public function isConfigured(): bool
+    {
+        return filled($this->apiKey);
+    }
+
+    public function testConnection(): array
+    {
+        if (! $this->isConfigured()) {
+            return ['success' => false, 'error' => 'No API key configured.'];
+        }
+
+        try {
+            $response = match ($this->provider) {
+                'openai_dalle', 'stability_ai' => Http::timeout(15)->withToken($this->apiKey)->get('https://api.openai.com/v1/models'),
+                'replicate_sd' => Http::timeout(15)->withToken($this->apiKey)->get('https://api.replicate.com/v1/account'),
+                'fal_flux' => Http::timeout(15)->withToken($this->apiKey)->get('https://fal.run/fal-ai/'),
+                               'ideogram' => Http::timeout(15)->withHeader('Api-Key', $this->apiKey)->get('https://api.ideogram.ai/balance'),
+                default => Http::timeout(15)->get('https://httpbin.org/get'),
+            };
+
+            return ['success' => $response->successful(), 'message' => "{$this->provider} API reachable."];
+        } catch (Throwable $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+}

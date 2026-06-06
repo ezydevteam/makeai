@@ -226,7 +226,15 @@ class UserManagementController extends Controller
             'Expires' => '0',
         ];
 
-        $columns = ['ULID', 'Name', 'Email', 'Credits', 'Plan', 'Status', 'Joined At'];
+        $columns = [
+            translate('ULID'),
+            translate('Name'),
+            translate('Email'),
+            translate('Credits'),
+            translate('Plan'),
+            translate('Status'),
+            translate('Joined At'),
+        ];
 
         $callback = function () use ($users, $columns) {
             $file = fopen('php://output', 'w');
@@ -238,8 +246,8 @@ class UserManagementController extends Controller
                     $user->name,
                     $user->email,
                     $user->credits,
-                    $user->plan?->name ?? 'None',
-                    $user->is_active ? 'Active' : 'Inactive',
+                    $user->plan?->name ?? translate('None'),
+                    $user->is_active ? translate('Active') : translate('Inactive'),
                     $user->created_at->format('Y-m-d H:i:s'),
                 ]);
             }

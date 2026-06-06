@@ -22,10 +22,23 @@ class FoundationSeeder extends Seeder
     private function seedSettings(): void
     {
         $settings = [
+            // Branding identity
+            ['key' => 'site_name', 'value' => 'MakeAI', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_tagline', 'value' => 'One platform. Every AI tool.', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_description', 'value' => 'Generate content, images, code, and more with AI.', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_logo_light', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_logo_dark', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_favicon_ico', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_favicon_png', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_og_image', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_copyright_text', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_support_email', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_support_url', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_terms_url', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+            ['key' => 'site_privacy_url', 'value' => '', 'type' => 'string', 'group' => 'branding'],
+
             // General
-            ['key' => 'site_name', 'value' => 'MakeAI', 'type' => 'string', 'group' => 'general'],
-            ['key' => 'site_tagline', 'value' => 'One platform. Every AI tool.', 'type' => 'string', 'group' => 'general'],
-            ['key' => 'site_description', 'value' => 'Generate content, images, code, and more with AI.', 'type' => 'string', 'group' => 'general'],
+            ['key' => 'site_url', 'value' => 'http://localhost', 'type' => 'string', 'group' => 'general'],
             ['key' => 'timezone', 'value' => 'UTC', 'type' => 'string', 'group' => 'general'],
             ['key' => 'maintenance_mode', 'value' => '0', 'type' => 'boolean', 'group' => 'general'],
             ['key' => 'app_version', 'value' => '1.0.0', 'type' => 'string', 'group' => 'general'],
@@ -42,8 +55,14 @@ class FoundationSeeder extends Seeder
             ['key' => 'default_credits_new_user', 'value' => '100', 'type' => 'integer', 'group' => 'ai'],
 
             // License
+            ['key' => 'license_key', 'value' => '', 'type' => 'encrypted', 'group' => 'license'],
             ['key' => 'license_type', 'value' => '1', 'type' => 'integer', 'group' => 'license'],
             ['key' => 'license_verified', 'value' => '0', 'type' => 'boolean', 'group' => 'license'],
+            ['key' => 'license_buyer', 'value' => '', 'type' => 'string', 'group' => 'license'],
+            ['key' => 'license_purchase_date', 'value' => '', 'type' => 'string', 'group' => 'license'],
+            ['key' => 'license_domain', 'value' => '', 'type' => 'encrypted', 'group' => 'license'],
+            ['key' => 'license_last_reverify', 'value' => '', 'type' => 'string', 'group' => 'license'],
+            ['key' => 'license_grace_start', 'value' => null, 'type' => 'string', 'group' => 'license'],
             ['key' => 'subscriptions_enabled', 'value' => '0', 'type' => 'boolean', 'group' => 'license'],
             ['key' => 'default_pricing_country', 'value' => 'US', 'type' => 'string', 'group' => 'pricing'],
             ['key' => 'pricing_trusted_proxy_ips', 'value' => '', 'type' => 'string', 'group' => 'pricing'],
@@ -83,6 +102,75 @@ class FoundationSeeder extends Seeder
             ['key' => 'comments_require_approval', 'value' => '0', 'type' => 'boolean', 'group' => 'comments'],
             ['key' => 'comments_notify_admin', 'value' => '0', 'type' => 'boolean', 'group' => 'comments'],
             ['key' => 'comments_poll_seconds', 'value' => '60', 'type' => 'integer', 'group' => 'comments'],
+
+            // Rate Limits — text_gen
+            ['key' => 'rl_text_gen_guest_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_text_gen_guest_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_text_gen_free_user_max', 'value' => '30', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_text_gen_free_user_window', 'value' => '60', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_text_gen_pro_user_max', 'value' => '120', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_text_gen_pro_user_window', 'value' => '60', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — auth
+            ['key' => 'rl_auth_guest_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_auth_guest_window', 'value' => '900', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_auth_free_user_max', 'value' => '10', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_auth_free_user_window', 'value' => '900', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_auth_pro_user_max', 'value' => '20', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_auth_pro_user_window', 'value' => '900', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — otp
+            ['key' => 'rl_otp_guest_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_otp_guest_window', 'value' => '900', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_otp_free_user_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_otp_free_user_window', 'value' => '900', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_otp_pro_user_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_otp_pro_user_window', 'value' => '900', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — contact
+            ['key' => 'rl_contact_guest_max', 'value' => '3', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_contact_guest_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_contact_free_user_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_contact_free_user_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_contact_pro_user_max', 'value' => '10', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_contact_pro_user_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — comments
+            ['key' => 'rl_comments_guest_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_comments_guest_window', 'value' => '60', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_comments_free_user_max', 'value' => '10', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_comments_free_user_window', 'value' => '60', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_comments_pro_user_max', 'value' => '20', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_comments_pro_user_window', 'value' => '60', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — newsletter
+            ['key' => 'rl_newsletter_guest_max', 'value' => '3', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_newsletter_guest_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_newsletter_free_user_max', 'value' => '3', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_newsletter_free_user_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_newsletter_pro_user_max', 'value' => '3', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_newsletter_pro_user_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — public
+            ['key' => 'rl_public_guest_max', 'value' => '5', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_public_guest_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_public_free_user_max', 'value' => '15', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_public_free_user_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_public_pro_user_max', 'value' => '30', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_public_pro_user_window', 'value' => '3600', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — social_auth
+            ['key' => 'rl_social_auth_guest_max', 'value' => '10', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_social_auth_guest_window', 'value' => '300', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_social_auth_free_user_max', 'value' => '10', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_social_auth_free_user_window', 'value' => '300', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_social_auth_pro_user_max', 'value' => '10', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_social_auth_pro_user_window', 'value' => '300', 'type' => 'integer', 'group' => 'rate_limits'],
+
+            // Rate Limits — AI abuse
+            ['key' => 'rl_ai_abuse_threshold', 'value' => '100', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_ai_abuse_window', 'value' => '60', 'type' => 'integer', 'group' => 'rate_limits'],
+            ['key' => 'rl_ai_abuse_ban_duration', 'value' => '86400', 'type' => 'integer', 'group' => 'rate_limits'],
         ];
 
         foreach ($settings as $setting) {

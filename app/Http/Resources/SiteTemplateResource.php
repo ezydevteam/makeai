@@ -26,9 +26,9 @@ class SiteTemplateResource extends JsonResource
             'font_heading' => $this->font_heading,
             'font_body' => $this->font_body,
 
-            'hero_headline' => $this->hero_headline ?? settings('app_name', config('app.name')),
+            'hero_headline' => $this->hero_headline ?? settings('site_name', config('app.name')),
             'hero_subheadline' => $this->hero_subheadline ?? settings('site_tagline', ''),
-            'hero_cta_text' => $this->hero_cta_text ?? __('Get Started'),
+            'hero_cta_text' => $this->hero_cta_text ?? translate('Get Started'),
             'hero_cta_url' => $this->hero_cta_url ?? route('register'),
             'hero_bg_image' => $this->hero_bg_image ? Storage::url($this->hero_bg_image) : null,
 

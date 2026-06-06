@@ -47,11 +47,6 @@ class Plan extends Model
         });
     }
 
-    public function subscriptions()
-    {
-        return $this->hasMany(Subscription::class);
-    }
-
     public function countryPrices()
     {
         return $this->hasMany(PlanCountryPrice::class);

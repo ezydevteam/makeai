@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { usePage, useForm } from '@inertiajs/vue3';
+import { useTranslate } from '@/Composables/useTranslate'
 
 const page = usePage();
+const { t } = useTranslate()
 const settings = computed<Record<string, any>>(() => (page.props.newsletterSettings as Record<string, any>) || {});
 
 const isVisible = ref(false);
@@ -122,19 +124,19 @@ const submit = () => {
                         </svg>
                     </div>
                     
-                    <h2 class="text-2xl font-black text-gray-900 mb-3">{{ settings.newsletter_popup_title || 'Subscribe to our Newsletter' }}</h2>
-                    <p class="text-gray-600 mb-8">{{ settings.newsletter_popup_description || 'Get the latest updates delivered directly to your inbox.' }}</p>
+                    <h2 class="text-2xl font-black text-gray-900 mb-3">{{ settings.newsletter_popup_title || t('Subscribe to our Newsletter') }}</h2>
+                    <p class="text-gray-600 mb-8">{{ settings.newsletter_popup_description || t('Get the latest updates delivered directly to your inbox.') }}</p>
 
                     <form v-if="!form.recentlySuccessful" @submit.prevent="submit" class="space-y-4">
                         <div>
-                            <input v-model="form.name" type="text" placeholder="Your Name (Optional)" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all" />
+                            <input v-model="form.name" type="text" :placeholder="t('Your Name (Optional)')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all" />
                         </div>
                         <div>
-                            <input v-model="form.email" type="email" :placeholder="settings.newsletter_popup_placeholder || 'Enter your email address'" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all" required />
+                            <input v-model="form.email" type="email" :placeholder="settings.newsletter_popup_placeholder || t('Enter your email address')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all" required />
                         </div>
                         <button type="submit" :disabled="form.processing" class="w-full py-3.5 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50">
-                            <span v-if="form.processing">Subscribing...</span>
-                            <span v-else>{{ settings.newsletter_popup_submit_text || 'Subscribe' }}</span>
+                            <span v-if="form.processing">{{ t('Subscribing...') }}</span>
+                            <span v-else>{{ settings.newsletter_popup_submit_text || t('Subscribe') }}</span>
                         </button>
                     </form>
 
@@ -142,10 +144,10 @@ const submit = () => {
                         <svg class="w-12 h-12 text-success-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <p class="font-bold text-success-800">{{ settings.newsletter_popup_success_message || 'Thanks for subscribing!' }}</p>
+                        <p class="font-bold text-success-800">{{ settings.newsletter_popup_success_message || t('Thanks for subscribing!') }}</p>
                     </div>
 
-                    <p class="text-xs text-gray-400 mt-6">We respect your privacy. Unsubscribe at any time.</p>
+                    <p class="text-xs text-gray-400 mt-6">{{ t('We respect your privacy. Unsubscribe at any time.') }}</p>
                 </div>
             </div>
         </div>

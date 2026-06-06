@@ -1,0 +1,1 @@
+import{a as e,x as t}from"./dist-CZvXzufH.js";function n(){let n=e(),r=t(()=>n.props.translations??{});return{t:(e,t)=>{let n=r.value[e]??e;return t&&Object.entries(t).forEach(([e,t])=>{n=n.replace(RegExp(`:${e}`,`g`),String(t))}),n}}}export{n as t};

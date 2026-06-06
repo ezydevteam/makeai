@@ -15,8 +15,8 @@ interface AiDriverInterface
      * Send a synchronous chat completion request.
      *
      * @param  array  $messages  [['role' => 'user', 'content' => 'Hello']]
-     * @param  string  $model    Model identifier
-     * @param  array   $options  Additional options (temperature, max_tokens, etc.)
+     * @param  string  $model  Model identifier
+     * @param  array  $options  Additional options (temperature, max_tokens, etc.)
      * @return array{content: string, input_tokens: int, output_tokens: int, model: string}
      */
     public function chatCompletion(array $messages, string $model, array $options = []): array;
@@ -24,9 +24,6 @@ interface AiDriverInterface
     /**
      * Stream a chat completion, yielding tokens as they arrive.
      *
-     * @param  array  $messages
-     * @param  string $model
-     * @param  array  $options
      * @return \Generator Yields string tokens, final yield is array with usage stats
      */
     public function streamChatCompletion(array $messages, string $model, array $options = []): \Generator;

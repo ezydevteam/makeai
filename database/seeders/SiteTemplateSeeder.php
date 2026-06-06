@@ -11,6 +11,17 @@ class SiteTemplateSeeder extends Seeder
     {
         $templates = [
             [
+                'slug' => 'ai-chatbot',
+                'name' => 'AI Chatbot',
+                'tagline' => 'ChatGPT / Claude-style conversational AI',
+                'description' => 'Full-screen conversational AI experience with product modes, projects, and streaming chat.',
+                'icon' => 'ti-messages',
+                'layout_component' => 'AiChatTemplate',
+                'bundled_tool_slugs' => json_encode([]),
+                'requires_pro' => false,
+                'sort_order' => 1,
+            ],
+            [
                 'slug' => 'social-media-manager',
                 'name' => 'Social Media Manager',
                 'tagline' => 'Your all-in-one social media content command center',
@@ -83,20 +94,7 @@ class SiteTemplateSeeder extends Seeder
                 'color_surface' => '#161b22',
                 'color_text' => '#e6edf3',
             ],
-            [
-                'slug' => 'ai-chatbot-builder',
-                'name' => 'AI Chatbot Builder',
-                'tagline' => 'Build conversational AI experiences',
-                'description' => 'Conversational bot creation and knowledge base management.',
-                'icon' => 'ti-messages',
-                'layout_component' => 'AiChatbotBuilderTemplate',
-                'bundled_tool_slugs' => json_encode([
-                    'chatbot-script', 'faq-generator', 'kb-article',
-                    'onboarding-guide',
-                ]),
-                'requires_pro' => true,
-                'sort_order' => 7,
-            ],
+
             [
                 'slug' => 'academic-writer',
                 'name' => 'Academic Writer',
@@ -109,7 +107,7 @@ class SiteTemplateSeeder extends Seeder
                     'citation-generator', 'study-guide',
                 ]),
                 'requires_pro' => false,
-                'sort_order' => 8,
+                'sort_order' => 7,
             ],
         ];
 

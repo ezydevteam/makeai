@@ -3,25 +3,36 @@
 namespace App\Services\AI\Drivers;
 
 use App\Services\AI\Contracts\AiDriverInterface;
+use App\Services\AI\Providers\PerplexityProvider;
 use Illuminate\Contracts\Events\Dispatcher;
-use Laravel\Ai\AnonymousAgent;
+use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\Providers\EmbeddingProvider;
 use Laravel\Ai\Contracts\Providers\TextProvider;
+use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Gateway\Anthropic\AnthropicGateway;
 use Laravel\Ai\Gateway\Gemini\GeminiGateway;
 use Laravel\Ai\Gateway\OpenAi\OpenAiGateway;
 use Laravel\Ai\Messages\AssistantMessage;
 use Laravel\Ai\Messages\UserMessage;
-use Laravel\Ai\Streaming\Events\StreamEnd;
-use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Providers\AnthropicProvider;
+use Laravel\Ai\Providers\BedrockProvider;
+use Laravel\Ai\Providers\CohereProvider;
 use Laravel\Ai\Providers\DeepSeekProvider;
+use Laravel\Ai\Providers\ElevenLabsProvider;
 use Laravel\Ai\Providers\GeminiProvider;
 use Laravel\Ai\Providers\GroqProvider;
+use Laravel\Ai\Providers\JinaProvider;
 use Laravel\Ai\Providers\MistralProvider;
+use Laravel\Ai\Providers\OllamaProvider;
 use Laravel\Ai\Providers\OpenAiProvider;
 use Laravel\Ai\Providers\OpenRouterProvider;
+use Laravel\Ai\Providers\VoyageAiProvider;
 use Laravel\Ai\Providers\XaiProvider;
+use Laravel\Ai\Streaming\Events\ReasoningDelta;
+use Laravel\Ai\Streaming\Events\ReasoningEnd;
+use Laravel\Ai\Streaming\Events\ReasoningStart;
+use Laravel\Ai\Streaming\Events\StreamEnd;
+use Laravel\Ai\Streaming\Events\TextDelta;
 
 /**
  * LaravelAiDriver — wraps Laravel AI SDK providers behind AiDriverInterface.
@@ -60,6 +71,13 @@ class LaravelAiDriver implements AiDriverInterface
         'openrouter' => 'openrouter',
         'groq' => 'groq',
         'mistral' => 'mistral',
+        'ollama' => 'ollama',
+        'bedrock' => 'bedrock',
+        'cohere' => 'cohere',
+        'eleven' => 'eleven',
+        'jina' => 'jina',
+        'voyageai' => 'voyageai',
+        'perplexity' => 'perplexity',
     ];
 
     public function __construct(
@@ -109,9 +127,11 @@ class LaravelAiDriver implements AiDriverInterface
 
     public function chatCompletion(array $messages, string $model, array $options = []): array
     {
+        $this->injectConfigForSdk();
+
         [$instructions, $history, $prompt] = $this->splitForAgent($messages);
 
-        $agent = new \Laravel\Ai\AnonymousAgent(
+        $agent = new ThinkingAgent(
             instructions: $instructions,
             messages: $history,
             tools: [],
@@ -126,17 +146,19 @@ class LaravelAiDriver implements AiDriverInterface
 
         return [
             'content' => $response->text,
-            'input_tokens' => $response->usage->inputTokens,
-            'output_tokens' => $response->usage->outputTokens,
+            'input_tokens' => $response->usage->promptTokens,
+            'output_tokens' => $response->usage->completionTokens,
             'model' => $response->meta->model,
         ];
     }
 
     public function streamChatCompletion(array $messages, string $model, array $options = []): \Generator
     {
+        $this->injectConfigForSdk();
+
         [$instructions, $history, $prompt] = $this->splitForAgent($messages);
 
-        $agent = new AnonymousAgent(
+        $agent = new ThinkingAgent(
             instructions: $instructions,
             messages: $history,
             tools: [],
@@ -150,17 +172,28 @@ class LaravelAiDriver implements AiDriverInterface
         );
 
         $tokens = [];
+        $reasoningTokens = [];
         $usage = null;
+        $isReasoning = false;
 
         foreach ($stream as $event) {
-            if ($event instanceof TextDelta) {
-                $tokens[] = $event->text;
-                yield $event->text;
-            }
-            if ($event instanceof StreamEnd) {
+            if ($event instanceof ReasoningStart) {
+                $isReasoning = true;
+                yield ['reasoning_start' => true];
+            } elseif ($event instanceof ReasoningEnd) {
+                $isReasoning = false;
+                yield ['reasoning_end' => true];
+            } elseif ($event instanceof ReasoningDelta) {
+                $reasoningTokens[] = $event->delta;
+                yield ['reasoning' => $event->delta];
+            } elseif ($event instanceof TextDelta) {
+                $tokens[] = $event->delta;
+                yield $event->delta;
+            } elseif ($event instanceof StreamEnd) {
                 $usage = [
-                    'input_tokens' => $event->usage->inputTokens,
-                    'output_tokens' => $event->usage->outputTokens,
+                    'input_tokens' => $event->usage->promptTokens,
+                    'output_tokens' => $event->usage->completionTokens,
+                    'reasoning_tokens' => $event->usage->reasoningTokens,
                     'model' => $model,
                     'content' => implode('', $tokens),
                 ];
@@ -211,6 +244,22 @@ class LaravelAiDriver implements AiDriverInterface
             'model' => $response->meta->model,
             'tokens_used' => $response->tokens,
         ])->all();
+    }
+
+    // ─── Config Injection (for SDK resolution) ───────────────────
+
+    /**
+     * Inject the dynamic DB-stored API key into config so the SDK's AiManager
+     * can read it when resolving providers.
+     */
+    private function injectConfigForSdk(): void
+    {
+        if ($this->apiKey) {
+            config()->set("ai.providers.{$this->driverName}.key", $this->apiKey);
+        }
+        if ($this->baseUrl) {
+            config()->set("ai.providers.{$this->driverName}.url", $this->baseUrl);
+        }
     }
 
     // ─── Provider Resolution ─────────────────────────────────────
@@ -274,6 +323,13 @@ class LaravelAiDriver implements AiDriverInterface
             'openrouter' => new OpenRouterProvider($config, $events),
             'groq' => new GroqProvider($config, $events),
             'mistral' => new MistralProvider($config, $events),
+            'ollama' => new OllamaProvider($config, $events),
+            'bedrock' => new BedrockProvider($config, $events),
+            'cohere' => new CohereProvider($config, $events),
+            'eleven' => new ElevenLabsProvider($config, $events),
+            'jina' => new JinaProvider($config, $events),
+            'voyageai' => new VoyageAiProvider($config, $events),
+            'perplexity' => new PerplexityProvider(new OpenAiGateway($events), $config, $events),
             default => throw new \RuntimeException("Unsupported AI driver: {$driver}"),
         };
     }
@@ -303,7 +359,7 @@ class LaravelAiDriver implements AiDriverInterface
 
         foreach ($messages as $i => $msg) {
             if ($msg['role'] === 'system') {
-                $instructions .= ($instructions ? "\n" : '') . $msg['content'];
+                $instructions .= ($instructions ? "\n" : '').$msg['content'];
             } elseif ($msg['role'] === 'assistant') {
                 $history[] = new AssistantMessage($msg['content']);
             } elseif ($msg['role'] === 'user') {

@@ -2,10 +2,8 @@
 
 namespace App\Providers;
 
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\RateLimiter;
+use App\Services\AddonService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -24,48 +22,20 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureBroadcasting();
+        $this->registerAddons();
 
         Blade::directive('ads', function ($zone) {
             return "<?php echo app(\\App\\Services\\AdsService::class)->render($zone); ?>";
         });
+    }
 
-        RateLimiter::for('ai_text_gen', function (Request $request) {
-            $limit = (int) settings('ai_text_generation_rate_limit_per_minute', 60);
-
-            return Limit::perMinute(max(1, $limit))->by(
-                $request->user()?->id ?: $request->ip()
-            );
-        });
-
-        RateLimiter::for('admin-login', function (Request $request) {
-            return Limit::perMinute(10)->by($request->ip());
-        });
-
-        RateLimiter::for('admin-2fa', function (Request $request) {
-            return Limit::perMinute(10)->by($request->session()->get('admin_2fa_id', 'guest').'|'.$request->ip());
-        });
-
-        RateLimiter::for('admin-password-email', function (Request $request) {
-            return Limit::perHour(3)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
-        });
-
-        RateLimiter::for('admin-password-reset', function (Request $request) {
-            return Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
-        });
-
-        RateLimiter::for('password-email', function (Request $request) {
-            return Limit::perHour(3)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
-        });
-
-        RateLimiter::for('password-reset', function (Request $request) {
-            return Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip());
-        });
-
-        RateLimiter::for('user-2fa', function (Request $request) {
-            return Limit::perMinutes(15, 5)->by(
-                $request->session()->get('user_2fa_id', $request->user()?->id ?: 'guest').'|'.$request->ip()
-            );
-        });
+    private function registerAddons(): void
+    {
+        try {
+            app(AddonService::class)->registerActiveAddons();
+        } catch (\Throwable) {
+            // Silently skip if addons directory or settings are unavailable
+        }
     }
 
     private function configureBroadcasting(): void

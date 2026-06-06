@@ -14,6 +14,44 @@ class AdminRole extends Model
         'is_system' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        $superSlug = config('auth.providers.admins.super_admin_slug', 'super-admin');
+
+        // Prevent setting is_system=true on any non-super-admin role via raw DB access
+        static::creating(function (AdminRole $role) use ($superSlug) {
+            if ($role->is_system && $role->slug !== $superSlug) {
+                $role->is_system = false;
+            }
+        });
+
+        static::updating(function (AdminRole $role) use ($superSlug) {
+            $originalSlug = $role->getOriginal('slug');
+
+            // Block changing the super-admin slug to something else
+            if ($originalSlug === $superSlug && $role->slug !== $superSlug) {
+                $role->slug = $superSlug;
+            }
+
+            // Block changing a non-super-admin slug to super-admin
+            if ($originalSlug !== $superSlug && $role->slug === $superSlug) {
+                $role->slug = $originalSlug;
+            }
+
+            // Block setting is_system on non-super-admin roles
+            if ($role->is_system && $role->slug !== $superSlug) {
+                $role->is_system = false;
+            }
+        });
+
+        // Prevent deleting the super-admin role
+        static::deleting(function (AdminRole $role) use ($superSlug) {
+            if ($role->slug === $superSlug) {
+                return false;
+            }
+        });
+    }
+
     /**
      * Permissions assigned to this role.
      */

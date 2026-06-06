@@ -52,10 +52,10 @@ class HeaderBuilderController extends Controller
                 'blocks' => [
                     ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => [
                         'image' => null,
-                        'alt' => settings('app_name', 'MakeAI'),
+                        'alt' => settings('app_name', translate('Application')),
                         'link' => '/',
                         'show_text' => true,
-                        'text' => settings('app_name', 'MakeAI'),
+                        'text' => settings('app_name', translate('Application')),
                     ]],
                     ['id' => 'nav', 'type' => 'navigation', 'enabled' => true, 'config' => ['menu_slug' => 'main', 'alignment' => 'center', 'text_color' => '', 'hover_color' => '', 'hover_style' => 'underline', 'submenu_bg_color' => '', 'submenu_text_color' => '']],
                     ['id' => 'search', 'type' => 'search', 'enabled' => false, 'config' => ['compact' => false, 'search_style' => 'box', 'enable_live_search' => true, 'show_suggestions' => true, 'icon_class' => 'ti ti-search', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
@@ -109,10 +109,10 @@ class HeaderBuilderController extends Controller
                     ]],
                     ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => [
                         'image' => null,
-                        'alt' => settings('app_name', 'MakeAI'),
+                        'alt' => settings('app_name', translate('Application')),
                         'link' => '/',
                         'show_text' => true,
-                        'text' => settings('app_name', 'MakeAI'),
+                        'text' => settings('app_name', translate('Application')),
                     ]],
                     ['id' => 'mobile_notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => []],
                     ['id' => 'mobile_dark', 'type' => 'dark_mode', 'enabled' => true, 'config' => ['label' => translate('Theme'), 'icon_class' => '', 'show_label' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],

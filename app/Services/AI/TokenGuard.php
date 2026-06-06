@@ -53,13 +53,13 @@ class TokenGuard
             // 2. Check user daily limit
             $dailyLimit = $user->daily_limit ?? (float) settings('user_daily_credit_limit', 0);
             if ($dailyLimit > 0 && ($user->credits_used_today + $estimatedCost) > $dailyLimit) {
-                throw new CreditLimitException('daily');
+                throw new CreditLimitException('daily', $dailyLimit - $user->credits_used_today);
             }
 
             // 3. Check user monthly limit
             $monthlyLimit = $user->monthly_limit ?? (float) settings('user_monthly_credit_limit', 0);
             if ($monthlyLimit > 0 && ($user->credits_used_month + $estimatedCost) > $monthlyLimit) {
-                throw new CreditLimitException('monthly');
+                throw new CreditLimitException('monthly', $monthlyLimit - $user->credits_used_month);
             }
 
             // 4. Check user credit balance
@@ -95,6 +95,7 @@ class TokenGuard
      * POST-COMPLETION — run AFTER receiving AI response.
      * Deducts credits, updates counters, logs usage.
      *
+     * @param  bool  $success  true = full credit deduction, false = partial tokens logged as 'cancelled', no deduction
      * @return float Credits actually used
      */
     public static function after(
@@ -105,7 +106,10 @@ class TokenGuard
         string $provider = 'openai',
         string $type = 'chat',
         array $metadata = [],
-        bool $deductCredits = true
+        bool $deductCredits = true,
+        bool $success = true,
+        ?string $requestId = null,
+        ?int $responseTimeMs = null
     ): float {
         // Fetch model config from DB for pricing
         $dbModel = AiModel::where('slug', $model)->first();
@@ -115,8 +119,8 @@ class TokenGuard
 
         $deducted = false;
 
-        // Deduct credits via the User model method (creates transaction record)
-        if ($user && $deductCredits) {
+        // Only deduct credits on successful completions
+        if ($user && $deductCredits && $success) {
             $deducted = $user->deductCredits($credits, "AI generation: {$model}", [
                 'provider' => $provider,
                 'model' => $model,
@@ -126,22 +130,28 @@ class TokenGuard
             ]);
         }
 
-        // Update global spend tracker in cache using dated micro-USD precision.
-        self::incrementGlobalSpend($costUsd);
-        self::notifyHighAiCostIfNeeded();
+        // Update global spend tracker — only for completed requests
+        if ($success) {
+            self::incrementGlobalSpend($costUsd);
+            self::notifyHighAiCostIfNeeded();
+        }
 
-        $billingFailed = $deductCredits && ! $deducted;
+        $status = $success ? 'completed' : 'cancelled';
+        $billingFailed = $deductCredits && ! $deducted && $success;
 
         AiUsageLog::create([
             'user_id' => $user?->id,
             'provider' => $provider,
             'model' => $model,
             'type' => $type,
+            'tool_slug' => $metadata['template_slug'] ?? $metadata['tool_slug'] ?? null,
             'input_tokens' => $inputTokens,
             'output_tokens' => $outputTokens,
             'cost_usd' => $costUsd,
-            'credits_used' => $billingFailed ? 0 : ($deductCredits ? $credits : 0),
-            'status' => $billingFailed ? 'failed' : 'completed',
+            'credits_used' => ($success && $deductCredits && $deducted) ? $credits : 0,
+            'request_id' => $requestId,
+            'response_time_ms' => $responseTimeMs,
+            'status' => $billingFailed ? 'failed' : $status,
             'metadata' => $billingFailed
                 ? array_merge($metadata, [
                     'billing_error' => 'INSUFFICIENT_CREDITS_AFTER_COMPLETION',
@@ -150,7 +160,7 @@ class TokenGuard
                 : $metadata,
         ]);
 
-        return ($deductCredits && $deducted) ? $credits : 0.0;
+        return ($success && $deductCredits && $deducted) ? $credits : 0.0;
     }
 
     /**
@@ -197,6 +207,7 @@ class TokenGuard
             'provider' => $provider,
             'model' => $model,
             'type' => $type,
+            'tool_slug' => $metadata['template_slug'] ?? $metadata['tool_slug'] ?? null,
             'input_tokens' => $inputTokens,
             'output_tokens' => $outputTokens,
             'cost_usd' => $costUsd,

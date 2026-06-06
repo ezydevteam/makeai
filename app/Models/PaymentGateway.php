@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Crypt;
 
 class PaymentGateway extends Model
 {
@@ -43,7 +42,7 @@ class PaymentGateway extends Model
         }
 
         try {
-            return Crypt::decryptString((string) $value);
+            return \Illuminate\Support\Facades\Crypt::decryptString((string) $value);
         } catch (\Throwable) {
             return $default;
         }
@@ -53,7 +52,7 @@ class PaymentGateway extends Model
     {
         return collect($credentials)
             ->filter(fn ($value) => $value !== null && $value !== '')
-            ->map(fn ($value) => Crypt::encryptString((string) $value))
+            ->map(fn ($value) => \Illuminate\Support\Facades\Crypt::encryptString((string) $value))
             ->all();
     }
 

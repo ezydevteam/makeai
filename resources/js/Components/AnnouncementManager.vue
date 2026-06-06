@@ -168,7 +168,7 @@ onUnmounted(() => {
                 <span v-if="banner.title" class="font-bold hidden md:inline">{{ banner.title }}:</span>
                 <span v-html="banner.content"></span>
                 <a v-if="banner.cta_text && banner.cta_url" :href="banner.cta_url" class="flex-none rounded-full px-3.5 py-1 text-sm font-semibold shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" :style="{ backgroundColor: banner.text_color || '#ffffff', color: banner.bg_color || '#4f46e5' }">
-                    {{ banner.cta_text }} <span aria-hidden="true">&rarr;</span>
+                    {{ banner.cta_text }} <span aria-hidden="true">→</span>
                 </a>
             </div>
             <button @click="dismiss(banner)" type="button" class="flex-none p-1 focus-visible:outline-offset-[-4px] opacity-80 hover:opacity-100 transition-opacity">

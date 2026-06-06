@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Services\NotificationEventService;
+use App\Services\RateLimiterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
@@ -24,24 +25,47 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
-        $throttleKey = 'login:'.$request->ip();
-        $maxAttempts = (int) settings('login_throttle_max', 5);
+        $rateLimiter = app(RateLimiterService::class);
+        $result = $rateLimiter->attempt('auth', $request->ip());
 
-        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
-                'email' => [translate('Too many attempts. Try again in :seconds seconds.', ['seconds' => $seconds])],
+                'email' => [translate('Too many attempts. Try again in :seconds seconds.', [
+                    'seconds' => $result['retry_after_seconds'],
+                ])],
+            ]);
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        if ($user && $user->isLocked()) {
+            $minutes = (int) ceil(now()->diffInMinutes($user->locked_until));
+            throw ValidationException::withMessages([
+                'email' => [translate('Account locked for :minutes minutes due to too many attempts.', [
+                    'minutes' => $minutes,
+                ])],
             ]);
         }
 
         if (! Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
-            RateLimiter::hit($throttleKey, 900);
+            $rateLimiter->hit('auth', $request->ip(), 900);
+
+            if ($user) {
+                $user->incrementLoginAttempts();
+
+                if ($user->fresh()->isLocked()) {
+                    throw ValidationException::withMessages([
+                        'email' => [translate('Account locked for 15 minutes due to too many failed attempts.')],
+                    ]);
+                }
+            }
+
             throw ValidationException::withMessages([
                 'email' => [translate('These credentials do not match our records.')],
             ]);
         }
 
-        RateLimiter::clear($throttleKey);
+        $rateLimiter->clear('auth', $request->ip());
 
         $user = Auth::user();
 
@@ -52,9 +76,10 @@ class LoginController extends Controller
             ]);
         }
 
-        if ($user->hasTotpEnabled()) {
+        if ($user->two_factor_enabled) {
             $request->session()->put('user_2fa_id', $user->id);
             $request->session()->put('user_2fa_remember', $request->boolean('remember'));
+            $request->session()->put('user_2fa_method', $user->hasTotpEnabled() ? 'totp' : 'otp');
             Auth::logout();
 
             return redirect()->route('two-factor.show');

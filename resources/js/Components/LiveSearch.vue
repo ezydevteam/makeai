@@ -205,9 +205,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div ref="root" class="relative" :class="compact ? 'w-full' : 'w-52 focus-within:w-72 transition-all duration-200'">
+    <div
+        ref="root"
+        class="relative transition-[width,transform] duration-200 ease-out"
+        :class="compact ? 'w-full' : 'w-52 focus-within:w-80 focus-within:scale-[1.01]'"
+    >
         <label class="sr-only" :for="`live-search-${context}`">{{ t('Search') }}</label>
-        <svg class="pointer-events-none absolute inset-inline-start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <input
@@ -217,20 +221,20 @@ onUnmounted(() => {
             type="search"
             autocomplete="off"
             :placeholder="t('Search...')"
-            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 ps-9 pe-10 text-sm text-gray-900 shadow-sm transition-all focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 ps-10 pe-11 text-sm text-gray-900 shadow-sm transition-all focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
             @focus="focus"
             @keydown.down.prevent="navigate(1)"
             @keydown.up.prevent="navigate(-1)"
             @keydown.enter.prevent="submit"
             @keydown.esc.prevent="closeOnEscape"
         >
-        <svg v-if="loading" class="absolute inset-inline-end-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
+        <svg v-if="loading" class="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
 
         <Transition enter-active-class="transition ease-out duration-150" enter-from-class="opacity-0 translate-y-1" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-1">
-            <div v-if="open" class="absolute inset-inline-end-0 top-full z-50 mt-2 w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+            <div v-if="open" class="absolute inset-inline-start-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
                 <div v-if="showSuggestions && props.showSuggestions" class="p-3">
                     <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Suggested searches') }}</p>
                     <button

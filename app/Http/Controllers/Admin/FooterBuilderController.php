@@ -17,7 +17,7 @@ class FooterBuilderController extends Controller
      */
     private function getDefaults(): array
     {
-        $appName = settings('app_name', 'MakeAI');
+        $appName = settings('app_name', translate('Application'));
 
         return [
             'layout' => 4, // 1, 2, 3, or 4 columns

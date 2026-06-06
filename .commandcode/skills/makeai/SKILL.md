@@ -643,7 +643,7 @@ resources/js/composables/useRateLimit.ts — countdown on 429
 
 ### COLOR USAGE
 
-**Primary color = Emerald Green `#10b981`**
+**Primary color = Blue `#1F75FE`**
 - Use for: primary buttons, active sidebar items, focus rings, success states, brand accents
 - Never use green for: errors, warnings, neutral info
 
@@ -1060,7 +1060,7 @@ Wrapper: white card, border, border-radius 12px, overflow hidden
 }
 ```
 
-**Icon box background = tool color at 10% opacity (e.g. `#10b981` → `rgba(16,185,129,0.1)`).**
+**Icon box background = tool color at 10% opacity (e.g. `#1F75FE` → `rgba(31,117,254,0.1)`).**
 **Icon color = tool's category color at full opacity.**
 **NEVER use a generic gray icon box — always use the tool's color.**
 
@@ -1357,3 +1357,29 @@ There is NO separate Vue file per tool. `ToolPage.vue` reads the `fields` JSON a
 | Can disable | ✅ Yes | ✅ Yes |
 | Shows lock icon in admin | ✅ Yes | ❌ No |
 s lock icon in admin | ✅ Yes | ❌ No |
+
+
+---
+
+### Use AppSelect for all `<select>` elements
+
+**Always** use the `AppSelect` component (`resources/js/Components/AppSelect.vue`) for every `<select>` in the frontend — user pages and admin pages alike. Never use native `<select>` directly.
+
+**Import:** `import AppSelect from '@/Components/AppSelect.vue'`
+
+**API:**
+```
+<AppSelect
+    v-model="form.field"
+    :options="[{ value: 'foo', label: 'Foo' }, { value: 'bar', label: 'Bar' }]"
+    placeholder="Select..."
+    label="Field Label"
+    :error="form.errors.field"
+    :live-search="true"
+    :multiple="false"
+/>
+```
+
+**Props:** `modelValue` (string|number|null), `options` (SelectOption[]), `placeholder`, `label`, `error`, `searchPlaceholder`, `liveSearch` (boolean, shows search input when options.length > size), `size` (number, dropdown height in items, default 8), `multiple` (boolean), `disabled`, `required`, `id`, `name`.
+
+**SelectOption interface:** `{ value: string | number, label: string, icon?: string, disabled?: boolean }`

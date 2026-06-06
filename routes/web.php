@@ -10,11 +10,13 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Auth\TwoFactorLoginController;
 use App\Http\Controllers\Auth\VerificationController;
+use App\Http\Controllers\Billing\StripeController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\HomepageController;
 use App\Http\Controllers\LiveSearchController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\NewsletterController;
@@ -23,16 +25,13 @@ use App\Http\Controllers\PricingController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\User\DashboardController;
 use App\Http\Controllers\User\SettingsController as UserSettingsController;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
-use App\Http\Controllers\HomepageController;
 use App\Http\Resources\SiteTemplateResource;
 use App\Models\AiTool;
-use App\Models\Faq;
 use App\Models\Page;
-use App\Models\Setting;
 use App\Models\SiteTemplate;
-use App\Models\Testimonial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
@@ -47,12 +46,27 @@ use Inertia\Inertia;
 |
 */
 
+// ─── Installation Wizard ────────────────────
+require __DIR__.'/install.php';
+
 // ─── Admin Routes ───────────────────────────
 Route::middleware('web')->prefix('admin')->group(base_path('routes/admin.php'));
 
 // ─── Public ─────────────────────────────────
 Route::get('/', function () {
     $slug = settings('homepage_template', 'default');
+
+    if ($slug === 'ai-chatbot') {
+        return Inertia::render('Chat/Index', [
+            'hide_header' => (bool) settings('hide_site_header', false),
+            'hide_footer' => (bool) settings('hide_site_footer', false),
+            'default_chat_model' => settings('default_chat_model', 'gpt-4o-mini'),
+            'allow_model_select' => (bool) settings('allow_model_select', true),
+            'show_friendly_model_names' => (bool) settings('show_friendly_model_names', false),
+            'allow_guest_messages' => (bool) settings('allow_guest_messages', false),
+            'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
+        ]);
+    }
 
     if ($slug === 'default') {
         return app(HomepageController::class)->show();
@@ -91,7 +105,7 @@ Route::get('/', function () {
 Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
 Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->name('affiliate.capture');
 Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch');
-Route::get('/live-search', LiveSearchController::class)->middleware('throttle:60,1')->name('live-search');
+Route::get('/live-search', LiveSearchController::class)->middleware('throttle:public,60,60')->name('live-search');
 
 // ─── Guest Auth ─────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -101,21 +115,21 @@ Route::middleware('guest')->group(function () {
     Route::post('register', [RegisterController::class, 'register'])->name('register.attempt');
     Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
         ->whereIn('provider', ['google', 'github', 'facebook', 'reddit', 'twitter'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:social_auth')
         ->name('social.redirect');
     Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
         ->whereIn('provider', ['google', 'github', 'facebook', 'reddit', 'twitter'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:social_auth')
         ->name('social.callback');
 
     // Password Reset
     Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-    Route::post('forgot-password', [PasswordResetController::class, 'sendResetOtp'])->middleware('throttle:password-email')->name('password.email');
+    Route::post('forgot-password', [PasswordResetController::class, 'sendResetOtp'])->middleware('throttle:otp,3,3600')->name('password.email');
     Route::get('reset-password', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-    Route::post('reset-password/verify', [PasswordResetController::class, 'verifyResetOtp'])->middleware('throttle:password-reset')->name('password.verify');
-    Route::post('reset-password', [PasswordResetController::class, 'resetPassword'])->middleware('throttle:password-reset')->name('password.update');
+    Route::post('reset-password/verify', [PasswordResetController::class, 'verifyResetOtp'])->middleware('throttle:otp,5,900')->name('password.verify');
+    Route::post('reset-password', [PasswordResetController::class, 'resetPassword'])->middleware('throttle:otp,5,900')->name('password.update');
     Route::get('two-factor', [TwoFactorLoginController::class, 'show'])->name('two-factor.show');
-    Route::post('two-factor', [TwoFactorLoginController::class, 'verify'])->middleware('throttle:user-2fa')->name('two-factor.verify');
+    Route::post('two-factor', [TwoFactorLoginController::class, 'verify'])->middleware('throttle:otp,5,900')->name('two-factor.verify');
 });
 
 // ─── Authenticated ──────────────────────────
@@ -132,13 +146,17 @@ Route::middleware('auth')->group(function () {
 
     // User Dashboard + AI Writer (verified only)
     Route::middleware('verified')->group(function () {
-        Route::get('/dashboard', function () {
-            return Inertia::render('User/Dashboard');
-        })->name('user.dashboard');
-        Route::get('/dashboard/settings', [UserSettingsController::class, 'show'])->name('user.settings');
-        Route::post('/dashboard/settings/two-factor', [UserSettingsController::class, 'enableTwoFactor'])->middleware('throttle:user-2fa')->name('user.settings.2fa.enable');
-        Route::post('/dashboard/settings/two-factor/disable', [UserSettingsController::class, 'disableTwoFactor'])->middleware('throttle:user-2fa')->name('user.settings.2fa.disable');
-        Route::post('/dashboard/settings/two-factor/recovery-codes', [UserSettingsController::class, 'regenerateRecoveryCodes'])->middleware('throttle:user-2fa')->name('user.settings.2fa.recovery-codes');
+        Route::get('/user/dashboard', [DashboardController::class, 'index'])->name('user.dashboard');
+        Route::get('/user/settings', [UserSettingsController::class, 'show'])->name('user.settings');
+        Route::post('/user/settings/two-factor', [UserSettingsController::class, 'enableTwoFactor'])->middleware('throttle:otp,5,900')->name('user.settings.2fa.enable');
+        Route::post('/user/settings/two-factor/disable', [UserSettingsController::class, 'disableTwoFactor'])->middleware('throttle:otp,5,900')->name('user.settings.2fa.disable');
+        Route::post('/user/settings/two-factor/recovery-codes', [UserSettingsController::class, 'regenerateRecoveryCodes'])->middleware('throttle:otp,5,900')->name('user.settings.2fa.recovery-codes');
+        Route::put('/user/profile', [UserSettingsController::class, 'updateProfile'])->name('user.profile.update');
+        Route::put('/user/profile/password', [UserSettingsController::class, 'updatePassword'])->name('user.password.update');
+        Route::put('/user/profile/avatar', [UserSettingsController::class, 'updateAvatar'])->name('user.avatar.update');
+        Route::get('/user/api-keys', [UserSettingsController::class, 'apiKeys'])->name('user.api-keys');
+        Route::post('/user/api-keys', [UserSettingsController::class, 'storeApiKey'])->name('user.api-keys.store');
+        Route::delete('/user/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('user.api-keys.destroy');
 
         Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
         Route::post('/checkout/coupon-preview', [CheckoutController::class, 'previewCoupon'])->name('checkout.coupon-preview');
@@ -147,11 +165,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/checkout/bank-transfer/{payment}/proof', [CheckoutController::class, 'uploadBankProof'])->name('checkout.bank.proof');
         Route::get('/checkout/paypal/return/{payment}', [CheckoutController::class, 'paypalReturn'])->name('checkout.paypal.return');
         Route::get('/checkout/pending/{payment}', [CheckoutController::class, 'pending'])->name('checkout.pending');
+        Route::get('/checkout/stripe', [StripeController::class, 'checkout'])->name('checkout.stripe');
+        Route::get('/billing-portal', [StripeController::class, 'billingPortal'])->name('billing.portal');
         Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
-        Route::get('/dashboard/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate.dashboard');
-        Route::post('/dashboard/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
-        Route::post('/dashboard/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
+        Route::get('/user/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate.dashboard');
+        Route::post('/user/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
+        Route::post('/user/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
 
         Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
         Route::patch('/documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
@@ -186,12 +206,12 @@ Route::get('/blog/tag/{slug}', [BlogController::class, 'tag'])->name('blog.tag')
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
 
 // ─── Public Community ───────────────────────
-Route::post('/comments', [CommentController::class, 'store'])->middleware('throttle:5,1')->name('comments.store');
+Route::post('/comments', [CommentController::class, 'store'])->middleware('throttle:comments')->name('comments.store');
 Route::patch('/comments/{comment}', [CommentController::class, 'update'])->middleware('auth')->name('comments.update');
 Route::delete('/comments/{comment}', [CommentController::class, 'destroy'])->middleware('auth')->name('comments.delete');
-Route::post('/comments/{comment}/like', [CommentController::class, 'like'])->middleware('throttle:20,1')->name('comments.like');
-Route::post('/comments/{comment}/report', [CommentController::class, 'report'])->middleware('throttle:5,1')->name('comments.report');
-Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:3,60')->name('newsletter.subscribe');
+Route::post('/comments/{comment}/like', [CommentController::class, 'like'])->middleware('throttle:comments,20,60')->name('comments.like');
+Route::post('/comments/{comment}/report', [CommentController::class, 'report'])->middleware('throttle:comments')->name('comments.report');
+Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:newsletter')->name('newsletter.subscribe');
 Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 
 // ─── Ads ────────────────────────────────────
@@ -201,10 +221,10 @@ Route::post('/api/ads/{ad}/click', [AdController::class, 'trackClick'])->name('a
 Route::get('/ads/click/{ad}', [AdController::class, 'click'])->name('ads.click');
 
 // ─── Contact ────────────────────────────────
-Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:contact')->name('contact.store');
 
 // ─── Payment Webhooks ───────────────────────
-Route::post('/webhooks/stripe', [PaymentWebhookController::class, 'stripe'])->name('webhooks.stripe');
+Route::post('/webhooks/stripe', [App\Http\Controllers\Billing\StripeWebhookController::class, 'handleWebhook'])->name('webhooks.stripe');
 Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->name('webhooks.paypal');
 Route::match(['get', 'post'], '/webhooks/paddle', [PaymentWebhookController::class, 'paddle'])->name('webhooks.paddle');
 Route::post('/webhooks/razorpay', [PaymentWebhookController::class, 'razorpay'])->name('webhooks.razorpay');
@@ -212,6 +232,20 @@ Route::match(['get', 'post'], '/webhooks/sslcommerz', [PaymentWebhookController:
 Route::post('/webhooks/coingate', [PaymentWebhookController::class, 'coingate'])->name('webhooks.coingate');
 Route::post('/webhooks/paystack', [PaymentWebhookController::class, 'paystack'])->name('webhooks.paystack');
 Route::match(['get', 'post'], '/webhooks/2checkout', [PaymentWebhookController::class, 'twoCheckout'])->name('webhooks.2checkout');
+
+// ─── Chat Routes ────────────────────────────
+Route::get('/chat', function () {
+    return Inertia::render('Chat/Index', [
+        'hide_header' => (bool) settings('hide_site_header', false),
+        'hide_footer' => (bool) settings('hide_site_footer', false),
+        'default_chat_model' => settings('default_chat_model', 'gpt-4o-mini'),
+        'allow_model_select' => (bool) settings('allow_model_select', true),
+        'show_friendly_model_names' => (bool) settings('show_friendly_model_names', false),
+        'allow_guest_messages' => (bool) settings('allow_guest_messages', false),
+        'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
+        'chat_credits_low_threshold' => (int) settings('chat_credits_low_threshold', 100),
+    ]);
+})->name('chat.index');
 
 // ─── Dynamic CMS Pages ──────────────────────
 Route::post('/{slug}/password', function (Request $request, string $slug) {

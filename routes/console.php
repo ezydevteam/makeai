@@ -30,6 +30,14 @@ Artisan::command('subscriptions:expire-past-due', function () {
     $this->info(translate(':count expired subscriptions processed.', ['count' => $expired]));
 })->purpose('Expire past-due subscriptions and notify users');
 
+Artisan::command('notes:prune-expired', function () {
+    $deleted = \App\Models\AdminNote::whereNotNull('auto_delete_date')
+        ->where('auto_delete_date', '<=', now())
+        ->delete();
+
+    $this->info(translate(':count expired notes pruned.', ['count' => $deleted]));
+})->purpose('Delete admin notes past their auto-delete date');
+
 Schedule::command('ai:reset-usage-counters')
     ->dailyAt('00:05')
     ->withoutOverlapping();
@@ -40,6 +48,18 @@ Schedule::command('notifications:subscription-reminders')
 
 Schedule::command('subscriptions:expire-past-due')
     ->hourly()
+    ->withoutOverlapping();
+
+Schedule::command('notes:prune-expired')
+    ->hourly()
+    ->withoutOverlapping();
+
+Schedule::command('exports:cleanup')
+    ->daily()
+    ->withoutOverlapping();
+
+Schedule::command('license:reverify')
+    ->daily()
     ->withoutOverlapping();
 
 Schedule::call(function (): void {

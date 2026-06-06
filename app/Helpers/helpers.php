@@ -241,16 +241,6 @@ if (! function_exists('estimate_token_cost')) {
 |--------------------------------------------------------------------------
 */
 
-if (! function_exists('get_license_type')) {
-    /**
-     * Get the license type: 1 = Regular, 2 = Extended.
-     */
-    function get_license_type(): int
-    {
-        return (int) settings('license_type', 1);
-    }
-}
-
 if (! function_exists('is_extended_license')) {
     /**
      * Check if the license is Extended (type 2).
@@ -268,29 +258,6 @@ if (! function_exists('is_regular_license')) {
     function is_regular_license(): bool
     {
         return get_license_type() === 1;
-    }
-}
-
-if (! function_exists('isProAvailable')) {
-    /**
-     * Check if subscription/billing features are available.
-     * Requires Extended License AND subscriptions enabled in settings.
-     */
-    function isProAvailable(): bool
-    {
-        return is_extended_license() && (bool) settings('subscriptions_enabled', false);
-    }
-}
-
-if (! function_exists('license_verified')) {
-    /**
-     * Quick check if license is verified (from cache).
-     */
-    function license_verified(): bool
-    {
-        return Cache::remember('license_verified', 604800, function () {
-            return ! empty(settings('license_key'));
-        });
     }
 }
 

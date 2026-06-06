@@ -123,7 +123,7 @@ class AgentService
             $messages[] = ['role' => 'assistant', 'content' => $content];
             $messages[] = [
                 'role' => 'user',
-                'content' => "Tool '{$toolName}' returned: " . json_encode($toolResponse),
+                'content' => "Tool '{$toolName}' returned: ".json_encode($toolResponse),
             ];
         }
 
@@ -202,7 +202,7 @@ class AgentService
         foreach ($tools as $tool) {
             if (is_callable($tool)) {
                 $ref = new \ReflectionFunction($tool);
-                if ($ref->getName() === $name || 'anonymous_tool' === $name) {
+                if ($ref->getName() === $name || $name === 'anonymous_tool') {
                     try {
                         return $ref->invokeArgs($arguments);
                     } catch (\Throwable $e) {

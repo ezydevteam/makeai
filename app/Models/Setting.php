@@ -18,12 +18,36 @@ class Setting extends Model
     private const CACHE_TTL = null; // forever, invalidated on write
 
     /**
+     * Legacy aliases for renamed keys (PART 02 branding normalization).
+     * Canonical keys use site_* prefix. app_* is backward-compat.
+     */
+    private const ALIASES = [
+        'app_name'          => 'site_name',
+        'app_url'           => 'site_url',
+        'app_logo_light'    => 'site_logo_light',
+        'app_logo_dark'     => 'site_logo_dark',
+        'app_tagline'       => 'site_tagline',
+        'app_description'   => 'site_description',
+        'app_favicon_ico'   => 'site_favicon_ico',
+        'app_favicon_png'   => 'site_favicon_png',
+        'app_og_image'      => 'site_og_image',
+        'app_copyright_text'=> 'site_copyright_text',
+        'app_support_email' => 'site_support_email',
+        'app_support_url'   => 'site_support_url',
+        'app_terms_url'     => 'site_terms_url',
+        'app_privacy_url'   => 'site_privacy_url',
+    ];
+
+    /**
      * Get a setting value by key, with caching.
      */
     public static function getValue(string $key, mixed $default = null): mixed
     {
-        return Cache::rememberForever(self::CACHE_PREFIX.$key, function () use ($key, $default) {
-            $setting = static::where('key', $key)->first();
+        // Resolve legacy alias
+        $resolvedKey = self::ALIASES[$key] ?? $key;
+
+        return Cache::rememberForever(self::CACHE_PREFIX.$resolvedKey, function () use ($resolvedKey, $default) {
+            $setting = static::where('key', $resolvedKey)->first();
 
             if (! $setting) {
                 return $default;

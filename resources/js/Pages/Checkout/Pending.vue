@@ -94,7 +94,7 @@ const gatewayLabel = computed(() => props.payment.gateway.replace(/_/g, ' ').rep
             </div>
 
             <div class="mt-8 flex flex-wrap justify-center gap-3">
-                <Link href="/dashboard" class="rounded-xl bg-primary-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-500">
+                <Link :href="route('user.dashboard')" class="rounded-xl bg-primary-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-500">
                     {{ t('Go to dashboard') }}
                 </Link>
                 <Link href="/pricing" class="rounded-xl border border-gray-200 bg-white px-5 py-3 text-sm font-bold text-gray-700 transition hover:border-primary-300 hover:text-primary-600">

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Webhooks;
 
 use App\Http\Controllers\Controller;
+use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
-use App\Models\Subscription;
 use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,68 +13,6 @@ use Illuminate\Support\Facades\Http;
 
 class PaymentWebhookController extends Controller
 {
-    public function stripe(Request $request, SubscriptionLifecycleService $lifecycle): JsonResponse
-    {
-        $gateway = PaymentGateway::where('slug', 'stripe')->where('is_enabled', true)->firstOrFail();
-        $payload = $request->getContent();
-
-        if (! $this->validStripeSignature($payload, (string) $request->header('Stripe-Signature'), (string) $gateway->getCredential('webhook_secret'))) {
-            return response()->json(['message' => 'Invalid signature'], 400);
-        }
-
-        $event = json_decode($payload, true);
-        $type = $event['type'] ?? '';
-        $object = $event['data']['object'] ?? [];
-
-        if ($type === 'checkout.session.completed') {
-            $paymentUlid = data_get($object, 'metadata.payment_ulid') ?: data_get($object, 'client_reference_id');
-            $payment = $paymentUlid ? Payment::where('ulid', $paymentUlid)->first() : null;
-
-            if ($payment) {
-                $lifecycle->activateFromPayment(
-                    $payment,
-                    data_get($object, 'payment_intent', data_get($object, 'id')),
-                    data_get($object, 'subscription')
-                );
-            }
-        }
-
-        if ($type === 'invoice.paid') {
-            $subscriptionId = data_get($object, 'subscription');
-
-            if ($subscriptionId) {
-                $lifecycle->renewFromGatewaySubscription(
-                    'stripe',
-                    $subscriptionId,
-                    data_get($object, 'payment_intent', data_get($object, 'id')),
-                    ((float) data_get($object, 'amount_paid', 0)) / 100,
-                    strtoupper((string) data_get($object, 'currency', 'USD'))
-                );
-            }
-        }
-
-        if ($type === 'customer.subscription.deleted') {
-            $subscription = Subscription::where('gateway', 'stripe')
-                ->where('gateway_subscription_id', data_get($object, 'id'))
-                ->first();
-
-            if ($subscription) {
-                $lifecycle->cancelAtPeriodEnd($subscription);
-            }
-        }
-
-        if (in_array($type, ['checkout.session.expired', 'payment_intent.payment_failed'], true)) {
-            $paymentUlid = data_get($object, 'metadata.payment_ulid') ?: data_get($object, 'client_reference_id');
-            $payment = $paymentUlid ? Payment::where('ulid', $paymentUlid)->first() : null;
-
-            if ($payment) {
-                $lifecycle->fail($payment, $type);
-            }
-        }
-
-        return response()->json(['received' => true]);
-    }
-
     public function paypal(Request $request, SubscriptionLifecycleService $lifecycle): JsonResponse
     {
         $gateway = PaymentGateway::where('slug', 'paypal')->where('is_enabled', true)->firstOrFail();
@@ -113,7 +51,7 @@ class PaymentWebhookController extends Controller
         }
 
         if (in_array($type, ['BILLING.SUBSCRIPTION.CANCELLED', 'BILLING.SUBSCRIPTION.EXPIRED'], true)) {
-            $subscription = Subscription::where('gateway', 'paypal')
+            $subscription = GatewaySubscription::where('gateway', 'paypal')
                 ->where('gateway_subscription_id', data_get($resource, 'id'))
                 ->first();
 
@@ -134,14 +72,6 @@ class PaymentWebhookController extends Controller
         }
 
         return response()->json(['received' => true]);
-    }
-
-    public function generic(Request $request, string $gateway): JsonResponse
-    {
-        return response()->json([
-            'received' => true,
-            'message' => "{$gateway} webhook endpoint is registered. Event processing is not enabled yet.",
-        ]);
     }
 
     public function paddle(Request $request, SubscriptionLifecycleService $lifecycle): JsonResponse
@@ -277,31 +207,7 @@ class PaymentWebhookController extends Controller
         return response()->json(['received' => true]);
     }
 
-    private function validStripeSignature(string $payload, string $signatureHeader, string $secret): bool
-    {
-        if (! $secret || ! $signatureHeader) {
-            return false;
-        }
-
-        $parts = collect(explode(',', $signatureHeader))
-            ->mapWithKeys(function (string $part) {
-                [$key, $value] = array_pad(explode('=', $part, 2), 2, null);
-
-                return [$key => $value];
-            });
-
-        $timestamp = $parts->get('t');
-        $signature = $parts->get('v1');
-
-        if (! $timestamp || ! $signature) {
-            return false;
-        }
-
-        $signedPayload = $timestamp.'.'.$payload;
-        $expected = hash_hmac('sha256', $signedPayload, $secret);
-
-        return hash_equals($expected, $signature);
-    }
+    // ─── Signature Verification ───────────────
 
     private function validPayPalSignature(Request $request, PaymentGateway $gateway): bool
     {

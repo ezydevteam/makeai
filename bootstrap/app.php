@@ -6,8 +6,12 @@ use App\Http\Middleware\CheckCredits;
 use App\Http\Middleware\DemoMode;
 use App\Http\Middleware\DetectPricingCountry;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\InstallationMiddleware;
+use App\Http\Middleware\LicenseMiddleware;
 use App\Http\Middleware\LocaleMiddleware;
+use App\Http\Middleware\NotBanned;
 use App\Http\Middleware\PreventRequestsDuringMaintenance as MakeAiPreventRequestsDuringMaintenance;
+use App\Http\Middleware\ThrottleAiRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -28,6 +32,8 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $middleware->web(append: [
+            InstallationMiddleware::class,
+            LicenseMiddleware::class,
             DemoMode::class,
             LocaleMiddleware::class,
             DetectPricingCountry::class,
@@ -42,6 +48,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.auth' => AdminAuth::class,
             'admin.permission' => AdminPermission::class,
             'check.credits' => CheckCredits::class,
+            'not.banned' => NotBanned::class,
+            'throttle' => ThrottleAiRequests::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

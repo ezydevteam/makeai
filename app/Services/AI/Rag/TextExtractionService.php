@@ -40,16 +40,13 @@ class TextExtractionService
                 || $mimeType === 'application/pdf' => $this->extractPdf($filePath),
 
             $extension === 'docx'
-                || $mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                => $this->extractDocx($filePath),
+                || $mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => $this->extractDocx($filePath),
 
             $extension === 'xlsx'
-                || $mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                => $this->extractXlsx($filePath),
+                || $mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => $this->extractXlsx($filePath),
 
             $extension === 'pptx'
-                || $mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                => $this->extractPptx($filePath),
+                || $mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' => $this->extractPptx($filePath),
 
             default => throw new RuntimeException("Unsupported file type: {$extension} ({$mimeType})"),
         };
@@ -154,7 +151,7 @@ class TextExtractionService
         $zip->close();
 
         if (! $xmlContent) {
-            throw new RuntimeException("Invalid DOCX file: no document.xml found");
+            throw new RuntimeException('Invalid DOCX file: no document.xml found');
         }
 
         $xml = simplexml_load_string($xmlContent);
@@ -201,7 +198,7 @@ class TextExtractionService
         $zip->close();
 
         if (! $sheetXml) {
-            throw new RuntimeException("Invalid XLSX file: no sheet data found");
+            throw new RuntimeException('Invalid XLSX file: no sheet data found');
         }
 
         $sheet = simplexml_load_string($sheetXml);
@@ -250,7 +247,7 @@ class TextExtractionService
             $slideText = implode(' ', array_map(fn ($t) => (string) $t, $texts));
 
             if (trim($slideText) !== '') {
-                $text .= "Slide {$i}:\n" . trim($slideText) . "\n\n";
+                $text .= "Slide {$i}:\n".trim($slideText)."\n\n";
             }
         }
 
@@ -271,7 +268,7 @@ class TextExtractionService
                 // Extract text between parentheses in Tj/TJ operators
                 if (preg_match_all('/\(([^)]*)\)\s*Tj/', $block, $tjMatches)) {
                     foreach ($tjMatches[1] as $tjText) {
-                        $text .= $this->decodePdfString($tjText) . ' ';
+                        $text .= $this->decodePdfString($tjText).' ';
                     }
                 }
             }

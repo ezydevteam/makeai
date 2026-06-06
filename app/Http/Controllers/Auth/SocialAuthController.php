@@ -6,11 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\AffiliateService;
 use App\Services\NotificationEventService;
+use App\Services\RateLimiterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -24,7 +24,8 @@ class SocialAuthController extends Controller
         $this->ensureSocialiteIsInstalled();
         $this->ensureProviderIsConfigured($provider);
 
-        RateLimiter::hit($this->throttleKey($request, $provider), 300);
+        $rateLimiter = app(RateLimiterService::class);
+        $rateLimiter->hit('social_auth', $this->throttleKey($request, $provider), 300);
 
         return $this->driver($provider)->redirect();
     }
@@ -35,9 +36,12 @@ class SocialAuthController extends Controller
         $this->ensureSocialiteIsInstalled();
         $this->ensureProviderIsConfigured($provider);
 
+        $rateLimiter = app(RateLimiterService::class);
         $throttleKey = $this->throttleKey($request, $provider);
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 10)) {
+        $result = $rateLimiter->attempt('social_auth', $throttleKey, 10, 900);
+
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'email' => [translate('Too many social login attempts. Please try again later.')],
             ]);
@@ -46,13 +50,13 @@ class SocialAuthController extends Controller
         try {
             $socialUser = $this->driver($provider)->user();
         } catch (\Throwable) {
-            RateLimiter::hit($throttleKey, 900);
+            $rateLimiter->hit('social_auth', $throttleKey, 900);
 
             return redirect()->route('login')
                 ->with('error', translate('Social login could not be completed. Please try again.'));
         }
 
-        RateLimiter::clear($throttleKey);
+        $rateLimiter->clear('social_auth', $throttleKey);
 
         $providerId = (string) $socialUser->getId();
         $email = $this->resolveEmail($provider, $providerId, $socialUser->getEmail());
@@ -216,6 +220,6 @@ class SocialAuthController extends Controller
 
     private function throttleKey(Request $request, string $provider): string
     {
-        return 'social-login:'.$provider.':'.$request->ip();
+        return $provider.'|'.$request->ip();
     }
 }

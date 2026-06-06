@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Mail\ContactMessageMail;
 use App\Models\ContactMessage;
 use App\Services\InAppNotificationService;
+use App\Services\RateLimiterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
 
 class ContactController extends Controller
@@ -21,43 +21,41 @@ class ContactController extends Controller
             return back()->with('error', translate('Contact form is currently disabled.'));
         }
 
-        $executed = RateLimiter::attempt(
-            'contact-submission:'.$request->ip(),
-            3,
-            function () use ($request) {
-                if (filled($request->input('website'))) {
-                    return;
-                }
+        $rateLimiter = app(RateLimiterService::class);
+        $result = $rateLimiter->attempt('contact', $request->ip(), 3, 3600);
 
-                $subjectOptions = $this->subjectOptions();
-                $subjectRules = settings('contact_subject_mode', 'text') === 'dropdown' && $subjectOptions !== []
-                    ? ['nullable', 'string', 'max:255', Rule::in($subjectOptions)]
-                    : ['nullable', 'string', 'max:255'];
-
-                $validated = $request->validate([
-                    'name' => 'required|string|max:255',
-                    'email' => 'required|email|max:255',
-                    'subject' => $subjectRules,
-                    'message' => 'required|string|max:5000',
-                    'website' => 'nullable|string|max:0',
-                ]);
-
-                unset($validated['website']);
-
-                $message = ContactMessage::create(array_merge($validated, [
-                    'ip_address' => $request->ip(),
-                ]));
-
-                $this->queueNotification($message);
-                $this->queueInAppNotification($message);
-                $this->queueAutoReply($message);
-            },
-            3600 // 1 hour
-        );
-
-        if (! $executed) {
+        if (! $result['allowed']) {
             return back()->with('error', translate('Too many messages. Please try again later.'));
         }
+
+        $rateLimiter->hit('contact', $request->ip(), 3600);
+
+        if (filled($request->input('website'))) {
+            return back()->with('success', settings('contact_success_message', translate('Your message has been sent successfully. We will get back to you soon!')));
+        }
+
+        $subjectOptions = $this->subjectOptions();
+        $subjectRules = settings('contact_subject_mode', 'text') === 'dropdown' && $subjectOptions !== []
+            ? ['nullable', 'string', 'max:255', Rule::in($subjectOptions)]
+            : ['nullable', 'string', 'max:255'];
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|max:255',
+            'subject' => $subjectRules,
+            'message' => 'required|string|max:5000',
+            'website' => 'nullable|string|max:0',
+        ]);
+
+        unset($validated['website']);
+
+        $message = ContactMessage::create(array_merge($validated, [
+            'ip_address' => $request->ip(),
+        ]));
+
+        $this->queueNotification($message);
+        $this->queueInAppNotification($message);
+        $this->queueAutoReply($message);
 
         return back()->with('success', settings('contact_success_message', translate('Your message has been sent successfully. We will get back to you soon!')));
     }
@@ -122,7 +120,7 @@ class ContactController extends Controller
             settings('contact_auto_reply_subject', translate('We received your message')),
             $body,
             settings('contact_notification_email'),
-            settings('app_name', 'MakeAI')
+            settings('app_name', translate('Application'))
         ));
     }
 }

@@ -43,6 +43,9 @@ if (! function_exists('isProAvailable')) {
      */
     function isProAvailable(): bool
     {
+        if (app()->environment('local')) {
+            return true;
+        }
         return is_extended_license() && (bool) settings('subscriptions_enabled', false);
     }
 }
@@ -53,6 +56,10 @@ if (! function_exists('license_verified')) {
      */
     function license_verified(): bool
     {
+        if (app()->environment('local')) {
+            return true;
+        }
+
         return (bool) settings('license_verified', false);
     }
 }
@@ -64,5 +71,15 @@ if (! function_exists('get_license_buyer')) {
     function get_license_buyer(): string
     {
         return (string) settings('license_buyer', '');
+    }
+}
+
+if (! function_exists('get_license_domain')) {
+    /**
+     * Get the domain hash stored at activation.
+     */
+    function get_license_domain(): string
+    {
+        return (string) settings('license_domain', '');
     }
 }

@@ -19,6 +19,7 @@
     },
     "dependencies": {
         "@inertiajs/core": "^3.1.1",
+        "@inertiajs/server": "^0.1.0",
         "@inertiajs/vue3": "^3.1.1",
         "@tabler/icons-webfont": "^3.44.0",
         "@tiptap/extension-color": "^3.23.4",
@@ -38,7 +39,10 @@
         "@tiptap/vue-3": "^3.23.4",
         "@vitejs/plugin-vue": "^6.0.6",
         "@vueuse/core": "^14.3.0",
+        "chart.js": "^4.5.1",
+        "highlight.js": "^11.11.1",
         "laravel-echo": "^2.3.4",
+        "marked": "^18.0.4",
         "pinia": "^3.0.4",
         "pusher-js": "^8.5.0",
         "qrcode": "^1.5.4",

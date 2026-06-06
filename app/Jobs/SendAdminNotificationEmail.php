@@ -70,7 +70,7 @@ class SendAdminNotificationEmail implements ShouldQueue
     private function html(User $user, string $message, ?string $actionUrl, ?string $actionLabel): string
     {
         $safeMessage = nl2br(e($message));
-        $appName = e(settings('app_name', 'Application'));
+        $appName = e(settings('app_name', translate('Application')));
         $userName = e($user->name);
         $button = '';
 

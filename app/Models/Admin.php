@@ -19,7 +19,8 @@ class Admin extends Authenticatable
 
     protected $fillable = [
         'name', 'email', 'password', 'avatar', 'role_id',
-        'is_active', 'two_factor_secret', 'two_factor_enabled',
+        'is_active', 'must_change_password',
+        'two_factor_secret', 'two_factor_enabled',
         'two_factor_confirmed_at', 'two_factor_recovery_codes',
         'otp_secret', 'otp_expires_at',
         'last_login_at', 'last_login_ip',

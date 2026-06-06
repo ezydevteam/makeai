@@ -67,6 +67,22 @@ export interface CurrencyInfo {
 
 export type CurrencyPosition = 'before' | 'before_with_space' | 'after' | 'after_with_space'
 
+export interface Branding {
+    site_name: string
+    site_tagline: string
+    site_description: string
+    site_logo_light: string
+    site_logo_dark: string
+    site_favicon_ico: string
+    site_favicon_png: string
+    site_og_image: string
+    site_copyright_text: string
+    site_support_email: string
+    site_support_url: string
+    site_terms_url: string
+    site_privacy_url: string
+}
+
 export interface SharedPageProps {
     auth: {
         user: User | null
@@ -82,6 +98,7 @@ export interface SharedPageProps {
         [key: string]: unknown
     }
     appName: string
+    branding: Branding
     locale: LocaleInfo
     isRtl?: boolean
     languages?: LanguageOption[]

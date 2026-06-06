@@ -41,7 +41,7 @@ class Payment extends Model
 
     public function subscription()
     {
-        return $this->belongsTo(Subscription::class);
+        return $this->belongsTo(GatewaySubscription::class, 'subscription_id');
     }
 
     public function getRouteKeyName(): string

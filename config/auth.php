@@ -76,6 +76,7 @@ return [
         'admins' => [
             'driver' => 'eloquent',
             'model' => Admin::class,
+            'super_admin_slug' => env('ADMIN_SUPER_SLUG', 'super-admin'),
         ],
     ],
 

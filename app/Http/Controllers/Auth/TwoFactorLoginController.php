@@ -21,12 +21,36 @@ class TwoFactorLoginController extends Controller
             return Inertia::location(route('login'));
         }
 
-        return Inertia::render('Auth/TwoFactor');
+        $method = $request->session()->get('user_2fa_method', 'totp');
+
+        if ($method === 'otp') {
+            $userId = $request->session()->get('user_2fa_id');
+            $user = User::find($userId);
+
+            if ($user && ! $user->isOtpLocked() && ! $request->session()->has('user_otp_sent')) {
+                $otpCode = $user->generateOtp();
+                $request->session()->put('user_otp_sent', true);
+
+                dispatch(new \App\Jobs\SendTemplatedEmail(
+                    $user,
+                    'login_2fa_otp',
+                    ['code' => $otpCode, 'name' => $user->name]
+                ));
+            }
+        }
+
+        return Inertia::render('Auth/TwoFactor', [
+            'twoFactorMethod' => $method,
+            'userOtpExpiresAt' => $method === 'otp'
+                ? User::find($request->session()->get('user_2fa_id'))?->otp_expires_at?->toISOString()
+                : null,
+        ]);
     }
 
     public function verify(LoginTwoFactorRequest $request, TotpService $totp)
     {
         $userId = $request->session()->get('user_2fa_id');
+        $method = $request->session()->get('user_2fa_method', 'totp');
 
         if (! $userId) {
             return redirect()->route('login');
@@ -39,7 +63,22 @@ class TwoFactorLoginController extends Controller
         }
 
         $code = (string) $request->validated('code');
-        $verified = $user->verifyTotp($code, $totp) || $user->useRecoveryCode($code);
+
+        if ($method === 'totp') {
+            $verified = $user->verifyTotp($code, $totp) || $user->useRecoveryCode($code);
+        } else {
+            $verified = $user->verifyOtp($code);
+            if (! $verified) {
+                if ($user->isOtpLocked()) {
+                    throw ValidationException::withMessages([
+                        'code' => [translate('Too many attempts. Try again later.')],
+                    ]);
+                }
+                throw ValidationException::withMessages([
+                    'code' => [translate('Invalid verification code.')],
+                ]);
+            }
+        }
 
         if (! $verified) {
             throw ValidationException::withMessages([
@@ -47,7 +86,11 @@ class TwoFactorLoginController extends Controller
             ]);
         }
 
-        $request->session()->forget('user_2fa_id');
+        if ($method === 'otp') {
+            $user->clearOtp();
+        }
+
+        $request->session()->forget(['user_2fa_id', 'user_2fa_method', 'user_otp_sent']);
 
         Auth::login($user, (bool) $request->session()->pull('user_2fa_remember', false));
         $this->recordLogin($user, $request);

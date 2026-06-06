@@ -2,8 +2,6 @@
 
 namespace App\Services\AI\Rag;
 
-use RuntimeException;
-
 /**
  * ChunkingService — splits text into overlapping chunks for embedding.
  *

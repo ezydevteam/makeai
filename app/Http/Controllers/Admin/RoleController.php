@@ -12,6 +12,45 @@ use Inertia\Inertia;
 class RoleController extends Controller
 {
     /**
+     * Permission prefixes that only a Super Admin can grant.
+     * These control admin/role management, impersonation, and license.
+     */
+    private const PRIVILEGED_PREFIXES = [
+        'admins.',
+        'roles.',
+        'users.impersonate',
+        'settings.license',
+    ];
+
+    /**
+     * Strip permissions the current admin is not allowed to assign.
+     * Non-super-admins cannot grant privileged permissions, nor
+     * permissions they don't themselves possess.
+     */
+    private function filterAssignablePermissions(array $permissionIds): array
+    {
+        $admin = auth('admin')->user();
+
+        if ($admin->isSuperAdmin()) {
+            return $permissionIds;
+        }
+
+        $permissions = AdminPermission::whereIn('id', $permissionIds)->get();
+        $adminSlugs = $admin->getAllPermissions();
+
+        return $permissions->filter(function (AdminPermission $perm) use ($adminSlugs) {
+            // Block privileged prefixes entirely
+            foreach (self::PRIVILEGED_PREFIXES as $prefix) {
+                if (str_starts_with($perm->slug, $prefix)) {
+                    return false;
+                }
+            }
+
+            // Only allow permissions the admin themselves have
+            return in_array($perm->slug, $adminSlugs, true);
+        })->pluck('id')->toArray();
+    }
+    /**
      * Display a listing of the roles.
      */
     public function index()
@@ -41,6 +80,13 @@ class RoleController extends Controller
             'permissions.*' => 'exists:admin_permissions,id',
         ]);
 
+        $superSlug = config('auth.providers.admins.super_admin_slug', 'super-admin');
+
+        // Block creating a role with the super-admin slug
+        if (Str::slug($validated['name']) === $superSlug) {
+            return back()->with('error', translate('This role name is reserved.'));
+        }
+
         $role = AdminRole::create([
             'name' => $validated['name'],
             'slug' => Str::slug($validated['name']),
@@ -49,7 +95,7 @@ class RoleController extends Controller
         ]);
 
         if (! empty($validated['permissions'])) {
-            $role->permissions()->sync($validated['permissions']);
+            $role->permissions()->sync($this->filterAssignablePermissions($validated['permissions']));
         }
 
         return back()->with('success', translate('Role created successfully.'));
@@ -73,6 +119,13 @@ class RoleController extends Controller
             'permissions.*' => 'exists:admin_permissions,id',
         ]);
 
+        $superSlug = config('auth.providers.admins.super_admin_slug', 'super-admin');
+
+        // Block renaming a role to the super-admin slug
+        if (Str::slug($validated['name']) === $superSlug && $role->slug !== $superSlug) {
+            return back()->with('error', translate('This role name is reserved.'));
+        }
+
         $role->update([
             'name' => $validated['name'],
             'slug' => Str::slug($validated['name']),
@@ -80,7 +133,7 @@ class RoleController extends Controller
         ]);
 
         if (isset($validated['permissions'])) {
-            $role->permissions()->sync($validated['permissions']);
+            $role->permissions()->sync($this->filterAssignablePermissions($validated['permissions']));
         } else {
             $role->permissions()->detach();
         }
@@ -94,6 +147,12 @@ class RoleController extends Controller
     public function destroy(AdminRole $role)
     {
         abort_unless(auth('admin')->user()->hasPermission('roles.delete'), 403);
+
+        $superSlug = config('auth.providers.admins.super_admin_slug', 'super-admin');
+
+        if ($role->slug === $superSlug) {
+            return back()->with('error', translate('The Super Admin role cannot be deleted.'));
+        }
 
         if ($role->is_system) {
             return back()->with('error', translate('System roles cannot be deleted.'));

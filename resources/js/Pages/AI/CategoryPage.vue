@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
 import UserLayout from '@/Layouts/UserLayout.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserLayout })
 
@@ -11,6 +12,7 @@ interface Category {
     description: string
     icon: string
     color: string
+    requires_login: boolean
 }
 
 interface Template {
@@ -21,6 +23,7 @@ interface Template {
     icon: string
     color: string
     requires_pro: boolean
+    requires_login: boolean
     is_featured: boolean
 }
 
@@ -29,15 +32,16 @@ const props = defineProps<{
     tools: Template[]
 }>()
 
+const { t } = useTranslate()
 </script>
 
 <template>
-    <Head :title="category.name + ' AI Tools'" />
+    <Head :title="t(':name AI Tools', { name: category.name })" />
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <!-- Breadcrumb -->
         <div class="flex items-center gap-2 mb-6 text-sm">
-            <Link :href="route('ai.tools.index')" class="text-gray-500 hover:text-primary-400 transition-colors">AI Tools</Link>
+            <Link :href="route('ai.tools.index')" class="text-gray-500 hover:text-primary-400 transition-colors">{{ t('AI Tools') }}</Link>
             <i class="ti-chevron-right text-gray-600 text-xs"></i>
             <span class="text-gray-300">{{ category.name }}</span>
         </div>
@@ -53,11 +57,11 @@ const props = defineProps<{
                     <i :class="[category.icon || 'ti-apps', 'text-3xl']" :style="{ color: category.color || '#3b82f6' }"></i>
                 </div>
                 <div>
-                    <h1 class="text-3xl font-bold text-white mb-2">{{ category.name }} Tools</h1>
-                    <p class="text-gray-400 max-w-2xl leading-relaxed">{{ category.description || `Explore our collection of AI-powered tools for ${category.name.toLowerCase()}.` }}</p>
+                    <h1 class="text-3xl font-bold text-white mb-2">{{ t(':name Tools', { name: category.name }) }}</h1>
+                    <p class="text-gray-400 max-w-2xl leading-relaxed">{{ category.description || t('Explore our collection of AI-powered tools for :name.', { name: category.name.toLowerCase() }) }}</p>
                     <div class="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300">
                         <i class="ti-layers text-primary-400"></i>
-                        {{ tools.length }} tools available
+                        {{ t(':count tools available', { count: tools.length }) }}
                     </div>
                 </div>
             </div>
@@ -73,7 +77,7 @@ const props = defineProps<{
             >
                 <!-- Badges -->
                 <div v-if="t.requires_pro" class="absolute top-3 right-3 px-2 py-0.5 bg-gradient-to-r from-primary-500/20 to-accent-500/20 text-accent-400 text-[10px] font-bold uppercase rounded-full border border-accent-500/20 shadow-sm shadow-accent-500/10">PRO</div>
-                <div v-else-if="t.requires_pro" class="absolute top-3 right-3 px-2 py-0.5 bg-warning-500/15 text-warning-400 text-[10px] font-bold uppercase rounded-full border border-warning-500/20">PREMIUM</div>
+                <div v-else-if="t.requires_login" class="absolute top-3 right-3 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20">LOGIN</div>
 
                 <!-- Icon -->
                 <div
@@ -98,10 +102,10 @@ const props = defineProps<{
             <div class="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4">
                 <i :class="[category.icon || 'ti-apps', 'text-2xl text-gray-500']"></i>
             </div>
-            <h3 class="text-white font-medium mb-1">No tools yet</h3>
-            <p class="text-gray-500 text-sm mb-6">We're still building tools for this category. Check back soon!</p>
+            <h3 class="text-white font-medium mb-1">{{ t('No tools yet') }}</h3>
+            <p class="text-gray-500 text-sm mb-6">{{ t("We're still building tools for this category. Check back soon!") }}</p>
             <Link :href="route('ai.tools.index')" class="px-6 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-medium transition-colors border border-white/5">
-                Explore All Tools
+                {{ t('Explore All Tools') }}
             </Link>
         </div>
     </div>

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiKey;
+use App\Models\AiModel;
 use App\Models\AiTool;
 use App\Models\Category;
 use App\Models\ToolReview;
+use App\Services\AI\ProviderRegistry;
 use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -30,7 +33,7 @@ class AiToolController extends Controller
         if ($request->filled('search')) {
             $query->where('name', 'like', '%'.$request->search.'%');
         }
-        if ($request->filled('status')) {
+        if ($request->filled('status') && in_array($request->status, ['active', 'inactive'])) {
             $query->where('is_active', $request->status === 'active');
         }
 
@@ -43,19 +46,27 @@ class AiToolController extends Controller
 
     public function create()
     {
+        $configuredProviders = AiKey::available()->distinct()->pluck('provider')->toArray();
+
         return Inertia::render('Admin/AI/Tools/Editor', [
             'tool' => null,
             'categories' => Category::orderBy('sort_order')->get(['id', 'name', 'slug']),
+            'aiModels' => AiModel::active()
+                ->whereIn('provider', $configuredProviders)
+                ->orderBy('provider')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'provider']),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $this->validateTool($request);
-        $data['fields'] = json_encode($this->normalizeFields($data['fields'] ?? []));
-        $data['how_it_works'] = isset($data['how_it_works']) ? json_encode($data['how_it_works']) : null;
-        $data['usage_examples'] = isset($data['usage_examples']) ? json_encode($data['usage_examples']) : null;
-        $data['faq_items'] = isset($data['faq_items']) ? json_encode($data['faq_items']) : null;
+        $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
+
+        if ($request->hasFile('og_image_file')) {
+            $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
+        }
 
         $tool = AiTool::create($data);
 
@@ -70,10 +81,16 @@ class AiToolController extends Controller
     public function edit(AiTool $tool)
     {
         $tool->load('category:id,name,slug');
+        $configuredProviders = AiKey::available()->distinct()->pluck('provider')->toArray();
 
         return Inertia::render('Admin/AI/Tools/Editor', [
             'tool' => $tool,
             'categories' => Category::orderBy('sort_order')->get(['id', 'name', 'slug']),
+            'aiModels' => AiModel::active()
+                ->whereIn('provider', $configuredProviders)
+                ->orderBy('provider')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'provider']),
             'reviews' => ToolReview::where('tool_slug', $tool->slug)
                 ->with('user:id,name,email')
                 ->latest()
@@ -85,10 +102,11 @@ class AiToolController extends Controller
     public function update(Request $request, AiTool $tool)
     {
         $data = $this->validateTool($request, $tool->id);
-        $data['fields'] = json_encode($this->normalizeFields($data['fields'] ?? []));
-        $data['how_it_works'] = isset($data['how_it_works']) ? json_encode($data['how_it_works']) : null;
-        $data['usage_examples'] = isset($data['usage_examples']) ? json_encode($data['usage_examples']) : null;
-        $data['faq_items'] = isset($data['faq_items']) ? json_encode($data['faq_items']) : null;
+        $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
+
+        if ($request->hasFile('og_image_file')) {
+            $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
+        }
 
         $wasActive = $tool->is_active;
 
@@ -103,6 +121,10 @@ class AiToolController extends Controller
 
     public function destroy(AiTool $tool)
     {
+        if ($tool->isSystem()) {
+            return back()->with('error', translate('System tools cannot be deleted.'));
+        }
+
         $tool->delete();
 
         return redirect()->route('admin.ai.tools.index')
@@ -172,13 +194,20 @@ class AiToolController extends Controller
 
             // Tab 3: Fields
             'fields' => 'nullable|array',
+            'fields.*.id' => 'nullable|string|max:100',
             'fields.*.key' => 'nullable|string|max:100',
             'fields.*.name' => 'nullable|string|max:100',
             'fields.*.label' => 'required_with:fields|string|max:255',
-            'fields.*.type' => 'required_with:fields|string|in:text,textarea,select,number,toggle,slider,color,tags_input,tone_select,language_select,length_select,model_select,image_upload,file_upload,code_input,url',
+            'fields.*.type' => 'required_with:fields|string|in:text,textarea,select,number,toggle,slider,color,tags_input,tone_select,language_select,length_select,model_select,image_upload,file_upload,code_input,url,date,datetime_local,radio,multi_select,hidden',
             'fields.*.required' => 'boolean',
             'fields.*.options' => 'nullable|array',
             'fields.*.placeholder' => 'nullable|string|max:255',
+            'fields.*.default' => 'nullable',
+            'fields.*.min' => 'nullable|numeric',
+            'fields.*.max' => 'nullable|numeric',
+            'fields.*.step' => 'nullable|numeric|min:0',
+            'fields.*.rows' => 'nullable|integer|min:1|max:50',
+            'fields.*.max_length' => 'nullable|integer|min:1',
 
             // Tab 4: Content
             'about_content' => 'nullable|string|max:10000',
@@ -196,6 +225,7 @@ class AiToolController extends Controller
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:500',
             'og_image' => 'nullable|string|max:500',
+            'og_image_file' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:4096',
         ]);
     }
 
@@ -209,5 +239,14 @@ class AiToolController extends Controller
                 'key' => $name,
             ]);
         }, $fields));
+    }
+
+    private function normalizeJsonArray(?array $data): ?array
+    {
+        if ($data === null) {
+            return null;
+        }
+
+        return array_values($data);
     }
 }

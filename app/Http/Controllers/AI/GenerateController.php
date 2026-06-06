@@ -70,6 +70,7 @@ class GenerateController extends Controller
             $sentChars = 0;
             $truncated = false;
             $content = '';
+            $completed = false;
 
             try {
                 $stream = $provider->streamChatCompletion(
@@ -79,6 +80,10 @@ class GenerateController extends Controller
                 );
 
                 foreach ($stream as $chunk) {
+                    if (connection_aborted()) {
+                        break;
+                    }
+
                     if (is_string($chunk)) {
                         if ($isGuestPublic && $publicMaxChars > 0) {
                             $remaining = max(0, $publicMaxChars - $sentChars);
@@ -102,13 +107,27 @@ class GenerateController extends Controller
                         }
                         flush();
                     } elseif (is_array($chunk)) {
-                        // Final chunk with usage stats
-                        $usageStats = $chunk;
+                        if (isset($chunk['reasoning_start'])) {
+                            echo 'data: '.json_encode(['reasoning_start' => true])."\n\n";
+                        } elseif (isset($chunk['reasoning_end'])) {
+                            echo 'data: '.json_encode(['reasoning_end' => true])."\n\n";
+                        } elseif (isset($chunk['reasoning'])) {
+                            echo 'data: '.json_encode(['reasoning' => $chunk['reasoning']])."\n\n";
+                        } else {
+                            // Final chunk with usage stats
+                            $usageStats = $chunk;
+                        }
+                        if (ob_get_level() > 0) {
+                            ob_flush();
+                        }
+                        flush();
                     }
                 }
 
+                $completed = ! connection_aborted();
+
                 // Record usage after stream completes
-                if ($usageStats) {
+                if ($usageStats && $completed) {
                     $creditsUsed = TokenGuard::after(
                         $user,
                         $usageStats['input_tokens'],
@@ -117,7 +136,8 @@ class GenerateController extends Controller
                         $completion->provider ?? 'openai',
                         'template',
                         ['template_slug' => $template->slug, 'personal_api_key' => (bool) $completion->apiKey],
-                        ! $completion->apiKey && ! $isGuestPublic
+                        ! $completion->apiKey && ! $isGuestPublic,
+                        true
                     );
 
                     // Send usage info as final SSE event
@@ -125,6 +145,7 @@ class GenerateController extends Controller
                         'usage' => [
                             'input_tokens' => $usageStats['input_tokens'],
                             'output_tokens' => $usageStats['output_tokens'],
+                            'reasoning_tokens' => $usageStats['reasoning_tokens'] ?? 0,
                             'credits_used' => $creditsUsed,
                         ],
                     ])."\n\n";
@@ -134,11 +155,27 @@ class GenerateController extends Controller
                     flush();
                 }
 
-                // Increment template usage counter
-                $template->incrementUsage();
+                if (! $completed && $usageStats) {
+                    TokenGuard::after(
+                        $user,
+                        $usageStats['input_tokens'] ?? 0,
+                        $usageStats['output_tokens'] ?? 0,
+                        $usageStats['model'] ?? $completion->model,
+                        $completion->provider ?? 'openai',
+                        'template',
+                        ['template_slug' => $template->slug, 'aborted' => true],
+                        false,
+                        false
+                    );
+                }
 
-                if ($truncated) {
-                    $upsell = "\n\n---\nPublic preview limited. Sign in to generate the full output.";
+                // Increment template usage counter
+                if ($completed) {
+                    $template->incrementUsage();
+                }
+
+                if ($completed && $truncated) {
+                    $upsell = "\n\n---\n".translate('Public preview limited. Sign in to generate the full output.');
                     $content .= $upsell;
 
                     echo 'data: '.json_encode([
@@ -151,7 +188,7 @@ class GenerateController extends Controller
                     flush();
                 }
 
-                $document = (! $isGuestPublic && $user && $content !== '')
+                $document = ($completed && ! $isGuestPublic && $user && $content !== '')
                     ? $this->saveGeneratedDocument($template, $user, $content)
                     : null;
 
@@ -256,7 +293,7 @@ class GenerateController extends Controller
 
             if ($isGuestPublic && $publicMaxChars > 0 && mb_strlen($content) > $publicMaxChars) {
                 $content = mb_substr($content, 0, $publicMaxChars)
-                    ."\n\n---\nPublic preview limited. Sign in to generate the full output.";
+                    ."\n\n---\n".translate('Public preview limited. Sign in to generate the full output.');
             }
 
             $document = (! $isGuestPublic && $user)
@@ -275,6 +312,7 @@ class GenerateController extends Controller
                     'usage' => [
                         'input_tokens' => $result['input_tokens'],
                         'output_tokens' => $result['output_tokens'],
+                        'reasoning_tokens' => $result['reasoning_tokens'] ?? 0,
                         'credits_used' => $creditsUsed,
                     ],
                 ],

@@ -1,98 +1,67 @@
+import { reactive } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { watch } from 'vue'
 
-interface ToastrOptions {
-    closeButton?: boolean
-    progressBar?: boolean
-    positionClass?: string
-    timeOut?: number
+export interface ToastItem {
+    id: number
+    message: string
+    type: 'success' | 'error' | 'warning' | 'info'
+    title?: string
+    duration: number
+    removing: boolean
+    paused: boolean
 }
 
-const defaultOptions: ToastrOptions = {
-    closeButton: true,
-    progressBar: true,
-    positionClass: 'toast-top-right',
-    timeOut: 4000,
-}
+let nextId = 1
 
-/**
- * Simple toast notification composable.
- * Uses native notification styling (no external toastr dependency).
- * Can be swapped to toastr.js later when installed.
- */
-export function useToastr() {
-    const show = (message: string, type: 'success' | 'error' | 'warning' | 'info', title?: string) => {
-        // Create toast element
-        const toast = document.createElement('div')
-        toast.className = `toast-notification toast-${type}`
-        if (title) {
-            const titleElement = document.createElement('div')
-            titleElement.className = 'toast-title'
-            titleElement.textContent = title
-            toast.appendChild(titleElement)
-        }
+export const toastStore = reactive<{ toasts: ToastItem[] }>({
+    toasts: [],
+})
 
-        const messageElement = document.createElement('div')
-        messageElement.className = 'toast-message'
-        messageElement.textContent = message
-        toast.appendChild(messageElement)
-
-        const closeButton = document.createElement('button')
-        closeButton.className = 'toast-close'
-        closeButton.type = 'button'
-        closeButton.textContent = 'x'
-        toast.appendChild(closeButton)
-
-        // Get or create container
-        let container = document.getElementById('toast-container')
-        if (!container) {
-            container = document.createElement('div')
-            container.id = 'toast-container'
-            document.body.appendChild(container)
-        }
-
-        container.appendChild(toast)
-
-        // Close button
-        closeButton.addEventListener('click', () => {
-            toast.classList.add('toast-hiding')
-            setTimeout(() => toast.remove(), 300)
-        })
-
-        // Auto remove
-        setTimeout(() => {
-            toast.classList.add('toast-hiding')
-            setTimeout(() => toast.remove(), 300)
-        }, defaultOptions.timeOut)
-
-        // Animate in
-        requestAnimationFrame(() => toast.classList.add('toast-visible'))
+function addToast(message: string, type: ToastItem['type'], title?: string, duration = 4500) {
+    const toast: ToastItem = {
+        id: nextId++,
+        message,
+        type,
+        title,
+        duration,
+        removing: false,
+        paused: false,
     }
+    toastStore.toasts.push(toast)
+}
 
-    const success = (message: string, title?: string) => show(message, 'success', title)
-    const error = (message: string, title?: string) => show(message, 'error', title)
-    const warning = (message: string, title?: string) => show(message, 'warning', title)
-    const info = (message: string, title?: string) => show(message, 'info', title)
+export function removeToast(id: number) {
+    const t = toastStore.toasts.find(toast => toast.id === id)
+    if (!t || t.removing) return
+    t.removing = true
+    setTimeout(() => {
+        const idx = toastStore.toasts.findIndex(toast => toast.id === id)
+        if (idx !== -1) toastStore.toasts.splice(idx, 1)
+    }, 350)
+}
+
+export function useToastr() {
+    const success = (message: string, title?: string) => addToast(message, 'success', title)
+    const error = (message: string, title?: string) => addToast(message, 'error', title)
+    const warning = (message: string, title?: string) => addToast(message, 'warning', title)
+    const info = (message: string, title?: string) => addToast(message, 'info', title)
 
     return { success, error, warning, info }
 }
 
-/**
- * Watch Inertia flash messages and display toasts automatically.
- * Call this once in your root App/Layout component.
- */
 export function useFlashToasts() {
     const page = usePage()
     const toast = useToastr()
 
     watch(
-        () => page.props.flash as unknown as Record<string, string | null>,
+        () => page.props.flash as Record<string, string | null>,
         (flash) => {
             if (flash?.success) toast.success(flash.success)
             if (flash?.error) toast.error(flash.error)
             if (flash?.warning) toast.warning(flash.warning)
             if (flash?.info) toast.info(flash.info)
         },
-        { immediate: true }
+        { immediate: true },
     )
 }

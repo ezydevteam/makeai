@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { computed } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -47,6 +49,7 @@ const reply = () => {
     })
 }
 const resolveTicket = () => router.post(route('support.tickets.resolve', props.ticket.ticket_number), {}, { preserveScroll: true })
+const ratingOptions = [{ value: 5, label: '5 / 5' }, { value: 4, label: '4 / 5' }, { value: 3, label: '3 / 5' }, { value: 2, label: '2 / 5' }, { value: 1, label: '1 / 5' }]
 const rateTicket = () => ratingForm.post(route('support.tickets.rate', props.ticket.ticket_number), { preserveScroll: true })
 </script>
 
@@ -95,9 +98,7 @@ const rateTicket = () => ratingForm.post(route('support.tickets.rate', props.tic
 
         <form v-if="ticket.status === 'resolved' && settings.satisfaction_rating_enabled && !ticket.satisfaction_rating" @submit.prevent="rateTicket" class="mt-6 rounded-xl border border-primary-200 bg-primary-50 p-5">
             <h2 class="text-lg font-bold text-gray-900">{{ t('Rate this support experience') }}</h2>
-            <select v-model="ratingForm.rating" class="mt-4 rounded-lg border border-primary-200 bg-white px-3 py-2 text-sm">
-                <option v-for="value in [5, 4, 3, 2, 1]" :key="value" :value="value">{{ value }} / 5</option>
-            </select>
+            <AppSelect v-model="ratingForm.rating" :options="ratingOptions" />
             <textarea v-model="ratingForm.comment" rows="3" class="mt-3 w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-sm" :placeholder="t('Optional comment')"></textarea>
             <button type="submit" class="mt-3 rounded-lg bg-primary-600 px-5 py-2 text-sm font-medium text-white hover:bg-primary-500">{{ t('Submit Rating') }}</button>
         </form>

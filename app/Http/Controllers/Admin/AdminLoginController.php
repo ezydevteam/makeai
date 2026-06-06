@@ -10,10 +10,11 @@ use App\Http\Requests\Admin\Auth\AdminTwoFactorRequest;
 use App\Http\Requests\Admin\Auth\AdminVerifyPasswordResetOtpRequest;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\Admin;
+use App\Services\RateLimiterService;
 use App\Services\Security\TotpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,38 +34,34 @@ class AdminLoginController extends Controller
      */
     public function login(AdminLoginRequest $request)
     {
-        // Rate limiting
-        $throttleKey = 'admin-login:'.strtolower((string) $request->validated('email')).'|'.$request->ip();
-        $maxAttempts = (int) settings('login_throttle_max', 5);
-        $decayMinutes = (int) settings('login_throttle_minutes', 15);
+        $rateLimiter = app(RateLimiterService::class);
+        $throttleKey = strtolower((string) $request->validated('email')).'|'.$request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
+        $result = $rateLimiter->attempt('auth', $throttleKey);
 
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'email' => [translate('Too many login attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $seconds,
+                    'seconds' => $result['retry_after_seconds'],
                 ])],
             ]);
         }
 
-        // Attempt login
         $credentials = $request->only('email', 'password');
 
         if (! Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
-            RateLimiter::hit($throttleKey, $decayMinutes * 60);
+            $rateLimiter->hit('auth', $throttleKey, 900);
 
             throw ValidationException::withMessages([
                 'email' => [translate('These credentials do not match our records.')],
             ]);
         }
 
-        RateLimiter::clear($throttleKey);
+        $rateLimiter->clear('auth', $throttleKey);
 
         /** @var Admin $admin */
         $admin = Auth::guard('admin')->user();
 
-        // Check if account is active
         if (! $admin->is_active) {
             Auth::guard('admin')->logout();
             throw ValidationException::withMessages([
@@ -72,7 +69,6 @@ class AdminLoginController extends Controller
             ]);
         }
 
-        // Check if 2FA is enabled
         if ($admin->two_factor_enabled) {
             $method = $admin->hasTotpEnabled() ? 'totp' : 'email';
 
@@ -81,7 +77,6 @@ class AdminLoginController extends Controller
                 $this->sendOtp($admin, $otp, 'login_otp');
             }
 
-            // Store admin ID in session for 2FA verification
             $request->session()->put('admin_2fa_id', $admin->id);
             $request->session()->put('admin_2fa_method', $method);
             Auth::guard('admin')->logout();
@@ -89,7 +84,6 @@ class AdminLoginController extends Controller
             return redirect()->route('admin.2fa.show');
         }
 
-        // Record login
         $admin->recordLogin($request->ip());
 
         $request->session()->regenerate();
@@ -121,11 +115,15 @@ class AdminLoginController extends Controller
             return redirect()->route('admin.login');
         }
 
-        $throttleKey = 'admin-2fa:'.$adminId.'|'.$request->ip();
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+        $rateLimiter = app(RateLimiterService::class);
+        $throttleKey = $adminId.'|'.$request->ip();
+
+        $result = $rateLimiter->attempt('otp', $throttleKey, 5, 900);
+
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'code' => [translate('Too many verification attempts. Please try again in :seconds seconds.', [
-                    'seconds' => RateLimiter::availableIn($throttleKey),
+                    'seconds' => $result['retry_after_seconds'],
                 ])],
             ]);
         }
@@ -141,14 +139,14 @@ class AdminLoginController extends Controller
             : $admin->verifyOtp($code);
 
         if (! $verified) {
-            RateLimiter::hit($throttleKey, 900);
+            $rateLimiter->hit('otp', $throttleKey, 900);
 
             throw ValidationException::withMessages([
                 'code' => [translate('Invalid or expired verification code.')],
             ]);
         }
 
-        RateLimiter::clear($throttleKey);
+        $rateLimiter->clear('otp', $throttleKey);
         $admin->clearOtp();
         $request->session()->forget('admin_2fa_id');
         $request->session()->forget('admin_2fa_method');
@@ -169,17 +167,20 @@ class AdminLoginController extends Controller
     public function sendPasswordResetOtp(AdminForgotPasswordRequest $request)
     {
         $email = strtolower((string) $request->validated('email'));
-        $throttleKey = 'admin-password-email:'.$email.'|'.$request->ip();
+        $rateLimiter = app(RateLimiterService::class);
+        $throttleKey = $email.'|'.$request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
+        $result = $rateLimiter->attempt('otp', $throttleKey, 3, 3600);
+
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'email' => [translate('Too many reset requests. Please try again in :seconds seconds.', [
-                    'seconds' => RateLimiter::availableIn($throttleKey),
+                    'seconds' => $result['retry_after_seconds'],
                 ])],
             ]);
         }
 
-        RateLimiter::hit($throttleKey, 3600);
+        $rateLimiter->hit('otp', $throttleKey, 3600);
 
         /** @var Admin $admin */
         $admin = Admin::query()
@@ -210,12 +211,15 @@ class AdminLoginController extends Controller
     {
         $data = $request->validated();
         $email = strtolower((string) $data['email']);
-        $throttleKey = 'admin-password-reset:'.$email.'|'.$request->ip();
+        $rateLimiter = app(RateLimiterService::class);
+        $throttleKey = $email.'|'.$request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+        $result = $rateLimiter->attempt('otp', $throttleKey, 5, 900);
+
+        if (! $result['allowed']) {
             throw ValidationException::withMessages([
                 'code' => [translate('Too many reset attempts. Please try again in :seconds seconds.', [
-                    'seconds' => RateLimiter::availableIn($throttleKey),
+                    'seconds' => $result['retry_after_seconds'],
                 ])],
             ]);
         }
@@ -226,14 +230,14 @@ class AdminLoginController extends Controller
             ->first();
 
         if (! $admin || ! $admin->verifyOtp((string) $data['code'])) {
-            RateLimiter::hit($throttleKey, 900);
+            $rateLimiter->hit('otp', $throttleKey, 900);
 
             throw ValidationException::withMessages([
                 'code' => [translate('Invalid or expired reset code.')],
             ]);
         }
 
-        RateLimiter::clear($throttleKey);
+        $rateLimiter->clear('otp', $throttleKey);
         $request->session()->put('admin_password_reset_email', $email);
         $request->session()->put('admin_password_reset_verified', true);
 
@@ -284,6 +288,41 @@ class AdminLoginController extends Controller
     /**
      * Log the admin out.
      */
+    public function showChangePassword(): Response
+    {
+        return Inertia::render('Admin/Auth/ChangePassword');
+    }
+
+    public function changePassword(Request $request)
+    {
+        $admin = auth('admin')->user();
+        if (! $admin) {
+            return redirect()->route('admin.login');
+        }
+
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        if (! Hash::check($validated['current_password'], $admin->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => translate('The current password is incorrect.'),
+            ]);
+        }
+
+        $admin->update([
+            'password' => Hash::make($validated['password']),
+            'must_change_password' => false,
+        ]);
+
+        // Re-authenticate after password change
+        Auth::guard('admin')->login($admin);
+
+        return redirect()->route('admin.dashboard')
+            ->with('success', translate('Password changed successfully.'));
+    }
+
     public function logout(Request $request)
     {
         Auth::guard('admin')->logout();

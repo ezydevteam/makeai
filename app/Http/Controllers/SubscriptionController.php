@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\GatewaySubscription;
 use App\Models\PaymentGateway;
-use App\Models\Subscription;
 use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -15,7 +15,7 @@ class SubscriptionController extends Controller
     {
         abort_unless(isProAvailable(), 404);
 
-        $subscription = Subscription::query()
+        $subscription = GatewaySubscription::query()
             ->where('user_id', $request->user()->id)
             ->whereIn('status', ['active', 'trialing'])
             ->latest()
@@ -27,7 +27,7 @@ class SubscriptionController extends Controller
         return back()->with('success', translate('Subscription canceled. Access remains until the current period ends.'));
     }
 
-    private function cancelGatewaySubscription(Subscription $subscription): void
+    private function cancelGatewaySubscription(GatewaySubscription $subscription): void
     {
         if (! $subscription->gateway_subscription_id) {
             return;
@@ -37,14 +37,6 @@ class SubscriptionController extends Controller
 
         if (! $gateway) {
             return;
-        }
-
-        if ($subscription->gateway === 'stripe') {
-            $secret = $gateway->getCredential('secret_key');
-
-            if ($secret) {
-                Http::withToken($secret)->delete('https://api.stripe.com/v1/subscriptions/'.$subscription->gateway_subscription_id);
-            }
         }
 
         if ($subscription->gateway === 'paypal') {

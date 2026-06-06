@@ -8,11 +8,18 @@ interface StreamPayload {
 
 export function useStream() {
     const output = ref('')
+    const reasoning = ref('')
+    const isReasoning = ref(false)
     const isStreaming = ref(false)
     const error = ref('')
     const usage = ref<Record<string, unknown> | null>(null)
     const savedDocument = ref<Record<string, unknown> | null>(null)
     const truncated = ref(false)
+    let headerCallback: ((headers: Headers) => void) | null = null
+
+    const onHeaders = (cb: (headers: Headers) => void) => {
+        headerCallback = cb
+    }
 
     const csrfToken = (): string => {
         const cookie = document.cookie.match('(^|;)\\s*XSRF-TOKEN\\s*=\\s*([^;]+)')
@@ -21,6 +28,8 @@ export function useStream() {
 
     const generate = async (payload: StreamPayload): Promise<void> => {
         output.value = ''
+        reasoning.value = ''
+        isReasoning.value = false
         error.value = ''
         usage.value = null
         savedDocument.value = null
@@ -38,6 +47,10 @@ export function useStream() {
                 credentials: 'same-origin',
                 body: JSON.stringify(payload),
             })
+
+            if (headerCallback) {
+                headerCallback(response.headers)
+            }
 
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}))
@@ -70,6 +83,9 @@ export function useStream() {
 
                     const data = JSON.parse(raw)
                     if (data.error) error.value = data.error
+                    if (data.reasoning_start) isReasoning.value = true
+                    if (data.reasoning_end) isReasoning.value = false
+                    if (data.reasoning) reasoning.value += data.reasoning
                     if (data.token) output.value += data.token
                     if (data.usage) usage.value = data.usage
                     if (data.document) savedDocument.value = data.document
@@ -83,5 +99,5 @@ export function useStream() {
         }
     }
 
-    return { output, isStreaming, error, usage, savedDocument, truncated, generate }
+    return { output, reasoning, isReasoning, isStreaming, error, usage, savedDocument, truncated, generate, onHeaders }
 }
