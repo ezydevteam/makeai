@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppSelect from '@/Components/AppSelect.vue'
 
 export interface ToolField {
     id?: string
@@ -47,7 +48,8 @@ const fieldError = (field: ToolField): string => {
 
 const normalizedOptions = (field: ToolField) => {
     if (field.type === 'tone_select') {
-        return ['Professional', 'Friendly', 'Casual', 'Formal', 'Humorous', 'Persuasive', 'Inspirational', 'Empathetic']
+        const tones = ['Professional', 'Friendly', 'Casual', 'Formal', 'Humorous', 'Persuasive', 'Inspirational', 'Empathetic']
+        return tones.map(t => ({ label: t, value: t.toLowerCase() }))
     }
     if (field.type === 'length_select') {
         return [
@@ -64,11 +66,7 @@ const normalizedOptions = (field: ToolField) => {
         return (props.models || []).map((model) => ({ label: `${model.name} (${model.provider})`, value: model.slug }))
     }
 
-    return field.options || []
-}
-
-const optionPair = (option: string | { label: string; value: string }) => {
-    return typeof option === 'string' ? { label: option, value: option } : option
+    return (field.options || []).map(o => typeof o === 'string' ? { label: o, value: o } : o)
 }
 
 const updateValue = (name: string, value: unknown) => {
@@ -117,14 +115,14 @@ const readFile = (field: ToolField, event: Event) => {
     else reader.readAsText(file)
 }
 
-const inputClass = 'w-full px-4 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500/40 transition-all shadow-sm'
-const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
+const inputClass = 'w-full px-4 py-2.5 border rounded-xl text-sm transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40 bg-white dark:bg-white/[0.03] border-gray-300 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600'
+const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red-500/50 dark:focus:ring-red-500/40'
 </script>
 
 <template>
     <form class="space-y-4" @submit.prevent="emit('submit')">
         <div v-for="field in fields" :key="fieldName(field)">
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 {{ field.label }}
                 <span v-if="field.required" class="text-danger-500">*</span>
             </label>
@@ -135,7 +133,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                 :value="String(values[fieldName(field)] ?? '')"
                 :rows="field.type === 'code_input' ? 8 : (field.rows || 4)"
                 :maxlength="field.max_length"
-                :placeholder="field.placeholder"
+                :placeholder="field.placeholder || `Enter ${field.label.toLowerCase()}...`"
                 :required="field.required"
                 :disabled="disabled"
                 :class="[inputClass, { 'font-mono': field.type === 'code_input' }, fieldError(field) ? inputClassError : '']"
@@ -144,19 +142,15 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
             />
 
             <!-- select / tone_select / language_select / length_select / model_select -->
-            <select
+            <AppSelect
                 v-else-if="['select', 'tone_select', 'language_select', 'length_select', 'model_select'].includes(field.type)"
-                :value="String(values[fieldName(field)] ?? '')"
-                :required="field.required"
+                :model-value="String(values[fieldName(field)] ?? '') || null"
+                :options="normalizedOptions(field)"
+                :placeholder="field.placeholder || `Select ${field.label.toLowerCase()}...`"
                 :disabled="disabled"
-                :class="[inputClass, fieldError(field) ? inputClassError : '']"
-                @change="updateValue(fieldName(field), ($event.target as HTMLSelectElement).value)"
-            >
-                <option value="" class="bg-surface-900">Select...</option>
-                <option v-for="option in normalizedOptions(field)" :key="optionPair(option).value" :value="optionPair(option).value" class="bg-surface-900">
-                    {{ optionPair(option).label }}
-                </option>
-            </select>
+                :error="fieldError(field)"
+                @update:model-value="updateValue(fieldName(field), $event)"
+            />
 
             <!-- number -->
             <input
@@ -166,7 +160,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                 :min="field.min"
                 :max="field.max"
                 :step="field.step"
-                :placeholder="field.placeholder"
+                :placeholder="field.placeholder || `Enter ${field.label.toLowerCase()}...`"
                 :required="field.required"
                 :disabled="disabled"
                 :class="[inputClass, fieldError(field) ? inputClassError : '']"
@@ -189,12 +183,12 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
             </div>
 
             <!-- toggle -->
-            <label v-else-if="field.type === 'toggle'" class="inline-flex items-center gap-3 text-sm text-gray-300">
+            <label v-else-if="field.type === 'toggle'" class="inline-flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
                 <input
                     type="checkbox"
                     :checked="Boolean(values[fieldName(field)])"
                     :disabled="disabled"
-                    class="w-4 h-4 rounded border-white/20 bg-white/[0.03] text-primary-500 focus:ring-primary-500/40"
+                    class="w-4 h-4 rounded border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.03] text-primary-500 focus:ring-primary-500/40"
                     @change="updateValue(fieldName(field), ($event.target as HTMLInputElement).checked)"
                 />
                 <span>{{ values[fieldName(field)] ? 'Enabled' : 'Disabled' }}</span>
@@ -206,7 +200,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                 :value="String(values[fieldName(field)] ?? field.default ?? '#10b981')"
                 type="color"
                 :disabled="disabled"
-                class="w-full h-11 px-2 py-1 bg-white/[0.03] border border-white/10 rounded-xl"
+                class="w-full h-11 px-2 py-1 bg-white dark:bg-white/[0.03] border border-gray-300 dark:border-white/10 rounded-xl"
             />
 
             <!-- tags_input -->
@@ -223,7 +217,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                         v-for="tag in (Array.isArray(values[fieldName(field)]) ? values[fieldName(field)] as string[] : [])"
                         :key="tag"
                         type="button"
-                        class="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-300 border border-primary-500/20 text-xs"
+                        class="px-2.5 py-1 rounded-lg bg-primary-500/10 text-primary-700 dark:text-primary-300 border border-primary-500/20 text-xs"
                         @click="removeTag(field, tag)"
                     >
                         {{ tag }} x
@@ -238,7 +232,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                 type="file"
                 :required="field.required"
                 :disabled="disabled"
-                class="w-full px-4 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-sm text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-500/20 file:px-3 file:py-1.5 file:text-primary-200"
+                class="w-full px-4 py-2.5 bg-white dark:bg-white/[0.03] border border-gray-300 dark:border-white/10 rounded-xl text-sm text-gray-700 dark:text-gray-300 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-500/20 file:px-3 file:py-1.5 file:text-primary-700 dark:file:text-primary-200"
                 @change="readFile(field, $event)"
             />
 
@@ -269,9 +263,9 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
             <!-- radio -->
             <div v-else-if="field.type === 'radio'" class="flex flex-wrap gap-3">
                 <label
-                    v-for="option in (field.options || []).map(o => typeof o === 'string' ? { label: o, value: o } : o)"
+                    v-for="option in normalizedOptions(field)"
                     :key="option.value"
-                    class="inline-flex items-center gap-2 text-sm text-gray-300 cursor-pointer"
+                    class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                 >
                     <input
                         type="radio"
@@ -279,7 +273,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                         :value="option.value"
                         :checked="String(values[fieldName(field)] ?? '') === option.value"
                         :disabled="disabled"
-                        class="w-4 h-4 border-white/20 bg-white/[0.03] text-primary-500 focus:ring-primary-500/40"
+                        class="w-4 h-4 border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.03] text-primary-500 focus:ring-primary-500/40"
                         @change="updateValue(fieldName(field), option.value)"
                     />
                     {{ option.label }}
@@ -289,12 +283,12 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
             <!-- multi_select -->
             <div v-else-if="field.type === 'multi_select'" class="flex flex-wrap gap-2">
                 <label
-                    v-for="option in (field.options || []).map(o => typeof o === 'string' ? { label: o, value: o } : o)"
+                    v-for="option in normalizedOptions(field)"
                     :key="option.value"
                     class="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors border"
                     :class="(Array.isArray(values[fieldName(field)]) && (values[fieldName(field)] as string[]).includes(option.value))
-                        ? 'bg-primary-500/15 text-primary-300 border-primary-500/30'
-                        : 'bg-white/[0.03] text-gray-400 border-white/10 hover:border-white/20'"
+                        ? 'bg-primary-500/15 text-primary-700 dark:text-primary-300 border-primary-500/30'
+                        : 'bg-gray-50 dark:bg-white/[0.03] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/20'"
                     @click="toggleMultiSelectOption(field, option.value)"
                 >
                     <input
@@ -320,7 +314,7 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40'
                 :value="String(values[fieldName(field)] ?? '')"
                 :type="field.type === 'url' ? 'url' : 'text'"
                 :maxlength="field.max_length"
-                :placeholder="field.placeholder"
+                :placeholder="field.placeholder || `Enter ${field.label.toLowerCase()}...`"
                 :required="field.required"
                 :disabled="disabled"
                 :class="[inputClass, fieldError(field) ? inputClassError : '']"

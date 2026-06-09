@@ -134,10 +134,6 @@ class FooterBuilderRequest extends FormRequest
 
     private function sanitizeHtml(string $html): string
     {
-        $html = preg_replace('/<\s*(script|style|iframe|object|embed)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? '';
-        $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $html) ?? '';
-
-        return strip_tags($html, '<p><br><strong><b><em><i><u><ul><ol><li><a><span><div><small><code>');
+        return \App\Services\TiptapHtmlSanitizer::sanitize($html, \App\Services\TiptapHtmlSanitizer::BASIC_TAGS);
     }
 }

@@ -16,7 +16,7 @@ class DocumentController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'slug' => 'required|string|max:100|exists:ai_templates,slug',
+            'slug' => 'required|string|max:100|exists:ai_tools,slug',
             'title' => 'nullable|string|max:255',
             'content' => 'required|string|max:200000',
             'folder_id' => 'nullable|integer',
@@ -29,7 +29,7 @@ class DocumentController extends Controller
             'title' => $data['title'] ?: $template->name.' Output',
             'content' => $data['content'],
             'tool_slug' => $template->slug,
-            'word_count' => str_word_count(strip_tags($data['content'])),
+            'word_count' => Document::calculateWordCount($data['content']),
             'folder_id' => $data['folder_id'] ?? null,
         ]);
 
@@ -76,7 +76,7 @@ class DocumentController extends Controller
             'title' => $data['title'],
             'content' => $data['content'],
             'folder_id' => $data['folder_id'] ?? null,
-            'word_count' => str_word_count(strip_tags($data['content'])),
+            'word_count' => Document::calculateWordCount($data['content']),
         ]);
 
         if ($request->expectsJson()) {
@@ -93,4 +93,62 @@ class DocumentController extends Controller
 
         return back()->with('success', translate('Document updated successfully.'));
     }
+
+    public function index(Request $request): Response
+    {
+        $user = $request->user();
+        $search = $request->input('search');
+
+        $documents = Document::query()
+            ->where('user_id', $user->id)
+            ->when($search, function ($query, $search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                      ->orWhere('tool_slug', 'like', "%{$search}%")
+                      ->orWhere('content', 'like', "%{$search}%");
+                });
+            })
+            ->latest()
+            ->paginate(12)
+            ->withQueryString();
+
+        $mappedDocuments = collect($documents->items())->map(fn ($document) => [
+            'id' => $document->id,
+            'title' => $document->title,
+            'tool_slug' => $document->tool_slug,
+            'word_count' => $document->word_count,
+            'created_at' => $document->created_at?->toISOString(),
+            'updated_at' => $document->updated_at?->toISOString(),
+        ])->all();
+
+        return Inertia::render('Documents/Index', [
+            'documents' => $mappedDocuments,
+            'filters' => [
+                'search' => $search,
+            ],
+            'pagination' => [
+                'current_page' => $documents->currentPage(),
+                'last_page' => $documents->lastPage(),
+                'total' => $documents->total(),
+                'links' => $documents->linkCollection(),
+            ],
+        ]);
+    }
+
+    public function destroy(Request $request, Document $document)
+    {
+        abort_unless($document->user_id === $request->user()->id, 403);
+
+        $document->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => translate('Document deleted successfully.'),
+            ]);
+        }
+
+        return back()->with('success', translate('Document deleted successfully.'));
+    }
 }
+

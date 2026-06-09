@@ -15,11 +15,10 @@ class SupportSettingsRequest extends FormRequest
     {
         return [
             'tickets_enabled' => ['required', 'boolean'],
-            'guest_tickets' => ['required', 'boolean'],
             'max_attachments_per_reply' => ['required', 'integer', 'min:0', 'max:10'],
             'max_attachment_size_mb' => ['required', 'integer', 'min:1', 'max:50'],
             'allowed_attachment_types' => ['required', 'string', 'max:255'],
-            'auto_close_resolved_days' => ['required', 'integer', 'min:1', 'max:365'],
+            'auto_close_resolved_days' => ['required', 'integer', 'min:0', 'max:365'],
             'sla_first_response_hours' => ['required', 'integer', 'min:1', 'max:720'],
             'sla_resolution_hours' => ['required', 'integer', 'min:1', 'max:1440'],
             'notify_admin_new_ticket' => ['required', 'boolean'],

@@ -115,7 +115,7 @@ const submit = () => {
             <button 
                 type="submit" 
                 :disabled="form.processing"
-                class="w-full bg-primary-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-primary-500 transition-all shadow-xl shadow-primary-600/20 disabled:opacity-50"
+                class="w-full btn-primary py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-primary-600/20 disabled:opacity-50"
             >
                 {{ form.processing ? t('Sending...') : t('Send Message') }}
             </button>

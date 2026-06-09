@@ -5,10 +5,8 @@ namespace App\Services\AI\Drivers;
 use App\Services\AI\Contracts\AiDriverInterface;
 use App\Services\AI\Providers\PerplexityProvider;
 use Illuminate\Contracts\Events\Dispatcher;
-use Laravel\Ai\Contracts\HasProviderOptions;
 use Laravel\Ai\Contracts\Providers\EmbeddingProvider;
 use Laravel\Ai\Contracts\Providers\TextProvider;
-use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Gateway\Anthropic\AnthropicGateway;
 use Laravel\Ai\Gateway\Gemini\GeminiGateway;
 use Laravel\Ai\Gateway\OpenAi\OpenAiGateway;
@@ -28,6 +26,7 @@ use Laravel\Ai\Providers\OpenAiProvider;
 use Laravel\Ai\Providers\OpenRouterProvider;
 use Laravel\Ai\Providers\VoyageAiProvider;
 use Laravel\Ai\Providers\XaiProvider;
+use Laravel\Ai\Streaming\Events\Error as StreamError;
 use Laravel\Ai\Streaming\Events\ReasoningDelta;
 use Laravel\Ai\Streaming\Events\ReasoningEnd;
 use Laravel\Ai\Streaming\Events\ReasoningStart;
@@ -197,6 +196,10 @@ class LaravelAiDriver implements AiDriverInterface
                     'model' => $model,
                     'content' => implode('', $tokens),
                 ];
+            } elseif ($event instanceof StreamError) {
+                throw new \RuntimeException(
+                    ($event->message ?? $event->type ?? 'Stream error from provider'),
+                );
             }
         }
 

@@ -52,7 +52,10 @@ class VerificationController extends Controller
         $user->clearOtp();
         $user->markEmailAsVerified();
 
+        $showOnboarding = is_null($user->onboarding_completed_at);
+
         return redirect()->route('user.dashboard')
+            ->with('show_onboarding', $showOnboarding)
             ->with('success', translate('Email verified successfully!'));
     }
 

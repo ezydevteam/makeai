@@ -37,14 +37,6 @@ class AdminAuth
                 ->with('error', translate('Your admin account has been deactivated.'));
         }
 
-        if ($admin->must_change_password && ! $request->routeIs('admin.password.change*', 'admin.logout')) {
-            if ($request->expectsJson()) {
-                return response()->json(['message' => translate('Password change required.')], 403);
-            }
-
-            return redirect()->route('admin.password.change');
-        }
-
         return $next($request);
     }
 }

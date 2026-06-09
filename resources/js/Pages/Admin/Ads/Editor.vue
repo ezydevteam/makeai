@@ -55,7 +55,7 @@ const submit = () => {
                 <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ ad ? t('Edit Advertisement') : t('Create Advertisement') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Configure zone, audience, creative, schedule, and tracking behavior.') }}</p>
             </div>
-            <button type="button" :disabled="form.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-60" @click="submit">
+            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="submit">
                 {{ form.processing ? t('Saving...') : t('Save ad') }}
             </button>
         </div>

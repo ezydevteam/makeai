@@ -211,7 +211,7 @@ onUnmounted(() => {
                         <button
                             type="button"
                             :disabled="resendCountdown > 0 || resendForm.processing"
-                            class="mt-5 flex w-full items-center justify-center rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-primary-300 transition-colors hover:border-primary-400/50 hover:bg-primary-500/10 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:border-white/10 disabled:hover:bg-transparent"
+                            class="mt-5 flex w-full items-center justify-center rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-primary-300 transition-colors hover:border-primary-400/50/10 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:border-white/10 disabled:hover:bg-transparent"
                             @click="resendOtp"
                         >
                             <span v-if="resendForm.processing">{{ $t('Sending...') }}</span>

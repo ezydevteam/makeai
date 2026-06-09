@@ -58,6 +58,7 @@ class FaqController extends Controller
 
         $category->update([
             'name' => $validated['name'],
+            'slug' => Str::slug($validated['name']).'-'.uniqid(),
             'sort_order' => $validated['sort_order'],
         ]);
 
@@ -78,6 +79,7 @@ class FaqController extends Controller
 
     public function store(FaqRequest $request)
     {
+        $this->authorizeFaqs();
         $validated = $this->normalizeFaqPayload($request->validated());
 
         Faq::create($validated);
@@ -153,7 +155,8 @@ class FaqController extends Controller
 
     public function generate(FaqGenerateRequest $request, AiService $aiService): JsonResponse
     {
-        $user = User::query()->first();
+        $admin = auth('admin')->user();
+        $user = User::where('email', $admin?->email)->first() ?? User::query()->first();
 
         if (! $user) {
             return response()->json([
@@ -219,11 +222,7 @@ class FaqController extends Controller
 
     private function sanitizeAnswer(string $answer): string
     {
-        $answer = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $answer) ?? '';
-        $answer = preg_replace('/\son\w+=("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $answer) ?? '';
-        $answer = preg_replace('/javascript:/i', '', $answer) ?? '';
-
-        return strip_tags($answer, '<p><br><strong><b><em><i><u><ul><ol><li><a>');
+        return \App\Services\TiptapHtmlSanitizer::sanitize($answer, \App\Services\TiptapHtmlSanitizer::FAQ_TAGS);
     }
 
     private function decodeAiJsonArray(string $content): array

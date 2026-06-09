@@ -22,7 +22,8 @@ class SendNewsletterCampaign implements ShouldQueue
     public int $tries = 1;
 
     public function __construct(
-        protected int $campaignId
+        protected int $campaignId,
+        protected bool $retryOnly = false
     ) {
         $this->onQueue('emails');
     }
@@ -31,7 +32,16 @@ class SendNewsletterCampaign implements ShouldQueue
     {
         $campaign = NewsletterCampaign::find($this->campaignId);
 
-        if (! $campaign || $campaign->status === 'sent') {
+        if (! $campaign) {
+            return;
+        }
+
+        if ($this->retryOnly) {
+            $this->handleRetry($campaign);
+            return;
+        }
+
+        if ($campaign->status === 'sent') {
             return;
         }
 
@@ -102,6 +112,24 @@ class SendNewsletterCampaign implements ShouldQueue
         return self::userAudienceQuery($audience)->count();
     }
 
+    private function handleRetry(NewsletterCampaign $campaign): void
+    {
+        NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
+            ->where('status', 'failed')
+            ->orderBy('id')
+            ->chunkById(100, function ($recipients) use ($campaign) {
+                foreach ($recipients as $recipient) {
+                    $this->sendToRecipient($campaign, [
+                        'email' => $recipient->email,
+                        'name' => $recipient->name,
+                        'subscriber_id' => $recipient->subscriber_id,
+                        'user_id' => $recipient->user_id,
+                        'unsubscribe_url' => route('newsletter.unsubscribe', $recipient->subscriber?->token ?? ''),
+                    ]);
+                }
+            });
+    }
+
     private static function userAudienceQuery(string $audience)
     {
         $query = User::query()
@@ -141,7 +169,7 @@ class SendNewsletterCampaign implements ShouldQueue
             ]
         );
 
-        $rendered = $this->render($campaign, $recipientData);
+        $rendered = self::renderCampaign($campaign, $recipientData);
 
         try {
             Mail::html($rendered['html'], function ($message) use ($recipientData, $rendered) {
@@ -186,7 +214,7 @@ class SendNewsletterCampaign implements ShouldQueue
     /**
      * @param  array{email:string,name:?string,unsubscribe_url:string}  $recipientData
      */
-    private function render(NewsletterCampaign $campaign, array $recipientData): array
+    public static function renderCampaign(NewsletterCampaign $campaign, array $recipientData): array
     {
         $content = $campaign->content;
 
@@ -221,10 +249,15 @@ class SendNewsletterCampaign implements ShouldQueue
             'campaign_content' => $content,
         ]));
         $layout = settings('mail_layout', '{content}');
+        $pixelUrl = route('newsletter.open', [
+            'campaign' => $campaign->id,
+            'email' => base64_encode($recipientData['email']),
+        ]);
+        $trackingPixel = '<img src="'.$pixelUrl.'" width="1" height="1" alt="" style="display:none" />';
 
         return [
             'subject' => $subject,
-            'html' => str_replace('{content}', $body, $layout),
+            'html' => str_replace('{content}', $body, $layout).$trackingPixel,
         ];
     }
 

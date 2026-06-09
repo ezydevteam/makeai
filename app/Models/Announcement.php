@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\Admin;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Announcement extends Model
 {
@@ -18,9 +20,9 @@ class Announcement extends Model
         'ends_at' => 'datetime',
     ];
 
-    public function creator()
+    public function creator(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(Admin::class, 'created_by');
     }
 
     public function scopeActive($query)

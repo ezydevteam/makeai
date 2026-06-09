@@ -57,9 +57,13 @@
 
 /* Support both light and dark color schemes */
 :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --start: left;
     --end: right;
+}
+
+.dark {
+    color-scheme: dark;
 }
 
 [dir="rtl"] {
@@ -156,11 +160,19 @@ input[type="radio"]:disabled,
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #4b5563;
+    background: #cbd5e1;
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: #4b5563;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
     background: #6b7280;
 }
 
@@ -213,14 +225,14 @@ input[type="radio"]:disabled,
 /* Inputs, Selects, Textareas */
 .dark input:not([type="checkbox"]):not([type="radio"]),
 .dark select,
-.dark textarea {
+.dark textarea:not(.chat-textarea) {
     background-color: var(--color-surface-800) !important;
     border-color: var(--color-surface-700) !important;
     color: #f4f4f5 !important;
 }
 
 .dark input::placeholder,
-.dark textarea::placeholder {
+.dark textarea:not(.chat-textarea)::placeholder {
     color: #71717a !important;
 }
 
@@ -375,8 +387,8 @@ input[type="radio"]:disabled,
     background: var(--color-surface-800);
 }
 
-:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus,
-:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus-visible {
+:where(input:not(.ai-tools-search):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus,
+:where(input:not(.ai-tools-search):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus-visible {
     border-color: var(--color-primary-500) !important;
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 12%, transparent) !important;
     outline: none !important;
@@ -424,4 +436,189 @@ input[type="radio"]:disabled,
     margin-top: 0.375rem;
     font-size: 0.8125rem;
     color: var(--color-danger-500);
+}
+/* Button utilities */
+.btn-primary,
+.btn-secondary,
+.btn-success {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  padding: 0.5rem 1.25rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.25rem;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.btn-primary {
+  background: var(--color-primary-500);
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover {
+  background: var(--color-primary-600);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--color-secondary-500), var(--color-secondary-600));
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(135deg, var(--color-secondary-600), var(--color-secondary-700));
+  box-shadow: var(--shadow-glow-blue);
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--color-success-500), var(--color-success-600));
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-success:hover {
+  background: linear-gradient(135deg, var(--color-success-600), var(--color-success-700));
+  box-shadow: 0 0 20px rgb(16 185 129 / 0.25);
+  transform: translateY(-1px);
+}
+
+.btn-success:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-warning,
+.btn-danger {
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, var(--color-warning-500), var(--color-warning-600));
+  color: var(--color-gray-900);
+}
+
+.btn-warning:hover {
+  background: linear-gradient(135deg, var(--color-warning-600), var(--color-warning-700));
+  box-shadow: 0 0 20px rgb(245 158 11 / 0.22);
+  transform: translateY(-1px);
+}
+
+.btn-warning:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--color-danger-500), var(--color-danger-600));
+  color: #ffffff;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, var(--color-danger-600), var(--color-danger-700));
+  box-shadow: 0 0 20px rgb(239 68 68 / 0.22);
+  transform: translateY(-1px);
+}
+
+.btn-danger:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-success:focus-visible,
+.btn-warning:focus-visible,
+.btn-danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.18), var(--shadow-sm);
+}
+
+.dark .btn-primary,
+.dark .btn-secondary,
+.dark .btn-success,
+.dark .btn-warning,
+.dark .btn-danger {
+  color: #f9fafb;
+  box-shadow: var(--shadow-sm);
+}
+
+.dark .btn-primary {
+  background: var(--color-primary-500);
+}
+
+.dark .btn-primary:hover {
+  background: var(--color-primary-600);
+}
+
+.dark .btn-secondary {
+  background: linear-gradient(135deg, var(--color-secondary-500), var(--color-secondary-600));
+}
+
+.dark .btn-secondary:hover {
+  background: linear-gradient(135deg, var(--color-secondary-600), var(--color-secondary-700));
+}
+
+.dark .btn-success {
+  background: linear-gradient(135deg, var(--color-success-500), var(--color-success-600));
+}
+
+.dark .btn-success:hover {
+  background: linear-gradient(135deg, var(--color-success-600), var(--color-success-700));
+}
+
+.dark .btn-warning {
+  background: linear-gradient(135deg, var(--color-warning-500), var(--color-warning-600));
+  color: var(--color-gray-950);
+}
+
+.dark .btn-warning:hover {
+  background: linear-gradient(135deg, var(--color-warning-600), var(--color-warning-700));
+}
+
+.dark .btn-danger {
+  background: linear-gradient(135deg, var(--color-danger-500), var(--color-danger-600));
+}
+
+.dark .btn-danger:hover {
+  background: linear-gradient(135deg, var(--color-danger-600), var(--color-danger-700));
+}
+
+.dark .btn-primary:focus-visible,
+.dark .btn-secondary:focus-visible,
+.dark .btn-success:focus-visible,
+.dark .btn-warning:focus-visible,
+.dark .btn-danger:focus-visible {
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.12), var(--shadow-sm);
+}
+
+/* Chat composer textarea should stay flat inside the pill */
+.chat-textarea,
+.chat-textarea:focus,
+.chat-textarea:focus-visible {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }

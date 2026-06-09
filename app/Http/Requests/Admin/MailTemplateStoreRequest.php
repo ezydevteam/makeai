@@ -12,6 +12,18 @@ class MailTemplateStoreRequest extends FormRequest
         return auth('admin')->check();
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('content')) {
+            $this->merge([
+                'content' => \App\Services\TiptapHtmlSanitizer::sanitize(
+                    (string) $this->input('content'),
+                    \App\Services\TiptapHtmlSanitizer::FULL_TAGS
+                ),
+            ]);
+        }
+    }
+
     public function rules(): array
     {
         return [

@@ -55,6 +55,13 @@ class CannedResponseController extends Controller
         return back()->with('success', translate('Canned response deleted.'));
     }
 
+    public function track(SupportCannedResponse $response)
+    {
+        $response->increment('usage_count');
+
+        return response()->json(['success' => true]);
+    }
+
     private function authorizeRespond(): void
     {
         abort_unless(auth('admin')->user()?->hasPermission('support.respond'), 403);

@@ -20,7 +20,21 @@ use Inertia\Response;
 
 class SettingsController extends Controller
 {
-    public function show(Request $request, TotpService $totp): Response
+    public function profile(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('User/Profile', [
+            'user' => [
+                'name' => $user->name,
+                'email' => $user->email,
+                'avatar' => $user->avatar,
+            ],
+        ]);
+    }
+
+    public function security(Request $request, TotpService $totp): Response
     {
         /** @var User $user */
         $user = $request->user();
@@ -42,7 +56,7 @@ class SettingsController extends Controller
             );
         }
 
-        return Inertia::render('User/Settings', [
+        return Inertia::render('User/Security', [
             'twoFactor' => [
                 'enabled' => $user->hasTotpEnabled(),
                 'confirmed_at' => $user->two_factor_confirmed_at?->toDateTimeString(),
@@ -75,10 +89,12 @@ class SettingsController extends Controller
             $user->save();
             $user->sendEmailVerificationNotification();
 
-            return back()->with('success', translate('Profile updated. Please verify your new email address.'));
+            return redirect()->route('user.dashboard.profile')
+                ->with('success', translate('Profile updated. Please verify your new email address.'));
         }
 
-        return back()->with('success', translate('Profile updated successfully.'));
+        return redirect()->route('user.dashboard.profile')
+            ->with('success', translate('Profile updated successfully.'));
     }
 
     public function updatePassword(Request $request): RedirectResponse
@@ -99,7 +115,8 @@ class SettingsController extends Controller
 
         $user->update(['password' => $validated['password']]);
 
-        return back()->with('success', translate('Password changed successfully.'));
+        return redirect()->route('user.dashboard.profile')
+            ->with('success', translate('Password changed successfully.'));
     }
 
     public function updateAvatar(Request $request): RedirectResponse
@@ -119,7 +136,8 @@ class SettingsController extends Controller
 
         $user->update(['avatar' => $path]);
 
-        return back()->with('success', translate('Avatar updated successfully.'));
+        return redirect()->route('user.dashboard.profile')
+            ->with('success', translate('Avatar updated successfully.'));
     }
 
     // ─── API Keys ──────────────────────────────
@@ -187,7 +205,7 @@ class SettingsController extends Controller
         $request->session()->put('user_plain_recovery_codes', $recoveryCodes);
 
         return redirect()
-            ->route('user.settings')
+            ->route('user.dashboard.security')
             ->with('success', translate('Two-factor authentication enabled successfully.'));
     }
 
@@ -213,7 +231,7 @@ class SettingsController extends Controller
         $request->session()->put('user_plain_recovery_codes', $user->generateRecoveryCodes());
 
         return redirect()
-            ->route('user.settings')
+            ->route('user.dashboard.security')
             ->with('success', translate('Recovery codes regenerated successfully.'));
     }
 

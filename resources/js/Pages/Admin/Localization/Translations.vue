@@ -227,7 +227,7 @@ onUnmounted(() => {
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <button
                     type="button"
-                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:cursor-not-allowed disabled:opacity-60"
                     :disabled="dirtyCount === 0 || savingAll"
                     @click="saveAllChanges"
                 >
@@ -280,7 +280,7 @@ onUnmounted(() => {
                             </span>
                             <button
                                 type="button"
-                                class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary transition disabled:cursor-not-allowed disabled:opacity-60"
                                 :disabled="!isDirty(translation) || isSaving(translation.id) || savingAll"
                                 @click="saveTranslation(translation)"
                             >
@@ -300,7 +300,7 @@ onUnmounted(() => {
             <div v-if="translations.links.length > 3" class="flex flex-col gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <p class="text-xs text-gray-500">{{ t('Showing :from to :to of :total phrases', { from: translations.from, to: translations.to, total: translations.total }) }}</p>
                 <div class="flex flex-wrap items-center gap-1">
-                    <Link v-for="(link, i) in translations.links" :key="i" :href="link.url || '#'" v-html="link.label" :class="[link.active ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50', !link.url ? 'opacity-50 cursor-not-allowed' : '']" class="px-3 py-1.5 text-xs font-bold border rounded-lg transition-all" />
+                    <Link v-for="(link, i) in translations.links" :key="i" :href="link.url || '#'" v-html="link.label" :class="[link.active ? 'btn-primary border-primary-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50', !link.url ? 'opacity-50 cursor-not-allowed' : '']" class="px-3 py-1.5 text-xs font-bold border rounded-lg transition-all" />
                 </div>
             </div>
         </div>

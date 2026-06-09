@@ -47,7 +47,7 @@ const submit = () => {
                         <input v-model="form.password" type="password" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-primary-400 focus:ring-primary-400" autocomplete="current-password">
                     </label>
                     <p v-if="form.errors.password" class="text-sm text-red-600">{{ form.errors.password }}</p>
-                    <button type="submit" :disabled="form.processing" class="w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-60">
+                    <button type="submit" :disabled="form.processing" class="w-full rounded-lg btn-primary disabled:opacity-60">
                         {{ form.processing ? t('Checking...') : t('Unlock Page') }}
                     </button>
                 </form>

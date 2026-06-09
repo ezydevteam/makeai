@@ -5,11 +5,12 @@ import type { SelectOption } from '@/Components/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 const props = withDefaults(defineProps<{
-    modelValue: string
+    modelValue?: string
     label?: string
     error?: string
     placeholder?: string
 }>(), {
+    modelValue: '',
     label: '',
     error: '',
     placeholder: '',
@@ -284,19 +285,31 @@ const icons: [string, string][] = [
     ['ti ti-brand-firefox', 'Firefox'],
     ['ti ti-brand-safari', 'Safari'],
     ['ti ti-brand-edge', 'Edge'],
+
+    // ── Category icons (used by seeders) ─────────────
+    ['ti ti-speakerphone', 'Speakerphone'],
+    ['ti ti-school', 'School'],
+    ['ti ti-device-gamepad', 'Gamepad'],
+    ['ti ti-chart-arrows', 'Chart Arrows'],
+    ['ti ti-headset', 'Headset'],
+    ['ti ti-scale', 'Scale'],
+    ['ti ti-checklist', 'Checklist'],
 ]
 
 const options = computed<SelectOption[]>(() => {
+    const seen = new Set<string>()
     const list: SelectOption[] = [{ value: '', label: t('No icon') }]
     for (const [className, label] of icons) {
+        if (seen.has(className)) continue
+        seen.add(className)
         list.push({ value: className, label: t(label), icon: className })
     }
     return list
 })
 
 const selected = computed({
-    get: () => props.modelValue || '',
-    set: (val) => emit('update:modelValue', String(val)),
+    get: () => props.modelValue ?? '',
+    set: (val) => emit('update:modelValue', String(val ?? '')),
 })
 </script>
 

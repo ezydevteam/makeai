@@ -7,30 +7,57 @@ interface TranslateComposable {
     t: (key: string, replace?: TranslationReplacements) => string
 }
 
+function applyReplacements(text: string, replace?: TranslationReplacements): string {
+    if (!replace) return text
+
+    let result = text
+
+    if ('count' in replace) {
+        const count = Number(replace.count)
+        const parts = result.split('|')
+        if (parts.length === 2) {
+            result = count === 1 ? parts[0] : parts[1]
+        } else if (parts.length === 3) {
+            // Support zero/singular/plural: zero|one|many
+            result = count === 0 ? parts[0] : count === 1 ? parts[1] : parts[2]
+        }
+    }
+
+    Object.entries(replace).forEach(([k, v]) => {
+        result = result.replace(new RegExp(`:${k}`, 'g'), String(v))
+    })
+
+    return result
+}
+
 /**
  * Translation composable — uses translations shared via Inertia.
+ *
+ * Supports pluralization with pipe syntax:
+ *   t('One item|:count items', { count: 5 })     → "5 items"
+ *   t('No items|One item|:count items', { count: 0 }) → "No items"
  *
  * @example
  * const { t } = useTranslate()
  * t('Welcome back, :name', { name: user.name })
  */
+let clientCache: Record<string, string> | null = null
+
 export function useTranslate(): TranslateComposable {
     const page = usePage()
 
     const translations = computed(() => {
-        return (page.props.translations ?? {}) as Record<string, string>
+        const props = page.props.translations as Record<string, string> | null
+        if (props) {
+            clientCache = props
+            return props
+        }
+        return clientCache ?? ({} as Record<string, string>)
     })
 
     const t: TranslateComposable['t'] = (key, replace) => {
-        let text = translations.value[key] ?? key
-
-        if (replace) {
-            Object.entries(replace).forEach(([k, v]) => {
-                text = text.replace(new RegExp(`:${k}`, 'g'), String(v))
-            })
-        }
-
-        return text
+        const text = translations.value[key] ?? key
+        return applyReplacements(text, replace)
     }
 
     return { t }

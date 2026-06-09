@@ -29,6 +29,15 @@ class AffiliateSettingsRequest extends FormRequest
             'commission_hold_days' => ['required', 'integer', 'min:0', 'max:365'],
             'allow_custom_alias' => ['boolean'],
             'terms_page_slug' => ['nullable', 'string', 'max:255', 'exists:pages,slug'],
+            'marketing_banners' => ['nullable', 'array'],
+            'marketing_banners.*.url' => ['nullable', 'url', 'max:2048'],
+            'marketing_banners.*.label' => ['nullable', 'string', 'max:255'],
+            'promotional_emails' => ['nullable', 'array'],
+            'promotional_emails.*.subject' => ['nullable', 'string', 'max:255'],
+            'promotional_emails.*.body' => ['nullable', 'string', 'max:10000'],
+            'social_posts' => ['nullable', 'array'],
+            'social_posts.*.text' => ['nullable', 'string', 'max:1000'],
+            'social_posts.*.platform' => ['nullable', 'string', 'max:50'],
         ];
     }
 }

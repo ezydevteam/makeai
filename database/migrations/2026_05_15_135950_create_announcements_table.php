@@ -28,7 +28,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamp('starts_at')->nullable();
             $table->timestamp('ends_at')->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete(); // or admins if you have admins table, but usually it's users in this project.
+            $table->foreignId('created_by')->nullable()->constrained('admins')->nullOnDelete();
             $table->timestamps();
         });
     }

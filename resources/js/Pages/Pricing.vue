@@ -202,7 +202,7 @@ const planActionUrl = (plan: Plan) => {
                         :key="cycle"
                         type="button"
                         @click="billing = cycle"
-                        :class="billing === cycle ? 'bg-primary-600 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
+                        :class="billing === cycle ? 'btn-primary shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
                         class="rounded-xl px-5 py-2 text-sm font-bold transition"
                     >
                         {{ billingLabels[cycle] }}
@@ -253,7 +253,7 @@ const planActionUrl = (plan: Plan) => {
                         </li>
                     </ul>
 
-                    <Link :href="planActionUrl(plan)" :class="[plan.is_featured ? 'bg-primary-600 text-white shadow-xl shadow-primary-600/20 hover:bg-primary-500' : 'bg-gray-100 text-gray-900 hover:bg-gray-200']" class="block text-center py-4 rounded-2xl font-black text-sm transition-all hover:-translate-y-1">
+                    <Link :href="planActionUrl(plan)" :class="[plan.is_featured ? 'btn-primary shadow-xl shadow-primary-600/20' : 'bg-gray-100 text-gray-900 hover:bg-gray-200']" class="block text-center py-4 rounded-2xl font-black text-sm transition-all hover:-translate-y-1">
                         {{ activeCycle(plan).is_trial ? settings.pricing_trial_button_text : settings.pricing_checkout_button_text }}
                     </Link>
 
@@ -270,7 +270,7 @@ const planActionUrl = (plan: Plan) => {
 
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
                 <div v-for="pack in creditPacks" :key="pack.id" :class="[pack.is_popular ? 'border-primary-200 bg-primary-50/30' : 'border-gray-100 bg-white shadow-sm']" class="relative border rounded-3xl p-6 text-center hover:border-primary-300 transition-all group">
-                    <div v-if="pack.is_popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full">{{ t('Popular') }}</div>
+                    <div v-if="pack.is_popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 btn-primary text-[10px] font-black uppercase tracking-widest rounded-full">{{ t('Popular') }}</div>
                     <p class="text-3xl font-black text-gray-900 mb-1 group-hover:scale-110 transition-transform">{{ pack.credits.toLocaleString() }}</p>
                     <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4">{{ t('credits') }}</p>
                     <p class="text-xl font-black text-primary-600">{{ pack.formatted_price }}</p>

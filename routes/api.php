@@ -35,11 +35,11 @@ Route::prefix('v1')->group(function () {
     });
 
     // ─── Generation Endpoints (credits check handles auth for non-public) ─────
-    Route::middleware(['throttle:text_gen', 'check.credits'])->prefix('generate')->group(function () {
+    Route::middleware(['web', 'throttle:text_gen', 'check.credits'])->prefix('generate')->group(function () {
         Route::post('stream', [GenerateController::class, 'stream']);    // SSE streaming
         Route::post('text', [GenerateController::class, 'text']);       // Sync JSON
     });
-    Route::middleware('throttle:text_gen')->prefix('generate')->group(function () {
+    Route::middleware(['web', 'throttle:text_gen'])->prefix('generate')->group(function () {
         Route::get('estimate', [GenerateController::class, 'estimate']); // Cost estimate
     });
 

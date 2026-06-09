@@ -12,6 +12,7 @@ use App\Http\Middleware\LocaleMiddleware;
 use App\Http\Middleware\NotBanned;
 use App\Http\Middleware\PreventRequestsDuringMaintenance as MakeAiPreventRequestsDuringMaintenance;
 use App\Http\Middleware\ThrottleAiRequests;
+use App\Http\Middleware\ToolSlugRedirect;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -37,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
             DemoMode::class,
             LocaleMiddleware::class,
             DetectPricingCountry::class,
+            ToolSlugRedirect::class,
             HandleInertiaRequests::class,
         ]);
 

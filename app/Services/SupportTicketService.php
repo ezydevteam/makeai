@@ -15,6 +15,8 @@ use Illuminate\Support\Str;
 
 class SupportTicketService
 {
+    public function __construct(private readonly MailService $mail) {}
+
     public function createTicket(User $user, array $data, array $attachments = []): SupportTicket
     {
         return DB::transaction(function () use ($user, $data, $attachments) {
@@ -47,11 +49,13 @@ class SupportTicketService
             $reply = $this->createReply($ticket, 'user', $user->id, $content, false, false, $attachments);
 
             $ticket->update([
-                'status' => in_array($ticket->status, ['resolved', 'closed'], true) ? 'open' : 'waiting_user',
+                'status' => 'open',
                 'last_reply_at' => $reply->created_at,
                 'last_reply_by' => 'user',
                 'user_last_read_at' => now(),
             ]);
+
+            $this->sendUserReplyNotification($ticket, $user);
 
             return $reply;
         });
@@ -80,6 +84,10 @@ class SupportTicketService
             }
 
             $ticket->update($updates);
+
+            if (! $internalNote) {
+                $this->sendReplyNotification($ticket);
+            }
 
             return $reply;
         });
@@ -110,6 +118,33 @@ class SupportTicketService
         ]);
     }
 
+    public function mergeTickets(SupportTicket $source, SupportTicket $target): SupportTicket
+    {
+        return DB::transaction(function () use ($source, $target) {
+            SupportTicketReply::where('ticket_id', $source->id)
+                ->update(['ticket_id' => $target->id]);
+
+            SupportTicketAttachment::where('ticket_id', $source->id)
+                ->update(['ticket_id' => $target->id]);
+
+            $source->delete();
+
+            $lastReply = SupportTicketReply::where('ticket_id', $target->id)->latest()->first();
+            $statuses = SupportTicketReply::where('ticket_id', $target->id)
+                ->where('is_internal_note', false)
+                ->latest()
+                ->value('author_type');
+
+            $target->update([
+                'status' => $target->status === 'closed' ? 'open' : $target->status,
+                'last_reply_at' => $lastReply?->created_at ?? $target->last_reply_at,
+                'last_reply_by' => $statuses ?? $target->last_reply_by,
+            ]);
+
+            return $target->fresh(['department', 'assignedAdmin', 'replies']);
+        });
+    }
+
     public function nextTicketNumber(): string
     {
         $year = now()->format('Y');
@@ -123,6 +158,65 @@ class SupportTicketService
         $next = $last ? ((int) Str::afterLast($last, '-')) + 1 : 1;
 
         return $prefix.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+    }
+
+    public function sendNewTicketNotification(SupportTicket $ticket): void
+    {
+        if (! (bool) settings('notify_admin_new_ticket', true)) {
+            return;
+        }
+
+        $assignedAdmin = $ticket->assignedAdmin;
+        $recipient = $assignedAdmin?->email ?? settings('mail_from_address');
+
+        if (! $recipient) {
+            return;
+        }
+
+        $this->mail->send('admin_announcement', $recipient, [
+            'user_name' => $assignedAdmin?->name ?? 'Support Team',
+            'message' => "New ticket #{$ticket->ticket_number}: {$ticket->subject}",
+            'user_email' => $recipient,
+        ]);
+    }
+
+    private function sendReplyNotification(SupportTicket $ticket): void
+    {
+        if (! (bool) settings('notify_user_reply', true)) {
+            return;
+        }
+
+        $user = $ticket->user;
+
+        if (! $user?->email) {
+            return;
+        }
+
+        $this->mail->send('admin_announcement', $user->email, [
+            'user_name' => $user->name,
+            'message' => "You have a new reply on your support ticket #{$ticket->ticket_number}: \"{$ticket->subject}\"",
+            'user_email' => $user->email,
+        ]);
+    }
+
+    private function sendUserReplyNotification(SupportTicket $ticket, User $user): void
+    {
+        if (! (bool) settings('notify_admin_new_ticket', true)) {
+            return;
+        }
+
+        $assignedAdmin = $ticket->assignedAdmin;
+        $recipient = $assignedAdmin?->email ?? settings('mail_from_address');
+
+        if (! $recipient) {
+            return;
+        }
+
+        $this->mail->send('admin_announcement', $recipient, [
+            'user_name' => $assignedAdmin?->name ?? 'Support Team',
+            'message' => "New reply from {$user->name} on ticket #{$ticket->ticket_number}: \"{$ticket->subject}\"",
+            'user_email' => $recipient,
+        ]);
     }
 
     private function createReply(
@@ -194,10 +288,6 @@ class SupportTicketService
 
     private function sanitizeContent(string $content): string
     {
-        $html = strip_tags($content, '<p><br><strong><b><em><i><u><ul><ol><li><blockquote><code><pre><a><img>');
-        $html = preg_replace('/\s+on[a-z]+\s*=\s*(".*?"|\'.*?\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/\s+(href|src)\s*=\s*("|\')?\s*javascript:[^"\'>\s]*(\2)?/i', '', $html) ?? '';
-
-        return $html;
+        return \App\Services\TiptapHtmlSanitizer::sanitize($content, \App\Services\TiptapHtmlSanitizer::BASIC_TAGS);
     }
 }

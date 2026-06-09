@@ -19,6 +19,9 @@ interface Program {
     commission_hold_days: number
     allow_custom_alias: boolean
     terms_page_slug: string | null
+    marketing_banners: Array<{ url: string; label?: string }> | null
+    promotional_emails: Array<{ subject: string; body: string }> | null
+    social_posts: Array<{ text: string; platform?: string }> | null
 }
 
 const props = defineProps<{
@@ -36,6 +39,23 @@ const payoutMethodOptions = ['paypal', 'bank_transfer', 'credits']
 const payoutNote = ref<Record<number, string>>({})
 const payoutStatus = ref<Record<number, string>>({})
 
+const mkBanners = ref<Array<{ url: string; label: string }>>(
+    (props.program.marketing_banners || []).map((b) => ({ url: b.url || '', label: b.label || '' }))
+)
+const mkEmails = ref<Array<{ subject: string; body: string }>>(
+    (props.program.promotional_emails || []).map((e) => ({ subject: e.subject || '', body: e.body || '' }))
+)
+const mkPosts = ref<Array<{ text: string; platform: string }>>(
+    (props.program.social_posts || []).map((p) => ({ text: p.text || '', platform: p.platform || '' }))
+)
+
+const addBanner = () => mkBanners.value.push({ url: '', label: '' })
+const removeBanner = (i: number) => mkBanners.value.splice(i, 1)
+const addEmail = () => mkEmails.value.push({ subject: '', body: '' })
+const removeEmail = (i: number) => mkEmails.value.splice(i, 1)
+const addPost = () => mkPosts.value.push({ text: '', platform: '' })
+const removePost = (i: number) => mkPosts.value.splice(i, 1)
+
 const form = useForm({
     is_active: props.program.is_active,
     commission_type: props.program.commission_type,
@@ -51,15 +71,23 @@ const form = useForm({
     commission_hold_days: props.program.commission_hold_days,
     allow_custom_alias: props.program.allow_custom_alias,
     terms_page_slug: props.program.terms_page_slug ?? '',
-})
+    marketing_banners: mkBanners.value,
+    promotional_emails: mkEmails.value,
+    social_posts: mkPosts.value,
+} as any)
 
 const toggleMethod = (method: string) => {
     form.payout_methods = form.payout_methods.includes(method)
-        ? form.payout_methods.filter((item) => item !== method)
+        ? form.payout_methods.filter((item: string) => item !== method)
         : [...form.payout_methods, method]
 }
 
-const save = () => form.post(route('admin.affiliate.settings'), { preserveScroll: true })
+const save = () => {
+    form.marketing_banners = mkBanners.value
+    form.promotional_emails = mkEmails.value
+    form.social_posts = mkPosts.value
+    form.post(route('admin.affiliate.settings'), { preserveScroll: true })
+}
 const approve = (id: number) => router.post(route('admin.affiliate.commissions.approve', id), {}, { preserveScroll: true })
 const reject = (id: number) => router.post(route('admin.affiliate.commissions.reject', id), {}, { preserveScroll: true })
 const processPayout = (id: number) => router.post(route('admin.affiliate.payouts.process', id), {
@@ -87,6 +115,7 @@ const processPayout = (id: number) => router.post(route('admin.affiliate.payouts
 
             <div class="grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
                 <form class="space-y-6" @submit.prevent="save">
+                    <!-- Core Settings -->
                     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <div class="mb-4 flex items-center justify-between">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Settings') }}</h2>
@@ -163,6 +192,64 @@ const processPayout = (id: number) => router.post(route('admin.affiliate.payouts
                         </div>
                     </section>
 
+                    <!-- Marketing Banners -->
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <div class="mb-4 flex items-center justify-between">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Marketing banners') }}</h2>
+                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="addBanner">+ {{ t('Add banner') }}</button>
+                        </div>
+                        <div class="space-y-3">
+                            <div v-for="(b, i) in mkBanners" :key="i" class="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="text-xs font-bold text-gray-500">#{{ i + 1 }}</span>
+                                    <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removeBanner(i)">{{ t('Remove') }}</button>
+                                </div>
+                                <input v-model="b.url" type="url" class="mb-2 w-full rounded border border-gray-200 px-2 py-1 text-xs" placeholder="https://example.com/banner.png" />
+                                <input v-model="b.label" type="text" class="w-full rounded border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Label (optional)')" />
+                            </div>
+                            <p v-if="mkBanners.length === 0" class="text-sm text-gray-400">{{ t('No banners configured.') }}</p>
+                        </div>
+                    </section>
+
+                    <!-- Promotional Emails -->
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <div class="mb-4 flex items-center justify-between">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Promotional emails') }}</h2>
+                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="addEmail">+ {{ t('Add email') }}</button>
+                        </div>
+                        <div class="space-y-3">
+                            <div v-for="(e, i) in mkEmails" :key="i" class="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="text-xs font-bold text-gray-500">#{{ i + 1 }}</span>
+                                    <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removeEmail(i)">{{ t('Remove') }}</button>
+                                </div>
+                                <input v-model="e.subject" type="text" class="mb-2 w-full rounded border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Subject')" />
+                                <textarea v-model="e.body" rows="4" class="w-full rounded border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Email body')" />
+                            </div>
+                            <p v-if="mkEmails.length === 0" class="text-sm text-gray-400">{{ t('No email templates configured.') }}</p>
+                        </div>
+                    </section>
+
+                    <!-- Social Posts -->
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                        <div class="mb-4 flex items-center justify-between">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Social media posts') }}</h2>
+                            <button type="button" class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="addPost">+ {{ t('Add post') }}</button>
+                        </div>
+                        <div class="space-y-3">
+                            <div v-for="(p, i) in mkPosts" :key="i" class="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="text-xs font-bold text-gray-500">#{{ i + 1 }}</span>
+                                    <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removePost(i)">{{ t('Remove') }}</button>
+                                </div>
+                                <input v-model="p.platform" type="text" class="mb-2 w-full rounded border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Platform (e.g. Twitter, LinkedIn)')" />
+                                <textarea v-model="p.text" rows="3" class="w-full rounded border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Post text')" />
+                            </div>
+                            <p v-if="mkPosts.length === 0" class="text-sm text-gray-400">{{ t('No social posts configured.') }}</p>
+                        </div>
+                    </section>
+
+                    <!-- Terms -->
                     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
                         <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{{ t('Terms') }}</h2>
                         <label class="block">
@@ -173,7 +260,7 @@ const processPayout = (id: number) => router.post(route('admin.affiliate.payouts
                             </datalist>
                             <span class="mt-1 block text-xs text-gray-500">{{ t('Create a CMS page first, then enter its slug here.') }}</span>
                         </label>
-                        <button type="submit" :disabled="form.processing" class="mt-4 w-full rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white">{{ form.processing ? t('Saving...') : t('Save settings') }}</button>
+                        <button type="submit" :disabled="form.processing" class="mt-4 w-full rounded-lg btn-primary">{{ form.processing ? t('Saving...') : t('Save settings') }}</button>
                     </section>
                 </form>
 
@@ -189,7 +276,7 @@ const processPayout = (id: number) => router.post(route('admin.affiliate.payouts
                                     <td class="px-4 py-3">{{ commission.amount }}</td>
                                     <td class="px-4 py-3"><span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">{{ t(commission.status) }}</span></td>
                                     <td class="px-4 py-3 text-right">
-                                        <button v-if="commission.status === 'pending'" class="mr-2 rounded-lg bg-primary-600 px-3 py-1 text-xs font-bold text-white" @click="approve(commission.id)">{{ t('Approve') }}</button>
+                                        <button v-if="commission.status === 'pending'" class="mr-2 rounded-lg btn-primary" @click="approve(commission.id)">{{ t('Approve') }}</button>
                                         <button v-if="commission.status === 'pending'" class="rounded-lg bg-red-500 px-3 py-1 text-xs font-bold text-white" @click="reject(commission.id)">{{ t('Reject') }}</button>
                                     </td>
                                 </tr>
@@ -215,7 +302,7 @@ const processPayout = (id: number) => router.post(route('admin.affiliate.payouts
                                                 <option value="rejected">{{ t('Rejected') }}</option>
                                             </select>
                                             <input v-model="payoutNote[payout.id]" class="w-28 rounded-lg border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Note')" />
-                                            <button class="rounded-lg bg-primary-600 px-3 py-1 text-xs font-bold text-white" @click="processPayout(payout.id)">{{ t('Save') }}</button>
+                                            <button class="rounded-lg btn-primary" @click="processPayout(payout.id)">{{ t('Save') }}</button>
                                         </div>
                                     </td>
                                 </tr>

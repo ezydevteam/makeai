@@ -25,7 +25,7 @@ const submit = () => {
 </script>
 
 <template>
-    <div v-if="withCard" class="bg-primary-600 rounded-3xl p-8 md:p-12 text-white relative overflow-hidden shadow-2xl shadow-primary-500/30">
+    <div v-if="withCard" class="btn-primary relative overflow-hidden shadow-2xl shadow-primary-500/30">
         <!-- Abstract Decoration -->
         <div class="absolute -top-12 -right-12 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
         <div class="absolute -bottom-12 -left-12 w-48 h-48 bg-accent-500/20 rounded-full blur-2xl"></div>
@@ -65,7 +65,7 @@ const submit = () => {
                 <input v-model="form.email" type="email" :placeholder="t('your@email.com')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-3 text-sm focus:border-primary-500 focus:outline-none transition-all dark:text-white" required />
             </div>
             <button type="submit" :disabled="form.processing" :class="[
-                'px-6 py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-all disabled:opacity-50',
+                'px-6 py-3 btn-primary rounded-xl font-bold transition-all disabled:opacity-50',
                 (layoutClass === 'horizontal' || layoutClass === 'auto') ? 'whitespace-nowrap' : ''
             ]">
                 {{ form.processing ? t('Joining...') : t('SUBSCRIBE') }}

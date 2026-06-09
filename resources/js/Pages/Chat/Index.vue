@@ -5,6 +5,7 @@ import { onClickOutside } from '@vueuse/core'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { useChat } from '@/Composables/useChat'
 import { useTranslate } from '@/Composables/useTranslate'
+import AdSection from '@/Components/AdSection.vue'
 import ChatSidebar from '@/Components/Chat/ChatSidebar.vue'
 import ChatWelcome from '@/Components/Chat/ChatWelcome.vue'
 import ChatMessages from '@/Components/Chat/ChatMessages.vue'
@@ -22,6 +23,22 @@ const exploreOpen = ref(false)
 const exploreRef = ref<HTMLElement | null>(null)
 const chat = useChat()
 const sidebarCollapsed = ref(false)
+const sidebarMobileOpen = ref(false)
+const mobileQuery = window.matchMedia('(max-width: 1023px)')
+const isMobile = ref(mobileQuery.matches)
+const activeChatUlid = computed(() => (page.props.active_chat_ulid as string | null) ?? null)
+
+const syncSidebarMode = () => {
+    isMobile.value = mobileQuery.matches
+    if (mobileQuery.matches) {
+        sidebarCollapsed.value = true
+        sidebarMobileOpen.value = false
+        return
+    }
+
+    sidebarCollapsed.value = false
+    sidebarMobileOpen.value = false
+}
 
 function handleKeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey
@@ -33,26 +50,37 @@ function handleKeydown(e: KeyboardEvent) {
         return
     }
 
-    // Ctrl+K — focus sidebar
-    if (mod && e.key === 'k') {
-        e.preventDefault()
-        return
-    }
-
     // Ctrl+B — toggle sidebar
     if (mod && e.key === 'b') {
         e.preventDefault()
-        sidebarCollapsed.value = !sidebarCollapsed.value
+        if (mobileQuery.matches) {
+            sidebarMobileOpen.value = !sidebarMobileOpen.value
+        } else {
+            sidebarCollapsed.value = !sidebarCollapsed.value
+        }
         return
     }
 }
 
-onMounted(() => document.addEventListener('keydown', handleKeydown))
-onUnmounted(() => document.removeEventListener('keydown', handleKeydown))
+onMounted(() => {
+    syncSidebarMode()
+    document.addEventListener('keydown', handleKeydown)
+    mobileQuery.addEventListener('change', syncSidebarMode)
+
+    if (activeChatUlid.value) {
+        void chat.selectConversationByUlid(activeChatUlid.value)
+    }
+})
+onUnmounted(() => {
+    document.removeEventListener('keydown', handleKeydown)
+    mobileQuery.removeEventListener('change', syncSidebarMode)
+})
 
 provide('chat', chat)
 provide('isProAvailable', isProAvailable)
 provide('sidebarCollapsed', sidebarCollapsed)
+provide('sidebarMobileOpen', sidebarMobileOpen)
+provide('isMobileSidebar', isMobile)
 
 onClickOutside(exploreRef, () => { exploreOpen.value = false })
 </script>
@@ -68,12 +96,21 @@ onClickOutside(exploreRef, () => { exploreOpen.value = false })
                 @click="exploreOpen = !exploreOpen"
             >
                 {{ t('Explore') }}
-                <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                <i class="ti ti-chevron-down text-[12px]"></i>
             </button>
-            <div v-if="exploreOpen" class="absolute right-0 top-full mt-1 min-w-[180px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1.5 z-50">
-                <Link href="/ai-tools" class="block px-3.5 py-1.5 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="exploreOpen = false">{{ t('All AI Tools') }}</Link>
-                <Link href="/blog" class="block px-3.5 py-1.5 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="exploreOpen = false">{{ t('Blog') }}</Link>
-                <Link href="/pricing" class="block px-3.5 py-1.5 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="exploreOpen = false">{{ t('Pricing') }}</Link>
+            <div v-if="exploreOpen" class="absolute right-0 top-full mt-1 min-w-[140px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1.5 z-50">
+                <Link href="/ai-tools" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="exploreOpen = false">
+                    <i class="ti ti-sparkles text-[14px]"></i>
+                    <span>{{ t('AI Tools') }}</span>
+                </Link>
+                <Link href="/blog" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="exploreOpen = false">
+                    <i class="ti ti-article text-[14px]"></i>
+                    <span>{{ t('Blog') }}</span>
+                </Link>
+                <Link href="/pricing" class="flex items-center gap-2.5 px-3.5 py-2 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="exploreOpen = false">
+                    <i class="ti ti-credit-card text-[14px]"></i>
+                    <span>{{ t('Pricing') }}</span>
+                </Link>
             </div>
         </div>
         <Link v-if="!isAuthenticated" :href="route('login')" class="px-4 py-1.5 rounded-full bg-[#1a1a1a] dark:bg-white text-white dark:text-[#1a1a1a] text-sm font-medium hover:opacity-90 transition-opacity no-underline">{{ t('Sign In') }}</Link>
@@ -81,10 +118,50 @@ onClickOutside(exploreRef, () => { exploreOpen.value = false })
 
     <!-- Authenticated: full layout with sidebar -->
     <div v-if="isAuthenticated" class="chat-layout">
-        <ChatSidebar />
+        <Teleport to="body">
+            <Transition
+                enter-active-class="transition-opacity duration-200"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition-opacity duration-150"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <button
+                    v-if="sidebarMobileOpen"
+                    type="button"
+                    class="fixed inset-0 z-40 bg-black/50 lg:hidden"
+                    :aria-label="t('Close sidebar')"
+                    @click="sidebarMobileOpen = false"
+                ></button>
+            </Transition>
+        </Teleport>
+
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="-translate-x-full opacity-0"
+            enter-to-class="translate-x-0 opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="translate-x-0 opacity-100"
+            leave-to-class="-translate-x-full opacity-0"
+        >
+            <div v-if="!isMobile || sidebarMobileOpen" class="sidebar-shell">
+                <ChatSidebar />
+            </div>
+        </Transition>
+
         <div class="chat-main">
+            <button
+                type="button"
+                class="absolute left-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/90 text-[#1a1a1a] shadow-lg dark:bg-white/10 dark:text-white lg:hidden"
+                :aria-label="t('Open sidebar')"
+                @click="sidebarMobileOpen = true"
+            >
+                <i class="ti ti-layout-sidebar-left-expand text-[18px]"></i>
+            </button>
             <ChatWelcome v-if="!chat.activeConversation.value" />
             <ChatMessages v-else />
+            <AdSection zone="chat_banner" class="mx-auto max-w-[768px] px-4" />
             <ChatInput />
         </div>
     </div>
@@ -94,6 +171,7 @@ onClickOutside(exploreRef, () => { exploreOpen.value = false })
         <div class="chat-main chat-main-full">
             <ChatWelcome v-if="!chat.activeConversation.value" />
             <ChatMessages v-else />
+            <AdSection zone="chat_banner" class="mx-auto max-w-[768px] px-4" />
             <ChatInput />
         </div>
     </div>
@@ -143,5 +221,40 @@ main { flex: 1 1 0% !important; min-height: 0 !important; position: relative !im
 
 .chat-main-full {
     max-width: 100%;
+}
+
+.sidebar-shell {
+    flex-shrink: 0;
+    block-size: 100vh;
+    align-self: stretch;
+}
+
+@media (max-width: 1023px) {
+    .sidebar-shell {
+        position: fixed;
+        inset-block: 0;
+        inset-inline-start: 0;
+        z-index: 50;
+        width: min(100vw, 320px);
+        max-width: 100vw;
+        background-color: #ffffff;
+        background-image: none;
+        border-inline-end: 1px solid var(--border-color);
+        box-shadow: 18px 0 40px rgb(0 0 0 / 0.18);
+        overflow: hidden;
+        block-size: 100vh;
+    }
+
+    .dark .sidebar-shell {
+        background-color: var(--color-surface-900);
+    }
+
+    .chat-layout {
+        padding-inline-start: 0;
+    }
+
+    .chat-main {
+        background: inherit;
+    }
 }
 </style>

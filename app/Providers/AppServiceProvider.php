@@ -2,7 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\BlogPost;
+use App\Observers\BlogPostObserver;
+use App\Policies\BlogPostPolicy;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 use App\Services\AddonService;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureBroadcasting();
         $this->registerAddons();
+
+        Gate::policy(BlogPost::class, BlogPostPolicy::class);
+        BlogPost::observe(BlogPostObserver::class);
 
         Blade::directive('ads', function ($zone) {
             return "<?php echo app(\\App\\Services\\AdsService::class)->render($zone); ?>";

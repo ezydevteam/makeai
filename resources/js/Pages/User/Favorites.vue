@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
-import { computed, ref } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import FavoriteButton from '@/Components/FavoriteButton.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -13,6 +13,7 @@ interface FavoriteItem {
     id: number
     type: string
     model_id: number
+    slug?: string
     title: string
     description: string | null
     url: string
@@ -34,8 +35,16 @@ interface PaginationLink {
     active: boolean
 }
 
+interface Collection {
+    ulid: string
+    name: string
+    icon: string | null
+    tool_count: number
+}
+
 const props = defineProps<{
     groups: FavoriteGroup[]
+    collections: Collection[]
     pagination: {
         current_page: number
         last_page: number
@@ -47,6 +56,8 @@ const props = defineProps<{
 const { t } = useTranslate()
 const activeType = ref('all')
 const viewMode = ref<'grid' | 'list'>('grid')
+const openDropdown = ref<number | null>(null)
+const addingToCollection = ref<string | null>(null)
 
 const allItems = computed(() => props.groups.flatMap((group) => group.items))
 
@@ -77,6 +88,31 @@ const paginationLabel = (label: string) => {
 
     return label.replace('&laquo;', '').replace('&raquo;', '').trim()
 }
+
+function toggleDropdown(itemId: number) {
+    openDropdown.value = openDropdown.value === itemId ? null : itemId
+}
+
+function addToCollection(collectionUlid: string, toolSlug: string) {
+    addingToCollection.value = collectionUlid
+    router.post(route('user.dashboard.collections.tools.add', collectionUlid), { tool_slug: toolSlug }, {
+        onFinish: () => {
+            addingToCollection.value = null
+            openDropdown.value = null
+        },
+    })
+}
+
+function handleClickOutside(event: MouseEvent) {
+    if (openDropdown.value === null) return
+    const target = event.target as HTMLElement
+    if (!target.closest('[data-collection-dropdown]')) {
+        openDropdown.value = null
+    }
+}
+
+onMounted(() => document.addEventListener('click', handleClickOutside))
+onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 </script>
 
 <template>
@@ -162,7 +198,36 @@ const paginationLabel = (label: string) => {
                     </div>
                 </Link>
 
-                <div :class="viewMode === 'grid' ? 'mt-4 flex justify-end border-t border-gray-100 pt-4 dark:border-white/10' : 'shrink-0'">
+                <div :class="viewMode === 'grid' ? 'mt-4 flex justify-end gap-2 border-t border-gray-100 pt-4 dark:border-white/10' : 'shrink-0 flex items-center gap-2'">
+                    <div v-if="item.type === 'ai_templates' && item.slug && props.collections.length > 0" class="relative" data-collection-dropdown>
+                        <button
+                            type="button"
+                            @click="toggleDropdown(item.id)"
+                            :aria-label="t('Add to collection')"
+                            class="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-300"
+                        >
+                            <i class="ti ti-folders text-sm"></i>
+                            <span>{{ t('Collect') }}</span>
+                            <i class="ti ti-chevron-down text-xs transition" :class="{ 'rotate-180': openDropdown === item.id }"></i>
+                        </button>
+                        <div v-if="openDropdown === item.id" class="absolute bottom-full right-0 z-50 mb-1 min-w-[200px] rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                            <p class="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500">{{ t('Add to collection') }}</p>
+                            <button
+                                v-for="col in props.collections"
+                                :key="col.ulid"
+                                type="button"
+                                :disabled="addingToCollection === col.ulid"
+                                @click="addToCollection(col.ulid, item.slug!)"
+                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-700"
+                            >
+                                <i v-if="col.icon" :class="col.icon" class="text-base shrink-0"></i>
+                                <i v-else class="ti ti-folders text-base shrink-0 text-gray-400"></i>
+                                <span class="flex-1 truncate">{{ col.name }}</span>
+                                <span v-if="addingToCollection === col.ulid" class="text-xs text-primary-500">{{ t('...') }}</span>
+                                <span v-else class="text-xs text-gray-400">{{ col.tool_count }}</span>
+                            </button>
+                        </div>
+                    </div>
                     <FavoriteButton
                         :model-type="item.type"
                         :model-id="item.model_id"

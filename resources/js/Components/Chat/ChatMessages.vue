@@ -2,10 +2,12 @@
 import { computed, inject, nextTick, ref, watch } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import ChatMessage from '@/Components/Chat/ChatMessage.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 import type { useChat } from '@/Composables/useChat'
 
 const chat = inject<ReturnType<typeof useChat>>('chat')!
 const page = usePage()
+const { t } = useTranslate()
 
 const scrollRef = ref<HTMLElement | null>(null)
 const userCredits = computed(() => (page.props.auth?.user as any)?.credits ?? 0)

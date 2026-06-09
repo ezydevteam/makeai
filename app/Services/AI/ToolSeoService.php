@@ -18,6 +18,8 @@ use App\Models\AiTool;
  */
 class ToolSeoService
 {
+    public function __construct(private ToolUrlHelper $urlHelper) {}
+
     /**
      * Generate meta tags for a tool page.
      */
@@ -35,7 +37,7 @@ class ToolSeoService
                                     'description' => $tool->description,
                                 ]),
             'keywords' => $this->generateKeywords($tool),
-            'canonical' => "{$baseUrl}/ai-tools/{$tool->slug}",
+            'canonical' => $this->urlHelper->canonical($tool->slug),
             'og_title' => $tool->meta_title ?? "{$tool->name} | {$name}",
             'og_description' => $tool->meta_description ?? $tool->description,
             'og_image' => $tool->og_image ?? settings('app_og_image', ''),
@@ -83,7 +85,7 @@ class ToolSeoService
             '@type' => 'SoftwareApplication',
             'name' => $tool->name,
             'description' => $tool->description,
-            'url' => "{$baseUrl}/ai-tools/{$tool->slug}",
+            'url' => $this->urlHelper->canonical($tool->slug),
             'applicationCategory' => 'WebApplication',
             'operatingSystem' => 'Web',
             'offers' => [
@@ -188,7 +190,7 @@ class ToolSeoService
                 '@type' => 'ListItem',
                 'position' => 3,
                 'name' => $tool->category->name,
-                'item' => "{$baseUrl}/ai-tools/category/{$tool->category->slug}",
+                'item' => $this->urlHelper->categoryCanonical($tool->category->slug),
             ];
             $items[] = [
                 '@type' => 'ListItem',

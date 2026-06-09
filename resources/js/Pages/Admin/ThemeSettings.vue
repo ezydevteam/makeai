@@ -77,7 +77,7 @@ const save = () => {
 
             <div class="flex justify-end gap-3 pt-4">
                 <Link :href="route('admin.themes')" class="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors text-sm">Cancel</Link>
-                <button type="submit" :disabled="form.processing" class="px-5 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-500 transition-colors text-sm font-medium disabled:opacity-50">
+                <button type="submit" :disabled="form.processing" class="px-5 py-2.5 btn-primary rounded-lg transition-colors text-sm font-medium disabled:opacity-50">
                     {{ form.processing ? 'Saving...' : 'Save Settings' }}
                 </button>
             </div>

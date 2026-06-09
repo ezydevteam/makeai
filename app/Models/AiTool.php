@@ -24,14 +24,14 @@ class AiTool extends Model
 
         // Generation config
         'output_type', 'model_override', 'max_tokens_override',
-        'temperature',
+        'temperature', 'max_variants',
 
         // Access control
         'access_level', 'requires_pro',
         'is_active', 'is_featured', 'is_system', 'supports_brand_voice',
 
         // Stats
-        'sort_order', 'usage_count', 'avg_output_tokens', 'avg_latency_ms',
+        'sort_order', 'usage_count', 'views_count', 'avg_output_tokens', 'avg_latency_ms',
         'avg_rating', 'review_count',
 
         // SEO
@@ -41,6 +41,7 @@ class AiTool extends Model
         'about_content', 'how_it_works', 'usage_examples', 'faq_items',
         'show_about', 'show_how_it_works', 'show_usage_examples',
         'show_faqs', 'show_reviews', 'show_related_tools',
+        'show_regenerate', 'show_improve', 'show_editor',
     ];
 
     protected function casts(): array
@@ -63,6 +64,11 @@ class AiTool extends Model
             'show_faqs' => 'boolean',
             'show_reviews' => 'boolean',
             'show_related_tools' => 'boolean',
+            'show_regenerate' => 'boolean',
+            'show_improve' => 'boolean',
+            'show_editor' => 'boolean',
+            'views_count' => 'integer',
+            'max_variants' => 'integer',
         ];
     }
 
@@ -74,6 +80,17 @@ class AiTool extends Model
             }
             if (empty($tool->slug)) {
                 $tool->slug = Str::slug($tool->name);
+            }
+        });
+
+        static::updating(function (AiTool $tool) {
+            // Track slug changes for 301 redirects
+            if ($tool->isDirty('slug')) {
+                $oldSlug = $tool->getOriginal('slug');
+                if ($oldSlug) {
+                    app(\App\Services\AI\ToolSlugHistoryService::class)
+                        ->record($oldSlug, $tool->slug, 'ai_tool');
+                }
             }
         });
 
@@ -89,11 +106,13 @@ class AiTool extends Model
                 'show_faqs', 'show_reviews', 'show_related_tools',
             ])) {
                 ToolCatalogCacheService::invalidateForTool($tool);
+                app(\App\Services\SitemapService::class)->invalidate();
             }
         });
 
         static::deleted(function (AiTool $tool) {
             ToolCatalogCacheService::invalidateForTool($tool);
+            app(\App\Services\SitemapService::class)->invalidate();
         });
     }
 

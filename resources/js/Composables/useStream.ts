@@ -4,6 +4,9 @@ interface StreamPayload {
     slug: string
     fields: Record<string, unknown>
     model?: string
+    action?: string
+    refine_content?: string
+    refine_instruction?: string
 }
 
 export function useStream() {

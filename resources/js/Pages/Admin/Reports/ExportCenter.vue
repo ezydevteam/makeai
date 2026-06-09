@@ -170,7 +170,7 @@ const pdfLimited = computed(() => format.value === 'pdf')
                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{{ t('Data Type') }}</label>
                     <div class="flex flex-wrap gap-2">
                         <button v-for="t in exportTypes" :key="t.value" @click="type = t.value"
-                            :class="type === t.value ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-700 hover:border-primary-300'"
+                            :class="type === t.value ? 'btn-primary border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-700 hover:border-primary-300'"
                             class="px-4 py-2 rounded-xl text-sm font-medium border transition-colors">
                             {{ t.label }}
                         </button>
@@ -182,7 +182,7 @@ const pdfLimited = computed(() => format.value === 'pdf')
                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{{ t('Date Range') }}</label>
                     <div class="flex flex-wrap gap-2 mb-3">
                         <button v-for="p in datePresets" :key="p.value" @click="setDatePreset(p.value)"
-                            :class="datePreset === p.value ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-700 hover:border-primary-300'"
+                            :class="datePreset === p.value ? 'btn-primary border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-700 hover:border-primary-300'"
                             class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors">
                             {{ p.label }}
                         </button>
@@ -201,7 +201,7 @@ const pdfLimited = computed(() => format.value === 'pdf')
                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{{ t('Format') }}</label>
                     <div class="flex flex-wrap gap-2">
                         <button v-for="f in formats" :key="f.value" @click="format = f.value"
-                            :class="format === f.value ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-700 hover:border-primary-300'"
+                            :class="format === f.value ? 'btn-primary border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-700 hover:border-primary-300'"
                             class="px-4 py-2 rounded-xl text-sm font-medium border transition-colors">
                             {{ f.label }}
                         </button>
@@ -214,7 +214,7 @@ const pdfLimited = computed(() => format.value === 'pdf')
                 <!-- Export Button -->
                 <div class="flex items-center gap-4">
                     <button @click="doExport" :disabled="exporting"
-                        class="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-semibold hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
+                        class="px-6 py-2.5 btn-primary rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2">
                         <svg v-if="exporting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />

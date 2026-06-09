@@ -150,7 +150,7 @@ onUnmounted(() => {
                                 type="button"
                                 :disabled="processing"
                                 class="rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
-                                :class="variant === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'bg-primary-600 hover:bg-primary-500'"
+                                :class="variant === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'btn-primary'"
                                 @click="emit('confirm')"
                             >
                                 {{ processing ? t(processingLabel) : t(confirmLabel) }}

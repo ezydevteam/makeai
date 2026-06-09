@@ -30,8 +30,9 @@ class MailTemplate extends Model
         $content = $this->content;
 
         foreach ($vars as $key => $value) {
-            $subject = str_replace('{'.$key.'}', (string) $value, $subject);
-            $content = str_replace('{'.$key.'}', (string) $value, $content);
+            $safe = e((string) $value);
+            $subject = str_replace('{'.$key.'}', $safe, $subject);
+            $content = str_replace('{'.$key.'}', $safe, $content);
         }
 
         return [

@@ -3,6 +3,7 @@ import { computed, provide, ref, onMounted, onUnmounted } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import { useChat } from '@/Composables/useChat'
 import { useTranslate } from '@/Composables/useTranslate'
+import AdSection from '@/Components/AdSection.vue'
 import ChatSidebar from '@/Components/Chat/ChatSidebar.vue'
 import ChatWelcome from '@/Components/Chat/ChatWelcome.vue'
 import ChatMessages from '@/Components/Chat/ChatMessages.vue'
@@ -55,6 +56,7 @@ provide('sidebarCollapsed', sidebarCollapsed)
         <div class="chat-main">
             <ChatWelcome v-if="!chat.activeConversation.value" />
             <ChatMessages v-else />
+            <AdSection zone="chat_banner" class="mx-auto max-w-[768px] px-4" />
             <ChatInput />
         </div>
     </div>
@@ -92,13 +94,13 @@ provide('sidebarCollapsed', sidebarCollapsed)
     inset: 0;
     display: flex;
     overflow: hidden;
-    background: #f6f5f4;
-    color: #1a1a1a;
+    background: var(--surface-bg);
+    color: var(--color-gray-900);
 }
 
 :global(.dark) .chat-layout {
-    background: #1a1a1a;
-    color: #e8e6e3;
+    background: var(--surface-bg);
+    color: var(--color-gray-100);
 }
 
 .chat-main {
@@ -107,5 +109,11 @@ provide('sidebarCollapsed', sidebarCollapsed)
     flex-direction: column;
     min-width: 0;
     position: relative;
+    background: var(--surface-bg);
+    color: inherit;
+}
+
+:global(.dark) .chat-main {
+    background: var(--surface-bg);
 }
 </style>

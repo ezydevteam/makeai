@@ -190,6 +190,7 @@ class AiToolController extends Controller
             'max_tokens_override' => 'nullable|integer|min:1|max:128000',
             'temperature' => 'nullable|numeric|min:0|max:2',
             'supports_brand_voice' => 'boolean',
+            'max_variants' => 'nullable|integer|min:1|max:5',
             'avg_output_tokens' => 'nullable|integer|min:1',
 
             // Tab 3: Fields
@@ -220,6 +221,9 @@ class AiToolController extends Controller
             'show_faqs' => 'boolean',
             'show_reviews' => 'boolean',
             'show_related_tools' => 'boolean',
+            'show_regenerate' => 'boolean',
+            'show_improve' => 'boolean',
+            'show_editor' => 'boolean',
 
             // Tab 5: SEO
             'meta_title' => 'nullable|string|max:255',

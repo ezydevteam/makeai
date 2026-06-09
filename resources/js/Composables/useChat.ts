@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 
 export interface ChatProduct {
@@ -70,6 +70,13 @@ async function apiPut<T>(url: string, body: Record<string, unknown>): Promise<T>
     return res.json()
 }
 
+function syncChatUrl(ulid: string | null) {
+    if (typeof window === 'undefined') return
+
+    const url = ulid ? `/chat/${ulid}` : '/chat'
+    window.history.replaceState(window.history.state, '', url)
+}
+
 export function useChat() {
     const products = ref<ChatProduct[]>([])
     const conversations = ref<Conversation[]>([])
@@ -101,6 +108,7 @@ export function useChat() {
     const error = ref('')
     const selectedModel = ref<string | null>(allowModelSelect ? null : defaultChatModel)
     const abortController = ref<AbortController | null>(null)
+    const pendingConversationUlid = ref<string | null>(null)
 
     async function loadProducts() {
         try { const data = await apiGet<{ success: boolean; data: ChatProduct[] }>('/api/v1/chat/products'); products.value = data.data } catch {}
@@ -129,6 +137,7 @@ export function useChat() {
         messages.value = []
         error.value = ''
         selectedModel.value = product?.default_model ?? null
+        syncChatUrl(null)
     }
 
     async function selectProject(project: ChatProject | null) {
@@ -144,8 +153,47 @@ export function useChat() {
         if (conv.product_slug) {
             selectedProduct.value = products.value.find(p => p.slug === conv.product_slug) ?? null
         }
+        syncChatUrl(conv.ulid)
         await loadMessages(conv.ulid)
     }
+
+    async function selectConversationByUlid(ulid: string) {
+        const existing = conversations.value.find(conv => conv.ulid === ulid)
+        if (existing) {
+            await selectConversation(existing)
+            return
+        }
+
+        pendingConversationUlid.value = ulid
+        const fallback: Conversation = {
+            ulid,
+            title: null,
+            product_slug: null,
+            model: null,
+            last_message_at: new Date().toISOString(),
+            project_id: null,
+        }
+
+        activeConversation.value = fallback
+        messages.value = []
+        error.value = ''
+        syncChatUrl(ulid)
+        await loadMessages(ulid)
+    }
+
+    watch(conversations, (list) => {
+        if (!pendingConversationUlid.value) return
+
+        const match = list.find(conv => conv.ulid === pendingConversationUlid.value)
+        if (!match) return
+
+        pendingConversationUlid.value = null
+        activeConversation.value = match
+        selectedModel.value = match.model
+        if (match.product_slug) {
+            selectedProduct.value = products.value.find(p => p.slug === match.product_slug) ?? null
+        }
+    })
 
     async function sendMessage(content: string, product_slug?: string) {
         if (!content.trim() || isStreaming.value) return
@@ -179,6 +227,7 @@ export function useChat() {
                     project_id: selectedProject.value?.id ?? null,
                 })
                 activeConversation.value = data.data
+                syncChatUrl(data.data.ulid)
             }
 
             if (!activeConversation.value) {
@@ -325,6 +374,17 @@ export function useChat() {
         await loadConversations(selectedProject.value?.id ?? null)
     }
 
+    async function renameConversation(convUlid: string, title: string | null) {
+        await apiPut(`/api/v1/chat/${convUlid}`, { title })
+        await loadConversations(selectedProject.value?.id ?? null)
+        if (activeConversation.value?.ulid === convUlid) {
+            activeConversation.value = {
+                ...activeConversation.value,
+                title,
+            }
+        }
+    }
+
     const isGuest = !usePage().props.auth?.user
     const allowGuest = (usePage().props.allow_guest_messages as boolean) ?? false
 
@@ -345,5 +405,6 @@ export function useChat() {
         newChat, selectConversation, selectProject, sendMessage, stopStreaming,
         loadConversations, loadProjects,
         deleteConversation, createProject, renameProject, deleteProject, moveToProject,
+        renameConversation, selectConversationByUlid,
     }
 }

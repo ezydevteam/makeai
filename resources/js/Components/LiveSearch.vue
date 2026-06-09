@@ -220,6 +220,7 @@ onUnmounted(() => {
             v-model="query"
             type="search"
             autocomplete="off"
+            data-global-search
             :placeholder="t('Search...')"
             class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 ps-10 pe-11 text-sm text-gray-900 shadow-sm transition-all focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
             @focus="focus"

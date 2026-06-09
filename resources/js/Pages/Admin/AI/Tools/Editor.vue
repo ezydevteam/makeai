@@ -54,6 +54,10 @@ const form = useForm({
     max_tokens_override: props.tool?.max_tokens_override || '',
     temperature: props.tool?.temperature ?? 0.7,
     supports_brand_voice: props.tool?.supports_brand_voice ?? true,
+    max_variants: props.tool?.max_variants ?? 1,
+    show_regenerate: props.tool?.show_regenerate ?? true,
+    show_improve: props.tool?.show_improve ?? true,
+    show_editor: props.tool?.show_editor ?? true,
     avg_output_tokens: props.tool?.avg_output_tokens || '',
 
     // Fields
@@ -82,7 +86,7 @@ const form = useForm({
 
 const categoryOptions = computed(() => [
     { value: '', label: t('None') },
-    ...props.categories.map((c: any) => ({ value: String(c.id), label: c.name })),
+    ...props.categories.map((c: any) => ({ value: c.id, label: c.name })),
 ])
 
 const accessLevelOptions = [
@@ -249,9 +253,9 @@ const submit = () => {
                     </Link>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditing ? t('Edit Tool') : t('Create Tool') }}</h1>
                 </div>
-                <p v-if="isEditing" class="text-sm text-gray-500 dark:text-gray-400 mt-1 ml-11">{{ tool.slug }}</p>
+                <p v-if="isEditing" class="text-sm text-gray-500 dark:text-gray-400 ml-11">{{ tool.slug }}</p>
             </div>
-            <button @click="submit" :disabled="form.processing" :class="form.processing ? 'opacity-50 cursor-wait' : ''" class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/20 transition-all">
+            <button @click="submit" :disabled="form.processing" :class="form.processing ? 'opacity-50 cursor-wait' : ''" class="inline-flex items-center gap-2 btn-primary">
                 <svg v-if="form.processing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 {{ isEditing ? t('Save Changes') : t('Create Tool') }}
             </button>
@@ -387,6 +391,50 @@ const submit = () => {
                             </button>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Supports Brand Voice') }}</span>
                         </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.max_variants > 1 ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.max_variants = form.max_variants > 1 ? 1 : 3"
+                            >
+                                <span :class="form.max_variants > 1 ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Variations') }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.show_regenerate ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.show_regenerate = !form.show_regenerate"
+                            >
+                                <span :class="form.show_regenerate ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Regenerate Button') }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.show_improve ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.show_improve = !form.show_improve"
+                            >
+                                <span :class="form.show_improve ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Improve Button') }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.show_editor ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.show_editor = !form.show_editor"
+                            >
+                                <span :class="form.show_editor ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Edit in Editor Button') }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -395,7 +443,7 @@ const submit = () => {
                     <div v-for="(field, i) in form.fields" :key="i" class="p-4 bg-gray-50 dark:bg-surface-800 rounded-xl border border-gray-200 dark:border-surface-700">
                         <div class="flex items-center justify-between mb-3">
                             <span class="text-xs font-bold text-gray-400 uppercase">{{ t('Field :number', { number: Number(i) + 1 }) }}</span>
-                            <button @click="confirmRemoveField(Number(i))" class="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                            <button @click="confirmRemoveField(Number(i))" class="p-1 text-gray-400 hover:text-red-500 transition-colors" :title="t('Delete field')">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                         </div>

@@ -163,7 +163,7 @@ watch(() => props.open, async (isOpen) => {
                         <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
                         <div class="flex items-center gap-2">
                             <button @click="save" :disabled="loading"
-                                class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all disabled:opacity-50">
+                                class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all disabled:opacity-50">
                                 {{ editingNote ? t('Update') : t('Add Note') }}
                             </button>
                             <button v-if="editingNote" @click="resetForm" class="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">{{ t('Cancel') }}</button>

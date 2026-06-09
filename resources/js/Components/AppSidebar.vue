@@ -106,7 +106,7 @@ const mockTags = ['AI Writer', 'Image Gen', 'Code Assistant', 'Marketing', 'SEO'
                 <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">{{ block.config.description }}</p>
                 <form @submit.prevent class="space-y-3">
                     <input type="email" :placeholder="t('Your email address')" class="w-full bg-gray-50 dark:bg-surface-800 border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 dark:text-white transition-all" required>
-                    <button type="submit" class="w-full bg-primary-600 hover:bg-primary-500 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-primary-600/20">
+                    <button type="submit" class="w-full btn-primary font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-primary-600/20">
                         {{ t('Subscribe Now') }}
                     </button>
                 </form>

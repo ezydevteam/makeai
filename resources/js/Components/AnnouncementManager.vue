@@ -108,7 +108,7 @@ onMounted(() => {
         // Just take the first active popup
         const p = popups[0]
         
-        if (!p.trigger_type || p.trigger_type === 'delay') {
+        if (p.trigger_type === 'delay') {
             const delay = p.trigger_value ? parseInt(p.trigger_value) * 1000 : 0
             setTimeout(() => triggerPopup(p), delay)
         } else if (p.trigger_type === 'scroll') {
@@ -143,7 +143,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div v-if="headerCouponVisible && headerCoupon" class="relative z-50 bg-primary-600 px-4 py-2 text-white shadow-sm">
+    <div v-if="headerCouponVisible && headerCoupon" class="relative z-50 btn-primary shadow-sm">
         <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-sm font-semibold">
             <span>{{ t(':discount off with coupon', { discount: headerCoupon.discount_label }) }}</span>
             <code class="rounded-md bg-white/15 px-2 py-0.5 font-mono text-xs tracking-wide">{{ headerCoupon.code }}</code>

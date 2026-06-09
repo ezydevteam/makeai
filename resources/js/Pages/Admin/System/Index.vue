@@ -38,6 +38,33 @@ type CronTask = {
     next_run: string
 }
 
+type HealthCheck = {
+    status: 'pass' | 'warn' | 'fail'
+    label: string
+    detail: string
+    suggestion: string | null
+}
+
+type HealthData = {
+    server: HealthCheck[]
+    application: HealthCheck[]
+    services: HealthCheck[]
+    license: HealthCheck[]
+}
+
+type HealthSummary = {
+    pass: number
+    warn: number
+    fail: number
+}
+
+type UpdateStatus = {
+    current_version: string
+    latest_version: string | null
+    update_available: boolean
+    last_checked: string | null
+}
+
 type CronStatus = {
     is_configured: boolean
     last_run_at: string | null
@@ -50,6 +77,9 @@ type CronStatus = {
 }
 
 const props = defineProps<{
+    health: HealthData
+    healthSummary: HealthSummary
+    update: UpdateStatus
     stats: Stats
     status: {
         is_maintenance: boolean
@@ -62,18 +92,39 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+const healthTab = ref('server')
 const confirmOpen = ref(false)
 const cronCopied = ref(false)
 const selectedBackground = ref<File | null>(null)
 const backgroundPreview = ref<string | null>(props.maintenance.maintenance_background_image_url)
 
 const cronRunForm = useForm({ task: '' })
+const checkUpdatesForm = useForm({})
 const maintenanceForm = useForm({
     ...props.maintenance,
     maintenance_background_image: null as File | null,
     remove_maintenance_background_image: false,
 })
 const toggleForm = useForm({})
+
+const healthTabs: Record<string, string> = {
+    server: 'Server',
+    application: 'Application',
+    services: 'Services',
+    license: 'License',
+}
+
+const statusIcon: Record<string, string> = {
+    pass: '✅',
+    warn: '⚠️',
+    fail: '❌',
+}
+
+const statusBadgeClass: Record<string, string> = {
+    pass: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    warn: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    fail: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+}
 
 const statLabels: Record<keyof Stats, string> = {
     php_version: 'PHP version',
@@ -143,7 +194,7 @@ const removeBackground = () => {
             </div>
             <button
                 type="button"
-                :class="status.is_maintenance ? 'bg-primary-600 hover:bg-primary-500' : 'bg-danger-600 hover:bg-danger-500'"
+                :class="status.is_maintenance ? 'btn-primary' : 'btn-danger'"
                 class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-60"
                 :disabled="toggleForm.processing"
                 @click="confirmOpen = true"
@@ -158,6 +209,91 @@ const removeBackground = () => {
 
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
+                <!-- Health Monitor -->
+                <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Site Health Monitor') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500">{{ t('Pass, warn, and fail checks across server, application, services, and license.') }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300">{{ healthSummary.pass }} pass</span>
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">{{ healthSummary.warn }} warn</span>
+                            <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300">{{ healthSummary.fail }} fail</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 flex gap-2 overflow-x-auto border-b border-gray-200 pb-2 dark:border-surface-700">
+                        <button v-for="(label, key) in healthTabs" :key="key" type="button"
+                            :class="healthTab === key ? 'border-primary-500 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
+                            class="border-b-2 px-3 py-1.5 text-sm font-medium transition-colors"
+                            @click="healthTab = key">{{ t(label) }}</button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div v-for="check in health[healthTab as keyof HealthData]" :key="check.label"
+                            class="flex items-start gap-3 rounded-lg border border-gray-100 p-3 dark:border-surface-700">
+                            <span class="mt-0.5 text-sm">{{ statusIcon[check.status] }}</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t(check.label) }}</span>
+                                    <span :class="statusBadgeClass[check.status]" class="inline-flex rounded-full px-2 py-0 text-[10px] font-semibold uppercase">{{ check.status }}</span>
+                                </div>
+                                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ check.detail }}</p>
+                                <p v-if="check.suggestion" class="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                                    💡 {{ t(check.suggestion) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Update Status -->
+                <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('One-Click Updates') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500">{{ t('Check for the latest version from Envato Marketplace.') }}</p>
+                        </div>
+                        <button type="button" :disabled="checkUpdatesForm.processing"
+                            class="inline-flex items-center gap-2 rounded-lg btn-primary text-sm disabled:opacity-60"
+                            @click="checkUpdatesForm.post(route('admin.system.check-updates'), { preserveScroll: true })">
+                            <svg v-if="checkUpdatesForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                            {{ checkUpdatesForm.processing ? t('Checking...') : t('Check for Updates') }}
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Current version') }}</div>
+                            <div class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ update.current_version }}</div>
+                        </div>
+                        <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Latest version') }}</div>
+                            <div class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ update.latest_version || '—' }}</div>
+                        </div>
+                        <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Last checked') }}</div>
+                            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ update.last_checked || t('Never') }}</div>
+                        </div>
+                    </div>
+
+                    <div v-if="update.update_available" class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/20">
+                        <div class="flex items-start gap-3">
+                            <span class="text-lg">🎉</span>
+                            <div>
+                                <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">{{ t('Update Available') }}</p>
+                                <p class="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                                    {{ t('Version :version is available. Go to License → Update to download and install.', { version: update.latest_version ?? '' }) }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <section id="cron-jobs" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
@@ -191,7 +327,7 @@ const removeBackground = () => {
                                 <h3 class="text-sm font-semibold">{{ t('Required Cron Entry') }}</h3>
                                 <p class="mt-1 text-xs text-gray-400">{{ t('Add this command in hosting cron jobs and run it every minute.') }}</p>
                             </div>
-                            <button type="button" class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-500" @click="copyCronEntry">
+                            <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary transition-colors" @click="copyCronEntry">
                                 {{ cronCopied ? t('Copied') : t('Copy Command') }}
                             </button>
                         </div>
@@ -288,7 +424,7 @@ const removeBackground = () => {
                         <span v-if="maintenanceForm.errors.maintenance_background_image" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_background_image }}</span>
                     </div>
 
-                    <button type="button" :disabled="maintenanceForm.processing" class="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-60" @click="saveMaintenance">
+                    <button type="button" :disabled="maintenanceForm.processing" class="mt-6 inline-flex items-center gap-2 rounded-lg btn-primary disabled:opacity-60" @click="saveMaintenance">
                         <svg v-if="maintenanceForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
@@ -358,7 +494,7 @@ const removeBackground = () => {
                 </div>
                 <div class="flex items-center justify-end gap-3 rounded-b-xl border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
                     <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700" @click="confirmOpen = false">{{ t('Cancel') }}</button>
-                    <button type="button" :disabled="toggleForm.processing" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-60" @click="toggleMaintenance">
+                    <button type="button" :disabled="toggleForm.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="toggleMaintenance">
                         {{ status.is_maintenance ? t('Go Live') : t('Enter Maintenance') }}
                     </button>
                 </div>

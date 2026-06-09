@@ -14,6 +14,7 @@ use App\Services\AI\AiService;
 use App\Services\SupportTicketService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class TicketController extends Controller
@@ -100,7 +101,16 @@ class TicketController extends Controller
         abort_unless((bool) settings('ai_reply_suggestion', true), 403);
 
         $ticket->load(['user:id,name', 'department:id,name', 'replies']);
-        $user = User::query()->firstOrFail();
+        $admin = auth('admin')->user();
+        $user = User::where('email', $admin?->email)->first() ?? User::query()->first();
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'code' => 'AI_USER_MISSING',
+                'message' => translate('No user account is available to process AI requests.'),
+            ], 422);
+        }
         $history = $ticket->replies
             ->where('is_internal_note', false)
             ->map(fn ($reply) => strtoupper($reply->author_type).': '.strip_tags($reply->content))
@@ -128,6 +138,117 @@ class TicketController extends Controller
         $ticket->delete();
 
         return redirect()->route('admin.support.tickets.index')->with('success', translate('Ticket deleted.'));
+    }
+
+    public function bulkAction(Request $request)
+    {
+        $this->authorizeSupport();
+
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:support_tickets,id'],
+            'action' => ['required', 'string', Rule::in(['assign', 'status', 'priority', 'delete'])],
+            'assigned_to' => ['required_if:action,assign', 'nullable', 'integer', 'exists:admins,id'],
+            'status' => ['required_if:action,status', 'string', Rule::in(['open', 'in_progress', 'waiting_user', 'resolved', 'closed'])],
+            'priority' => ['required_if:action,priority', 'string', Rule::in(['low', 'medium', 'high', 'urgent'])],
+        ]);
+
+        $ids = $validated['ids'];
+
+        match ($validated['action']) {
+            'assign' => SupportTicket::whereIn('id', $ids)->update(['assigned_to' => $validated['assigned_to'] ?? null]),
+            'status' => SupportTicket::whereIn('id', $ids)->get()->each(function (SupportTicket $ticket) use ($validated) {
+                $this->tickets->updateTicketState($ticket, ['status' => $validated['status']]);
+            }),
+            'priority' => SupportTicket::whereIn('id', $ids)->update(['priority' => $validated['priority']]),
+            'delete' => SupportTicket::whereIn('id', $ids)->delete(),
+        };
+
+        return back()->with('success', translate(':count ticket(s) updated.', ['count' => count($ids)]));
+    }
+
+    public function merge(Request $request, SupportTicket $ticket)
+    {
+        $this->authorizeSupport();
+
+        $validated = $request->validate([
+            'target_ticket_number' => ['required', 'string', 'exists:support_tickets,ticket_number'],
+        ]);
+
+        abort_if($ticket->ticket_number === $validated['target_ticket_number'], 422, translate('Cannot merge a ticket into itself.'));
+
+        $target = SupportTicket::where('ticket_number', $validated['target_ticket_number'])->firstOrFail();
+        $this->tickets->mergeTickets($ticket, $target);
+
+        return redirect()->route('admin.support.tickets.show', $target)->with('success', translate('Tickets merged successfully.'));
+    }
+
+    public function toggleUserBan(SupportTicket $ticket)
+    {
+        $this->authorizeSupport();
+
+        $user = $ticket->user;
+        abort_unless($user !== null, 404);
+
+        $user->update([
+            'is_banned' => ! $user->is_banned,
+            'ban_reason' => $user->is_banned ? null : 'Banned via support ticket #'.$ticket->ticket_number,
+        ]);
+
+        return back()->with('success', $user->fresh()->is_banned
+            ? translate('User banned from ticket creation.')
+            : translate('User unbanned.'));
+    }
+
+    public function export(Request $request)
+    {
+        $this->authorizeSupport();
+
+        $tickets = SupportTicket::query()
+            ->with(['user:id,name,email', 'department:id,name', 'assignedAdmin:id,name'])
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim($request->string('search')->toString());
+                $query->where(fn ($q) => $q
+                    ->where('ticket_number', 'like', "%{$search}%")
+                    ->orWhere('subject', 'like', "%{$search}%")
+                    ->orWhereHas('user', fn ($user) => $user->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%")));
+            })
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
+            ->when($request->filled('priority'), fn ($query) => $query->where('priority', $request->string('priority')->toString()))
+            ->when($request->filled('department'), fn ($query) => $query->where('department_id', $request->integer('department')))
+            ->when($request->filled('assigned_to'), fn ($query) => $query->where('assigned_to', $request->integer('assigned_to')))
+            ->latest('last_reply_at')
+            ->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="support-tickets-'.now()->format('Y-m-d').'.csv"',
+        ];
+
+        $callback = function () use ($tickets) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Ticket #', 'Subject', 'Customer', 'Email', 'Department', 'Assigned To', 'Status', 'Priority', 'Created', 'Resolved At', 'Rating']);
+
+            foreach ($tickets as $ticket) {
+                fputcsv($handle, [
+                    $ticket->ticket_number,
+                    $ticket->subject,
+                    $ticket->user?->name ?? '',
+                    $ticket->user?->email ?? '',
+                    $ticket->department?->name ?? '',
+                    $ticket->assignedAdmin?->name ?? translate('Unassigned'),
+                    $ticket->status,
+                    $ticket->priority,
+                    $ticket->created_at?->toDateTimeString() ?? '',
+                    $ticket->resolved_at?->toDateTimeString() ?? '',
+                    $ticket->satisfaction_rating ?? '',
+                ]);
+            }
+
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     private function stats(): array

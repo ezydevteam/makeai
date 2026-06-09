@@ -52,7 +52,7 @@ const activate = (slug: string) => {
                     <p class="text-sm text-gray-400 mb-4">{{ theme.description }}</p>
 
                     <div class="flex items-center gap-2">
-                        <button v-if="!theme.is_active && theme.license_ok" @click="activate(theme.slug)" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-500 transition-colors flex-1">Activate</button>
+                        <button v-if="!theme.is_active && theme.license_ok" @click="activate(theme.slug)" class="px-4 py-2 btn-primary text-sm font-medium rounded-lg transition-colors flex-1">Activate</button>
                         <span v-else-if="theme.is_active" class="px-4 py-2 bg-gray-50 text-gray-500 text-sm font-medium rounded-lg flex-1 text-center">Currently Active</span>
                         <span v-else class="px-4 py-2 bg-gray-50 text-gray-400 text-sm rounded-lg flex-1 text-center">Requires Extended License</span>
 

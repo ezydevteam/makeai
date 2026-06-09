@@ -41,7 +41,7 @@ const providers = [
 const providerOptions = computed(() => providers)
 
 const submit = () => {
-    form.post(route('user.api-keys.store'), {
+    form.post(route('user.dashboard.api-keys.store'), {
         onSuccess: () => {
             form.reset()
             showForm.value = false
@@ -51,7 +51,7 @@ const submit = () => {
 
 const deleteKey = (id: number) => {
     if (!confirm('Remove this API key?')) return
-    router.delete(route('user.api-keys.destroy', id))
+    router.delete(route('user.dashboard.api-keys.destroy', id))
 }
 </script>
 

@@ -165,7 +165,7 @@ function formatGraceTime(hours: number): string {
                     type="button"
                     :disabled="reverifyForm.processing"
                     @click="reverifyForm.post(route('admin.license.reverify'), { preserveScroll: true })"
-                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-500 disabled:opacity-60"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary shadow-sm transition-colors disabled:opacity-60"
                 >
                     <svg v-if="reverifyForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -223,7 +223,7 @@ function formatGraceTime(hours: number): string {
                     <button
                         type="submit"
                         :disabled="activateForm.processing"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-primary-500 disabled:opacity-60"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg transition-colors disabled:opacity-60"
                     >
                         <svg v-if="activateForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />

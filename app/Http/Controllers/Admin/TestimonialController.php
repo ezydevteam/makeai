@@ -42,6 +42,7 @@ class TestimonialController extends Controller
 
     public function update(TestimonialRequest $request, Testimonial $testimonial)
     {
+        $this->authorizeTestimonials();
         $validated = $this->normalizePayload($request, $testimonial);
 
         $testimonial->update($validated);
@@ -121,7 +122,8 @@ class TestimonialController extends Controller
 
     public function generate(TestimonialGenerateRequest $request, AiService $aiService): JsonResponse
     {
-        $user = User::query()->first();
+        $admin = auth('admin')->user();
+        $user = User::where('email', $admin?->email)->first() ?? User::query()->first();
 
         if (! $user) {
             return response()->json([
@@ -161,7 +163,7 @@ class TestimonialController extends Controller
                     'is_active' => true,
                     'is_featured' => false,
                     'sort_order' => Testimonial::max('sort_order') + $index + 1,
-                    'source' => 'manual',
+                    'source' => 'ai',
                 ];
             })
             ->filter(fn ($item) => $item['content'] !== '')

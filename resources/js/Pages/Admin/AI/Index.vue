@@ -2,8 +2,14 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { useTranslate } from '@/Composables/useTranslate'
+import { computed, watch } from 'vue';
 
 defineOptions({ layout: AdminLayout });
+
+interface ProviderModel {
+    slug: string;
+    name: string;
+}
 
 const props = defineProps<{
     providerStats: Record<string, {
@@ -11,8 +17,12 @@ const props = defineProps<{
         key_count: number,
         model_count: number
     }>,
+    providerModels: Record<string, ProviderModel[]>,
     globalSettings: {
         default_provider: string,
+        default_model: string,
+        fallback_provider: string,
+        fallback_model: string,
         max_tokens: number,
         show_tool_credit_costs: boolean
     }
@@ -20,8 +30,42 @@ const props = defineProps<{
 
 const form = useForm({
     default_provider: props.globalSettings.default_provider,
+    default_model: props.globalSettings.default_model,
+    fallback_provider: props.globalSettings.fallback_provider || '',
+    fallback_model: props.globalSettings.fallback_model || '',
     max_tokens: props.globalSettings.max_tokens,
     show_tool_credit_costs: props.globalSettings.show_tool_credit_costs,
+});
+
+// Models available for the currently selected provider
+const availableModels = computed<ProviderModel[]>(() => {
+    return props.providerModels[form.default_provider] ?? [];
+});
+
+// Models available for the fallback provider
+const fallbackModels = computed<ProviderModel[]>(() => {
+    if (!form.fallback_provider) return [];
+    return props.providerModels[form.fallback_provider] ?? [];
+});
+
+// When provider changes, auto-select the first available model
+watch(() => form.default_provider, (newProvider) => {
+    const models = props.providerModels[newProvider] ?? [];
+    if (models.length > 0 && !models.some(m => m.slug === form.default_model)) {
+        form.default_model = models[0].slug;
+    }
+});
+
+// When fallback provider changes, auto-select the first available model
+watch(() => form.fallback_provider, (newProvider) => {
+    if (!newProvider) {
+        form.fallback_model = '';
+        return;
+    }
+    const models = props.providerModels[newProvider] ?? [];
+    if (models.length > 0 && !models.some(m => m.slug === form.fallback_model)) {
+        form.fallback_model = models[0].slug;
+    }
 });
 
 const saveSettings = () => {
@@ -112,6 +156,25 @@ const providerColors: Record<string, string> = {
                         <p v-if="form.errors.default_provider" class="text-xs text-red-500 mt-1">{{ form.errors.default_provider }}</p>
                     </div>
 
+                    <!-- Default Model -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Default Model') }}</label>
+                        <select
+                            v-model="form.default_model"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%3E%3Cpath%20fill=%22%239ca3af%22%20d=%22M7%2010l5%205%205-5z%22/%3E%3C/svg%3E')] bg-[length:16px] bg-[right_0.75rem_center] bg-no-repeat pr-10"
+                            :disabled="availableModels.length === 0"
+                        >
+                            <option v-if="availableModels.length === 0" value="" disabled>
+                                {{ t('No models configured for this provider') }}
+                            </option>
+                            <option v-for="model in availableModels" :key="model.slug" :value="model.slug">
+                                {{ model.name }}
+                            </option>
+                        </select>
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('The model used for tools set to Inherit/Default.') }}</p>
+                        <p v-if="form.errors.default_model" class="text-xs text-red-500 mt-1">{{ form.errors.default_model }}</p>
+                    </div>
+
                     <!-- Max Tokens -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Global Max Tokens') }}</label>
@@ -124,6 +187,50 @@ const providerColors: Record<string, string> = {
                         />
                         <p class="text-xs text-gray-400 mt-1.5">{{ t('Hard limit for output tokens per request.') }}</p>
                         <p v-if="form.errors.max_tokens" class="text-xs text-red-500 mt-1">{{ form.errors.max_tokens }}</p>
+                    </div>
+                </div>
+
+                <!-- Fallback Provider/Model -->
+                <div class="p-4 bg-amber-50/50 rounded-xl border border-amber-100">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span class="text-sm font-semibold text-gray-800">{{ t('Fallback Provider & Model') }}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-4">{{ t('Automatically retries with this provider if the primary fails (rate limit, quota exceeded, server error).') }}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Fallback Provider -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ t('Fallback Provider') }}</label>
+                            <select
+                                v-model="form.fallback_provider"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%3E%3Cpath%20fill=%22%239ca3af%22%20d=%22M7%2010l5%205%205-5z%22/%3E%3C/svg%3E')] bg-[length:16px] bg-[right_0.75rem_center] bg-no-repeat pr-10"
+                            >
+                                <option value="">{{ t('— None (no fallback) —') }}</option>
+                                <option v-for="(stat, slug) in providerStats" :key="slug" :value="slug">
+                                    {{ stat.name }}
+                                </option>
+                            </select>
+                            <p v-if="form.errors.fallback_provider" class="text-xs text-red-500 mt-1">{{ form.errors.fallback_provider }}</p>
+                        </div>
+
+                        <!-- Fallback Model -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">{{ t('Fallback Model') }}</label>
+                            <select
+                                v-model="form.fallback_model"
+                                :disabled="!form.fallback_provider || fallbackModels.length === 0"
+                                class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%3E%3Cpath%20fill=%22%239ca3af%22%20d=%22M7%2010l5%205%205-5z%22/%3E%3C/svg%3E')] bg-[length:16px] bg-[right_0.75rem_center] bg-no-repeat pr-10 disabled:bg-gray-50 disabled:text-gray-400"
+                            >
+                                <option v-if="!form.fallback_provider" value="" disabled>{{ t('Select a provider first') }}</option>
+                                <option v-else-if="fallbackModels.length === 0" value="" disabled>{{ t('No models configured') }}</option>
+                                <option v-for="model in fallbackModels" :key="model.slug" :value="model.slug">
+                                    {{ model.name }}
+                                </option>
+                            </select>
+                            <p v-if="form.errors.fallback_model" class="text-xs text-red-500 mt-1">{{ form.errors.fallback_model }}</p>
+                        </div>
                     </div>
                 </div>
 

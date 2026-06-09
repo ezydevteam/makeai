@@ -10,6 +10,7 @@ use App\Models\NewsletterCampaign;
 use App\Models\NewsletterSubscriber;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class NewsletterController extends Controller
@@ -21,7 +22,7 @@ class NewsletterController extends Controller
     /**
      * List subscribers and campaigns.
      */
-    public function index()
+    public function index(Request $request)
     {
         $settings = Setting::getGroup('newsletter');
         $configuredSecrets = [];
@@ -31,8 +32,18 @@ class NewsletterController extends Controller
             unset($settings[$key]);
         }
 
+        $subscribersQuery = NewsletterSubscriber::query()->orderBy('created_at', 'desc');
+
+        if ($request->filled('search')) {
+            $search = $request->string('search')->toString();
+            $subscribersQuery->where(function ($query) use ($search) {
+                $query->where('email', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
         return Inertia::render('Admin/Community/Newsletter', [
-            'subscribers' => NewsletterSubscriber::orderBy('created_at', 'desc')->paginate(20),
+            'subscribers' => $subscribersQuery->paginate(20)->withQueryString(),
             'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->paginate(10),
             'stats' => [
                 'total' => NewsletterSubscriber::count(),
@@ -61,7 +72,6 @@ class NewsletterController extends Controller
     public function storeCampaign(NewsletterCampaignRequest $request)
     {
         $data = $request->validated();
-        $data['content'] = $this->sanitizeHtml($data['content']);
 
         if ($data['audience'] === 'users_pro' && ! isProAvailable()) {
             return back()->with('error', translate('Pro audience is only available when subscriptions are enabled.'));
@@ -104,6 +114,66 @@ class NewsletterController extends Controller
     }
 
     /**
+     * Delete a campaign.
+     */
+    public function destroyCampaign(NewsletterCampaign $campaign)
+    {
+        if ($campaign->status === 'sending') {
+            return back()->with('error', translate('Cannot delete a campaign that is currently sending.'));
+        }
+
+        $campaign->delete();
+
+        return back()->with('success', translate('Campaign deleted.'));
+    }
+
+    /**
+     * Update a draft campaign.
+     */
+    public function updateCampaign(NewsletterCampaignRequest $request, NewsletterCampaign $campaign)
+    {
+        if ($campaign->status !== 'draft') {
+            return back()->with('error', translate('Only draft campaigns can be edited.'));
+        }
+
+        $data = $request->validated();
+
+        if ($data['audience'] === 'users_pro' && ! isProAvailable()) {
+            return back()->with('error', translate('Pro audience is only available when subscriptions are enabled.'));
+        }
+
+        $campaign->update($data);
+
+        return back()->with('success', translate('Campaign updated.'));
+    }
+
+    /**
+     * Send a test email for a campaign.
+     */
+    public function testCampaign(NewsletterCampaign $campaign)
+    {
+        $adminEmail = auth('admin')->user()?->email;
+
+        if (! $adminEmail) {
+            return back()->with('error', translate('No admin email found.'));
+        }
+
+        dispatch(function () use ($campaign, $adminEmail) {
+            $rendered = SendNewsletterCampaign::renderCampaign($campaign, [
+                'email' => $adminEmail,
+                'name' => 'Test Admin',
+                'unsubscribe_url' => '#',
+            ]);
+
+            \Illuminate\Support\Facades\Mail::html($rendered['html'], function ($message) use ($adminEmail, $rendered) {
+                $message->to($adminEmail)->subject('[TEST] '.$rendered['subject']);
+            });
+        })->onQueue('emails');
+
+        return back()->with('success', translate('Test email queued to :email.', ['email' => $adminEmail]));
+    }
+
+    /**
      * Delete a subscriber.
      */
     public function destroySubscriber(NewsletterSubscriber $subscriber)
@@ -130,12 +200,22 @@ class NewsletterController extends Controller
         return back()->with('success', translate('Newsletter settings updated successfully.'));
     }
 
-    private function sanitizeHtml(string $html): string
+    public function retryFailed(NewsletterCampaign $campaign)
     {
-        $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html) ?? '';
-        $html = preg_replace('/\son\w+=("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/javascript:/i', '', $html) ?? '';
+        if ($campaign->status !== 'sent') {
+            return back()->with('error', translate('Only sent campaigns with failures can be retried.'));
+        }
 
-        return strip_tags($html, '<p><br><strong><b><em><i><u><s><ul><ol><li><blockquote><h1><h2><h3><h4><h5><a><img><table><thead><tbody><tr><th><td><pre><code><hr>');
+        $failedCount = NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
+            ->where('status', 'failed')
+            ->count();
+
+        if ($failedCount === 0) {
+            return back()->with('warning', translate('No failed recipients to retry.'));
+        }
+
+        SendNewsletterCampaign::dispatch($campaign->id, true)->onQueue('emails');
+
+        return back()->with('success', translate('Retrying :count failed recipients.', ['count' => $failedCount]));
     }
 }

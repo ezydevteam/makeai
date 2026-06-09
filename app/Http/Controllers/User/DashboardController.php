@@ -21,6 +21,7 @@ class DashboardController extends Controller
         /** @var User $user */
         $user = $request->user();
         $period = $request->query('chart_period', '7d');
+        $showOnboarding = $request->session()->pull('show_onboarding', ! $user->onboarding_completed_at);
 
         return Inertia::render('User/Dashboard', [
             'stats' => $this->stats($user),
@@ -32,6 +33,7 @@ class DashboardController extends Controller
             'recentDocuments' => $this->recentDocuments($user),
             'plan' => $this->planData($user),
             'referral' => $this->referralData($user),
+            'showOnboarding' => $showOnboarding,
         ]);
     }
 

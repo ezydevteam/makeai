@@ -1,16 +1,24 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { useTranslate } from '@/Composables/useTranslate';
+import { computed } from 'vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: AdminLayout })
+
+interface SelectOption {
+    value: string
+    label: string
+}
 
 const props = defineProps<{
-    settings: Record<string, any>
+    settings: Record<string, string | number | null>
     configuredSecrets: Record<string, boolean>
-}>();
+}>()
 
-const { t } = useTranslate();
+const { t } = useTranslate()
+const page = usePage()
 
 const form = useForm({
     mail_driver: props.settings.mail_driver || 'smtp',
@@ -29,173 +37,300 @@ const form = useForm({
     ses_region: props.settings.ses_region || 'us-east-1',
     postmark_token: '',
     sendgrid_api_key: '',
-});
+})
+
+const testForm = useForm({
+    email: '',
+})
+
+const driverOptions = computed<SelectOption[]>(() => [
+    { value: 'smtp', label: t('SMTP') },
+    { value: 'mailgun', label: t('Mailgun') },
+    { value: 'ses', label: t('Amazon SES') },
+    { value: 'postmark', label: t('Postmark') },
+    { value: 'sendgrid', label: t('SendGrid') },
+    { value: 'log', label: t('Log (For Testing)') },
+])
+
+const encryptionOptions = computed<SelectOption[]>(() => [
+    { value: 'tls', label: t('TLS') },
+    { value: 'ssl', label: t('SSL') },
+    { value: 'null', label: t('None') },
+])
+
+const providerStats = computed(() => ({
+    driver: String(form.mail_driver).toUpperCase(),
+    sender: form.mail_from_address || t('Not configured'),
+    secured: Object.values(props.configuredSecrets).filter(Boolean).length,
+}))
+
+const flashSuccess = computed(() => String(page.props.flash?.success ?? ''))
+const flashError = computed(() => String(page.props.flash?.error ?? ''))
 
 const submit = () => {
-    form.post(route('admin.mail.update'), { preserveScroll: true });
-};
+    form.post(route('admin.mail.update'), { preserveScroll: true })
+}
 
-const testForm = useForm({ email: '' });
 const sendTest = () => {
-    testForm.post(route('admin.mail.test'), { preserveScroll: true });
-};
+    testForm.post(route('admin.mail.test'), { preserveScroll: true })
+}
 </script>
 
 <template>
-    <Head :title="t('Mail Settings - Admin')" />
-    <div class="max-w-5xl mx-auto px-6 py-8">
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">{{ t('Mail System') }}</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ t('Configure your email delivery service and sender details.') }}</p>
-        </div>
+    <Head :title="t('Mail Settings')" />
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div class="lg:col-span-2 space-y-8">
-                <form @submit.prevent="submit" class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-8">
-                    <!-- Basic Info -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="md:col-span-2">
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Mail Driver') }}</label>
-                            <select v-model="form.mail_driver" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all font-bold">
-                                <option value="smtp">{{ t('SMTP') }}</option>
-                                <option value="mailgun">{{ t('Mailgun') }}</option>
-                                <option value="ses">{{ t('Amazon SES') }}</option>
-                                <option value="postmark">{{ t('Postmark') }}</option>
-                                <option value="sendgrid">{{ t('SendGrid') }}</option>
-                                <option value="log">{{ t('Log (For Testing)') }}</option>
-                            </select>
+    <div class="px-6 py-8">
+        <div class="mx-auto max-w-7xl">
+            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Settings') }}</h1>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure your email delivery provider, sender identity, and test outgoing messages.') }}</p>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row">
+                    <Link
+                        :href="route('admin.mail.templates.index')"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                    >
+                        <i class="ti ti-mail text-base"></i>
+                        {{ t('Templates') }}
+                    </Link>
+                    <Link
+                        :href="route('admin.mail.logs.index')"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                    >
+                        <i class="ti ti-history text-base"></i>
+                        {{ t('Logs') }}
+                    </Link>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <form @submit.prevent="submit" class="space-y-6">
+                    <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Delivery Provider') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the service used to send transactional and notification emails.') }}</p>
                         </div>
 
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('From Address') }}</label>
-                            <input v-model="form.mail_from_address" type="email" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="'hello@example.com'">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('From Name') }}</label>
-                            <input v-model="form.mail_from_name" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="t('Your Team')">
-                        </div>
-                    </div>
-
-                    <!-- SMTP Fields -->
-                    <div v-if="form.mail_driver === 'smtp'" class="pt-6 border-t border-gray-50 space-y-6">
-                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">{{ t('SMTP Credentials') }}</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
                             <div class="md:col-span-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Host') }}</label>
-                                <input v-model="form.mail_host" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Mail Driver') }}</label>
+                                <AppSelect v-model="form.mail_driver" :options="driverOptions" :placeholder="t('Select a driver')" />
+                                <p v-if="form.errors.mail_driver" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.mail_driver }}</p>
                             </div>
+
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Port') }}</label>
-                                <input v-model="form.mail_port" type="number" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('From Address') }}</label>
+                                <input
+                                    v-model="form.mail_from_address"
+                                    type="email"
+                                    placeholder="hello@example.com"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                >
+                                <p v-if="form.errors.mail_from_address" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.mail_from_address }}</p>
                             </div>
+
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Encryption') }}</label>
-                                <select v-model="form.mail_encryption" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
-                                    <option value="tls">{{ t('TLS') }}</option>
-                                    <option value="ssl">{{ t('SSL') }}</option>
-                                    <option value="null">{{ t('None') }}</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Username') }}</label>
-                                <input v-model="form.mail_username" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Password') }}</label>
-                                <input v-model="form.mail_password" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.mail_password ? t('Stored securely - leave blank to keep') : ''">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('From Name') }}</label>
+                                <input
+                                    v-model="form.mail_from_name"
+                                    type="text"
+                                    :placeholder="t('Your Team')"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                >
+                                <p v-if="form.errors.mail_from_name" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.mail_from_name }}</p>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Mailgun Fields -->
-                    <div v-if="form.mail_driver === 'mailgun'" class="pt-6 border-t border-gray-50 space-y-6">
-                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">{{ t('Mailgun API') }}</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Domain') }}</label>
-                                <input v-model="form.mailgun_domain" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                    <div v-if="form.mail_driver === 'smtp'" class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('SMTP Credentials') }}</h2>
+                        </div>
+                        <div class="grid grid-cols-1 gap-6 p-6 md:grid-cols-3">
+                            <div class="md:col-span-2">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Host') }}</label>
+                                <input v-model="form.mail_host" type="text" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                             </div>
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Endpoint') }}</label>
-                                <select v-model="form.mailgun_endpoint" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
-                                    <option value="api.mailgun.net">{{ t('US (api.mailgun.net)') }}</option>
-                                    <option value="api.eu.mailgun.net">{{ t('EU (api.eu.mailgun.net)') }}</option>
-                                </select>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Port') }}</label>
+                                <input v-model="form.mail_port" type="number" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Encryption') }}</label>
+                                <AppSelect v-model="form.mail_encryption" :options="encryptionOptions" :placeholder="t('Select encryption')" />
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Username') }}</label>
+                                <input v-model="form.mail_username" type="text" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Password') }}</label>
+                                <input
+                                    v-model="form.mail_password"
+                                    type="password"
+                                    :placeholder="configuredSecrets.mail_password ? t('Stored securely - leave blank to keep') : ''"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                >
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="form.mail_driver === 'mailgun'" class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Mailgun API') }}</h2>
+                        </div>
+                        <div class="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Domain') }}</label>
+                                <input v-model="form.mailgun_domain" type="text" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Endpoint') }}</label>
+                                <AppSelect
+                                    v-model="form.mailgun_endpoint"
+                                    :options="[
+                                        { value: 'api.mailgun.net', label: t('US (api.mailgun.net)') },
+                                        { value: 'api.eu.mailgun.net', label: t('EU (api.eu.mailgun.net)') },
+                                    ]"
+                                    :placeholder="t('Select endpoint')"
+                                />
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Secret Key') }}</label>
-                                <input v-model="form.mailgun_secret" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.mailgun_secret ? t('Stored securely - leave blank to keep') : ''">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Secret Key') }}</label>
+                                <input
+                                    v-model="form.mailgun_secret"
+                                    type="password"
+                                    :placeholder="configuredSecrets.mailgun_secret ? t('Stored securely - leave blank to keep') : ''"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                >
                             </div>
                         </div>
                     </div>
 
-                    <!-- SES Fields -->
-                    <div v-if="form.mail_driver === 'ses'" class="pt-6 border-t border-gray-50 space-y-6">
-                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">{{ t('Amazon SES') }}</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div v-if="form.mail_driver === 'ses'" class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Amazon SES') }}</h2>
+                        </div>
+                        <div class="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Access Key ID') }}</label>
-                                <input v-model="form.ses_key" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Access Key ID') }}</label>
+                                <input v-model="form.ses_key" type="text" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                             </div>
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Region') }}</label>
-                                <input v-model="form.ses_region" type="text" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="'us-east-1'">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Region') }}</label>
+                                <input v-model="form.ses_region" type="text" placeholder="us-east-1" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Secret Access Key') }}</label>
-                                <input v-model="form.ses_secret" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.ses_secret ? t('Stored securely - leave blank to keep') : ''">
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Secret Access Key') }}</label>
+                                <input
+                                    v-model="form.ses_secret"
+                                    type="password"
+                                    :placeholder="configuredSecrets.ses_secret ? t('Stored securely - leave blank to keep') : ''"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                >
                             </div>
                         </div>
                     </div>
 
-                    <!-- Postmark Fields -->
-                    <div v-if="form.mail_driver === 'postmark'" class="pt-6 border-t border-gray-50 space-y-6">
-                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">{{ t('Postmark API') }}</h3>
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Server Token') }}</label>
-                            <input v-model="form.postmark_token" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.postmark_token ? t('Stored securely - leave blank to keep') : ''">
+                    <div v-if="form.mail_driver === 'postmark'" class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Postmark API') }}</h2>
+                        </div>
+                        <div class="p-6">
+                            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Server Token') }}</label>
+                            <input
+                                v-model="form.postmark_token"
+                                type="password"
+                                :placeholder="configuredSecrets.postmark_token ? t('Stored securely - leave blank to keep') : ''"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                            >
                         </div>
                     </div>
 
-                    <!-- SendGrid Fields -->
-                    <div v-if="form.mail_driver === 'sendgrid'" class="pt-6 border-t border-gray-50 space-y-6">
-                        <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs">{{ t('SendGrid API') }}</h3>
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('API Key') }}</label>
-                            <input v-model="form.sendgrid_api_key" type="password" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="configuredSecrets.sendgrid_api_key ? t('Stored securely - leave blank to keep') : ''">
+                    <div v-if="form.mail_driver === 'sendgrid'" class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('SendGrid API') }}</h2>
+                        </div>
+                        <div class="p-6">
+                            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('API Key') }}</label>
+                            <input
+                                v-model="form.sendgrid_api_key"
+                                type="password"
+                                :placeholder="configuredSecrets.sendgrid_api_key ? t('Stored securely - leave blank to keep') : ''"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                            >
                         </div>
                     </div>
 
-                    <div class="pt-8">
-                        <button type="submit" :disabled="form.processing" class="bg-primary-600 hover:bg-primary-500 text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-primary-600/20">
+                    <div class="flex justify-start">
+                        <button
+                            type="submit"
+                            :disabled="form.processing"
+                            class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <i class="ti ti-device-floppy text-base"></i>
                             {{ form.processing ? t('Saving...') : t('Save Configuration') }}
                         </button>
                     </div>
                 </form>
-            </div>
 
-            <div class="space-y-6">
-                <!-- Test Mail Card -->
-                <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                    <h3 class="font-black text-gray-900 uppercase tracking-widest text-xs border-b border-gray-50 pb-4">{{ t('Connectivity Test') }}</h3>
-                    <p class="text-xs text-gray-500 leading-relaxed">{{ t('Save your settings first, then send a test email to verify delivery.') }}</p>
-
-                    <form @submit.prevent="sendTest" class="space-y-4">
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{{ t('Recipient Email') }}</label>
-                            <input v-model="testForm.email" type="email" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="'test@example.com'">
+                <div class="space-y-6">
+                    <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Connectivity Test') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Save your settings first, then send a test email to verify provider connectivity.') }}</p>
                         </div>
-                        <button type="submit" :disabled="testForm.processing" class="w-full bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-2xl font-bold transition-all">
-                            {{ testForm.processing ? t('Sending...') : t('Send Test Mail') }}
-                        </button>
-                    </form>
-                </div>
 
-                <!-- Info Card -->
-                <div class="bg-primary-600 p-8 rounded-3xl shadow-xl shadow-primary-600/20 text-white relative overflow-hidden">
-                    <svg class="absolute -right-10 -bottom-10 w-40 h-40 text-white/10" fill="currentColor" viewBox="0 0 24 24"><path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
-                    <h4 class="font-black text-lg mb-2">{{ t('Email Delivery') }}</h4>
-                    <p class="text-xs text-white/80 leading-relaxed">{{ t('Using a professional SMTP provider like Mailgun or Postmark is highly recommended for high deliverability rates.') }}</p>
+                        <form @submit.prevent="sendTest" class="space-y-4 p-6">
+                            <div
+                                v-if="flashSuccess"
+                                class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900/30 dark:bg-emerald-900/10 dark:text-emerald-300"
+                            >
+                                {{ flashSuccess }}
+                            </div>
+
+                            <div
+                                v-if="flashError"
+                                class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-300"
+                            >
+                                {{ flashError }}
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Recipient Email') }}</label>
+                                <input
+                                    v-model="testForm.email"
+                                    type="email"
+                                    placeholder="test@example.com"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                >
+                                <p v-if="testForm.errors.email" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ testForm.errors.email }}</p>
+                            </div>
+
+                            <button
+                                type="submit"
+                                :disabled="testForm.processing"
+                                class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-surface-700 dark:hover:bg-surface-600"
+                            >
+                                <i class="ti ti-send text-base"></i>
+                                {{ testForm.processing ? t('Sending...') : t('Send Test Mail') }}
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="rounded-2xl border border-primary-200 bg-primary-50 p-6 shadow-sm dark:border-primary-900/30 dark:bg-primary-900/10">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-500 text-white shadow-sm">
+                                <i class="ti ti-mail-bolt text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Delivery Advice') }}</h3>
+                                <p class="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('For better deliverability, use a dedicated provider such as Mailgun, Postmark, SES, or SendGrid instead of basic shared SMTP.') }}</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

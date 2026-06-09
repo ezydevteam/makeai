@@ -70,6 +70,11 @@ class AffiliateController extends Controller
                 'alias_link' => $user->affiliate_custom_slug ? route('affiliate.capture', $user->affiliate_custom_slug) : null,
             ],
             'chart' => $this->chart($user->id),
+            'marketing' => [
+                'banners' => $program->marketing_banners ?: [],
+                'emails' => $program->promotional_emails ?: [],
+                'posts' => $program->social_posts ?: [],
+            ],
             'referrals' => AffiliateReferral::query()
                 ->with('referred:id,ulid,name,email,created_at')
                 ->where('referrer_id', $user->id)
@@ -87,6 +92,7 @@ class AffiliateController extends Controller
             'commissions' => AffiliateCommission::query()
                 ->with('payment:id,ulid,amount,currency')
                 ->where('referrer_id', $user->id)
+                ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
                 ->latest()
                 ->paginate(10),
             'payouts' => AffiliatePayout::query()

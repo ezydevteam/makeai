@@ -3,14 +3,21 @@
 namespace App\Http\Requests\Support;
 
 use App\Models\SupportDepartment;
+use App\Traits\HasAttachmentValidation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreTicketRequest extends FormRequest
 {
+    use HasAttachmentValidation;
+
     public function authorize(): bool
     {
-        return $this->user() !== null && (bool) settings('tickets_enabled', true);
+        $user = $this->user();
+
+        return $user !== null
+            && ! $user->is_banned
+            && (bool) settings('tickets_enabled', true);
     }
 
     public function rules(): array
@@ -36,13 +43,5 @@ class StoreTicketRequest extends FormRequest
     public function departments()
     {
         return SupportDepartment::active()->orderBy('sort_order')->get(['id', 'name']);
-    }
-
-    private function allowedMimes(): string
-    {
-        return collect(explode(',', (string) settings('allowed_attachment_types', 'jpg,png,gif,pdf,txt,zip,mp4')))
-            ->map(fn ($type) => trim($type))
-            ->filter()
-            ->implode(',');
     }
 }

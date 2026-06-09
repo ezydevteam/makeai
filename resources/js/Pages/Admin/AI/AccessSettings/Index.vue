@@ -2,93 +2,82 @@
     <Head :title="t('AI Access Settings')" />
 
     <AdminLayout>
-        <template #header>
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
+        <div class="py-12">
+            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <div class="mb-6">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         {{ t('AI Access Settings') }}
-                    </h2>
+                    </h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Manage visibility and access requirements for all AI tools.') }}
                     </p>
                 </div>
-            </div>
-        </template>
-
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <!-- Preset Actions Card -->
-                <div class="p-6 mb-6 overflow-hidden bg-white shadow-sm sm:rounded-lg dark:bg-gray-800">
-                    <h3 class="mb-4 text-lg font-medium text-gray-900 dark:text-gray-100">{{ t('Global Presets') }}</h3>
-                    <div class="flex flex-wrap gap-4">
-                        <button @click="applyPreset('all_public')" class="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
-                            {{ t('Make All Public') }}
-                        </button>
-                        <button @click="applyPreset('all_login')" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
-                            {{ t('Require Login for All') }}
-                        </button>
-                        <button @click="applyPreset('all_pro')" class="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium">
-                            {{ t('Pro Only for All') }}
-                        </button>
-                        <button @click="applyPreset('reset_inherit')" class="px-5 py-2.5 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600">
-                            {{ t('Reset to Inherit') }}
-                        </button>
-                    </div>
-                </div>
 
                 <!-- Filters -->
-                <div class="flex items-center justify-between mb-4">
+                <div class="mb-4 flex items-center justify-between gap-4">
                     <div class="flex items-center gap-4">
                         <div class="w-64">
-                            <input
-                                v-model="form.search"
-                                type="text"
-                                class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:border-primary-500 focus:outline-none dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                                :placeholder="t('Search tools...')"
-                                @keyup.enter="applyFilters"
-                            />
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                                    </svg>
+                                </span>
+                                <input
+                                    v-model="searchQuery"
+                                    type="text"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    :placeholder="t('Search tools...')"
+                                />
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear search')"
+                                    :title="t('Clear search')"
+                                    @click="clearSearch"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                            </div>
                         </div>
                         <div class="w-48">
-                            <select
+                            <AppSelect
                                 v-model="form.category"
-                                class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:border-primary-500 focus:outline-none dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                                @change="applyFilters"
-                            >
-                                <option value="">{{ t('All Categories') }}</option>
-                                <option v-for="category in categories" :key="category.id" :value="category.id">
-                                    {{ category.name }}
-                                </option>
-                            </select>
+                                :options="categoryOptions"
+                                :placeholder="t('All Categories')"
+                                live-search
+                                @update:model-value="applyFilters"
+                            />
                         </div>
                     </div>
                     
                     <div class="flex items-center gap-4">
                         <!-- Bulk Action Dropdown -->
-                        <div class="flex items-center gap-2" v-if="selectedIds.length > 0">
-                            <span class="text-sm text-gray-500 dark:text-gray-400">
+                        <div class="flex items-center gap-2">
+                            <span v-if="selectedIds.length > 0" class="text-sm text-gray-500 dark:text-gray-400">
                                 {{ t(':count selected', { count: selectedIds.length }) }}
                             </span>
-                            <select
+                            <AppSelect
                                 v-model="bulkAction"
-                                class="w-48 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:border-primary-500 focus:outline-none dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                            >
-                                <option value="">{{ t('Select Access Level') }}</option>
-                                <option v-for="level in accessLevels" :key="level.value" :value="level.value">
-                                    {{ level.label }}
-                                </option>
-                            </select>
-                            <button @click="applyBulkUpdate" :disabled="!bulkAction" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50">
-                                {{ t('Apply') }}
-                            </button>
+                                :options="accessLevels"
+                                :placeholder="t('Select Access Level')"
+                                class="w-56"
+                            />
+                            <div :title="selectedIds.length === 0 ? t('Select at 1 tool to apply') : ''">
+                                <button @click="applyBulkUpdate" :disabled="!bulkAction || selectedIds.length === 0" class="px-4 py-2 btn-primary rounded-lg transition-colors text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
+                                    {{ t('Apply') }}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Data Table -->
-                <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <div class="overflow-hidden border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                            <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                            <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                                 <tr>
                                     <th scope="col" class="p-4 w-4">
                                         <div class="flex items-center">
@@ -108,9 +97,9 @@
                             </thead>
                             <tbody>
                                 <tr
-                                    v-for="tool in tools.data"
+                                    v-for="tool in filteredTools"
                                     :key="tool.id"
-                                    class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
                                 >
                                     <td class="w-4 p-4">
                                         <div class="flex items-center">
@@ -136,13 +125,15 @@
                                     <td class="px-6 py-4 text-right">
                                         <Link
                                             :href="route('admin.ai.tools.edit', tool.id)"
-                                            class="font-medium text-primary-600 dark:text-primary-500 hover:underline"
+                                            :title="t('Edit')"
+                                            :aria-label="t('Edit')"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                                         >
-                                            {{ t('Edit') }}
+                                            <i class="ti ti-edit text-base"></i>
                                         </Link>
                                     </td>
                                 </tr>
-                                <tr v-if="tools.data.length === 0">
+                                <tr v-if="filteredTools.length === 0">
                                     <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                         {{ t('No tools found.') }}
                                     </td>
@@ -159,32 +150,87 @@
 
             </div>
         </div>
+
+        <ActionConfirmModal
+            :open="confirmModal.open"
+            :title="confirmModal.title"
+            :message="confirmModal.message"
+            :confirm-label="confirmModal.confirmLabel"
+            :processing-label="confirmModal.processingLabel"
+            :processing="confirmModal.processing"
+            variant="primary"
+            @cancel="closeConfirmModal"
+            @confirm="runConfirmedAction"
+        />
     </AdminLayout>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import Pagination from '@/Components/Pagination.vue';
-import { useTranslate } from '@/Composables/useTranslate';
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import Pagination from '@/Components/Pagination.vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
-const { t } = useTranslate();
+interface Category {
+    id: number | string
+    name: string
+}
+
+interface ToolCategory {
+    name?: string | null
+}
+
+interface ToolItem {
+    id: number
+    name: string
+    access_level: string
+    category?: ToolCategory | null
+}
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
+interface ToolsResponse {
+    data: ToolItem[]
+    links?: PaginationLink[]
+}
+
+interface Filters {
+    category?: string | number | null
+}
+
+interface ConfirmModalState {
+    open: boolean
+    title: string
+    message: string
+    confirmLabel: string
+    processingLabel: string
+    processing: boolean
+    action: null | (() => void)
+}
+
+const { t } = useTranslate()
 
 const props = defineProps({
-    tools: Object,
-    categories: Array,
-    filters: Object,
+    tools: Object as () => ToolsResponse,
+    categories: Array as () => Category[],
+    filters: Object as () => Filters,
     globalDefault: String,
-});
+})
 
 const form = useForm({
-    search: props.filters.search || '',
-    category: props.filters.category || '',
-});
+    category: props.filters.category ? String(props.filters.category) : '',
+})
 
-const selectedIds = ref([]);
-const bulkAction = ref('');
+const searchQuery = ref('')
+const selectedIds = ref<number[]>([])
+const bulkAction = ref<string | number | null>('')
 
 const accessLevels = [
     { value: 'inherit', label: t('Inherit (Default)') },
@@ -192,66 +238,138 @@ const accessLevels = [
     { value: 'login_required', label: t('Login Required') },
     { value: 'free_plan', label: t('Free Plan') },
     { value: 'pro_plan', label: t('Pro Plan') },
-];
+]
+
+const categoryOptions = computed(() => [
+    { value: '', label: t('All Categories') },
+    ...props.categories.map((category) => ({
+        value: String(category.id),
+        label: category.name,
+    })),
+])
+
+const confirmModal = ref<ConfirmModalState>({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    processingLabel: '',
+    processing: false,
+    action: null,
+})
 
 const isAllSelected = computed(() => {
-    return props.tools.data.length > 0 && selectedIds.value.length === props.tools.data.length;
-});
+    return filteredTools.value.length > 0 && filteredTools.value.every((tool) => selectedIds.value.includes(tool.id))
+})
 
-const toggleAll = (e) => {
-    if (e.target.checked) {
-        selectedIds.value = props.tools.data.map(t => t.id);
+const toggleAll = (e: Event) => {
+    const target = e.target as HTMLInputElement
+    if (target.checked) {
+        const visibleIds = filteredTools.value.map((tool) => tool.id)
+        selectedIds.value = Array.from(new Set([...selectedIds.value, ...visibleIds]))
     } else {
-        selectedIds.value = [];
+        const visibleIds = new Set(filteredTools.value.map((tool) => tool.id))
+        selectedIds.value = selectedIds.value.filter((id) => !visibleIds.has(id))
     }
-};
+}
 
-const getAccessLevelLabel = (level) => {
-    return accessLevels.find(l => l.value === level)?.label || level;
-};
+const getAccessLevelLabel = (level: string) => {
+    return accessLevels.find((item) => item.value === level)?.label || level
+}
 
-const getAccessLevelBadgeClass = (level) => {
+const getAccessLevelBadgeClass = (level: string) => {
     switch (level) {
-        case 'public': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-        case 'login_required': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-        case 'pro_plan': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-        case 'free_plan': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        case 'public': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+        case 'login_required': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+        case 'pro_plan': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
+        case 'free_plan': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
     }
-};
+}
 
 const applyFilters = () => {
     form.get(route('admin.ai.access.index'), {
         preserveState: true,
         preserveScroll: true,
-    });
-};
+    })
+}
 
-const applyPreset = (presetValue) => {
-    if (confirm(t('Are you sure you want to apply this preset to ALL tools?'))) {
-        router.post(route('admin.ai.access.preset'), { preset: presetValue }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                selectedIds.value = [];
-            }
-        });
+const clearSearch = () => {
+    searchQuery.value = ''
+}
+const filteredTools = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+    if (!query) {
+        return props.tools.data
     }
-};
+
+    return props.tools.data.filter((tool) => {
+        const categoryName = tool.category?.name?.toLowerCase() ?? ''
+        return tool.name.toLowerCase().includes(query) || categoryName.includes(query)
+    })
+})
+
+const openConfirmModal = (config: Omit<ConfirmModalState, 'open' | 'processing'>) => {
+    confirmModal.value = {
+        ...config,
+        open: true,
+        processing: false,
+    }
+}
+
+const closeConfirmModal = () => {
+    if (confirmModal.value.processing) {
+        return
+    }
+
+    confirmModal.value = {
+        open: false,
+        title: '',
+        message: '',
+        confirmLabel: '',
+        processingLabel: '',
+        processing: false,
+        action: null,
+    }
+}
+
+const runConfirmedAction = () => {
+    if (!confirmModal.value.action) {
+        return
+    }
+
+    confirmModal.value.processing = true
+    confirmModal.value.action()
+}
 
 const applyBulkUpdate = () => {
-    if (selectedIds.value.length === 0 || !bulkAction.value) return;
+    if (selectedIds.value.length === 0 || !bulkAction.value) return
 
-    if (confirm(t('Update access level to ":level" for :count tools?', { level: getAccessLevelLabel(bulkAction.value), count: selectedIds.value.length }))) {
-        router.post(route('admin.ai.access.bulk'), {
-            tool_ids: selectedIds.value,
-            access_level: bulkAction.value
-        }, {
-            preserveScroll: true,
-            onSuccess: () => {
-                selectedIds.value = [];
-                bulkAction.value = '';
-            }
-        });
-    }
-};
+    const selectedLevel = String(bulkAction.value)
+
+    openConfirmModal({
+        title: t('Apply access level?'),
+        message: t('Update access level to ":level" for :count tools?', {
+            level: getAccessLevelLabel(selectedLevel),
+            count: selectedIds.value.length,
+        }),
+        confirmLabel: t('Apply'),
+        processingLabel: t('Applying...'),
+        action: () => {
+            router.post(route('admin.ai.access.bulk'), {
+                tool_ids: selectedIds.value,
+                access_level: selectedLevel,
+            }, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    selectedIds.value = []
+                    bulkAction.value = ''
+                },
+                onFinish: () => {
+                    closeConfirmModal()
+                },
+            })
+        },
+    })
+}
 </script>

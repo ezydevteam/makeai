@@ -32,10 +32,30 @@ class AiManagementController extends Controller
             ];
         }
 
+        // Build provider → models map for the default model select
+        $providerModels = [];
+        foreach ($providers as $slug => $info) {
+            $models = AiModel::where('provider', $slug)
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['slug', 'name'])
+                ->map(fn (AiModel $m) => ['slug' => $m->slug, 'name' => $m->name])
+                ->values()
+                ->toArray();
+
+            if (! empty($models)) {
+                $providerModels[$slug] = $models;
+            }
+        }
+
         return Inertia::render('Admin/AI/Index', [
             'providerStats' => $providerStats,
+            'providerModels' => $providerModels,
             'globalSettings' => [
                 'default_provider' => settings('default_ai_provider', config('ai.default_provider')),
+                'default_model' => settings('default_ai_model', 'gpt-4o-mini'),
+                'fallback_provider' => settings('fallback_ai_provider', ''),
+                'fallback_model' => settings('fallback_ai_model', ''),
                 'max_tokens' => settings('max_tokens_per_request', config('ai.limits.max_tokens_per_request')),
                 'show_tool_credit_costs' => (bool) settings('show_tool_credit_costs', true),
             ],
@@ -49,11 +69,43 @@ class AiManagementController extends Controller
     {
         $data = $request->validate([
             'default_provider' => 'required|string|in:'.implode(',', array_keys(config('ai.providers', []))),
+            'default_model' => 'required|string|max:100',
+            'fallback_provider' => 'nullable|string|max:50',
+            'fallback_model' => 'nullable|string|max:100',
             'max_tokens' => 'required|integer|min:1|max:128000',
             'show_tool_credit_costs' => 'required|boolean',
         ]);
 
+        // Validate that the selected model belongs to the selected provider
+        $modelRecord = AiModel::where('slug', $data['default_model'])
+            ->where('provider', $data['default_provider'])
+            ->where('is_active', true)
+            ->first();
+
+        if (! $modelRecord) {
+            return back()->withErrors([
+                'default_model' => translate('Selected model is not available for this provider.'),
+            ]);
+        }
+
+        // Validate fallback model if fallback provider is set
+        if (! empty($data['fallback_provider']) && ! empty($data['fallback_model'])) {
+            $fbModel = AiModel::where('slug', $data['fallback_model'])
+                ->where('provider', $data['fallback_provider'])
+                ->where('is_active', true)
+                ->first();
+
+            if (! $fbModel) {
+                return back()->withErrors([
+                    'fallback_model' => translate('Selected fallback model is not available for this provider.'),
+                ]);
+            }
+        }
+
         Setting::setValue('default_ai_provider', $data['default_provider'], 'string', 'ai');
+        Setting::setValue('default_ai_model', $data['default_model'], 'string', 'ai');
+        Setting::setValue('fallback_ai_provider', $data['fallback_provider'] ?? '', 'string', 'ai');
+        Setting::setValue('fallback_ai_model', $data['fallback_model'] ?? '', 'string', 'ai');
         Setting::setValue('max_tokens_per_request', $data['max_tokens'], 'integer', 'ai');
         Setting::setValue('default_max_tokens', $data['max_tokens'], 'integer', 'ai');
         Setting::setValue('show_tool_credit_costs', $data['show_tool_credit_costs'], 'boolean', 'ai');

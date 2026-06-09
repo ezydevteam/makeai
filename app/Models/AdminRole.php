@@ -89,4 +89,72 @@ class AdminRole extends Model
     {
         return $this->permissions()->where('slug', $slug)->exists();
     }
+
+    /**
+     * Default permission slugs for built-in roles.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public static function defaultPermissionSlugsMap(): array
+    {
+        return [
+            'super-admin' => [
+                '*',
+            ],
+            'manager' => [
+                'dashboard.view', 'dashboard.analytics',
+                'users.view', 'users.create', 'users.edit', 'users.credits', 'users.manage',
+                'settings.manage', 'settings.general', 'settings.ai', 'settings.payment', 'settings.mail',
+                'ai.tools', 'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
+                'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
+                'plans.view', 'plans.create', 'plans.edit',
+                'payments.view', 'payments.gateways',
+                'translations.manage', 'translations.view', 'translations.edit',
+                'reports.revenue', 'reports.usage', 'reports.export',
+                'support.tickets', 'support.respond', 'support.departments', 'support.canned',
+            ],
+            'support' => [
+                'dashboard.view',
+                'users.view', 'users.edit',
+                'support.tickets', 'support.respond',
+                'support.departments', 'support.canned',
+            ],
+            'content-manager' => [
+                'dashboard.view',
+                'ai.tools', 'ai.templates',
+                'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
+                'translations.view', 'translations.edit',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function defaultPermissionSlugs(): array
+    {
+        return self::defaultPermissionSlugsMap()[$this->slug] ?? [];
+    }
+
+    public function hasDefaultPermissions(): bool
+    {
+        return $this->defaultPermissionSlugs() !== [];
+    }
+
+    public function syncDefaultPermissions(): void
+    {
+        $defaultSlugs = $this->defaultPermissionSlugs();
+
+        if ($defaultSlugs === []) {
+            return;
+        }
+
+        if ($defaultSlugs === ['*']) {
+            $this->permissions()->sync(AdminPermission::query()->pluck('id'));
+
+            return;
+        }
+
+        $this->syncPermissionsBySlug($defaultSlugs);
+    }
 }

@@ -272,7 +272,7 @@ const saveSettings = () => {
             </section>
 
             <div class="flex justify-end">
-                <button type="submit" :disabled="form.processing" class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-primary-500 disabled:opacity-60">
+                <button type="submit" :disabled="form.processing" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg transition-colors disabled:opacity-60">
                     <svg v-if="form.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />

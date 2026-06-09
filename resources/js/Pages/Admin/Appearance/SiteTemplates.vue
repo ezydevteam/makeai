@@ -34,7 +34,7 @@
           <div class="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-surface-700">
             <a
               :href="route('admin.site-templates.edit', template.slug)"
-              class="inline-flex items-center rounded-lg bg-primary-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors"
+              class="inline-flex items-center rounded-lg btn-primary transition-colors"
             >
               {{ t('Edit') }}
             </a>

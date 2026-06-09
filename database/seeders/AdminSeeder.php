@@ -140,40 +140,10 @@ class AdminSeeder extends Seeder
         // 3. Assign Permissions to Roles
         // ═══════════════════════════════════════════
 
-        // Super Admin gets ALL permissions (handled by HasRBAC trait bypass)
-        // But we assign them anyway for UI display
-        $allPermIds = AdminPermission::pluck('id');
-        $superAdmin->permissions()->sync($allPermIds);
-
-        // Manager — everything except admin/role management and license
-        $manager->syncPermissionsBySlug([
-            'dashboard.view', 'dashboard.analytics',
-            'users.view', 'users.create', 'users.edit', 'users.credits', 'users.manage',
-            'settings.manage', 'settings.general', 'settings.ai', 'settings.payment', 'settings.mail',
-            'ai.tools', 'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
-            'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
-            'plans.view', 'plans.create', 'plans.edit',
-            'payments.view', 'payments.gateways',
-            'translations.manage', 'translations.view', 'translations.edit',
-            'reports.revenue', 'reports.usage', 'reports.export',
-            'support.tickets', 'support.respond', 'support.departments', 'support.canned',
-        ]);
-
-        // Support — limited access
-        $support->syncPermissionsBySlug([
-            'dashboard.view',
-            'users.view', 'users.edit',
-            'support.tickets', 'support.respond',
-            'support.departments', 'support.canned',
-        ]);
-
-        // Content Manager
-        $contentManager->syncPermissionsBySlug([
-            'dashboard.view',
-            'ai.tools', 'ai.templates',
-            'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
-            'translations.view', 'translations.edit',
-        ]);
+        $superAdmin->syncDefaultPermissions();
+        $manager->syncDefaultPermissions();
+        $support->syncDefaultPermissions();
+        $contentManager->syncDefaultPermissions();
 
         // ═══════════════════════════════════════════
         // 4. Create Default Super Admin
@@ -185,7 +155,7 @@ class AdminSeeder extends Seeder
                 'password' => Hash::make('admin123'),
                 'role_id' => $superAdmin->id,
                 'is_active' => true,
-                'must_change_password' => true,
+                'must_change_password' => false,
             ]
         );
     }

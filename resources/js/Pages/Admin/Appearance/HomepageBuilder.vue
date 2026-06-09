@@ -337,12 +337,12 @@ const setHomepageTemplate = (slug: string) => {
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Build the landing page with draggable sections, live preview controls, SEO, and conversion settings.') }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <button @click="mobilePreview = !mobilePreview" type="button" :class="mobilePreview ? 'bg-primary-600 text-white' : 'bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700'" class="px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">
+                    <button @click="mobilePreview = !mobilePreview" type="button" :class="mobilePreview ? 'btn-primary' : 'bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700'" class="px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">
                         {{ mobilePreview ? t('Mobile Preview On') : t('Mobile Preview') }}
                     </button>
                     <button @click="settingsModalOpen = true" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-all shadow-sm">{{ t('General Settings') }}</button>
                     <button @click="openPreview" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-all shadow-sm">{{ t('Live Preview') }}</button>
-                    <button @click="submit" :disabled="form.processing" class="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
+                    <button @click="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
                         {{ form.processing ? t('Saving...') : t('Save Homepage') }}
                     </button>
                 </div>
@@ -392,7 +392,7 @@ const setHomepageTemplate = (slug: string) => {
                         <div v-if="form.sections.length === 0" class="border-2 border-dashed border-gray-200 dark:border-surface-700 rounded-2xl p-10 text-center bg-gray-50/50 dark:bg-surface-800/50">
                             <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-1">{{ t('No sections yet') }}</h3>
                             <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">{{ t('Add a section to start building your homepage.') }}</p>
-                            <button @click="addSectionModalOpen = true" type="button" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-bold">{{ t('Add first section') }}</button>
+                            <button @click="addSectionModalOpen = true" type="button" class="px-4 py-2 btn-primary rounded-lg text-sm font-bold">{{ t('Add first section') }}</button>
                         </div>
 
                         <div class="space-y-2">
@@ -573,7 +573,7 @@ const setHomepageTemplate = (slug: string) => {
                 </div>
                 <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
                     <button @click="sectionModalOpen = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">{{ t('Cancel') }}</button>
-                    <button @click="saveSectionSettings" type="button" class="px-5 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20">{{ t('Apply Configuration') }}</button>
+                    <button @click="saveSectionSettings" type="button" class="px-5 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20">{{ t('Apply Configuration') }}</button>
                 </div>
             </div>
         </div>
@@ -626,7 +626,7 @@ const setHomepageTemplate = (slug: string) => {
                     </div>
                 </div>
                 <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end">
-                    <button @click="settingsModalOpen = false" type="button" class="px-5 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all">{{ t('Done') }}</button>
+                    <button @click="settingsModalOpen = false" type="button" class="px-5 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all">{{ t('Done') }}</button>
                 </div>
             </div>
         </div>
@@ -644,7 +644,7 @@ const setHomepageTemplate = (slug: string) => {
                     <a
                         v-if="props.activeHomepageTemplate !== 'default'"
                         :href="route('admin.site-templates.edit', props.activeHomepageTemplate)"
-                        class="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-bold hover:bg-primary-500 transition-colors"
+                        class="inline-flex items-center gap-2 mt-4 px-4 py-2 btn-primary rounded-lg text-sm font-bold transition-colors"
                     >
                         {{ t('Edit Template Settings') }}
                     </a>

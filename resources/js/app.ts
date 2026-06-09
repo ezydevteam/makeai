@@ -7,6 +7,9 @@ import { ZiggyVue } from 'ziggy-js'
 import AppSelect from './Components/AppSelect.vue'
 import AppColorPicker from './Components/AppColorPicker.vue'
 import ToastContainer from './Components/ToastContainer.vue'
+import CommandPalette from './Components/CommandPalette.vue'
+import ShortcutsReferenceModal from './Components/ShortcutsReferenceModal.vue'
+import { useGlobalShortcuts } from './Composables/useKeyboardShortcuts'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
 const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
@@ -44,9 +47,11 @@ createInertiaApp({
         syncDocumentLocale(props.initialPage.props.locale)
         router.on('navigate', (event) => syncDocumentLocale(event.detail.page.props.locale))
 
+        useGlobalShortcuts()
+
         const pinia = createPinia()
         const vueApp = createApp({
-            render: () => [h(App, props), h(ToastContainer)],
+            render: () => [h(App, props), h(ToastContainer), h(CommandPalette), h(ShortcutsReferenceModal)],
         })
 
         vueApp

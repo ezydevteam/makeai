@@ -31,7 +31,6 @@ class SettingsController extends Controller
     {
         return [
             'tickets_enabled' => (bool) settings('tickets_enabled', true),
-            'guest_tickets' => (bool) settings('guest_tickets', false),
             'max_attachments_per_reply' => (int) settings('max_attachments_per_reply', 5),
             'max_attachment_size_mb' => (int) settings('max_attachment_size_mb', 10),
             'allowed_attachment_types' => settings('allowed_attachment_types', 'jpg,png,gif,pdf,txt,zip,mp4'),

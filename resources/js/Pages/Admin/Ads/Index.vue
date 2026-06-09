@@ -59,7 +59,7 @@ const saveSettings = () => settingsForm.post(route('admin.ads.settings'), { pres
                 <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Ads') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Manage zones, AdSense, custom HTML, image links, and audience rules.') }}</p>
             </div>
-            <Link :href="route('admin.ads.create')" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500">
+            <Link :href="route('admin.ads.create')" class="rounded-lg btn-primary">
                 {{ t('Create ad') }}
             </Link>
         </div>
@@ -70,7 +70,7 @@ const saveSettings = () => settingsForm.post(route('admin.ads.settings'), { pres
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Global Ad Settings') }}</h2>
                     <p class="mt-1 text-sm text-gray-500">{{ t('Set publisher ID, auto ads, and subscriber visibility rules.') }}</p>
                 </div>
-                <button type="submit" :disabled="settingsForm.processing" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+                <button type="submit" :disabled="settingsForm.processing" class="rounded-lg btn-primary disabled:opacity-60">
                     {{ settingsForm.processing ? t('Saving...') : t('Save settings') }}
                 </button>
             </div>

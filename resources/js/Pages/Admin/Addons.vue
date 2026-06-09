@@ -37,8 +37,8 @@ const deactivate = (slug: string) => router.post(route('admin.addons.deactivate'
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
                     <Link v-if="addon.is_active && addon.settings?.length" :href="route('admin.addons.settings', { slug: addon.slug })" class="px-3 py-2 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 text-sm">Settings</Link>
-                    <button v-if="addon.is_active" @click="deactivate(addon.slug)" class="px-4 py-2 bg-danger-500/10 text-danger-500 rounded-lg hover:bg-danger-500/20 text-sm font-medium">Deactivate</button>
-                    <button v-else-if="addon.license_ok" @click="activate(addon.slug)" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-500 text-sm font-medium">Activate</button>
+                    <button v-if="addon.is_active" @click="deactivate(addon.slug)" class="px-4 py-2 bg-danger-500/10 text-danger-500 rounded-lg/20 text-sm font-medium">Deactivate</button>
+                    <button v-else-if="addon.license_ok" @click="activate(addon.slug)" class="px-4 py-2 btn-primary rounded-lg text-sm font-medium">Activate</button>
                     <span v-else class="px-4 py-2 bg-white/5 text-gray-600 rounded-lg text-sm">Locked</span>
                 </div>
             </div>

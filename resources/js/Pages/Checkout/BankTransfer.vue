@@ -94,7 +94,7 @@ const submitProof = () => {
                             <p v-if="form.errors.note" class="mt-1 text-xs font-semibold text-red-600">{{ form.errors.note }}</p>
                         </label>
 
-                        <button :disabled="form.processing" type="submit" class="w-full rounded-xl bg-primary-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-500 disabled:bg-gray-300 disabled:shadow-none">
+                        <button :disabled="form.processing" type="submit" class="w-full rounded-xl btn-primary shadow-lg shadow-primary-600/20 transition disabled:bg-gray-300 disabled:shadow-none">
                             {{ form.processing ? t('Uploading...') : t('Submit proof') }}
                         </button>
                     </form>

@@ -12,6 +12,7 @@ interface SocialLoginProvider {
 interface PageProps {
     socialLoginProviders?: SocialLoginProvider[]
     branding?: { site_name?: string }
+    app?: { demo?: boolean; demo_credentials?: { admin: { email: string; password: string }; user: { email: string; password: string } } | null }
 }
 
 const form = useForm({
@@ -25,6 +26,8 @@ const showPassword = ref(false)
 const page = usePage()
 const { t } = useTranslate()
 const appName = computed(() => String((page.props as unknown as PageProps).branding?.site_name || t('Application')))
+const isDemo = computed(() => (page.props as unknown as PageProps).app?.demo ?? false)
+const demoCredentials = computed(() => (page.props as unknown as PageProps).app?.demo_credentials ?? null)
 const socialProviders = computed(() => {
     const props = page.props as unknown as PageProps
 
@@ -115,6 +118,24 @@ const submit = () => {
                 </form>
 
                 <div class="mt-10 pt-8 border-t border-gray-50 text-center">
+                    <!-- Demo credentials -->
+                    <div v-if="isDemo && demoCredentials" class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-800 dark:bg-amber-900/20">
+                        <p class="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-3">{{ t('Demo Credentials') }}</p>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600 dark:text-gray-400">{{ t('Admin') }}</span>
+                                <code class="text-xs bg-amber-100 dark:bg-amber-800 px-2 py-0.5 rounded font-mono text-amber-800 dark:text-amber-200">{{ demoCredentials.admin.email }}</code>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600 dark:text-gray-400">{{ t('User') }}</span>
+                                <code class="text-xs bg-amber-100 dark:bg-amber-800 px-2 py-0.5 rounded font-mono text-amber-800 dark:text-amber-200">{{ demoCredentials.user.email }}</code>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600 dark:text-gray-400">{{ t('Password') }}</span>
+                                <code class="text-xs bg-amber-100 dark:bg-amber-800 px-2 py-0.5 rounded font-mono text-amber-800 dark:text-amber-200">{{ demoCredentials.admin.password }}</code>
+                            </div>
+                        </div>
+                    </div>
                     <p class="text-sm text-gray-500 font-medium">
                         {{ t('Already have an account?') }}
                         <Link :href="route('login')" class="text-primary-600 hover:text-primary-700 font-black transition-colors ml-1">{{ t('Sign In') }}</Link>

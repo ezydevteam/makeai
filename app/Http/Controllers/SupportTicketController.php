@@ -59,6 +59,8 @@ class SupportTicketController extends Controller
             'action_label' => translate('View ticket'),
         ], $ticket->department?->assignedRole?->slug);
 
+        $this->tickets->sendNewTicketNotification($ticket);
+
         return redirect()->route('support.tickets.show', $ticket)->with('success', translate('Support ticket created.'));
     }
 
@@ -72,6 +74,7 @@ class SupportTicketController extends Controller
 
         return Inertia::render('Support/Show', [
             'ticket' => $this->ticketPayload($ticket, false),
+            'userLastReadAt' => $ticket->user_last_read_at?->toISOString() ?? $ticket->created_at->toISOString(),
             'settings' => $this->settings(),
         ]);
     }

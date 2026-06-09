@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import AppSelect from '@/Components/AppSelect.vue'
+import AdSection from '@/Components/AdSection.vue'
 
 defineOptions({ layout: UserLayout })
 
@@ -88,13 +89,15 @@ const formatDate = (value: string | null) => {
                         <input id="blog-search" v-model="search" @keyup.enter="applyFilters" type="search" :placeholder="t('Search articles')" class="flex-1 rounded-lg border border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:border-primary-400 focus:ring-primary-400">
                         <label class="sr-only" for="blog-sort">{{ t('Sort') }}</label>
                         <AppSelect id="blog-sort" v-model="sort" :options="sortOptions" @update:model-value="applyFilters" />
-                        <button @click="applyFilters" type="button" class="rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-500 transition-colors">
+                        <button @click="applyFilters" type="button" class="rounded-lg btn-primary transition-colors">
                             {{ t('Filter') }}
                         </button>
                     </div>
 
                     <div v-if="posts.data.length" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                        <Link v-for="post in posts.data" :key="post.ulid" :href="route('blog.show', post.slug)" class="group bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl shadow-sm overflow-hidden hover:border-primary-200 hover:shadow-md transition-all">
+                        <template v-for="(post, index) in posts.data" :key="post.ulid">
+                            <AdSection v-if="index === 2 || index === 5" zone="between_posts" class="col-span-full" />
+                            <Link :href="route('blog.show', post.slug)" class="group bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl shadow-sm overflow-hidden hover:border-primary-200 hover:shadow-md transition-all">
                             <div class="aspect-[16/9] bg-gray-100 dark:bg-surface-800 overflow-hidden">
                                 <img v-if="post.featured_image" :src="post.featured_image" :alt="post.featured_image_alt || post.title" class="h-full w-full object-cover group-hover:scale-[1.02] transition-transform duration-200">
                                 <div v-else class="h-full w-full bg-gradient-to-br from-primary-100 to-accent-400/20 dark:from-primary-900/30 dark:to-surface-800"></div>
@@ -112,6 +115,7 @@ const formatDate = (value: string | null) => {
                                 </div>
                             </div>
                         </Link>
+                        </template>
                     </div>
 
                     <div v-else class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl shadow-sm p-12 text-center">
@@ -120,11 +124,12 @@ const formatDate = (value: string | null) => {
                     </div>
 
                     <div v-if="posts.links.length > 3" class="mt-8 flex flex-wrap gap-2">
-                        <Link v-for="link in posts.links" :key="link.label" :href="link.url || '#'" v-html="link.label" :class="[link.active ? 'bg-primary-600 text-white' : 'bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300', !link.url ? 'opacity-50 pointer-events-none' : 'hover:border-primary-300']" class="min-w-10 rounded-lg border border-gray-200 dark:border-surface-800 px-3 py-2 text-center text-sm transition-colors" />
+                        <Link v-for="link in posts.links" :key="link.label" :href="link.url || '#'" v-html="link.label" :class="[link.active ? 'btn-primary' : 'bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300', !link.url ? 'opacity-50 pointer-events-none' : 'hover:border-primary-300']" class="min-w-10 rounded-lg border border-gray-200 dark:border-surface-800 px-3 py-2 text-center text-sm transition-colors" />
                     </div>
                 </main>
 
                 <aside class="space-y-5">
+                    <AdSection zone="sidebar_top" class="mb-3" />
                     <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl shadow-sm p-5">
                         <h2 class="text-sm font-bold uppercase tracking-wide text-gray-500">{{ t('Categories') }}</h2>
                         <div class="mt-4 space-y-2">
@@ -146,6 +151,7 @@ const formatDate = (value: string | null) => {
                             </Link>
                         </div>
                     </div>
+                    <AdSection zone="sidebar_bottom" class="mt-3" />
                 </aside>
             </div>
         </div>

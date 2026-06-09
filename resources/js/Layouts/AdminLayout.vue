@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { usePage, Link, router } from '@inertiajs/vue3'
 import { useTheme } from '@/Composables/useTheme'
 import { useFlashToasts } from '@/Composables/useToastr'
@@ -20,6 +20,30 @@ const profileOpen = ref(false)
 const actionsOpen = ref(false)
 const cacheClearing = ref(false)
 const confirmClearCacheOpen = ref(false)
+const demoDismissed = ref(false)
+
+onMounted(() => {
+    demoDismissed.value = sessionStorage.getItem('demo_admin_banner_dismissed') === '1'
+})
+
+const demoBannerColor = computed(() => {
+    const color = (page.props.app as any)?.demo_banner_color ?? 'amber'
+    const colors: Record<string, string> = {
+        indigo: 'bg-indigo-600',
+        amber: 'bg-amber-600',
+        emerald: 'bg-emerald-600',
+        rose: 'bg-rose-600',
+        sky: 'bg-sky-600',
+    }
+    return colors[color] ?? colors.amber
+})
+
+const envatoUrl = computed(() => (page.props as any).app?.envato_url ?? 'https://codecanyon.net')
+
+function dismissDemoBanner() {
+    demoDismissed.value = true
+    sessionStorage.setItem('demo_admin_banner_dismissed', '1')
+}
 
 const admin = computed(() => (page.props.admin as any)?.user)
 const adminDisplayName = computed(() => {
@@ -92,6 +116,19 @@ const closeHeaderMenus = () => {
     profileOpen.value = false
     actionsOpen.value = false
 }
+const adminSettings = computed(() => (page.props.appearanceAdminSettings as Record<string, string>) || {})
+watch(adminSettings, (settings) => {
+    const root = document.documentElement
+    if (settings.primary_color) root.style.setProperty('--admin-primary', settings.primary_color)
+    if (settings.sidebar_bg) root.style.setProperty('--admin-sidebar-bg', settings.sidebar_bg)
+    if (settings.sidebar_text_color) root.style.setProperty('--admin-sidebar-text', settings.sidebar_text_color)
+    if (settings.navbar_bg) root.style.setProperty('--admin-navbar-bg', settings.navbar_bg)
+    if (settings.navbar_text_color) root.style.setProperty('--admin-navbar-text', settings.navbar_text_color)
+    if (settings.accent_color) root.style.setProperty('--admin-accent', settings.accent_color)
+    if (settings.font_family) root.style.setProperty('--admin-font', settings.font_family)
+    if (settings.base_font_size) root.style.setProperty('--admin-font-size', settings.base_font_size)
+}, { immediate: true })
+
 onMounted(() => {
     document.addEventListener('click', closeHeaderMenus)
     document.addEventListener('keydown', onKeydown)
@@ -125,14 +162,27 @@ onUnmounted(() => {
         <!-- ═══ Main ═══ -->
         <div class="flex-1 flex flex-col min-w-0">
             <!-- Demo Notice -->
-                    <div v-if="$page.props.app?.demo" class="bg-indigo-600 px-4 py-2 text-center relative overflow-hidden">
-                        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
-                        <p class="text-xs font-black text-white uppercase tracking-[0.2em] relative z-10 flex items-center justify-center gap-4">
-                            <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-                    {{ t('Demo mode active — destructive actions are disabled') }}
-                            <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
-                        </p>
-                    </div>
+            <div v-if="$page.props.app?.demo && !demoDismissed" :class="demoBannerColor" class="px-4 py-2.5 text-center relative overflow-hidden">
+                <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
+                <div class="relative z-10 flex items-center justify-center gap-4 flex-wrap">
+                    <p class="text-sm font-semibold text-white flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                        {{ t('Demo mode active — destructive actions are disabled') }}
+                        <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                    </p>
+                    <a :href="envatoUrl" target="_blank" class="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-3 py-1 text-sm font-bold text-white hover:bg-white/30 transition-colors">
+                        {{ t('Buy Now') }}
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                    </a>
+                    <button @click="dismissDemoBanner" class="ml-2 p-1 rounded text-white/70 hover:text-white hover:bg-white/10 transition-colors" :title="t('Dismiss')">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
 
             <div v-if="showCronBanner" class="border-b border-amber-200 bg-amber-50 px-6 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
                 <div class="flex flex-col gap-3 text-sm font-medium lg:flex-row lg:items-center lg:justify-between">
@@ -248,7 +298,7 @@ onUnmounted(() => {
             </header>
 
             <!-- Content -->
-            <main class="flex-1 p-4 lg:p-6 overflow-y-auto">
+            <main class="flex-1 p-4 lg:p-6">
                 <slot />
             </main>
         </div>

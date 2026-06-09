@@ -11,6 +11,19 @@ const showAll = ref(false)
 const topProducts = computed(() => chat.products.value.slice(0, 2))
 const moreProducts = computed(() => chat.products.value.slice(2))
 
+const getProductIconClass = (icon?: string | null) => {
+    const value = icon?.trim()
+    if (!value) return 'ti ti-grid-dots'
+
+    if (value === 'ti-world-search' || value === 'ti ti-world-search') {
+        return 'ti ti-world-www'
+    }
+
+    if (value.startsWith('ti ')) return value
+    if (value.startsWith('ti-')) return `ti ${value}`
+    return `ti ti-${value}`
+}
+
 const selectProduct = (p: ChatProduct) => {
     chat.newChat(p)
 }
@@ -43,7 +56,7 @@ const selectProduct = (p: ChatProduct) => {
                     @click="chat.newChat(p)"
                 >
                     <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" :style="{ backgroundColor: p.color_hex + '18', color: p.color_hex }">
-                        <i :class="['ti', p.icon]" style="font-size:18px"></i>
+                        <i :class="getProductIconClass(p.icon)" class="text-[18px]"></i>
                     </div>
                     <div>
                         <div class="text-sm font-medium text-[#1a1a1a] dark:text-white/80">{{ p.name }}</div>

@@ -13,19 +13,31 @@ use App\Http\Controllers\Auth\VerificationController;
 use App\Http\Controllers\Billing\StripeController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\ChainController;
+use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\EmbedController;
 use App\Http\Controllers\FavoriteController;
+use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\HomepageController;
 use App\Http\Controllers\LiveSearchController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\OutputRatingController;
 use App\Http\Controllers\PricingController;
+use App\Http\Controllers\PlaygroundController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\ToolEmbedController;
+use App\Http\Controllers\ToolFavoriteController;
+use App\Http\Controllers\UsageDashboardController;
+use App\Http\Controllers\UserExportController;
 use App\Http\Controllers\User\DashboardController;
+use App\Http\Controllers\User\OnboardingController;
+use App\Http\Controllers\User\PrivacyController;
 use App\Http\Controllers\User\SettingsController as UserSettingsController;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
 use App\Http\Resources\SiteTemplateResource;
@@ -106,6 +118,7 @@ Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
 Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->name('affiliate.capture');
 Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch');
 Route::get('/live-search', LiveSearchController::class)->middleware('throttle:public,60,60')->name('live-search');
+Route::get('/css/theme-variables.css', \App\Http\Controllers\ThemeCssController::class)->name('theme-variables.css');
 
 // ─── Guest Auth ─────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -147,16 +160,6 @@ Route::middleware('auth')->group(function () {
     // User Dashboard + AI Writer (verified only)
     Route::middleware('verified')->group(function () {
         Route::get('/user/dashboard', [DashboardController::class, 'index'])->name('user.dashboard');
-        Route::get('/user/settings', [UserSettingsController::class, 'show'])->name('user.settings');
-        Route::post('/user/settings/two-factor', [UserSettingsController::class, 'enableTwoFactor'])->middleware('throttle:otp,5,900')->name('user.settings.2fa.enable');
-        Route::post('/user/settings/two-factor/disable', [UserSettingsController::class, 'disableTwoFactor'])->middleware('throttle:otp,5,900')->name('user.settings.2fa.disable');
-        Route::post('/user/settings/two-factor/recovery-codes', [UserSettingsController::class, 'regenerateRecoveryCodes'])->middleware('throttle:otp,5,900')->name('user.settings.2fa.recovery-codes');
-        Route::put('/user/profile', [UserSettingsController::class, 'updateProfile'])->name('user.profile.update');
-        Route::put('/user/profile/password', [UserSettingsController::class, 'updatePassword'])->name('user.password.update');
-        Route::put('/user/profile/avatar', [UserSettingsController::class, 'updateAvatar'])->name('user.avatar.update');
-        Route::get('/user/api-keys', [UserSettingsController::class, 'apiKeys'])->name('user.api-keys');
-        Route::post('/user/api-keys', [UserSettingsController::class, 'storeApiKey'])->name('user.api-keys.store');
-        Route::delete('/user/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('user.api-keys.destroy');
 
         Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
         Route::post('/checkout/coupon-preview', [CheckoutController::class, 'previewCoupon'])->name('checkout.coupon-preview');
@@ -169,27 +172,134 @@ Route::middleware('auth')->group(function () {
         Route::get('/billing-portal', [StripeController::class, 'billingPortal'])->name('billing.portal');
         Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
-        Route::get('/user/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate.dashboard');
-        Route::post('/user/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
-        Route::post('/user/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
-
         Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
         Route::patch('/documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
+        Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
-        Route::get('/support', [SupportTicketController::class, 'index'])->name('support.index');
-        Route::post('/support/tickets', [SupportTicketController::class, 'store'])->name('support.tickets.store');
-        Route::get('/support/tickets/{ticket}', [SupportTicketController::class, 'show'])->name('support.tickets.show');
-        Route::post('/support/tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('support.tickets.reply');
-        Route::post('/support/tickets/{ticket}/resolve', [SupportTicketController::class, 'resolve'])->name('support.tickets.resolve');
-        Route::post('/support/tickets/{ticket}/rate', [SupportTicketController::class, 'rate'])->name('support.tickets.rate');
+        // ========= User Dashboard Panel Routes =========
+        Route::prefix('user/dashboard')->name('user.dashboard.')->group(function () {
 
-        Route::get('/dashboard/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
-        Route::post('/favorites/toggle', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+            // Settings → Profile & Security
+            Route::get('/profile', [UserSettingsController::class, 'profile'])->name('profile');
+            Route::get('/security', [UserSettingsController::class, 'security'])->name('security');
+            Route::post('/security/two-factor', [UserSettingsController::class, 'enableTwoFactor'])->middleware('throttle:otp,5,900')->name('security.2fa.enable');
+            Route::post('/security/two-factor/disable', [UserSettingsController::class, 'disableTwoFactor'])->middleware('throttle:otp,5,900')->name('security.2fa.disable');
+            Route::post('/security/two-factor/recovery-codes', [UserSettingsController::class, 'regenerateRecoveryCodes'])->middleware('throttle:otp,5,900')->name('security.2fa.recovery-codes');
 
+            // Privacy & GDPR
+            Route::get('/privacy', [PrivacyController::class, 'index'])->name('privacy');
+            Route::post('/privacy/export', [PrivacyController::class, 'requestExport'])->name('privacy.export');
+            Route::get('/privacy/export/{dataExportRequest}/download', [PrivacyController::class, 'downloadExport'])->name('privacy.export.download');
+            Route::post('/privacy/preferences', [PrivacyController::class, 'updatePreferences'])->name('privacy.preferences');
+            Route::post('/privacy/schedule-deletion', [PrivacyController::class, 'scheduleDeletion'])->name('privacy.schedule-deletion');
+            Route::post('/privacy/cancel-deletion', [PrivacyController::class, 'cancelDeletion'])->name('privacy.cancel-deletion');
+            Route::post('/privacy/sessions/revoke', [PrivacyController::class, 'revokeSession'])->name('privacy.sessions.revoke');
+            Route::post('/privacy/sign-out-all', [PrivacyController::class, 'signOutAllDevices'])->name('privacy.sign-out-all');
+
+            // Profile actions (PUT endpoints, no UI page)
+            Route::put('/profile', [UserSettingsController::class, 'updateProfile'])->name('profile.update');
+            Route::put('/profile/password', [UserSettingsController::class, 'updatePassword'])->name('password.update');
+            Route::put('/profile/avatar', [UserSettingsController::class, 'updateAvatar'])->name('avatar.update');
+
+            // API Keys
+            Route::get('/api-keys', [UserSettingsController::class, 'apiKeys'])->name('api-keys');
+            Route::post('/api-keys', [UserSettingsController::class, 'storeApiKey'])->name('api-keys.store');
+            Route::delete('/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('api-keys.destroy');
+
+            // Affiliate
+            Route::get('/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate');
+            Route::post('/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
+            Route::post('/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
+
+            // Favorites
+            Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
+
+            // Documents
+            Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
+
+            // Support
+            Route::get('/support', [SupportTicketController::class, 'index'])->name('support.index');
+            Route::post('/support/tickets', [SupportTicketController::class, 'store'])->middleware('throttle:public,5,3600')->name('support.tickets.store');
+            Route::get('/support/tickets/{ticket}', [SupportTicketController::class, 'show'])->name('support.tickets.show');
+            Route::post('/support/tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('support.tickets.reply');
+            Route::post('/support/tickets/{ticket}/resolve', [SupportTicketController::class, 'resolve'])->name('support.tickets.resolve');
+            Route::post('/support/tickets/{ticket}/rate', [SupportTicketController::class, 'rate'])->name('support.tickets.rate');
+
+            // Generation History
+            Route::prefix('history')->name('history.')->group(function () {
+                Route::get('/', [HistoryController::class, 'index'])->name('index');
+                Route::get('/tool/{toolSlug}', [HistoryController::class, 'byTool'])->name('by-tool');
+                Route::post('/{history}/restore', [HistoryController::class, 'restore'])->name('restore');
+                Route::post('/{history}/favorite', [HistoryController::class, 'favorite'])->name('favorite');
+                Route::post('/{historyA}/diff/{historyB}', [HistoryController::class, 'diff'])->name('diff');
+                Route::put('/{history}/label', [HistoryController::class, 'label'])->name('label');
+                Route::delete('/{history}', [HistoryController::class, 'destroy'])->name('destroy');
+            });
+
+            // Usage Dashboard
+            Route::get('/usage', [UsageDashboardController::class, 'index'])->name('usage.index');
+            Route::post('/usage/export', [UsageDashboardController::class, 'export'])->name('usage.export');
+
+            // Tool Collections
+            Route::prefix('collections')->name('collections.')->group(function () {
+                Route::get('/', [CollectionController::class, 'index'])->name('index');
+                Route::post('/', [CollectionController::class, 'store'])->name('store');
+                Route::get('/{collection}', [CollectionController::class, 'show'])->name('show');
+                Route::put('/{collection}', [CollectionController::class, 'update'])->name('update');
+                Route::delete('/{collection}', [CollectionController::class, 'destroy'])->name('destroy');
+                Route::post('/{collection}/tools', [CollectionController::class, 'addTool'])->name('tools.add');
+                Route::delete('/{collection}/tools/{slug}', [CollectionController::class, 'removeTool'])->name('tools.remove');
+                Route::patch('/{collection}/reorder', [CollectionController::class, 'reorder'])->name('reorder');
+            });
+
+            // AI Playground
+            Route::get('/playground', [PlaygroundController::class, 'index'])->name('playground.index');
+            Route::post('/playground/run', [PlaygroundController::class, 'run'])->name('playground.run');
+            Route::post('/playground/share', [PlaygroundController::class, 'share'])->name('playground.share');
+
+            // Quick Tool Chains
+            Route::prefix('chains')->name('chains.')->group(function () {
+                Route::get('/', [ChainController::class, 'index'])->name('index');
+                Route::get('/create', [ChainController::class, 'create'])->name('create');
+                Route::post('/', [ChainController::class, 'store'])->name('store');
+                Route::get('/{chain}', [ChainController::class, 'show'])->name('show');
+                Route::post('/{chain}/run', [ChainController::class, 'run'])->name('run');
+                Route::put('/{chain}', [ChainController::class, 'update'])->name('update');
+                Route::delete('/{chain}', [ChainController::class, 'destroy'])->name('destroy');
+            });
+
+            // Embed Management
+            Route::prefix('tool-embeds')->name('embeds.')->group(function () {
+                Route::get('/', [ToolEmbedController::class, 'index'])->name('index');
+                Route::post('/', [ToolEmbedController::class, 'store'])->name('store');
+                Route::put('/{embed}', [ToolEmbedController::class, 'update'])->name('update');
+                Route::delete('/{embed}', [ToolEmbedController::class, 'destroy'])->name('destroy');
+                Route::post('/{embed}/regenerate-token', [ToolEmbedController::class, 'regenerateToken'])->name('regen');
+            });
+
+            // User Export
+            Route::post('/export', [UserExportController::class, 'export'])->name('export');
+
+            // Onboarding
+            Route::prefix('onboarding')->name('onboarding.')->group(function () {
+                Route::post('/skip', [OnboardingController::class, 'skip'])->name('skip');
+                Route::post('/complete', [OnboardingController::class, 'complete'])->name('complete');
+                Route::get('/tools/{useCase}', [OnboardingController::class, 'recommendedTools'])->name('tools');
+                Route::get('/checklist', [OnboardingController::class, 'checklistState'])->name('checklist');
+                Route::post('/tooltip/dismiss', [OnboardingController::class, 'dismissTooltip'])->name('tooltip.dismiss');
+            });
+        });
+
+        // Standalone endpoints (not under /user/dashboard prefix)
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::get('/notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+
+        // Tool Favorites & Ratings (small POST endpoints)
+        Route::post('/favorites/toggle', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
+        Route::post('/tools/{toolSlug}/favorite', [ToolFavoriteController::class, 'toggle'])->name('tools.favorite');
+        Route::post('/ratings', [OutputRatingController::class, 'store'])->name('ratings.store');
     });
 });
 
@@ -198,12 +308,23 @@ Route::get('/ai-tools', [TemplateController::class, 'index'])->name('ai.tools.in
 Route::get('/ai-tools/category/{slug}', [TemplateController::class, 'category'])->name('ai.tools.category');
 Route::get('/ai-tools/{slug}', [TemplateController::class, 'show'])->name('ai.tools.show');
 
+// Public playground share
+Route::get('/playground/s/{uuid}', [PlaygroundController::class, 'showShare'])->name('playground.share.show');
+
+// Public embed routes
+Route::get('/embed/{token}', [EmbedController::class, 'show'])->name('embed.show');
+Route::post('/embed/{token}/run', [EmbedController::class, 'run'])->name('embed.run');
+Route::post('/embed/{token}/unlock', [EmbedController::class, 'unlock'])->name('embed.unlock');
+
 // ─── Blog ───────────────────────────────────
 Route::get('/blog/rss', [BlogController::class, 'rss'])->name('blog.rss');
 Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
 Route::get('/blog/category/{slug}', [BlogController::class, 'category'])->name('blog.category');
 Route::get('/blog/tag/{slug}', [BlogController::class, 'tag'])->name('blog.tag');
 Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
+
+// ─── Sitemap ────────────────────────────────
+Route::get('/sitemap.xml', [App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap');
 
 // ─── Public Community ───────────────────────
 Route::post('/comments', [CommentController::class, 'store'])->middleware('throttle:comments')->name('comments.store');
@@ -213,6 +334,8 @@ Route::post('/comments/{comment}/like', [CommentController::class, 'like'])->mid
 Route::post('/comments/{comment}/report', [CommentController::class, 'report'])->middleware('throttle:comments')->name('comments.report');
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->middleware('throttle:newsletter')->name('newsletter.subscribe');
 Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
+Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
+Route::get('/newsletter/open/{campaign}/{email}', [NewsletterController::class, 'trackOpen'])->name('newsletter.open');
 
 // ─── Ads ────────────────────────────────────
 Route::get('/api/ads/{zone}', [AdController::class, 'getActive'])->name('ads.active');
@@ -234,7 +357,7 @@ Route::post('/webhooks/paystack', [PaymentWebhookController::class, 'paystack'])
 Route::match(['get', 'post'], '/webhooks/2checkout', [PaymentWebhookController::class, 'twoCheckout'])->name('webhooks.2checkout');
 
 // ─── Chat Routes ────────────────────────────
-Route::get('/chat', function () {
+Route::get('/chat/{ulid?}', function (?string $ulid = null) {
     return Inertia::render('Chat/Index', [
         'hide_header' => (bool) settings('hide_site_header', false),
         'hide_footer' => (bool) settings('hide_site_footer', false),
@@ -244,6 +367,7 @@ Route::get('/chat', function () {
         'allow_guest_messages' => (bool) settings('allow_guest_messages', false),
         'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
         'chat_credits_low_threshold' => (int) settings('chat_credits_low_threshold', 100),
+        'active_chat_ulid' => $ulid,
     ]);
 })->name('chat.index');
 

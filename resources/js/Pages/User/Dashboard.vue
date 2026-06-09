@@ -5,6 +5,8 @@ import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
+import DashboardChecklist from '@/Components/DashboardChecklist.vue'
+import ContextualTooltip from '@/Components/ContextualTooltip.vue'
 
 interface ToolCard {
     name: string
@@ -214,8 +216,12 @@ watch(usageChart, () => { drawChart() })
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Your AI workspace is ready.') }}</p>
             </div>
 
+            <!-- Getting Started Checklist -->
+            <DashboardChecklist />
+
             <!-- Stats Row -->
             <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <ContextualTooltip tooltip-key="dashboard.stats" :content="t('Track your credits, daily/monthly usage and conversations at a glance.')">
                 <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm dark:bg-gray-900 dark:border-gray-800 relative overflow-hidden">
                     <div class="absolute top-[-20px] right-[-20px] w-[80px] h-[80px] rounded-full bg-[#1F75FE] opacity-[0.07]"></div>
                     <div class="relative z-10">
@@ -228,6 +234,7 @@ watch(usageChart, () => { drawChart() })
                         <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">{{ t('Credits') }}</div>
                     </div>
                 </div>
+                </ContextualTooltip>
 
                 <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm dark:bg-gray-900 dark:border-gray-800 relative overflow-hidden">
                     <div class="absolute top-[-20px] right-[-20px] w-[80px] h-[80px] rounded-full bg-amber-500 opacity-[0.07]"></div>
@@ -328,7 +335,9 @@ watch(usageChart, () => { drawChart() })
             <!-- Quick AI Tools -->
             <div>
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Quick AI tools') }}</h2>
+                    <ContextualTooltip tooltip-key="dashboard.quick-tools" :content="t('Jump into any AI tool right from here. Click \'View all\' to browse the full catalog.')">
+                        <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Quick AI tools') }}</h2>
+                    </ContextualTooltip>
                     <Link :href="route('ai.tools.index')" class="text-sm font-semibold text-[#1F75FE] hover:underline">{{ t('View all') }}</Link>
                 </div>
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -376,7 +385,7 @@ watch(usageChart, () => { drawChart() })
                 <div class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800">
                     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                         <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Referral') }}</h2>
-                        <Link :href="route('affiliate.dashboard')" class="text-sm font-semibold text-[#1F75FE] hover:underline">{{ t('Details') }}</Link>
+                        <Link :href="route('user.dashboard.affiliate')" class="text-sm font-semibold text-[#1F75FE] hover:underline">{{ t('Details') }}</Link>
                     </div>
                     <div class="p-6">
                         <div class="grid grid-cols-2 gap-4 mb-5">

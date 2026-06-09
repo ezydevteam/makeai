@@ -3,10 +3,17 @@ import { ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import Pagination from '@/Components/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
 
 interface Announcement {
     id: number
@@ -27,7 +34,14 @@ interface Announcement {
     ends_at: string | null
 }
 
-const props = defineProps<{ announcements: Announcement[] }>()
+const props = defineProps<{
+    announcements: { data: Announcement[]; links: PaginationLink[] }
+    filters: { search?: string }
+    totalCount: number
+    activeCount: number
+    topbarCount: number
+    popupCount: number
+}>()
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
 
@@ -54,6 +68,19 @@ const blank = (): Omit<Announcement, 'id'> => ({
 })
 
 const form = useForm(blank())
+const searchQuery = ref(props.filters.search || '')
+
+const applySearch = () => {
+    router.get(route('admin.announcements.index'), {
+        search: searchQuery.value || undefined,
+    }, { preserveScroll: true, preserveState: true, replace: true })
+}
+
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+const onSearchInput = () => {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(applySearch, 400)
+}
 
 const openCreate = () => {
     form.reset()
@@ -76,7 +103,6 @@ const openEdit = (a: Announcement) => {
     form.trigger_value = a.trigger_value ?? ''
     form.show_frequency = a.show_frequency
     form.is_active = a.is_active
-    // format dates for input[type="datetime-local"] if they exist
     form.starts_at = a.starts_at ? new Date(a.starts_at).toISOString().slice(0, 16) : ''
     form.ends_at = a.ends_at ? new Date(a.ends_at).toISOString().slice(0, 16) : ''
 
@@ -142,7 +168,7 @@ const typeColor: Record<string, string> = {
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Manage sitewide banners, popups, and in-app notifications.') }}</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button @click="openCreate" type="button" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20">
+                    <button @click="openCreate" type="button" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-600/20">
                         {{ t('+ Add Announcement') }}
                     </button>
                 </div>
@@ -151,35 +177,63 @@ const typeColor: Record<string, string> = {
             <!-- Stats bar -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-gray-900 dark:text-white">{{ announcements.length }}</div>
+                    <div class="text-2xl font-black text-gray-900 dark:text-white">{{ props.totalCount }}</div>
                     <div class="text-xs text-gray-500 mt-1">{{ t('Total') }}</div>
                 </div>
                 <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-success-600">{{ announcements.filter(a => a.is_active).length }}</div>
+                    <div class="text-2xl font-black text-success-600">{{ props.activeCount }}</div>
                     <div class="text-xs text-gray-500 mt-1">{{ t('Active') }}</div>
                 </div>
                 <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-blue-600">{{ announcements.filter(a => a.type === 'topbar').length }}</div>
+                    <div class="text-2xl font-black text-blue-600">{{ props.topbarCount }}</div>
                     <div class="text-xs text-gray-500 mt-1">{{ t('Top Bars') }}</div>
                 </div>
                 <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-purple-600">{{ announcements.filter(a => a.type === 'popup').length }}</div>
+                    <div class="text-2xl font-black text-purple-600">{{ props.popupCount }}</div>
                     <div class="text-xs text-gray-500 mt-1">{{ t('Popups') }}</div>
                 </div>
             </div>
 
+            <!-- Search -->
+            <div class="mb-6">
+                <div class="relative max-w-md">
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                        </svg>
+                    </span>
+                    <input
+                        v-model="searchQuery"
+                        type="text"
+                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        :placeholder="t('Search announcements...')"
+                        @input="onSearchInput"
+                    />
+                    <button
+                        v-if="searchQuery"
+                        type="button"
+                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                        @click="searchQuery = ''; applySearch()"
+                    >
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
             <!-- Empty state -->
-            <div v-if="announcements.length === 0" class="bg-white dark:bg-surface-900 rounded-2xl border-2 border-dashed border-gray-200 dark:border-surface-700 p-16 text-center">
+            <div v-if="announcements.data.length === 0" class="bg-white dark:bg-surface-900 rounded-2xl border-2 border-dashed border-gray-200 dark:border-surface-700 p-16 text-center">
                 <div class="text-5xl mb-4">📢</div>
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">{{ t('No announcements yet') }}</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ t('Create promotional banners or important notices for your users.') }}</p>
-                <button @click="openCreate" type="button" class="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all">{{ t('Add first announcement') }}</button>
+                <button @click="openCreate" type="button" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all">{{ t('Add first announcement') }}</button>
             </div>
 
             <!-- Announcements list -->
             <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 <div
-                    v-for="a in announcements"
+                    v-for="a in announcements.data"
                     :key="a.id"
                     class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
                     :class="!a.is_active ? 'opacity-60' : ''"
@@ -218,6 +272,9 @@ const typeColor: Record<string, string> = {
                     </div>
                 </div>
             </div>
+
+            <!-- Pagination -->
+            <Pagination :links="announcements.links" class="mt-8" />
         </div>
 
         <!-- Create / Edit Modal -->
@@ -338,7 +395,7 @@ const typeColor: Record<string, string> = {
                 
                 <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
                     <button @click="showForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">{{ t('Cancel') }}</button>
-                    <button @click="submit" :disabled="form.processing" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
+                    <button @click="submit" :disabled="form.processing" type="button" class="px-6 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
                         {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Add Announcement') }}
                     </button>
                 </div>

@@ -1,21 +1,437 @@
+<template>
+    <Head :title="t('Administrators')" />
+
+    <AdminLayout>
+        <div class="py-12">
+            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+                <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            {{ t('Administrators') }}
+                        </h1>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('Manage administrator accounts, roles, and access status.') }}
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col gap-3 sm:flex-row">
+                        <Link
+                            :href="route('admin.roles.index')"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        >
+                            <i class="ti ti-shield-lock text-base"></i>
+                            {{ t('Manage Roles') }}
+                        </Link>
+
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary"
+                            @click="openModal()"
+                        >
+                            <i class="ti ti-plus text-base"></i>
+                            {{ t('Add Admin') }}
+                        </button>
+
+                        <Link
+                            v-if="hasTrashedAdmins"
+                            :href="route('admin.admins.trash')"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        >
+                            <i class="ti ti-trash text-base"></i>
+                            {{ t('Trash') }}
+                        </Link>
+                    </div>
+                </div>
+
+                <div class="mb-4 flex flex-col gap-4">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div class="w-full xl:max-w-md">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                                    </svg>
+                                </span>
+                                <input
+                                    v-model="searchQuery"
+                                    type="text"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    :placeholder="t('Filter this table by name, email, or role...')"
+                                />
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear search')"
+                                    @click="searchQuery = ''"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
+                            <div class="w-full md:w-52">
+                                <AppSelect
+                                    v-model="filtersForm.status"
+                                    :options="statusOptions"
+                                    :placeholder="t('All Status')"
+                                    @update:model-value="applyFilters"
+                                />
+                            </div>
+
+                            <div class="w-full md:w-56">
+                                <AppSelect
+                                    v-model="filtersForm.role"
+                                    :options="roleOptions"
+                                    :placeholder="t('All Roles')"
+                                    live-search
+                                    @update:model-value="applyFilters"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                            <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">{{ t('Administrator') }}</th>
+                                    <th scope="col" class="px-6 py-3">{{ t('Role') }}</th>
+                                    <th scope="col" class="px-6 py-3">{{ t('Status') }}</th>
+                                    <th scope="col" class="px-6 py-3">{{ t('Last Login') }}</th>
+                                    <th scope="col" class="px-6 py-3 text-right">{{ t('Action') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr
+                                    v-for="admin in filteredAdmins"
+                                    :key="admin.id"
+                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                                >
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
+                                                {{ admin.name.charAt(0).toUpperCase() }}
+                                            </div>
+                                            <div class="min-w-0">
+                                                <p class="truncate font-medium text-gray-900 dark:text-white">{{ admin.name }}</p>
+                                                <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ admin.email }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                            :class="admin.role?.slug === 'super-admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'"
+                                        >
+                                            {{ admin.role?.name ?? t('No Role') }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                            :class="admin.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'"
+                                        >
+                                            {{ admin.is_active ? t('Active') : t('Inactive') }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
+                                        {{ admin.last_login_at ? formatDate(admin.last_login_at) : t('Never') }}
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="inline-flex items-center gap-2">
+                                            <Tooltip :content="t('Edit administrator')" placement="top">
+                                                <button
+                                                    type="button"
+                                                    :aria-label="t('Edit administrator')"
+                                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                                                    @click="openModal(admin)"
+                                                >
+                                                    <i class="ti ti-edit text-base"></i>
+                                                </button>
+                                            </Tooltip>
+
+                                            <Tooltip :content="t('Delete administrator')" placement="top">
+                                                <button
+                                                    v-if="admin.role?.slug !== 'super-admin'"
+                                                    type="button"
+                                                    :aria-label="t('Delete administrator')"
+                                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                                    @click="confirmDelete(admin)"
+                                                >
+                                                    <i class="ti ti-trash text-base"></i>
+                                                </button>
+                                            </Tooltip>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr v-if="filteredAdmins.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        {{ t('No administrators found.') }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div v-if="admins.links.length > 3" class="mt-4">
+                    <Pagination :links="admins.links" />
+                </div>
+            </div>
+        </div>
+
+        <ActionConfirmModal
+            :open="confirmModal.open"
+            :title="confirmModal.title"
+            :message="confirmModal.message"
+            :confirm-label="confirmModal.confirmLabel"
+            :processing-label="confirmModal.processingLabel"
+            :processing="confirmModal.processing"
+            :variant="confirmModal.variant"
+            @cancel="closeConfirmModal"
+            @confirm="runConfirmedAction"
+        />
+
+        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm">
+            <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                            {{ isEditing ? t('Edit Administrator') : t('Add Administrator') }}
+                        </h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {{ isEditing ? t('Update administrator details and access role.') : t('Create a new administrator account and assign a role.') }}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800 dark:hover:text-gray-200"
+                        :aria-label="t('Close modal')"
+                        @click="() => closeModal()"
+                    >
+                        <i class="ti ti-x text-base"></i>
+                    </button>
+                </div>
+
+                <div class="overflow-y-auto p-6">
+                    <form class="space-y-5" @submit.prevent="submit">
+                        <div class="grid gap-5 md:grid-cols-2">
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Name') }}
+                                </label>
+                                <input
+                                    v-model="form.name"
+                                    type="text"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                    :placeholder="t('Enter full name')"
+                                />
+                                <p v-if="form.errors.name" class="mt-1 text-sm text-red-500">{{ form.errors.name }}</p>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Email') }}
+                                </label>
+                                <input
+                                    v-model="form.email"
+                                    type="email"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                    :placeholder="t('Enter email address')"
+                                />
+                                <p v-if="form.errors.email" class="mt-1 text-sm text-red-500">{{ form.errors.email }}</p>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Role') }}
+                                </label>
+                                <AppSelect
+                                    v-model="form.role_id"
+                                    :options="roleOptions"
+                                    :placeholder="t('Select a role')"
+                                    live-search
+                                />
+                                <p v-if="form.errors.role_id" class="mt-1 text-sm text-red-500">{{ form.errors.role_id }}</p>
+                            </div>
+
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Password') }}
+                                </label>
+                                <div class="relative">
+                                    <input
+                                        v-model="form.password"
+                                        :type="showPassword ? 'text' : 'password'"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                        :placeholder="t('Enter password')"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                        :aria-label="showPassword ? t('Hide password') : t('Show password')"
+                                        @click="showPassword = !showPassword"
+                                    >
+                                        <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
+                                    </button>
+                                </div>
+                                <p v-if="isEditing" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Leave blank to keep the current password.') }}</p>
+                                <p v-if="form.errors.password" class="mt-1 text-sm text-red-500">{{ form.errors.password }}</p>
+                            </div>
+
+                            <div>
+                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Confirm Password') }}
+                                </label>
+                                <div class="relative">
+                                    <input
+                                        v-model="form.password_confirmation"
+                                        :type="showPasswordConfirmation ? 'text' : 'password'"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                        :placeholder="t('Confirm password')"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                        :aria-label="showPasswordConfirmation ? t('Hide password confirmation') : t('Show password confirmation')"
+                                        @click="showPasswordConfirmation = !showPasswordConfirmation"
+                                    >
+                                        <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div class="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        class="relative h-6 w-12 rounded-full transition-colors"
+                                        :class="form.is_active ? 'bg-success-500' : 'bg-gray-300 dark:bg-gray-600'"
+                                        @click="form.is_active = !form.is_active"
+                                    >
+                                        <span
+                                            class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform"
+                                            :class="form.is_active ? 'translate-x-6' : 'translate-x-0'"
+                                        ></span>
+                                    </button>
+
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                            {{ form.is_active ? t('Administrator account is active') : t('Administrator account is disabled') }}
+                                        </p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ t('Inactive administrators cannot sign in until you enable their account.') }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-800/50">
+                    <button
+                        type="button"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200 dark:hover:bg-surface-700"
+                        @click="() => closeModal()"
+                    >
+                        {{ t('Cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="form.processing"
+                        @click="submit"
+                    >
+                        {{ form.processing ? t('Saving...') : t('Save Changes') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </AdminLayout>
+</template>
+
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import { useDateFormat } from '@/Composables/useDateFormat';
-import { useTranslate } from '@/Composables/useTranslate';
+import { computed, ref } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import Pagination from '@/Components/Pagination.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import { useDateFormat } from '@/Composables/useDateFormat'
+import { useTranslate } from '@/Composables/useTranslate'
+
+interface Role {
+    id: number
+    name: string
+    slug: string
+}
+
+interface AdminItem {
+    id: number
+    name: string
+    email: string
+    role_id: number | null
+    is_active: boolean
+    last_login_at: string | null
+    role: Role | null
+}
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
+interface AdminsResponse {
+    data: AdminItem[]
+    links: PaginationLink[]
+}
+
+interface Filters {
+    status?: string | number | null
+    role?: string | number | null
+}
+
+interface ConfirmModalState {
+    open: boolean
+    title: string
+    message: string
+    confirmLabel: string
+    processingLabel: string
+    processing: boolean
+    variant: 'primary' | 'danger'
+    action: null | (() => void)
+}
 
 const props = defineProps<{
-    admins: any;
-    roles: any[];
-    filters: any;
-}>();
-const { t } = useTranslate();
-const { formatDate } = useDateFormat();
+    admins: AdminsResponse
+    roles: Role[]
+    filters: Filters
+    hasTrashedAdmins: boolean
+}>()
 
-const showModal = ref(false);
-const isEditing = ref(false);
-const currentAdmin = ref<any>(null);
+const { t } = useTranslate()
+const { formatDate } = useDateFormat()
+
+const searchQuery = ref('')
+const showModal = ref(false)
+const isEditing = ref(false)
+const currentAdmin = ref<AdminItem | null>(null)
+const showPassword = ref(false)
+const showPasswordConfirmation = ref(false)
+
+const filtersForm = useForm({
+    status: props.filters.status !== undefined && props.filters.status !== null ? String(props.filters.status) : '',
+    role: props.filters.role !== undefined && props.filters.role !== null ? String(props.filters.role) : '',
+})
 
 const form = useForm({
     name: '',
@@ -24,206 +440,154 @@ const form = useForm({
     password_confirmation: '',
     role_id: '',
     is_active: true,
-});
+})
 
-const openModal = (admin: any = null) => {
-    isEditing.value = !!admin;
-    currentAdmin.value = admin;
-    form.reset();
-    form.clearErrors();
+const confirmModal = ref<ConfirmModalState>({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: '',
+    processingLabel: '',
+    processing: false,
+    variant: 'primary',
+    action: null,
+})
+
+const statusOptions = computed(() => [
+    { value: '', label: t('All Status') },
+    { value: '1', label: t('Active') },
+    { value: '0', label: t('Inactive') },
+])
+
+const roleOptions = computed(() => [
+    { value: '', label: t('All Roles') },
+    ...props.roles.map((role) => ({
+        value: String(role.id),
+        label: role.name,
+    })),
+])
+
+const filteredAdmins = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+
+    if (!query) {
+        return props.admins.data
+    }
+
+    return props.admins.data.filter((admin) => {
+        return [
+            admin.name,
+            admin.email,
+            admin.role?.name ?? '',
+        ].some((value) => value.toLowerCase().includes(query))
+    })
+})
+
+const applyFilters = () => {
+    router.get(route('admin.admins.index'), {
+        status: filtersForm.status,
+        role: filtersForm.role,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    })
+}
+
+const resetModalState = () => {
+    showPassword.value = false
+    showPasswordConfirmation.value = false
+}
+
+const openModal = (admin: AdminItem | null = null) => {
+    isEditing.value = admin !== null
+    currentAdmin.value = admin
+    form.reset()
+    form.clearErrors()
+    resetModalState()
 
     if (admin) {
-        form.name = admin.name;
-        form.email = admin.email;
-        form.role_id = admin.role_id;
-        form.is_active = admin.is_active;
+        form.name = admin.name
+        form.email = admin.email
+        form.role_id = admin.role_id ? String(admin.role_id) : ''
+        form.is_active = admin.is_active
     } else {
-        form.is_active = true;
+        form.is_active = true
     }
-    
-    showModal.value = true;
-};
 
-const closeModal = () => {
-    showModal.value = false;
-    setTimeout(() => {
-        form.reset();
-        currentAdmin.value = null;
-    }, 200);
-};
+    showModal.value = true
+}
+
+const closeModal = (force = false) => {
+    if (form.processing && !force) {
+        return
+    }
+
+    showModal.value = false
+    form.reset()
+    form.clearErrors()
+    currentAdmin.value = null
+    resetModalState()
+}
 
 const submit = () => {
-    if (isEditing.value) {
+    if (isEditing.value && currentAdmin.value) {
         form.post(route('admin.admins.update', currentAdmin.value.id), {
             preserveScroll: true,
-            onSuccess: () => closeModal()
-        });
-    } else {
-        form.post(route('admin.admins.store'), {
-            preserveScroll: true,
-            onSuccess: () => closeModal()
-        });
+            onSuccess: () => closeModal(true),
+        })
+        return
     }
-};
 
-const deleteAdmin = (admin: any) => {
-    if (confirm(t('Are you sure you want to delete administrator :name?', { name: admin.name }))) {
-        router.delete(route('admin.admins.delete', admin.id), {
-            preserveScroll: true
-        });
+    form.post(route('admin.admins.store'), {
+        preserveScroll: true,
+        onSuccess: () => closeModal(true),
+    })
+}
+
+const openConfirmModal = (config: Omit<ConfirmModalState, 'open' | 'processing'>) => {
+    confirmModal.value = {
+        ...config,
+        open: true,
+        processing: false,
     }
-};
+}
+
+const closeConfirmModal = (force = false) => {
+    if (confirmModal.value.processing && !force) {
+        return
+    }
+
+    confirmModal.value = {
+        open: false,
+        title: '',
+        message: '',
+        confirmLabel: '',
+        processingLabel: '',
+        processing: false,
+        variant: 'primary',
+        action: null,
+    }
+}
+
+const runConfirmedAction = () => {
+    confirmModal.value.processing = true
+    confirmModal.value.action?.()
+}
+
+const confirmDelete = (admin: AdminItem) => {
+    openConfirmModal({
+        title: t('Delete administrator?'),
+        message: t('Delete administrator :name? This action cannot be undone.', { name: admin.name }),
+        confirmLabel: t('Delete'),
+        processingLabel: t('Deleting...'),
+        variant: 'danger',
+        action: () => {
+            router.delete(route('admin.admins.delete', admin.id), {
+                preserveScroll: true,
+                onFinish: () => closeConfirmModal(true),
+            })
+        },
+    })
+}
 </script>
-
-<template>
-    <Head :title="$t('Administrators')" />
-    <AdminLayout>
-        <template #title>Administrators</template>
-
-        <div class="p-6">
-            <div class="flex justify-between items-center mb-6">
-                <div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Admin Management</h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage team members and their roles</p>
-                </div>
-                <button @click="openModal()" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-500 transition-colors shadow-sm font-medium flex items-center gap-2">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    Add Administrator
-                </button>
-            </div>
-
-            <!-- Table -->
-            <div class="bg-white dark:bg-surface-900 rounded-xl shadow-sm border border-gray-200 dark:border-surface-800 overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 dark:bg-surface-800 border-b border-gray-200 dark:border-surface-700">
-                                <th class="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Role</th>
-                                <th class="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Login</th>
-                                <th class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-200 dark:divide-surface-800">
-                            <tr v-for="admin in admins.data" :key="admin.id" class="hover:bg-gray-50 dark:hover:bg-surface-800/50 transition-colors">
-                                <td class="px-6 py-4">
-                                    <div class="font-medium text-gray-900 dark:text-white">{{ admin.name }}</div>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                    {{ admin.email }}
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="[admin.role?.slug === 'super-admin' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-primary-100 text-primary-800 dark:bg-primary-900/30 dark:text-primary-400']">
-                                        {{ admin.role?.name || 'None' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="[admin.is_active ? 'bg-success-100 text-success-800 dark:bg-success-900/30 dark:text-success-400' : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400']">
-                                        {{ admin.is_active ? 'Active' : 'Inactive' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                    {{ admin.last_login_at ? formatDate(admin.last_login_at) : t('Never') }}
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex items-center justify-end gap-3">
-                                        <button @click="openModal(admin)" class="text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                        </button>
-                                        <button @click="deleteAdmin(admin)" class="text-gray-400 hover:text-danger-600 dark:hover:text-danger-400 transition-colors">
-                                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr v-if="admins.data.length === 0">
-                                <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                    No administrators found.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Pagination -->
-            <div v-if="admins.links && admins.links.length > 3" class="mt-6 flex flex-wrap gap-1">
-                <template v-for="(link, k) in admins.links" :key="k">
-                    <div v-if="link.url === null" class="px-4 py-2 text-sm text-gray-400 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-lg cursor-not-allowed" v-html="link.label"></div>
-                    <Link v-else :href="link.url" class="px-4 py-2 text-sm rounded-lg transition-colors border" :class="[link.active ? 'bg-primary-600 text-white border-primary-600 font-bold shadow-sm' : 'bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-surface-800 hover:bg-gray-50 dark:hover:bg-surface-800']" v-html="link.label" />
-                </template>
-            </div>
-        </div>
-
-        <!-- Modal -->
-        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="px-6 py-4 border-b border-gray-100 dark:border-surface-800 flex justify-between items-center shrink-0">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ isEditing ? 'Edit Administrator' : 'Add Administrator' }}</h3>
-                    <button @click="closeModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-                
-                <div class="p-6 overflow-y-auto">
-                    <form @submit.prevent="submit" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Name <span class="text-danger-500">*</span></label>
-                            <input v-model="form.name" type="text" class="w-full rounded-xl border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500" required>
-                            <p v-if="form.errors.name" class="mt-1 text-sm text-danger-500">{{ form.errors.name }}</p>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Email <span class="text-danger-500">*</span></label>
-                            <input v-model="form.email" type="email" class="w-full rounded-xl border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500" required>
-                            <p v-if="form.errors.email" class="mt-1 text-sm text-danger-500">{{ form.errors.email }}</p>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Role <span class="text-danger-500">*</span></label>
-                            <select v-model="form.role_id" class="w-full rounded-xl border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500" required>
-                                <option value="" disabled>Select a role...</option>
-                                <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }}</option>
-                            </select>
-                            <p v-if="form.errors.role_id" class="mt-1 text-sm text-danger-500">{{ form.errors.role_id }}</p>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Password <span v-if="!isEditing" class="text-danger-500">*</span></label>
-                                <input v-model="form.password" type="password" class="w-full rounded-xl border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500" :required="!isEditing">
-                                <p v-if="isEditing" class="mt-1 text-xs text-gray-500">Leave blank to keep current</p>
-                                <p v-if="form.errors.password" class="mt-1 text-sm text-danger-500">{{ form.errors.password }}</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Confirm Password</label>
-                                <input v-model="form.password_confirmation" type="password" class="w-full rounded-xl border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-gray-900 dark:text-white focus:ring-primary-500 focus:border-primary-500" :required="!isEditing || form.password.length > 0">
-                            </div>
-                        </div>
-
-                        <div class="pt-2">
-                            <label class="flex items-center gap-3 cursor-pointer">
-                                <div class="relative">
-                                    <input type="checkbox" v-model="form.is_active" class="sr-only peer" />
-                                    <div class="w-11 h-6 bg-gray-200 dark:bg-surface-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-success-500"></div>
-                                </div>
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Account Active</span>
-                            </label>
-                        </div>
-                    </form>
-                </div>
-                
-                <div class="p-6 border-t border-gray-100 dark:border-surface-800 bg-gray-50 dark:bg-surface-800/50 flex justify-end gap-3 shrink-0">
-                    <button type="button" @click="closeModal" class="px-4 py-2 text-gray-600 dark:text-gray-300 bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg hover:bg-gray-50 dark:hover:bg-surface-700 transition-colors font-medium">
-                        Cancel
-                    </button>
-                    <button type="button" @click="submit" :disabled="form.processing" class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-500 transition-colors shadow-sm font-medium disabled:opacity-50">
-                        {{ form.processing ? 'Saving...' : 'Save Administrator' }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </AdminLayout>
-</template>

@@ -33,7 +33,6 @@ class SupportSeeder extends Seeder
 
         $settings = [
             ['key' => 'tickets_enabled', 'value' => '1', 'type' => 'boolean'],
-            ['key' => 'guest_tickets', 'value' => '0', 'type' => 'boolean'],
             ['key' => 'max_attachments_per_reply', 'value' => '5', 'type' => 'integer'],
             ['key' => 'max_attachment_size_mb', 'value' => '10', 'type' => 'integer'],
             ['key' => 'allowed_attachment_types', 'value' => 'jpg,png,gif,pdf,txt,zip,mp4', 'type' => 'string'],

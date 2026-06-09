@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SystemController extends Controller
 {
@@ -22,6 +24,9 @@ class SystemController extends Controller
         $this->authorizeSystem();
 
         return Inertia::render('Admin/System/Index', [
+            'health' => $this->healthChecks(),
+            'healthSummary' => $this->healthCheckSummary(),
+            'update' => $this->updateStatus(),
             'stats' => [
                 'php_version' => PHP_VERSION,
                 'laravel_version' => app()->version(),
@@ -41,6 +46,57 @@ class SystemController extends Controller
         ]);
     }
 
+    public function health()
+    {
+        $this->authorizeSystem();
+
+        return Inertia::render('Admin/System/Health', [
+            'health' => $this->healthChecks(),
+            'healthSummary' => $this->healthCheckSummary(),
+            'stats' => [
+                'app_name' => 'MakeAI',
+                'app_version' => settings('app_version', '1.0.0'),
+                'php_version' => PHP_VERSION,
+                'laravel_version' => app()->version(),
+                'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? translate('N/A'),
+                'database_version' => $this->getDatabaseVersion(),
+                'disk_free' => $this->getDiskSpace(),
+                'memory_usage' => $this->getMemoryUsage(),
+            ],
+        ]);
+    }
+
+    public function updates()
+    {
+        $this->authorizeSystem();
+
+        return Inertia::render('Admin/System/Updates', [
+            'update' => $this->updateStatus(),
+        ]);
+    }
+
+    public function tools()
+    {
+        $this->authorizeSystem();
+
+        return Inertia::render('Admin/System/Tools', [
+            'cron' => $this->cronStatus(),
+            'logs' => $this->getLastLogs(),
+        ]);
+    }
+
+    public function maintenance()
+    {
+        $this->authorizeSystem();
+
+        return Inertia::render('Admin/System/Maintenance', [
+            'maintenance' => $this->maintenanceSettings(),
+            'status' => [
+                'is_maintenance' => app()->isDownForMaintenance(),
+            ],
+        ]);
+    }
+
     public function clearCache()
     {
         $this->authorizeSystem();
@@ -55,6 +111,12 @@ class SystemController extends Controller
         $task = collect($this->scheduledTasks())->firstWhere('key', $request->validated('task'));
 
         abort_unless($task && $task['runnable'], 404);
+
+        $isCronConfigured = $this->isSchedulerRunning();
+
+        if (! $isCronConfigured) {
+            return back()->with('error', translate('Cron scheduler is not configured. Set up the required cron entry first, then try again.'));
+        }
 
         $exitCode = $task['command'] === 'scheduler-heartbeat'
             ? $this->runSchedulerHeartbeat()
@@ -244,6 +306,69 @@ class SystemController extends Controller
                 'runnable' => true,
             ],
             [
+                'key' => 'notes-prune-expired',
+                'name' => translate('Prune expired notes'),
+                'command' => 'notes:prune-expired',
+                'frequency_key' => 'Hourly',
+                'frequency' => translate('Hourly'),
+                'description' => translate('Deletes admin notes past their auto-delete date.'),
+                'runnable' => true,
+            ],
+            [
+                'key' => 'tools-flush-views',
+                'name' => translate('Flush tool view counters'),
+                'command' => 'tools:flush-views',
+                'frequency_key' => 'Hourly',
+                'frequency' => translate('Hourly'),
+                'description' => translate('Persists in-memory tool view counts to database.'),
+                'runnable' => true,
+            ],
+            [
+                'key' => 'exports-cleanup',
+                'name' => translate('Cleanup old exports'),
+                'command' => 'exports:cleanup',
+                'frequency_key' => 'Daily',
+                'frequency' => translate('Daily'),
+                'description' => translate('Removes expired export files from storage.'),
+                'runnable' => true,
+            ],
+            [
+                'key' => 'license-reverify',
+                'name' => translate('Re-verify license'),
+                'command' => 'license:reverify',
+                'frequency_key' => 'Daily',
+                'frequency' => translate('Daily'),
+                'description' => translate('Re-verifies the active Envato license via API.'),
+                'runnable' => true,
+            ],
+            [
+                'key' => 'blog-publish-scheduled',
+                'name' => translate('Publish scheduled blog posts'),
+                'command' => 'blog:publish-scheduled',
+                'frequency_key' => 'Every minute',
+                'frequency' => translate('Every minute'),
+                'description' => translate('Publishes blog posts scheduled for the current time.'),
+                'runnable' => true,
+            ],
+            [
+                'key' => 'support-auto-close',
+                'name' => translate('Auto-close resolved tickets'),
+                'command' => 'support:auto-close',
+                'frequency_key' => 'Daily at 01:00',
+                'frequency' => translate('Daily at 01:00'),
+                'description' => translate('Closes resolved support tickets after inactivity.'),
+                'runnable' => true,
+            ],
+            [
+                'key' => 'social-refresh',
+                'name' => translate('Refresh social counts'),
+                'command' => 'social:refresh',
+                'frequency_key' => 'Daily at 04:00',
+                'frequency' => translate('Daily at 04:00'),
+                'description' => translate('Refreshes social media follower counters.'),
+                'runnable' => true,
+            ],
+            [
                 'key' => 'scheduler-heartbeat',
                 'name' => translate('Scheduler heartbeat'),
                 'command' => 'scheduler-heartbeat',
@@ -346,11 +471,415 @@ class SystemController extends Controller
 
     private function sanitizeHtml(string $html): string
     {
-        return trim(strip_tags($html, '<p><br><strong><b><em><i><u><s><ul><ol><li><blockquote><h2><h3><h4><a>'));
+        return \App\Services\TiptapHtmlSanitizer::sanitize($html);
     }
 
     private function authorizeSystem(): void
     {
         abort_unless(auth('admin')->user()?->hasPermission('settings.manage'), 403);
+    }
+
+    public function checkUpdates()
+    {
+        $this->authorizeSystem();
+
+        $itemId = config('license.item_id');
+        $apiToken = config('license.api_token');
+
+        if (blank($itemId) || blank($apiToken)) {
+            return back()->with('error', translate('Envato credentials not configured. Set ENVATO_ITEM_ID and ENVATO_API_TOKEN in your .env file.'));
+        }
+
+        try {
+            $response = Http::withToken($apiToken)
+                ->timeout(15)
+                ->get("https://api.envato.com/v3/market/catalog/item?id={$itemId}");
+
+            if (!$response->successful()) {
+                Log::warning('CheckUpdates: Envato API returned status '.$response->status());
+
+                return back()->with('error', translate('Could not reach Envato API. Status: :status', ['status' => $response->status()]));
+            }
+
+            $data = $response->json();
+            $latestVersion = $data['version'] ?? null;
+
+            if (blank($latestVersion)) {
+                return back()->with('error', translate('Could not determine latest version from Envato API response.'));
+            }
+
+            $currentVersion = settings('app_version', '1.0.0');
+            $updateAvailable = version_compare($latestVersion, $currentVersion, '>');
+
+            settings_set('update_version', $latestVersion, 'string', 'system');
+            settings_set('update_available', $updateAvailable, 'boolean', 'system');
+            settings_set('update_last_checked', now()->toDateTimeString(), 'string', 'system');
+
+            Cache::forget('update_available');
+
+            if ($updateAvailable) {
+                return back()->with('success', translate('Update available! Version :version (current: :current)', [
+                    'version' => $latestVersion,
+                    'current' => $currentVersion,
+                ]));
+            }
+
+            return back()->with('success', translate('You are up to date. Version :current is the latest.', [
+                'current' => $currentVersion,
+            ]));
+
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::warning('CheckUpdates: Could not connect to Envato API.', ['error' => $e->getMessage()]);
+
+            return back()->with('error', translate('Could not connect to Envato API. Please try again later.'));
+        } catch (\Throwable $e) {
+            Log::error('CheckUpdates: Unexpected error', ['error' => $e->getMessage()]);
+
+            return back()->with('error', translate('An unexpected error occurred while checking for updates.'));
+        }
+    }
+
+    private function updateStatus(): array
+    {
+        return [
+            'current_version' => settings('app_version', '1.0.0'),
+            'latest_version' => settings('update_version'),
+            'update_available' => (bool) settings('update_available'),
+            'last_checked' => settings('update_last_checked'),
+        ];
+    }
+
+    private function healthChecks(): array
+    {
+        return [
+            'server' => $this->serverChecks(),
+            'application' => $this->applicationChecks(),
+            'services' => $this->servicesChecks(),
+            'license' => $this->licenseChecks(),
+        ];
+    }
+
+    private function healthCheckSummary(): array
+    {
+        $checks = collect($this->healthChecks())->flatten(1);
+
+        return [
+            'pass' => $checks->where('status', 'pass')->count(),
+            'warn' => $checks->where('status', 'warn')->count(),
+            'fail' => $checks->where('status', 'fail')->count(),
+        ];
+    }
+
+    private function serverChecks(): array
+    {
+        return [
+            [
+                'status' => version_compare(PHP_VERSION, '8.3', '>=') ? 'pass' : 'fail',
+                'label' => translate('PHP version'),
+                'detail' => PHP_VERSION.' — '.translate('Required: 8.3+'),
+                'suggestion' => version_compare(PHP_VERSION, '8.3', '>=') ? null : translate('Upgrade PHP to version 8.3 or higher.'),
+            ],
+            [
+                'status' => $this->checkPhpExtensions(),
+                'label' => translate('PHP extensions'),
+                'detail' => $this->getPhpExtensionsSummary(),
+                'suggestion' => $this->getPhpExtensionsSuggestion(),
+            ],
+            [
+                'status' => is_writable(storage_path()) ? 'pass' : 'fail',
+                'label' => translate('Storage writable'),
+                'detail' => storage_path(),
+                'suggestion' => is_writable(storage_path()) ? null : translate('Make storage/ writable: chmod -R 775 storage'),
+            ],
+            [
+                'status' => is_writable(base_path('bootstrap/cache')) ? 'pass' : 'fail',
+                'label' => translate('Cache writable'),
+                'detail' => base_path('bootstrap/cache'),
+                'suggestion' => is_writable(base_path('bootstrap/cache')) ? null : translate('Make bootstrap/cache/ writable: chmod -R 775 bootstrap/cache'),
+            ],
+            [
+                'status' => $this->checkUploadSize(),
+                'label' => translate('Max upload size'),
+                'detail' => ini_get('upload_max_filesize'),
+                'suggestion' => $this->checkUploadSize() === 'fail' ? translate('Set upload_max_filesize ≥ 64M in php.ini') : null,
+            ],
+            [
+                'status' => $this->checkExecutionTime(),
+                'label' => translate('Max execution time'),
+                'detail' => ini_get('max_execution_time').'s',
+                'suggestion' => $this->checkExecutionTime() === 'fail' ? translate('Set max_execution_time ≥ 120 in php.ini') : null,
+            ],
+        ];
+    }
+
+    private function applicationChecks(): array
+    {
+        return [
+            [
+                'status' => filled(env('APP_KEY')) ? 'pass' : 'fail',
+                'label' => translate('APP_KEY set'),
+                'detail' => filled(env('APP_KEY')) ? translate('Configured') : translate('Missing'),
+                'suggestion' => filled(env('APP_KEY')) ? null : translate('Run: php artisan key:generate'),
+            ],
+            [
+                'status' => app()->environment('production') && env('APP_DEBUG') === true ? 'warn'
+                    : (app()->environment('production') ? 'pass' : 'warn'),
+                'label' => translate('Debug mode'),
+                'detail' => env('APP_DEBUG') ? translate('Enabled') : translate('Disabled'),
+                'suggestion' => app()->environment('production') && env('APP_DEBUG')
+                    ? translate('Set APP_DEBUG=false in production .env')
+                    : null,
+            ],
+            [
+                'status' => $this->isQueueRunning() ? 'pass' : 'warn',
+                'label' => translate('Queue worker'),
+                'detail' => $this->isQueueRunning() ? translate('Active') : translate('May be offline'),
+                'suggestion' => $this->isQueueRunning() ? null : translate('Start queue worker: php artisan queue:work'),
+            ],
+            [
+                'status' => $this->isSchedulerRunning() ? 'pass' : 'fail',
+                'label' => translate('Scheduler'),
+                'detail' => $this->isSchedulerRunning() ? translate('Active') : translate('Not running'),
+                'suggestion' => $this->isSchedulerRunning() ? null : translate('Add cron job. See Cron Jobs section below.'),
+            ],
+            [
+                'status' => config('cache.default') === 'redis' ? 'pass' : 'warn',
+                'label' => translate('Cache driver'),
+                'detail' => config('cache.default'),
+                'suggestion' => config('cache.default') === 'redis' ? null : translate('Use Redis for better performance: CACHE_STORE=redis'),
+            ],
+            [
+                'status' => config('session.driver') === 'redis' ? 'pass' : 'warn',
+                'label' => translate('Session driver'),
+                'detail' => config('session.driver'),
+                'suggestion' => config('session.driver') === 'redis' ? null : translate('Use Redis for sessions: SESSION_DRIVER=redis'),
+            ],
+            [
+                'status' => $this->broadcastingCheck(),
+                'label' => translate('Broadcasting'),
+                'detail' => $this->getBroadcastingDetail(),
+                'suggestion' => $this->getBroadcastingSuggestion(),
+            ],
+        ];
+    }
+
+    private function servicesChecks(): array
+    {
+        return [
+            [
+                'status' => $this->pingDatabase() ? 'pass' : 'fail',
+                'label' => translate('Database'),
+                'detail' => $this->pingDatabase() ? translate('Connected') : translate('Connection failed'),
+                'suggestion' => $this->pingDatabase() ? null : translate('Check DB_HOST, DB_PORT, DB_DATABASE in .env'),
+            ],
+            [
+                'status' => $this->pingRedis() ? 'pass' : 'fail',
+                'label' => translate('Redis'),
+                'detail' => $this->pingRedis() ? translate('Connected') : translate('Connection failed'),
+                'suggestion' => $this->pingRedis() ? null : translate('Check REDIS_HOST, REDIS_PORT in .env. Start Redis server.'),
+            ],
+            [
+                'status' => $this->storageWriteTest() ? 'pass' : 'fail',
+                'label' => translate('Storage write'),
+                'detail' => $this->storageWriteTest() ? translate('Writable') : translate('Not writable'),
+                'suggestion' => $this->storageWriteTest() ? null : translate('Check storage permissions and disk configuration.'),
+            ],
+        ];
+    }
+
+    private function licenseChecks(): array
+    {
+        $verified = license_verified();
+
+        return [
+            [
+                'status' => $verified ? 'pass' : 'fail',
+                'label' => translate('License active'),
+                'detail' => $verified ? translate('Verified') : translate('Not verified'),
+                'suggestion' => $verified ? null : translate('Activate your license in Settings → License.'),
+            ],
+            [
+                'status' => $verified ? $this->domainCheck() : 'warn',
+                'label' => translate('Domain match'),
+                'detail' => $this->domainCheck() ? translate('Matches') : ($verified ? translate('Mismatch') : translate('N/A')),
+                'suggestion' => $verified && ! $this->domainCheck() ? translate('Deactivate and re-activate license on this domain.') : null,
+            ],
+        ];
+    }
+
+    private function checkPhpExtensions(): string
+    {
+        $required = ['curl', 'zip', 'gd', 'mbstring', 'pdo', 'redis', 'fileinfo', 'tokenizer', 'xml'];
+        $missing = array_filter($required, fn(string $ext) => ! extension_loaded($ext));
+
+        if (empty($missing)) {
+            return 'pass';
+        }
+
+        return count($missing) <= 2 ? 'warn' : 'fail';
+    }
+
+    private function getPhpExtensionsSummary(): string
+    {
+        $required = ['curl', 'zip', 'gd', 'mbstring', 'pdo', 'redis', 'fileinfo', 'tokenizer', 'xml'];
+        $missing = array_filter($required, fn(string $ext) => ! extension_loaded($ext));
+
+        if (empty($missing)) {
+            return translate('All required extensions loaded');
+        }
+
+        return translate('Missing: :extensions', ['extensions' => implode(', ', $missing)]);
+    }
+
+    private function getPhpExtensionsSuggestion(): ?string
+    {
+        $required = ['curl', 'zip', 'gd', 'mbstring', 'pdo', 'redis', 'fileinfo', 'tokenizer', 'xml'];
+        $missing = array_filter($required, fn(string $ext) => ! extension_loaded($ext));
+
+        if (empty($missing)) {
+            return null;
+        }
+
+        return translate('Install missing PHP extensions: :extensions', ['extensions' => implode(', ', $missing)]);
+    }
+
+    private function checkUploadSize(): string
+    {
+        $val = ini_get('upload_max_filesize');
+        $bytes = $this->iniSizeToBytes($val);
+
+        if ($bytes >= 64 * 1024 * 1024) {
+            return 'pass';
+        }
+
+        if ($bytes >= 32 * 1024 * 1024) {
+            return 'warn';
+        }
+
+        return 'fail';
+    }
+
+    private function checkExecutionTime(): string
+    {
+        $val = (int) ini_get('max_execution_time');
+
+        if ($val >= 120) {
+            return 'pass';
+        }
+
+        if ($val >= 60) {
+            return 'warn';
+        }
+
+        return 'fail';
+    }
+
+    private function iniSizeToBytes(string $val): int
+    {
+        $val = trim($val);
+        $last = strtolower($val[strlen($val) - 1]);
+        $num = (int) $val;
+
+        return match ($last) {
+            'g' => $num * 1024 * 1024 * 1024,
+            'm' => $num * 1024 * 1024,
+            'k' => $num * 1024,
+            default => $num,
+        };
+    }
+
+    private function broadcastingCheck(): string
+    {
+        $driver = config('broadcasting.default');
+
+        if (in_array($driver, ['reverb', 'pusher'], true)) {
+            return $this->pingRedis() ? 'pass' : 'warn';
+        }
+
+        if ($driver === 'null' || blank($driver)) {
+            return 'warn';
+        }
+
+        return 'warn';
+    }
+
+    private function getBroadcastingDetail(): string
+    {
+        $driver = config('broadcasting.default');
+
+        return match ($driver) {
+            'reverb' => translate('Laravel Reverb (WebSocket)'),
+            'pusher' => translate('Pusher (WebSocket)'),
+            'polling' => translate('HTTP Polling'),
+            default => translate('Not configured'),
+        };
+    }
+
+    private function getBroadcastingSuggestion(): ?string
+    {
+        $driver = config('broadcasting.default');
+        $status = $this->broadcastingCheck();
+
+        if ($status === 'warn') {
+            if ($driver === 'reverb' && ! $this->pingRedis()) {
+                return translate('Reverb requires Redis. Configure Redis or switch to Pusher.');
+            }
+
+            if ($driver === 'null' || blank($driver)) {
+                return translate('Configure broadcasting driver in Settings → Broadcasting.');
+            }
+
+            return translate('Check broadcasting configuration.');
+        }
+
+        return null;
+    }
+
+    private function pingDatabase(): bool
+    {
+        try {
+            DB::connection()->getPdo();
+
+            return true;
+        } catch (\Exception) {
+            return false;
+        }
+    }
+
+    private function pingRedis(): bool
+    {
+        try {
+            return (bool) Cache::store('redis')->get('health:redis_ping', function () {
+                Cache::store('redis')->put('health:redis_ping', true, 10);
+
+                return true;
+            });
+        } catch (\Exception) {
+            return false;
+        }
+    }
+
+    private function storageWriteTest(): bool
+    {
+        try {
+            $path = 'health-check-test.txt';
+            Storage::disk('public')->put($path, 'test');
+            Storage::disk('public')->delete($path);
+
+            return true;
+        } catch (\Exception) {
+            return false;
+        }
+    }
+
+    private function domainCheck(): bool
+    {
+        try {
+            $service = app(\App\Services\LicenseService::class);
+
+            return $service->checkDomain();
+        } catch (\Exception) {
+            return false;
+        }
     }
 }

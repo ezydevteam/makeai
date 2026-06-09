@@ -78,7 +78,7 @@ const deleteCurrency = (id: number) => {
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     SYNC RATES
                 </button>
-                <button @click="openAddModal" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/20">
+                <button @click="openAddModal" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-500/20">
                     ADD CURRENCY
                 </button>
             </div>
@@ -86,7 +86,7 @@ const deleteCurrency = (id: number) => {
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div v-for="curr in currencies" :key="curr.id" :class="[curr.is_default ? 'border-primary-500 ring-1 ring-primary-500' : 'border-gray-200']" class="bg-white border rounded-2xl p-6 shadow-sm flex flex-col relative overflow-hidden group">
-                <div v-if="curr.is_default" class="absolute top-0 right-0 px-3 py-1 bg-primary-500 text-white text-[10px] font-black rounded-bl-xl">DEFAULT</div>
+                <div v-if="curr.is_default" class="absolute top-0 right-0 px-3 py-1 btn-primary text-[10px] font-black rounded-bl-xl">DEFAULT</div>
                 
                 <div class="flex items-center gap-4 mb-6">
                     <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center text-2xl font-bold text-gray-900 border border-gray-100 group-hover:bg-primary-50 group-hover:border-primary-100 transition-colors">
@@ -164,7 +164,7 @@ const deleteCurrency = (id: number) => {
                         </label>
                     </div>
                     <div class="pt-4">
-                        <button type="submit" :disabled="form.processing" class="w-full py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
+                        <button type="submit" :disabled="form.processing" class="w-full py-3 btn-primary rounded-xl font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
                             {{ form.processing ? 'Processing...' : (editingCurrency ? 'Update Currency' : 'Add Currency') }}
                         </button>
                     </div>

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Services\Security\TotpService;
 use App\Traits\HasRBAC;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Crypt;
@@ -13,7 +14,7 @@ use Throwable;
 
 class Admin extends Authenticatable
 {
-    use HasRBAC, Notifiable;
+    use HasRBAC, Notifiable, SoftDeletes;
 
     protected $guard = 'admin';
 
@@ -41,6 +42,7 @@ class Admin extends Authenticatable
             'two_factor_recovery_codes' => 'array',
             'otp_expires_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'deleted_at' => 'datetime',
         ];
     }
 

@@ -16,10 +16,12 @@ class NewsletterCampaignRecipient extends Model
         'status',
         'error_message',
         'sent_at',
+        'opened_at',
     ];
 
     protected $casts = [
         'sent_at' => 'datetime',
+        'opened_at' => 'datetime',
     ];
 
     public function campaign(): BelongsTo

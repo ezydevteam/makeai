@@ -1,126 +1,266 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import Pagination from '@/Components/Pagination.vue';
-import { useTranslate } from '@/Composables/useTranslate';
-import { useDateFormat } from '@/Composables/useDateFormat';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Head } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import { useTranslate } from '@/Composables/useTranslate'
+import { useDateFormat } from '@/Composables/useDateFormat'
 
-defineOptions({ layout: AdminLayout });
+defineOptions({ layout: AdminLayout })
+
+interface MailLogItem {
+    id: number
+    template_slug: string | null
+    recipient_email: string
+    subject: string
+    status: string
+    error_message: string | null
+    sent_at: string | null
+}
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
 
 const props = defineProps<{
     filters: {
-        search?: string,
+        search?: string
         status?: string
-    },
-    logs: {
-        data: Array<{
-            id: number,
-            template_slug: string,
-            recipient_email: string,
-            subject: string,
-            status: string,
-            error_message: string,
-            sent_at: string
-        }>,
-        links: Array<any>
     }
-}>();
+    logs: {
+        data: MailLogItem[]
+        links: PaginationLink[]
+    }
+}>()
 
-const filterForm = useForm({
+const { t } = useTranslate()
+const { formatDateTime } = useDateFormat()
+
+const filterForm = ref({
     search: props.filters.search || '',
     status: props.filters.status || '',
-});
-const { t } = useTranslate();
-const { formatDateTime } = useDateFormat();
+})
 
-const applyFilters = () => {
-    router.get(route('admin.mail.logs.index'), {
-        search: filterForm.search,
-        status: filterForm.status,
-    }, {
-        preserveScroll: true,
-        preserveState: true,
-        replace: true,
-    });
-};
+const openActionMenuId = ref<number | null>(null)
+
+const statusOptions = computed(() => [
+    { value: '', label: t('All statuses') },
+    { value: 'sent', label: t('Sent') },
+    { value: 'failed', label: t('Failed') },
+    { value: 'bounced', label: t('Bounced') },
+])
+
+const filteredLogs = computed(() => {
+    const search = filterForm.value.search.trim().toLowerCase()
+    const status = filterForm.value.status
+
+    return props.logs.data.filter((log) => {
+        const matchesStatus = !status || log.status === status
+
+        if (!matchesStatus) {
+            return false
+        }
+
+        if (!search) {
+            return true
+        }
+
+        return [
+            log.recipient_email,
+            log.subject,
+            log.template_slug || '',
+            log.status,
+            log.error_message || '',
+        ].some((value) => value.toLowerCase().includes(search))
+    })
+})
+
+function toggleActionMenu(id: number) {
+    openActionMenuId.value = openActionMenuId.value === id ? null : id
+}
+
+function closeActionMenu() {
+    openActionMenuId.value = null
+}
+
+function handleDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null
+
+    if (target?.closest('[data-mail-log-actions]')) {
+        return
+    }
+
+    closeActionMenu()
+}
+
+onMounted(() => {
+    document.addEventListener('click', handleDocumentClick)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('click', handleDocumentClick)
+})
 </script>
 
 <template>
-    <Head :title="$t('Mail Logs — Admin')" />
-    <div class="max-w-6xl mx-auto px-6 py-8">
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900">{{ t('Mail Delivery Logs') }}</h1>
-            <p class="text-sm text-gray-500 mt-1">{{ t('Monitor all outgoing communications and troubleshoot delivery issues.') }}</p>
-        </div>
+    <Head :title="t('Mail Logs')" />
 
-        <form @submit.prevent="applyFilters" class="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 mb-6 grid grid-cols-1 md:grid-cols-[1fr_180px_auto] gap-4">
-            <input v-model="filterForm.search" type="search" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all" :placeholder="$t('Search recipient, subject, or template')">
-            <select v-model="filterForm.status" class="w-full bg-gray-50 border-none rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 transition-all">
-                <option value="">{{ t('All statuses') }}</option>
-                <option value="sent">{{ t('Sent') }}</option>
-                <option value="failed">{{ t('Failed') }}</option>
-                <option value="bounced">{{ t('Bounced') }}</option>
-            </select>
-            <button type="submit" class="bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-primary-600/20">
-                {{ t('Filter') }}
-            </button>
-        </form>
+    <div class="space-y-6">
+        <section class="space-y-1">
+            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Mail Delivery Logs') }}</h1>
+            <p class="max-w-2xl text-sm text-gray-600 dark:text-gray-300">
+                {{ t('Review outgoing email activity, isolate failed deliveries, and resend templated messages when needed.') }}
+            </p>
+        </section>
 
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-gray-50/50">
-                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('Recipient') }}</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('Subject') }}</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('Template') }}</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">{{ t('Status') }}</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">{{ t('Sent At') }}</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">{{ t('Actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-50">
-                    <tr v-for="log in logs.data" :key="log.id" class="hover:bg-gray-50/50 transition-colors">
-                        <td class="px-6 py-4">
-                            <div class="font-bold text-gray-900 text-xs">{{ log.recipient_email }}</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="text-xs text-gray-600 truncate max-w-xs">{{ log.subject }}</div>
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="text-[10px] font-mono text-gray-400">{{ log.template_slug || t('Manual') }}</span>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            <div class="flex flex-col items-center gap-1">
-                                <span :class="{
-                                    'bg-success-100 text-success-600': log.status === 'sent',
-                                    'bg-danger-100 text-danger-600': log.status === 'failed',
-                                    'bg-amber-100 text-amber-600': log.status === 'bounced'
-                                }" class="px-2 py-1 text-[10px] font-black uppercase tracking-widest rounded-lg">
-                                    {{ log.status }}
-                                </span>
-                                <div v-if="log.error_message" class="text-[8px] text-danger-500 font-mono truncate max-w-[100px]" :title="log.error_message">
-                                    {{ log.error_message }}
+        <section class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
+                <div class="relative w-full lg:max-w-md">
+                    <i class="ti ti-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400" />
+                    <input
+                        v-model="filterForm.search"
+                        type="search"
+                        :placeholder="t('Search recipient, subject, or template')"
+                        class="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-11 pr-4 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                    >
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div class="sm:w-52">
+                        <AppSelect
+                            v-model="filterForm.status"
+                            :options="statusOptions"
+                            :placeholder="t('Filter by status')"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full border-separate border-spacing-0">
+                    <thead>
+                        <tr class="bg-gray-50/90 dark:bg-surface-800/80">
+                            <th class="rounded-tl-2xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                                {{ t('Recipient') }}
+                            </th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                                {{ t('Subject') }}
+                            </th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                                {{ t('Template') }}
+                            </th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                                {{ t('Status') }}
+                            </th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                                {{ t('Sent At') }}
+                            </th>
+                            <th class="rounded-tr-2xl border-b border-gray-100 px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                                {{ t('Actions') }}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr
+                            v-for="log in filteredLogs"
+                            :key="log.id"
+                            class="transition hover:bg-primary-50/50 dark:hover:bg-primary-900/10"
+                        >
+                            <td class="border-b border-gray-100 px-5 py-4 align-top dark:border-surface-800">
+                                <div class="space-y-1">
+                                    <p class="text-sm font-medium text-gray-900 dark:text-white">{{ log.recipient_email }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">#{{ log.id }}</p>
                                 </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 text-right text-[10px] text-gray-400 font-mono">
-                            {{ formatDateTime(log.sent_at) }}
-                        </td>
-                        <td class="px-6 py-4 text-right">
-                            <Link v-if="log.template_slug" :href="route('admin.mail.logs.resend', log.id)" method="post" as="button" preserve-scroll class="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-primary-600 transition-all shadow-md shadow-gray-900/10">
-                                {{ t('Resend') }}
-                            </Link>
-                        </td>
-                    </tr>
-                    <tr v-if="logs.data.length === 0">
-                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-400">
-                            {{ t('No mail logs found.') }}
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+                            </td>
+                            <td class="border-b border-gray-100 px-5 py-4 align-top dark:border-surface-800">
+                                <p class="max-w-md text-sm text-gray-700 dark:text-gray-200">{{ log.subject }}</p>
+                            </td>
+                            <td class="border-b border-gray-100 px-5 py-4 align-top dark:border-surface-800">
+                                <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-300">
+                                    {{ log.template_slug || t('Manual') }}
+                                </span>
+                            </td>
+                            <td class="border-b border-gray-100 px-5 py-4 align-top dark:border-surface-800">
+                                <div class="space-y-2">
+                                    <span
+                                        class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                                        :class="{
+                                            'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300': log.status === 'sent',
+                                            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300': log.status === 'failed',
+                                            'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300': log.status === 'bounced',
+                                            'bg-gray-100 text-gray-700 dark:bg-surface-800 dark:text-gray-300': !['sent', 'failed', 'bounced'].includes(log.status),
+                                        }"
+                                    >
+                                        {{ log.status }}
+                                    </span>
+                                    <p v-if="log.error_message" class="max-w-xs text-xs text-red-600 dark:text-red-300">
+                                        {{ log.error_message }}
+                                    </p>
+                                </div>
+                            </td>
+                            <td class="border-b border-gray-100 px-5 py-4 align-top text-sm text-gray-500 dark:border-surface-800 dark:text-gray-400">
+                                {{ log.sent_at ? formatDateTime(log.sent_at) : t('Not recorded') }}
+                            </td>
+                            <td class="border-b border-gray-100 px-5 py-4 align-top text-right dark:border-surface-800">
+                                <div class="relative inline-flex" data-mail-log-actions>
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:text-primary-300"
+                                        @click.stop="toggleActionMenu(log.id)"
+                                    >
+                                        <i class="ti ti-dots-vertical text-base" />
+                                    </button>
 
-        <Pagination :links="logs.links" />
+                                    <div
+                                        v-if="openActionMenuId === log.id"
+                                        class="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-gray-200 bg-white p-2 text-left shadow-lg dark:border-surface-700 dark:bg-surface-900"
+                                    >
+                                        <Link
+                                            v-if="log.template_slug"
+                                            :href="route('admin.mail.logs.resend', log.id)"
+                                            method="post"
+                                            as="button"
+                                            preserve-scroll
+                                            class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                            @click="closeActionMenu"
+                                        >
+                                            <i class="ti ti-refresh text-base" />
+                                            {{ t('Resend Email') }}
+                                        </Link>
+                                        <div
+                                            v-else
+                                            class="rounded-xl px-3 py-2 text-sm text-gray-400 dark:text-gray-500"
+                                        >
+                                            {{ t('Manual emails cannot be resent') }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <tr v-if="filteredLogs.length === 0">
+                            <td colspan="6" class="px-6 py-14 text-center">
+                                <div class="mx-auto flex max-w-sm flex-col items-center gap-3">
+                                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 text-gray-400 dark:bg-surface-800 dark:text-gray-500">
+                                        <i class="ti ti-mail text-xl" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('No mail logs found') }}</p>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Try adjusting your table search or status filter.') }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="border-t border-gray-100 px-5 py-4 dark:border-surface-800">
+                <Pagination :links="logs.links" />
+            </div>
+        </section>
     </div>
 </template>

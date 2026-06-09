@@ -90,7 +90,7 @@ const submit = () => {
             <button
                 type="button"
                 :disabled="form.processing"
-                class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500 disabled:opacity-60"
+                class="rounded-lg btn-primary shadow-sm transition disabled:opacity-60"
                 @click="submit"
             >
                 {{ form.processing ? t('Saving...') : t('Save settings') }}

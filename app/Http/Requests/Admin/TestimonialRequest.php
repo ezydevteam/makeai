@@ -35,7 +35,7 @@ class TestimonialRequest extends FormRequest
             'is_active' => ['required', 'boolean'],
             'is_featured' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0'],
-            'source' => ['required', Rule::in(['manual', 'google', 'trustpilot', 'import'])],
+            'source' => ['required', Rule::in(['manual', 'google', 'trustpilot', 'import', 'ai'])],
         ];
     }
 }

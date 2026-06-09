@@ -369,7 +369,7 @@ const persistTreeOrder = () => {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Menu Builder') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Structure public navigation menus for headers, footers, mobile drawers, and sidebars.') }}</p>
             </div>
-            <button type="button" class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-500" @click="openCreateMenu">
+            <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all" @click="openCreateMenu">
                 {{ t('New Menu') }}
             </button>
         </div>
@@ -411,7 +411,7 @@ const persistTreeOrder = () => {
                             <button type="button" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200" @click="openEditMenu(selectedMenu)">
                                 {{ t('Edit Menu') }}
                             </button>
-                            <button type="button" class="rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-500" @click="openCreateItem">
+                            <button type="button" class="rounded-lg btn-primary transition-colors" @click="openCreateItem">
                                 {{ t('Add Link') }}
                             </button>
                             <button type="button" class="rounded-lg bg-danger-50 px-4 py-2 text-xs font-semibold text-danger-600 transition-colors hover:bg-danger-100 dark:bg-danger-900/20 dark:text-danger-300" @click="requestDeleteMenu(selectedMenu)">
@@ -467,7 +467,7 @@ const persistTreeOrder = () => {
                 <div v-else class="rounded-xl border border-dashed border-gray-200 bg-white py-16 text-center shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Create your first menu') }}</h2>
                     <p class="mt-2 text-sm text-gray-500">{{ t('Menus can be assigned later in the header, footer, mobile drawer, and sidebar builders.') }}</p>
-                    <button type="button" class="mt-5 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-500" @click="openCreateMenu">
+                    <button type="button" class="mt-5 rounded-lg btn-primary" @click="openCreateMenu">
                         {{ t('New Menu') }}
                     </button>
                 </div>
@@ -496,7 +496,7 @@ const persistTreeOrder = () => {
                         </label>
                         <div class="flex items-center justify-end gap-3 rounded-b-xl pt-2">
                             <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showMenuModal = false">{{ t('Cancel') }}</button>
-                            <button type="submit" :disabled="menuForm.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-60">
+                            <button type="submit" :disabled="menuForm.processing" class="rounded-lg btn-primary disabled:opacity-60">
                                 {{ menuForm.processing ? t('Saving...') : t('Save Menu') }}
                             </button>
                         </div>
@@ -618,7 +618,7 @@ const persistTreeOrder = () => {
                         </div>
                         <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-surface-800 md:col-span-2">
                             <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showItemModal = false">{{ t('Cancel') }}</button>
-                            <button type="submit" :disabled="itemForm.processing" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500 disabled:opacity-60">
+                            <button type="submit" :disabled="itemForm.processing" class="rounded-lg btn-primary disabled:opacity-60">
                                 {{ itemForm.processing ? t('Saving...') : t('Save Item') }}
                             </button>
                         </div>

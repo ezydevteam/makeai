@@ -9,6 +9,7 @@ use App\Models\Document;
 use App\Models\Favorite;
 use App\Models\Page;
 use App\Models\User;
+use App\Services\ToolFavoritesService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -28,6 +29,7 @@ class FavoriteController extends Controller
 
         return Inertia::render('User/Favorites', [
             'groups' => $this->groupFavorites($favorites->getCollection()),
+            'collections' => app(ToolFavoritesService::class)->getUserCollections($user)->values(),
             'pagination' => [
                 'current_page' => $favorites->currentPage(),
                 'last_page' => $favorites->lastPage(),
@@ -118,6 +120,7 @@ class FavoriteController extends Controller
                 'id' => $favorite->id,
                 'type' => 'ai_templates',
                 'model_id' => $favoriteable->id,
+                'slug' => $favoriteable->slug,
                 'title' => $favoriteable->name,
                 'description' => $favoriteable->description,
                 'url' => route('ai.tools.show', $favoriteable->slug),

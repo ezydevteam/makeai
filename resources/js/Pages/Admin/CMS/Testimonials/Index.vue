@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Head, useForm, router } from '@inertiajs/vue3'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -21,32 +24,6 @@ interface Testimonial {
     source: 'manual' | 'google' | 'trustpilot' | 'import'
 }
 
-const props = defineProps<{ testimonials: Testimonial[] }>()
-const toast = useToastr()
-const { t } = useTranslate()
-
-const showForm = ref(false)
-const editingId = ref<number | null>(null)
-const importInput = ref<HTMLInputElement | null>(null)
-const avatarPreview = ref<string | null>(null)
-const showAiForm = ref(false)
-const aiGenerating = ref(false)
-const aiForm = ref({
-    company_type: 'AI SaaS platform',
-    tone: 'professional and authentic',
-    prompt: '',
-    count: 5,
-})
-
-const toneOptions = [
-    { value: 'professional and authentic', label: 'Professional' },
-    { value: 'friendly and conversational', label: 'Friendly' },
-    { value: 'confident and results-focused', label: 'Results-focused' },
-    { value: 'warm and trustworthy', label: 'Warm' },
-    { value: 'premium and polished', label: 'Premium' },
-    { value: 'casual startup voice', label: 'Casual startup' },
-]
-
 interface TestimonialForm {
     name: string
     role: string
@@ -59,6 +36,56 @@ interface TestimonialForm {
     is_featured: boolean
     sort_order: number
     source: Testimonial['source']
+}
+
+const props = defineProps<{ testimonials: Testimonial[] }>()
+
+const toast = useToastr()
+const { t } = useTranslate()
+
+const showForm = ref(false)
+const showAiForm = ref(false)
+const aiGenerating = ref(false)
+const editingId = ref<number | null>(null)
+const deleteTargetId = ref<number | null>(null)
+const openActionMenuId = ref<number | null>(null)
+const actionMenuPosition = ref({ top: 0, left: 0 })
+const importInput = ref<HTMLInputElement | null>(null)
+const avatarPreview = ref<string | null>(null)
+
+const aiForm = ref({
+    company_type: 'AI SaaS platform',
+    tone: 'professional and authentic',
+    prompt: '',
+    count: 5,
+})
+
+const toneOptions = [
+    { value: 'professional and authentic', label: t('Professional') },
+    { value: 'friendly and conversational', label: t('Friendly') },
+    { value: 'confident and results-focused', label: t('Results-focused') },
+    { value: 'warm and trustworthy', label: t('Warm') },
+    { value: 'premium and polished', label: t('Premium') },
+    { value: 'casual startup voice', label: t('Casual startup') },
+]
+
+const ratingOptions = [5, 4, 3, 2, 1].map((value) => ({
+    value,
+    label: t(':count Star', { count: String(value) }),
+}))
+
+const sourceOptions = [
+    { value: 'manual', label: t('Manual') },
+    { value: 'google', label: t('Google') },
+    { value: 'trustpilot', label: t('Trustpilot') },
+    { value: 'import', label: t('Import') },
+]
+
+const sourceClasses: Record<Testimonial['source'], string> = {
+    manual: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+    google: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
+    trustpilot: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
+    import: 'bg-gray-100 text-gray-700 dark:bg-surface-800 dark:text-gray-300',
 }
 
 const blank = (): TestimonialForm => ({
@@ -77,6 +104,28 @@ const blank = (): TestimonialForm => ({
 
 const form = useForm(blank())
 
+const totalTestimonials = computed(() => props.testimonials.length)
+const activeTestimonials = computed(() => props.testimonials.filter((item) => item.is_active).length)
+const featuredTestimonials = computed(() => props.testimonials.filter((item) => item.is_featured).length)
+const averageRating = computed(() => {
+    if (props.testimonials.length === 0) {
+        return '0.0'
+    }
+
+    const total = props.testimonials.reduce((sum, item) => sum + item.rating, 0)
+    return (total / props.testimonials.length).toFixed(1)
+})
+
+const sortedTestimonials = computed(() =>
+    [...props.testimonials].sort((left, right) => {
+        if (left.sort_order !== right.sort_order) {
+            return left.sort_order - right.sort_order
+        }
+
+        return right.id - left.id
+    }),
+)
+
 const openCreate = () => {
     form.reset()
     Object.assign(form, blank())
@@ -85,58 +134,148 @@ const openCreate = () => {
     showForm.value = true
 }
 
-const openEdit = (t: Testimonial) => {
-    form.name = t.name
-    form.role = t.role ?? ''
-    form.company = t.company ?? ''
-    form.avatar = t.avatar ?? ''
+const openEdit = (testimonial: Testimonial) => {
+    form.name = testimonial.name
+    form.role = testimonial.role ?? ''
+    form.company = testimonial.company ?? ''
+    form.avatar = testimonial.avatar ?? ''
     form.avatar_file = null
-    form.content = t.content
-    form.rating = t.rating
-    form.is_active = t.is_active
-    form.is_featured = t.is_featured
-    form.sort_order = t.sort_order
-    form.source = t.source
-    avatarPreview.value = resolveAvatar(t.avatar)
-    editingId.value = t.id
+    form.content = testimonial.content
+    form.rating = testimonial.rating
+    form.is_active = testimonial.is_active
+    form.is_featured = testimonial.is_featured
+    form.sort_order = testimonial.sort_order
+    form.source = testimonial.source
+    avatarPreview.value = resolveAvatar(testimonial.avatar)
+    editingId.value = testimonial.id
     showForm.value = true
+}
+
+const closeForm = () => {
+    showForm.value = false
+    editingId.value = null
+    avatarPreview.value = null
 }
 
 const submit = () => {
     if (editingId.value) {
         form.post(route('admin.testimonials.update', { testimonial: editingId.value }), {
             forceFormData: true,
-            onSuccess: () => { showForm.value = false },
+            onSuccess: () => {
+                closeForm()
+            },
         })
-    } else {
-        form.post(route('admin.testimonials.store'), {
-            forceFormData: true,
-            onSuccess: () => { showForm.value = false },
-        })
+
+        return
     }
+
+    form.post(route('admin.testimonials.store'), {
+        forceFormData: true,
+        onSuccess: () => {
+            closeForm()
+        },
+    })
 }
 
 const remove = (id: number) => {
-    if (!confirm(t('Delete this testimonial?'))) return
-    router.delete(route('admin.testimonials.delete', { testimonial: id }), { preserveScroll: true })
+    openActionMenuId.value = null
+    deleteTargetId.value = id
+}
+
+const confirmDelete = () => {
+    if (deleteTargetId.value === null) {
+        return
+    }
+
+    router.delete(route('admin.testimonials.delete', { testimonial: deleteTargetId.value }), {
+        preserveScroll: true,
+        onFinish: () => {
+            deleteTargetId.value = null
+        },
+    })
 }
 
 const toggleFeatured = (id: number) => {
+    openActionMenuId.value = null
     router.post(route('admin.testimonials.featured', { testimonial: id }), {}, { preserveScroll: true })
 }
 
 const toggleActive = (id: number) => {
+    openActionMenuId.value = null
     router.post(route('admin.testimonials.active', { testimonial: id }), {}, { preserveScroll: true })
 }
 
-const importFile = () => importInput.value?.click()
+const toggleActionMenu = async (id: number, event: MouseEvent) => {
+    if (openActionMenuId.value === id) {
+        openActionMenuId.value = null
+        return
+    }
 
-const handleImport = (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    if (!file) return
-    const fd = new FormData()
-    fd.append('csv', file)
-    router.post(route('admin.testimonials.import'), fd, { preserveScroll: true })
+    const trigger = event.currentTarget
+
+    if (!(trigger instanceof HTMLElement)) {
+        return
+    }
+
+    const rect = trigger.getBoundingClientRect()
+
+    openActionMenuId.value = id
+    actionMenuPosition.value = {
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.right + window.scrollX,
+    }
+
+    await nextTick()
+}
+
+const handleDocumentClick = (event: MouseEvent) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLElement) || target.closest('[data-testimonial-actions]')) {
+        return
+    }
+
+    openActionMenuId.value = null
+}
+
+const handleViewportChange = () => {
+    openActionMenuId.value = null
+}
+
+onMounted(() => {
+    document.addEventListener('click', handleDocumentClick)
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('scroll', handleViewportChange, true)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('click', handleDocumentClick)
+    window.removeEventListener('resize', handleViewportChange)
+    window.removeEventListener('scroll', handleViewportChange, true)
+})
+
+const importFile = () => {
+    importInput.value?.click()
+}
+
+const handleImport = (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0]
+
+    if (!file) {
+        return
+    }
+
+    const payload = new FormData()
+    payload.append('csv', file)
+
+    router.post(route('admin.testimonials.import'), payload, {
+        preserveScroll: true,
+        onFinish: () => {
+            if (importInput.value) {
+                importInput.value.value = ''
+            }
+        },
+    })
 }
 
 const handleAvatarChange = (event: Event) => {
@@ -146,14 +285,37 @@ const handleAvatarChange = (event: Event) => {
 }
 
 const resolveAvatar = (avatar: string | null): string => {
-    if (!avatar) return ''
-    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('/')) return avatar
+    if (!avatar) {
+        return ''
+    }
+
+    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('/')) {
+        return avatar
+    }
 
     return `/storage/${avatar}`
 }
 
+const initials = (name: string) => {
+    return name.trim().charAt(0).toUpperCase() || 'U'
+}
+
+const sourceLabel = (source: Testimonial['source']) => {
+    return ({
+        manual: t('Manual'),
+        google: t('Google'),
+        trustpilot: t('Trustpilot'),
+        import: t('Import'),
+    })[source]
+}
+
+const stars = (count: number) => Array.from({ length: 5 }, (_, index) => index < count)
+
 const generateTestimonials = async () => {
-    if (aiGenerating.value) return
+    if (aiGenerating.value) {
+        return
+    }
+
     aiGenerating.value = true
 
     try {
@@ -166,8 +328,12 @@ const generateTestimonials = async () => {
             },
             body: JSON.stringify(aiForm.value),
         })
+
         const payload = await response.json()
-        if (!response.ok || !payload.success) throw new Error(payload.message || t('AI generation failed.'))
+
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.message || t('AI generation failed.'))
+        }
 
         toast.success(payload.message || t('Testimonials generated.'))
         showAiForm.value = false
@@ -178,247 +344,589 @@ const generateTestimonials = async () => {
         aiGenerating.value = false
     }
 }
-
-const stars = (n: number) => Array.from({ length: 5 }, (_, i) => i < n)
-
-const sourceColor: Record<string, string> = {
-    manual: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
-    google: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400',
-    trustpilot: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-    import: 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-400',
-}
 </script>
 
 <template>
-    <Head :title="$t('Testimonials — Admin')" />
+    <Head :title="t('Testimonials - Admin')" />
+
     <AdminLayout>
-        <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="mx-auto max-w-7xl px-6 py-8">
+            <div class="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div class="space-y-2">
+                    <div>
+                        <h1 class="font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ t('Testimonials') }}</h1>
+                        <p class="mt-2 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('Manage customer proof for your homepage and marketing sections from one consistent admin workspace.') }}
+                        </p>
+                    </div>
+                </div>
 
-            <!-- Header -->
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-8">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Testimonials</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Manage customer reviews shown on the homepage and marketing pages.
-                        <a :href="route('admin.homepage.index')" class="text-primary-600 hover:underline ml-1">← Homepage Builder</a>
+                <div class="flex flex-wrap items-center gap-3">
+                    <input
+                        ref="importInput"
+                        type="file"
+                        accept=".csv,.txt"
+                        class="hidden"
+                        @change="handleImport"
+                    >
+                    <Tooltip :content="t('Homepage Builder')" placement="top">
+                        <Link
+                            :href="route('admin.homepage.index')"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                        >
+                            <i class="ti ti-layout-dashboard text-lg"></i>
+                        </Link>
+                    </Tooltip>
+                    <Tooltip :content="t('Import CSV')" placement="top">
+                        <button
+                            type="button"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                            @click="importFile"
+                        >
+                            <i class="ti ti-file-import text-lg"></i>
+                        </button>
+                    </Tooltip>
+                    <Tooltip :content="t('AI Generate')" placement="top">
+                        <button
+                            type="button"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
+                            @click="showAiForm = true"
+                        >
+                            <i class="ti ti-sparkles text-lg"></i>
+                        </button>
+                    </Tooltip>
+                    <button
+                        type="button"
+                        class="btn-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                        @click="openCreate"
+                    >
+                        <i class="ti ti-plus text-base"></i>
+                        {{ t('Add Testimonial') }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Total') }}</div>
+                    <div class="mt-3 font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ totalTestimonials }}</div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('All testimonials stored in the library.') }}</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Active') }}</div>
+                    <div class="mt-3 font-heading text-3xl font-bold text-emerald-600">{{ activeTestimonials }}</div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Currently visible across public sections.') }}</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Featured') }}</div>
+                    <div class="mt-3 font-heading text-3xl font-bold text-amber-500">{{ featuredTestimonials }}</div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Highlighted entries for premium placement.') }}</p>
+                </div>
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Average Rating') }}</div>
+                    <div class="mt-3 font-heading text-3xl font-bold text-blue-600">{{ averageRating }}</div>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Overall score based on saved testimonials.') }}</p>
+                </div>
+            </div>
+
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div v-if="sortedTestimonials.length === 0" class="px-6 py-16 text-center">
+                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl dark:bg-emerald-900/20">
+                        <span>💬</span>
+                    </div>
+                    <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">{{ t('No testimonials yet') }}</h3>
+                    <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+                        {{ t('Create your first testimonial to start building social proof across the homepage and landing sections.') }}
                     </p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <input ref="importInput" type="file" accept=".csv,.txt" class="hidden" @change="handleImport">
-                    <button @click="importFile" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-all shadow-sm">
-                        Import CSV
-                    </button>
-                    <button @click="showAiForm = true" type="button" class="px-4 py-2.5 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-900/40 text-violet-700 dark:text-violet-300 rounded-xl text-sm font-bold hover:bg-violet-100 transition-all shadow-sm">
-                        ✨ AI Generate
-                    </button>
-                    <button @click="openCreate" type="button" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20">
-                        + Add Testimonial
+                    <button
+                        type="button"
+                        class="btn-primary mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                        @click="openCreate"
+                    >
+                        {{ t('Add First Testimonial') }}
                     </button>
                 </div>
-            </div>
 
-            <!-- Stats bar -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-gray-900 dark:text-white">{{ testimonials.length }}</div>
-                    <div class="text-xs text-gray-500 mt-1">Total</div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-success-600">{{ testimonials.filter(t => t.is_active).length }}</div>
-                    <div class="text-xs text-gray-500 mt-1">Active</div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-yellow-500">{{ testimonials.filter(t => t.is_featured).length }}</div>
-                    <div class="text-xs text-gray-500 mt-1">Featured</div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-primary-600">
-                        {{ testimonials.length ? (testimonials.reduce((s,t) => s + t.rating, 0) / testimonials.length).toFixed(1) : '—' }}
+                <div v-else class="overflow-visible">
+                    <div class="overflow-x-auto overflow-y-visible rounded-t-2xl">
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-surface-700">
+                        <thead class="bg-gray-50 dark:bg-surface-800/70">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Customer') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Review') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Source') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Order') }}</th>
+                                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr
+                                v-for="testimonial in sortedTestimonials"
+                                :key="testimonial.id"
+                                class="transition hover:bg-primary-50/60 dark:hover:bg-primary-900/10"
+                            >
+                                <td class="px-6 py-5 align-top">
+                                    <div class="flex items-start gap-3">
+                                        <div
+                                            v-if="testimonial.avatar"
+                                            class="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-800"
+                                        >
+                                            <img
+                                                :src="resolveAvatar(testimonial.avatar)"
+                                                :alt="testimonial.name"
+                                                class="h-full w-full object-cover"
+                                            >
+                                        </div>
+                                        <div
+                                            v-else
+                                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                        >
+                                            {{ initials(testimonial.name) }}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 dark:text-white">{{ testimonial.name }}</div>
+                                            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                {{ [testimonial.role, testimonial.company].filter(Boolean).join(' · ') || t('No role or company') }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5 align-top">
+                                    <div class="max-w-xl">
+                                        <div class="mb-2 flex items-center gap-1">
+                                            <svg
+                                                v-for="(filled, index) in stars(testimonial.rating)"
+                                                :key="index"
+                                                class="h-4 w-4"
+                                                :class="filled ? 'text-amber-400' : 'text-gray-200 dark:text-surface-700'"
+                                                fill="currentColor"
+                                                viewBox="0 0 20 20"
+                                            >
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                            </svg>
+                                        </div>
+                                        <p class="line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ testimonial.content }}</p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5 align-top">
+                                    <span :class="sourceClasses[testimonial.source]" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold">
+                                        {{ sourceLabel(testimonial.source) }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-5 align-top">
+                                    <div class="flex flex-col items-start gap-2">
+                                        <span
+                                            :class="testimonial.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'"
+                                            class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
+                                        >
+                                            {{ testimonial.is_active ? t('Active') : t('Inactive') }}
+                                        </span>
+                                        <span
+                                            v-if="testimonial.is_featured"
+                                            class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/20 dark:text-amber-300"
+                                        >
+                                            {{ t('Featured') }}
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-5 align-top text-sm font-medium text-gray-700 dark:text-gray-200">
+                                    {{ testimonial.sort_order }}
+                                </td>
+                                <td class="overflow-visible px-6 py-5 align-top">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <div class="relative" data-testimonial-actions>
+                                            <button
+                                                type="button"
+                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
+                                                @click.stop="toggleActionMenu(testimonial.id, $event)"
+                                            >
+                                                <i class="ti ti-dots-vertical text-base"></i>
+                                            </button>
+                                        </div>
+                                        <Teleport to="body">
+                                            <div
+                                                v-if="openActionMenuId === testimonial.id"
+                                                data-testimonial-actions
+                                                class="fixed z-[80] w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
+                                                :style="{
+                                                    top: `${actionMenuPosition.top}px`,
+                                                    left: `${actionMenuPosition.left}px`,
+                                                    transform: 'translateX(-100%)',
+                                                }"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                    @click="openEdit(testimonial); openActionMenuId = null"
+                                                >
+                                                    <i class="ti ti-pencil text-base"></i>
+                                                    {{ t('Edit') }}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-amber-50 hover:text-amber-700 dark:text-gray-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+                                                    @click="toggleFeatured(testimonial.id)"
+                                                >
+                                                    <i class="ti ti-star text-base"></i>
+                                                    {{ testimonial.is_featured ? t('Unfeature') : t('Feature') }}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                                    @click="toggleActive(testimonial.id)"
+                                                >
+                                                    <i class="ti ti-toggle-right text-base"></i>
+                                                    {{ testimonial.is_active ? t('Deactivate') : t('Activate') }}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                    @click="remove(testimonial.id)"
+                                                >
+                                                    <i class="ti ti-trash text-base"></i>
+                                                    {{ t('Delete') }}
+                                                </button>
+                                            </div>
+                                        </Teleport>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                     </div>
-                    <div class="text-xs text-gray-500 mt-1">Avg Rating</div>
                 </div>
             </div>
+        </div>
 
-            <!-- Empty state -->
-            <div v-if="testimonials.length === 0" class="bg-white dark:bg-surface-900 rounded-2xl border-2 border-dashed border-gray-200 dark:border-surface-700 p-16 text-center">
-                <div class="text-5xl mb-4">💬</div>
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">No testimonials yet</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">Add testimonials to display on your homepage and boost trust with visitors.</p>
-                <button @click="openCreate" type="button" class="px-6 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all">Add first testimonial</button>
-            </div>
-
-            <!-- Testimonial cards -->
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                <div
-                    v-for="t in testimonials"
-                    :key="t.id"
-                    class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
-                    :class="!t.is_active ? 'opacity-60' : ''"
-                >
-                    <!-- Stars -->
-                    <div class="flex items-center gap-0.5">
-                        <svg v-for="(filled, i) in stars(t.rating)" :key="i" class="w-4 h-4" :class="filled ? 'text-yellow-400' : 'text-gray-200 dark:text-surface-700'" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                        </svg>
+        <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeForm">
+            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[16px] border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="border-b border-gray-200 bg-gray-50 px-6 py-5 dark:border-surface-700 dark:bg-surface-800/80">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500 text-white shadow-sm">
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 10.5h4.75m-4.75 3h8.75M6.75 19.5l-3-1.5V6.75A2.25 2.25 0 0 1 6 4.5h12A2.25 2.25 0 0 1 20.25 6.75v8.5A2.25 2.25 0 0 1 18 17.5H9.31L6.75 19.5Zm11.5-11.75.375.75.75.375-.75.375-.375.75-.375-.75-.75-.375.75-.375.375-.75Z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-heading text-2xl font-semibold text-gray-900 dark:text-white">
+                                    {{ editingId ? t('Edit Testimonial') : t('Create Testimonial') }}
+                                </h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ t('Shape customer proof with clean content, trusted identity details, and clear publishing controls.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="rounded-xl p-2 text-gray-400 transition hover:bg-white/80 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-gray-200"
+                            @click="closeForm"
+                        >
+                            <span class="sr-only">{{ t('Close') }}</span>
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
+                </div>
 
-                    <!-- Content -->
-                    <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-4">"{{ t.content }}"</p>
+                <div class="flex-1 overflow-y-auto px-6 py-6">
+                    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
+                        <div class="space-y-6">
+                            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                                <div class="mb-5">
+                                    <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Customer Details') }}</h4>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Define who said it and how that identity should appear on the site.') }}</p>
+                                </div>
 
-                    <!-- Author -->
-                    <div class="flex items-center gap-3 mt-auto">
-                        <div v-if="t.avatar" class="w-9 h-9 rounded-full bg-gray-100 dark:bg-surface-800 overflow-hidden shrink-0">
-                            <img :src="resolveAvatar(t.avatar)" :alt="t.name" class="w-full h-full object-cover">
+                                <div class="grid gap-5 md:grid-cols-2">
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Name') }} *</label>
+                                        <input
+                                            v-model="form.name"
+                                            type="text"
+                                            :placeholder="t('e.g. Sarah Khan')"
+                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        >
+                                        <p v-if="form.errors.name" class="mt-2 text-xs text-red-500">{{ form.errors.name }}</p>
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Role') }}</label>
+                                        <input
+                                            v-model="form.role"
+                                            type="text"
+                                            :placeholder="t('CEO, Developer, Founder...')"
+                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        >
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company') }}</label>
+                                        <input
+                                            v-model="form.company"
+                                            type="text"
+                                            :placeholder="t('e.g. PixelForge Studio')"
+                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        >
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
+                                        <input
+                                            v-model.number="form.sort_order"
+                                            type="number"
+                                            min="0"
+                                            :placeholder="t('e.g. 1')"
+                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        >
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                                <div class="mb-5 flex items-start justify-between gap-4">
+                                    <div>
+                                        <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Review Content') }}</h4>
+                                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Keep the quote clear, believable, and easy to scan in cards or sliders.') }}</p>
+                                    </div>
+                                    <div class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-500 dark:bg-surface-800 dark:text-gray-300">
+                                        {{ t(':count chars', { count: String(form.content.length) }) }}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Review') }} *</label>
+                                    <textarea
+                                        v-model="form.content"
+                                        rows="8"
+                                        :placeholder="t('Write the testimonial in a natural, specific tone that feels believable and useful.')"
+                                        class="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                    ></textarea>
+                                    <p v-if="form.errors.content" class="mt-2 text-xs text-red-500">{{ form.errors.content }}</p>
+                                </div>
+                            </section>
                         </div>
-                        <div v-else class="w-9 h-9 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-primary-600 font-black text-sm shrink-0">
-                            {{ t.name.charAt(0) }}
+
+                        <div class="space-y-6">
+                            <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                                <div class="border-b border-gray-200 px-5 py-4 dark:border-surface-700">
+                                    <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Preview') }}</h4>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Quick look at how the testimonial identity may feel in the UI.') }}</p>
+                                </div>
+                                <div class="space-y-5 p-5">
+                                    <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800">
+                                        <div class="mb-4 flex items-center gap-3">
+                                            <div class="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-lg font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                                <img v-if="avatarPreview" :src="avatarPreview" class="h-full w-full object-cover">
+                                                <span v-else>{{ initials(form.name) }}</span>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="truncate font-semibold text-gray-900 dark:text-white">{{ form.name || t('Customer Name') }}</div>
+                                                <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                    {{ [form.role, form.company].filter(Boolean).join(' · ') || t('Role and company') }}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
+                                            {{ form.content || t('Your testimonial preview will appear here as you type.') }}
+                                        </p>
+                                    </div>
+
+                                    <label class="inline-flex cursor-pointer items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
+                                        <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange">
+                                        <i class="ti ti-upload text-base"></i>
+                                        {{ t('Upload Photo') }}
+                                    </label>
+                                    <p v-if="form.errors.avatar_file" class="text-xs text-red-500">{{ form.errors.avatar_file }}</p>
+                                </div>
+                            </section>
+
+                            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                                <div class="mb-5">
+                                    <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Publishing Settings') }}</h4>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control rating, source, and whether this testimonial should be visible or featured.') }}</p>
+                                </div>
+
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Rating') }}</label>
+                                        <AppSelect
+                                            v-model.number="form.rating"
+                                            :options="ratingOptions"
+                                            :placeholder="t('Select rating')"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Source') }}</label>
+                                        <AppSelect
+                                            v-model="form.source"
+                                            :options="sourceOptions"
+                                            :placeholder="t('Select source')"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10"
+                                        @click="form.is_active = !form.is_active"
+                                    >
+                                        <div>
+                                            <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Active') }}</div>
+                                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show this testimonial on public-facing sections that consume active items.') }}</div>
+                                        </div>
+                                        <span
+                                            class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors"
+                                            :class="form.is_active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-surface-600'"
+                                        >
+                                            <span
+                                                class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                                                :class="form.is_active ? 'translate-x-5' : 'translate-x-0.5'"
+                                            ></span>
+                                        </span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-amber-200 hover:bg-amber-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-amber-900/40 dark:hover:bg-amber-900/10"
+                                        @click="form.is_featured = !form.is_featured"
+                                    >
+                                        <div>
+                                            <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Featured') }}</div>
+                                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Use this for priority placement in hero, spotlight, or premium testimonial sections.') }}</div>
+                                        </div>
+                                        <span
+                                            class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors"
+                                            :class="form.is_featured ? 'bg-amber-500' : 'bg-gray-300 dark:bg-surface-600'"
+                                        >
+                                            <span
+                                                class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+                                                :class="form.is_featured ? 'translate-x-5' : 'translate-x-0.5'"
+                                            ></span>
+                                        </span>
+                                    </button>
+                                </div>
+                            </section>
                         </div>
-                        <div class="min-w-0">
-                            <div class="text-sm font-bold text-gray-900 dark:text-white truncate">{{ t.name }}</div>
-                            <div class="text-xs text-gray-500 truncate">{{ [t.role, t.company].filter(Boolean).join(' · ') || '—' }}</div>
-                        </div>
-                        <span :class="sourceColor[t.source]" class="ml-auto text-[10px] uppercase font-bold px-2 py-0.5 rounded-md shrink-0">{{ t.source }}</span>
                     </div>
+                </div>
 
-                    <!-- Actions -->
-                    <div class="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-surface-800">
-                        <button @click="toggleFeatured(t.id)" type="button" :title="t.is_featured ? 'Remove from featured' : 'Mark featured'" :class="t.is_featured ? 'text-yellow-500' : 'text-gray-400 hover:text-yellow-500'" class="transition-colors">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        {{ t('Required fields are marked with *') }}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button
+                            type="button"
+                            class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700"
+                            @click="closeForm"
+                        >
+                            {{ t('Cancel') }}
                         </button>
-                        <button @click="toggleActive(t.id)" type="button" :class="t.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'" class="relative inline-flex h-5 w-9 rounded-full transition-colors ml-1">
-                            <span :class="t.is_active ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
-                        </button>
-                        <div class="flex-1"></div>
-                        <button @click="openEdit(t)" type="button" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-surface-700 text-gray-500 hover:text-primary-600 hover:border-primary-300 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </button>
-                        <button @click="remove(t.id)" type="button" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-surface-700 text-danger-500 hover:bg-danger-50 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        <button
+                            type="button"
+                            class="btn-primary inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            :disabled="form.processing"
+                            @click="submit"
+                        >
+                            <i class="ti ti-device-floppy text-base"></i>
+                            {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Create Testimonial') }}
                         </button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Create / Edit Modal -->
-        <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-6 border-b border-gray-100 dark:border-surface-800 flex items-center justify-between">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ editingId ? 'Edit Testimonial' : 'Add Testimonial' }}</h3>
-                    <button @click="showForm = false" type="button" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm">Close</button>
+        <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="showAiForm = false">
+            <div class="w-full max-w-xl overflow-hidden rounded-[16px] border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5 dark:border-surface-700">
+                    <div>
+                        <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">{{ t('AI Generate Testimonials') }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Generate demo-friendly testimonials with a consistent admin flow.') }}</p>
+                    </div>
+                    <button
+                        type="button"
+                        class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-gray-200"
+                        @click="showAiForm = false"
+                    >
+                        <span class="sr-only">{{ t('Close') }}</span>
+                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                 </div>
-                <div class="p-6 overflow-y-auto space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Name *</label>
-                            <input v-model="form.name" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                            <p v-if="form.errors.name" class="text-xs text-danger-500 mt-1">{{ form.errors.name }}</p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Role</label>
-                            <input v-model="form.role" type="text" :placeholder="$t('CEO, Developer…')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Company</label>
-                            <input v-model="form.company" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Avatar</label>
-                            <div class="flex items-center gap-3">
-                                <div class="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-primary-50 text-primary-700 flex items-center justify-center font-black">
-                                    <img v-if="avatarPreview" :src="avatarPreview" class="h-full w-full object-cover">
-                                    <span v-else>{{ form.name ? form.name.charAt(0) : 'U' }}</span>
-                                </div>
-                                <label class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-700 transition-colors hover:border-primary-300 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300">
-                                    <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange">
-                                    Upload photo
-                                </label>
-                            </div>
-                            <p v-if="form.errors.avatar_file" class="text-xs text-danger-500 mt-1">{{ form.errors.avatar_file }}</p>
-                        </div>
+
+                <div class="space-y-5 px-6 py-6">
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company Type') }}</label>
+                        <input
+                            v-model="aiForm.company_type"
+                            type="text"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                        >
                     </div>
 
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Review *</label>
-                        <textarea v-model="form.content" rows="4" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
-                        <p v-if="form.errors.content" class="text-xs text-danger-500 mt-1">{{ form.errors.content }}</p>
-                    </div>
-
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Rating</label>
-                            <select v-model.number="form.rating" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                                <option v-for="n in [5,4,3,2,1]" :key="n" :value="n">{{ n }} ★</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Source</label>
-                            <select v-model="form.source" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                                <option value="manual">Manual</option>
-                                <option value="google">Google</option>
-                                <option value="trustpilot">Trustpilot</option>
-                                <option value="import">Import</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">Sort</label>
-                            <input v-model.number="form.sort_order" type="number" min="0" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                        <div class="flex flex-col gap-3 pt-1">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input v-model="form.is_active" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
-                                <span class="text-xs font-bold text-gray-700 dark:text-gray-300">Active</span>
-                            </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input v-model="form.is_featured" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
-                                <span class="text-xs font-bold text-gray-700 dark:text-gray-300">Featured</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
-                    <button @click="showForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">Cancel</button>
-                    <button @click="submit" :disabled="form.processing" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
-                        {{ form.processing ? 'Saving…' : editingId ? 'Save Changes' : 'Add Testimonial' }}
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- AI Generate Modal -->
-        <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-                <div class="p-6 border-b border-gray-100 dark:border-surface-800 flex items-center justify-between">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">✨ AI Generate Testimonials</h3>
-                    <button @click="showAiForm = false" type="button" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm">Close</button>
-                </div>
-                <div class="p-6 space-y-4">
-                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                        Company type
-                        <input v-model="aiForm.company_type" type="text" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                    </label>
-                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                        Tone
-                        <select v-model="aiForm.tone" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Tone') }}</label>
+                        <select
+                            v-model="aiForm.tone"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                        >
                             <option v-for="option in toneOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
                         </select>
-                    </label>
-                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                        Prompt <span class="text-gray-400 normal-case">(optional)</span>
-                        <textarea v-model="aiForm.prompt" rows="3" class="mt-2 w-full resize-none bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500" :placeholder="$t('Mention target audience, product benefits, wording to avoid...')"></textarea>
-                    </label>
-                    <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                        Count
-                        <input v-model.number="aiForm.count" type="number" min="1" max="10" class="mt-2 w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-                    </label>
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Prompt') }}</label>
+                        <textarea
+                            v-model="aiForm.prompt"
+                            rows="4"
+                            :placeholder="t('Mention audience, positioning, product wins, or phrases to avoid...')"
+                            class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Count') }}</label>
+                        <input
+                            v-model.number="aiForm.count"
+                            type="number"
+                            min="1"
+                            max="10"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                        >
+                    </div>
                 </div>
-                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
-                    <button @click="showAiForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">Cancel</button>
-                    <button @click="generateTestimonials" :disabled="aiGenerating" type="button" class="px-6 py-2.5 bg-primary-600 text-white text-sm font-bold rounded-xl hover:bg-primary-500 transition-all disabled:opacity-50">
-                        {{ aiGenerating ? 'Generating...' : 'Generate' }}
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
+                    <button
+                        type="button"
+                        class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700"
+                        @click="showAiForm = false"
+                    >
+                        {{ t('Cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-primary inline-flex items-center rounded-xl px-6 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        :disabled="aiGenerating"
+                        @click="generateTestimonials"
+                    >
+                        {{ aiGenerating ? t('Generating...') : t('Generate') }}
                     </button>
                 </div>
             </div>
         </div>
+
+        <ActionConfirmModal
+            :open="deleteTargetId !== null"
+            :title="t('Delete testimonial?')"
+            :message="t('This testimonial will be deleted permanently.')"
+            :confirm-label="t('Delete')"
+            @cancel="deleteTargetId = null"
+            @confirm="confirmDelete"
+        />
     </AdminLayout>
 </template>

@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -18,157 +21,325 @@ interface CommentItem {
     commentable: { title?: string; name?: string; slug?: string } | null
 }
 
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
+type CommentStatus = 'all' | 'pending' | 'approved' | 'spam'
+
 const props = defineProps<{
     comments: {
         data: CommentItem[]
-        links: Array<{ url: string | null; label: string; active: boolean }>
+        links: PaginationLink[]
     }
     filters: { status?: string }
     pendingCount: number
-    settings: {
-        comments_enabled: boolean
-        comments_auto_approve_users: boolean
-        comments_allow_guests: boolean
-        comments_require_approval: boolean
-        comments_notify_admin: boolean
-        comments_poll_seconds: number
-        comments_akismet_configured: boolean
-    }
 }>()
 
 const { t } = useTranslate()
 
-const settingsForm = useForm({
-    comments_enabled: props.settings.comments_enabled,
-    comments_auto_approve_users: props.settings.comments_auto_approve_users,
-    comments_allow_guests: props.settings.comments_allow_guests,
-    comments_require_approval: props.settings.comments_require_approval,
-    comments_notify_admin: props.settings.comments_notify_admin,
-    comments_poll_seconds: props.settings.comments_poll_seconds,
-    comments_akismet_key: '',
-})
-
-const statusLabel = (status: string) => {
-    if (status === 'approved') return t('Approved')
-    if (status === 'spam') return t('Spam')
-    return t('Pending')
-}
+const openActionMenuId = ref<number | null>(null)
+const deleteCommentId = ref<number | null>(null)
+const searchQuery = ref('')
+const selectedStatus = ref<CommentStatus>('all')
 
 const authorName = (comment: CommentItem) => comment.user?.name || comment.guest_name || t('Guest')
 const contentTitle = (comment: CommentItem) => comment.commentable?.title || comment.commentable?.name || t('Unknown content')
 
-const filterBy = (status: string | null) => {
-    router.get(route('admin.comments.index'), status ? { status } : {}, { preserveScroll: true, preserveState: true })
+const totalComments = computed(() => props.comments.data.length)
+const approvedCount = computed(() => props.comments.data.filter(comment => comment.status === 'approved').length)
+const spamCount = computed(() => props.comments.data.filter(comment => comment.status === 'spam').length)
+const guestCount = computed(() => props.comments.data.filter(comment => !comment.user).length)
+const statusOptions = computed(() => [
+    { value: 'all', label: t('All') },
+    { value: 'pending', label: t('Pending') },
+    { value: 'approved', label: t('Approved') },
+    { value: 'spam', label: t('Spam') },
+])
+
+const filteredComments = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+
+    return props.comments.data.filter((comment) => {
+        const matchesStatus = selectedStatus.value === 'all' || comment.status === selectedStatus.value
+
+        if (!matchesStatus) {
+            return false
+        }
+
+        if (!query) {
+            return true
+        }
+
+        const haystack = [
+            comment.content,
+            authorName(comment),
+            comment.user?.email ?? '',
+            comment.guest_email ?? '',
+            contentTitle(comment),
+            comment.created_at,
+        ].join(' ').toLowerCase()
+
+        return haystack.includes(query)
+    })
+})
+
+const approve = (comment: CommentItem) => {
+    openActionMenuId.value = null
+    router.post(route('admin.comments.approve', comment.id), {}, { preserveScroll: true })
 }
 
-const approve = (comment: CommentItem) => router.post(route('admin.comments.approve', comment.id), {}, { preserveScroll: true })
-const markSpam = (comment: CommentItem) => router.post(route('admin.comments.spam', comment.id), {}, { preserveScroll: true })
-const remove = (comment: CommentItem) => router.delete(route('admin.comments.delete', comment.id), { preserveScroll: true })
-const saveSettings = () => settingsForm.post(route('admin.comments.settings'), { preserveScroll: true })
+const markSpam = (comment: CommentItem) => {
+    openActionMenuId.value = null
+    router.post(route('admin.comments.spam', comment.id), {}, { preserveScroll: true })
+}
+
+const requestDelete = (comment: CommentItem) => {
+    openActionMenuId.value = null
+    deleteCommentId.value = comment.id
+}
+
+const confirmDelete = () => {
+    if (deleteCommentId.value === null) {
+        return
+    }
+
+    router.delete(route('admin.comments.delete', deleteCommentId.value), {
+        preserveScroll: true,
+        onFinish: () => {
+            deleteCommentId.value = null
+        },
+    })
+}
+
+const toggleActionMenu = (id: number) => {
+    openActionMenuId.value = openActionMenuId.value === id ? null : id
+}
+
+const handleDocumentClick = (event: MouseEvent) => {
+    const target = event.target
+
+    if (!(target instanceof HTMLElement) || target.closest('[data-comment-actions]')) {
+        return
+    }
+
+    openActionMenuId.value = null
+}
+
+onMounted(() => {
+    document.addEventListener('click', handleDocumentClick)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('click', handleDocumentClick)
+})
 </script>
 
 <template>
     <Head :title="t('Comments')" />
 
     <div class="mx-auto max-w-7xl px-6 py-8">
-        <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Comments') }}</h1>
-                <p class="mt-1 text-sm text-gray-500">{{ t(':count comments waiting for moderation.', { count: pendingCount }) }}</p>
+                <div class="inline-flex items-center rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
+                    {{ t('Moderation Center') }}
+                </div>
+                <h1 class="mt-4 font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ t('Comments') }}</h1>
+                <p class="mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+                    {{ t(':count comments waiting for moderation.', { count: pendingCount }) }}
+                </p>
             </div>
-            <div class="flex flex-wrap gap-2">
-                <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium" @click="filterBy(null)">{{ t('All') }}</button>
-                <button type="button" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700" @click="filterBy('pending')">{{ t('Pending') }}</button>
-                <button type="button" class="rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-700" @click="filterBy('approved')">{{ t('Approved') }}</button>
-                <button type="button" class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700" @click="filterBy('spam')">{{ t('Spam') }}</button>
+
+            <Link
+                :href="route('admin.blog.settings.edit')"
+                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+            >
+                <i class="ti ti-settings text-base"></i>
+                {{ t('Blog Settings') }}
+            </Link>
+        </div>
+
+        <div class="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Visible Rows') }}</div>
+                <div class="mt-3 font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ totalComments }}</div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Comments currently loaded in this moderation view.') }}</p>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Pending') }}</div>
+                <div class="mt-3 font-heading text-3xl font-bold text-amber-500">{{ pendingCount }}</div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Items still waiting for a moderation decision.') }}</p>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Approved') }}</div>
+                <div class="mt-3 font-heading text-3xl font-bold text-primary-600">{{ approvedCount }}</div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Approved comments visible in the current result set.') }}</p>
+            </div>
+
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Guests / Spam') }}</div>
+                <div class="mt-3 flex items-end gap-2">
+                    <span class="font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ guestCount }}</span>
+                    <span class="pb-1 text-sm font-semibold text-red-500">{{ t(':count spam', { count: spamCount }) }}</span>
+                </div>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Quick signal for anonymous traffic and spam load.') }}</p>
             </div>
         </div>
 
-        <section class="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="mb-4 flex items-center justify-between gap-4">
-                <div>
-                    <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Comment settings') }}</h2>
-                    <p class="mt-1 text-sm text-gray-500">{{ t('Control moderation, guest comments, notifications, and spam filtering.') }}</p>
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-6 py-5 dark:border-surface-700 dark:bg-surface-800/60 md:flex-row md:items-center md:justify-between">
+                <div class="w-full md:max-w-sm">
+                    <div class="relative">
+                        <i class="ti ti-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+                        <input
+                            v-model="searchQuery"
+                            type="text"
+                            :placeholder="t('Search comments, author, email, or content')"
+                            class="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-4 text-sm text-gray-900 transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                        >
+                    </div>
                 </div>
-                <button type="button" :disabled="settingsForm.processing" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" @click="saveSettings">
-                    {{ settingsForm.processing ? t('Saving...') : t('Save settings') }}
-                </button>
+
+                <div class="w-full md:w-56">
+                    <AppSelect
+                        v-model="selectedStatus"
+                        :options="statusOptions"
+                        :placeholder="t('Select status')"
+                    />
+                </div>
             </div>
 
-            <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium">
-                    {{ t('Enable comments globally') }}
-                    <input v-model="settingsForm.comments_enabled" type="checkbox">
-                </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium">
-                    {{ t('Auto-approve logged-in users') }}
-                    <input v-model="settingsForm.comments_auto_approve_users" type="checkbox">
-                </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium">
-                    {{ t('Allow guest comments') }}
-                    <input v-model="settingsForm.comments_allow_guests" type="checkbox">
-                </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium">
-                    {{ t('Require approval for all') }}
-                    <input v-model="settingsForm.comments_require_approval" type="checkbox">
-                </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium">
-                    {{ t('Notify admin on new comment') }}
-                    <input v-model="settingsForm.comments_notify_admin" type="checkbox">
-                </label>
-                <label class="block rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium">
-                    <span class="mb-1 block">{{ t('Polling interval seconds') }}</span>
-                    <input v-model="settingsForm.comments_poll_seconds" type="number" min="10" max="300" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-                </label>
-                <label class="block rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium md:col-span-2 xl:col-span-3">
-                    <span class="mb-1 block">{{ t('Akismet API key') }}</span>
-                    <input v-model="settingsForm.comments_akismet_key" type="password" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" :placeholder="settings.comments_akismet_configured ? t('Configured - leave blank to keep') : t('Optional spam filter key')">
-                </label>
+            <div v-if="filteredComments.length === 0" class="px-6 py-16 text-center">
+                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
+                    <i class="ti ti-message-circle text-3xl"></i>
+                </div>
+                <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">{{ t('No comments found') }}</h3>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Try a different search or status filter.') }}</p>
+            </div>
+
+            <div v-else class="overflow-visible">
+                <div class="overflow-x-auto overflow-y-visible rounded-t-2xl">
+                    <table class="min-w-full divide-y divide-gray-200 text-left text-sm dark:divide-surface-700">
+                        <thead class="bg-gray-50 dark:bg-surface-800/70">
+                            <tr>
+                                <th class="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Comment') }}</th>
+                                <th class="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Author') }}</th>
+                                <th class="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Content') }}</th>
+                                <th class="px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr
+                                v-for="comment in filteredComments"
+                                :key="comment.id"
+                                class="transition hover:bg-primary-50/60 dark:hover:bg-primary-900/10"
+                            >
+                                <td class="max-w-xl px-6 py-5 align-top">
+                                    <p class="line-clamp-3 text-sm leading-6 text-gray-700 dark:text-gray-200">{{ comment.content }}</p>
+                                    <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ t(':likes likes, :reports reports', { likes: comment.likes_count, reports: comment.reports_count }) }}</p>
+                                </td>
+
+                                <td class="px-6 py-5 align-top">
+                                    <div class="font-semibold text-gray-900 dark:text-white">{{ authorName(comment) }}</div>
+                                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ comment.user?.email || comment.guest_email || t('No email') }}</div>
+                                    <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ comment.created_at }}</div>
+                                </td>
+
+                                <td class="px-6 py-5 align-top text-sm text-gray-600 dark:text-gray-300">{{ contentTitle(comment) }}</td>
+
+                                <td class="px-6 py-5 align-top">
+                                    <span
+                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold"
+                                        :class="comment.status === 'approved'
+                                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
+                                            : comment.status === 'spam'
+                                                ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                                                : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'"
+                                    >
+                                        {{ t(comment.status.charAt(0).toUpperCase() + comment.status.slice(1)) }}
+                                    </span>
+                                </td>
+
+                                <td class="overflow-visible px-6 py-5 align-top">
+                                    <div class="flex items-center justify-end">
+                                        <div class="relative" data-comment-actions>
+                                            <button
+                                                type="button"
+                                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
+                                                @click.stop="toggleActionMenu(comment.id)"
+                                            >
+                                                <i class="ti ti-dots-vertical text-base"></i>
+                                            </button>
+
+                                            <div
+                                                v-if="openActionMenuId === comment.id"
+                                                class="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
+                                            >
+                                                <button
+                                                    v-if="comment.status !== 'approved'"
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                                    @click="approve(comment)"
+                                                >
+                                                    <i class="ti ti-check text-base"></i>
+                                                    {{ t('Approve') }}
+                                                </button>
+
+                                                <button
+                                                    v-if="comment.status !== 'spam'"
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-red-50 hover:text-red-700 dark:text-gray-200 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                                                    @click="markSpam(comment)"
+                                                >
+                                                    <i class="ti ti-alert-triangle text-base"></i>
+                                                    {{ t('Mark as spam') }}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-red-50 hover:text-red-700 dark:text-gray-200 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                                                    @click="requestDelete(comment)"
+                                                >
+                                                    <i class="ti ti-trash text-base"></i>
+                                                    {{ t('Delete') }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div v-if="comments.links.length > 3" class="flex flex-wrap gap-2 border-t border-gray-100 p-4 dark:border-surface-800">
+                    <Link
+                        v-for="link in comments.links"
+                        :key="link.label"
+                        :href="link.url || '#'"
+                        preserve-scroll
+                        class="rounded-lg px-3 py-1.5 text-xs font-semibold"
+                        :class="[link.active ? 'btn-primary' : 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300', !link.url ? 'pointer-events-none opacity-50' : '']"
+                        v-html="link.label"
+                    />
+                </div>
             </div>
         </section>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                    <tr>
-                        <th class="px-4 py-3">{{ t('Comment') }}</th>
-                        <th class="px-4 py-3">{{ t('Author') }}</th>
-                        <th class="px-4 py-3">{{ t('Content') }}</th>
-                        <th class="px-4 py-3">{{ t('Status') }}</th>
-                        <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="comment in comments.data" :key="comment.id" class="border-t border-gray-100 hover:bg-primary-50/30">
-                        <td class="max-w-lg px-4 py-3">
-                            <p class="line-clamp-3 text-gray-700">{{ comment.content }}</p>
-                            <p class="mt-2 text-xs text-gray-400">{{ t(':likes likes, :reports reports', { likes: comment.likes_count, reports: comment.reports_count }) }}</p>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="font-semibold text-gray-900">{{ authorName(comment) }}</div>
-                            <div class="text-xs text-gray-500">{{ comment.user?.email || comment.guest_email }}</div>
-                        </td>
-                        <td class="px-4 py-3 text-gray-600">{{ contentTitle(comment) }}</td>
-                        <td class="px-4 py-3">
-                            <span :class="comment.status === 'approved' ? 'bg-primary-100 text-primary-700' : comment.status === 'spam' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'" class="rounded-full px-2.5 py-1 text-xs font-semibold">
-                                {{ statusLabel(comment.status) }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-3 text-right">
-                            <button v-if="comment.status !== 'approved'" type="button" class="mr-2 rounded-lg border border-primary-200 px-3 py-1 text-xs font-semibold text-primary-700" @click="approve(comment)">{{ t('Approve') }}</button>
-                            <button v-if="comment.status !== 'spam'" type="button" class="mr-2 rounded-lg border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700" @click="markSpam(comment)">{{ t('Spam') }}</button>
-                            <button type="button" class="rounded-lg bg-red-500 px-3 py-1 text-xs font-semibold text-white" @click="remove(comment)">{{ t('Delete') }}</button>
-                        </td>
-                    </tr>
-                    <tr v-if="comments.data.length === 0">
-                        <td colspan="5" class="px-4 py-12 text-center text-gray-400">{{ t('No comments found.') }}</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <div v-if="comments.links.length > 3" class="flex flex-wrap gap-2 border-t border-gray-100 p-4">
-                <Link v-for="link in comments.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="[link.active ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600', !link.url ? 'pointer-events-none opacity-50' : '']" class="rounded-lg px-3 py-1 text-xs font-semibold" v-html="link.label" />
-            </div>
-        </section>
+        <ActionConfirmModal
+            :open="deleteCommentId !== null"
+            :title="t('Delete comment?')"
+            :message="t('This comment will be permanently removed from moderation and public views.')"
+            :confirm-label="t('Delete')"
+            :cancel-label="t('Cancel')"
+            @confirm="confirmDelete"
+            @cancel="deleteCommentId = null"
+        />
     </div>
 </template>

@@ -22,6 +22,8 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800|plus-jakarta-sans:400,500,600,700,800" rel="stylesheet" />
 
+    <link rel="stylesheet" href="{{ route('theme-variables.css') }}" />
+
     @routes
     @if(settings('ads_auto_ads_enabled', false) && settings('adsense_publisher_id'))
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ settings('adsense_publisher_id') }}" crossorigin="anonymous"></script>

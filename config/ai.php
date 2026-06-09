@@ -64,7 +64,7 @@ return [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
-            'models' => ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'o1', 'o3', 'o4-mini'],
+            'models' => ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.4', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
         ],
 
         'anthropic' => [
@@ -72,7 +72,7 @@ return [
             'driver' => 'anthropic',
             'key' => env('ANTHROPIC_API_KEY'),
             'url' => env('ANTHROPIC_URL', 'https://api.anthropic.com/v1'),
-            'models' => ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-20250514'],
+            'models' => ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
         ],
 
         'google' => [
@@ -80,7 +80,7 @@ return [
             'driver' => 'gemini',
             'key' => env('GEMINI_API_KEY'),
             'url' => env('GEMINI_URL', 'https://generativelanguage.googleapis.com/v1beta'),
-            'models' => ['gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+            'models' => ['gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
         ],
 
         'xai' => [
@@ -88,7 +88,7 @@ return [
             'driver' => 'xai',
             'key' => env('XAI_API_KEY'),
             'url' => env('XAI_URL', 'https://api.x.ai/v1'),
-            'models' => ['grok-3', 'grok-3-mini'],
+            'models' => ['grok-4.3', 'grok-4.1-fast', 'grok-3', 'grok-3-mini'],
         ],
 
         'deepseek' => [
@@ -96,7 +96,7 @@ return [
             'driver' => 'deepseek',
             'key' => env('DEEPSEEK_API_KEY'),
             'url' => env('DEEPSEEK_URL', 'https://api.deepseek.com/v1'),
-            'models' => ['deepseek-r1', 'deepseek-v3'],
+            'models' => ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-r1', 'deepseek-v3'],
         ],
 
         'openrouter' => [
@@ -105,11 +105,11 @@ return [
             'key' => env('OPENROUTER_API_KEY'),
             'url' => env('OPENROUTER_URL', 'https://openrouter.ai/api/v1'),
             'models' => [
-                'openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o3-mini',
-                'anthropic/claude-sonnet-4-20250514', 'anthropic/claude-haiku-20250514',
-                'google/gemini-2.5-pro', 'google/gemini-2.0-flash',
+                'openai/gpt-5.5', 'openai/gpt-5.4', 'openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o4-mini',
+                'anthropic/claude-opus-4-8', 'anthropic/claude-sonnet-4-6', 'anthropic/claude-haiku-4-5',
+                'google/gemini-3.1-pro', 'google/gemini-3.5-flash', 'google/gemini-2.5-pro', 'google/gemini-2.0-flash',
                 'meta-llama/llama-4-maverick', 'meta-llama/llama-4-scout',
-                'deepseek/deepseek-v3', 'deepseek/deepseek-r1',
+                'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash', 'deepseek/deepseek-r1',
             ],
         ],
 
@@ -117,14 +117,14 @@ return [
             'name' => 'Groq',
             'driver' => 'groq',
             'key' => env('GROQ_API_KEY'),
-            'models' => ['llama-3.3-70b', 'mixtral-8x7b'],
+            'models' => ['llama-4-scout-17b', 'llama-3.3-70b', 'mixtral-8x7b'],
         ],
 
         'mistral' => [
             'name' => 'Mistral AI',
             'driver' => 'mistral',
             'key' => env('MISTRAL_API_KEY'),
-            'models' => ['mistral-large', 'mistral-nemo'],
+            'models' => ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'],
         ],
 
         'ollama' => [
@@ -145,8 +145,9 @@ return [
             'session_token' => env('AWS_SESSION_TOKEN'),
             'use_default_credential_provider' => env('AWS_USE_DEFAULT_CREDENTIALS', true),
             'models' => [
-                'anthropic.claude-sonnet-4-20250514-v1:0',
-                'anthropic.claude-haiku-20250514-v1:0',
+                'anthropic.claude-opus-4-8-v1:0',
+                'anthropic.claude-sonnet-4-6-v1:0',
+                'anthropic.claude-haiku-4-5-v1:0',
                 'meta.llama4-maverick-17b-instruct-v1:0',
             ],
         ],
@@ -196,8 +197,9 @@ return [
                 'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
                 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
                 'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo',
+                'deepseek-ai/DeepSeek-V4-Pro',
+                'deepseek-ai/DeepSeek-V4-Flash',
                 'mistralai/Mixtral-8x7B-Instruct-v0.1',
-                'deepseek-ai/DeepSeek-V3',
             ],
         ],
 

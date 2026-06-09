@@ -177,26 +177,26 @@ const saveDocument = async () => {
 </script>
 
 <template>
-    <div class="bg-white/[0.03] border border-white/5 rounded-2xl p-6 min-h-[500px] h-full flex flex-col relative overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-white/5">
-            <h3 class="text-sm font-semibold text-gray-300 flex items-center gap-2">
-                <i class="ti-align-left text-primary-400"></i> {{ t('Output Result') }}
+    <div class="h-full min-h-[400px] overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/5 dark:bg-white/[0.03] dark:shadow-none flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-white/5">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                <i class="ti ti-align-left text-primary-600 dark:text-primary-400"></i> {{ t('Output Result') }}
             </h3>
             <div class="flex flex-wrap items-center gap-2">
-                <button v-if="output" type="button" @click="copyOutput" class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
+                <button v-if="output" type="button" @click="copyOutput" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
                     <i :class="copied ? 'ti-check text-success-500' : 'ti-copy'"></i>
                     {{ copied ? t('Copied') : t('Copy') }}
                 </button>
-                <button v-if="output && canSave && !savedDocument" type="button" :disabled="saving" @click="openSaveModal" class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50">
-                    <i class="ti-device-floppy"></i>
+                <button v-if="output && canSave && !savedDocument" type="button" :disabled="saving" @click="openSaveModal" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50">
+                    <i class="ti ti-device-floppy"></i>
                     {{ t('Save') }}
                 </button>
-                <a v-if="output && isMedia && mediaUrl" :href="mediaUrl" :download="`${slug}-output`" class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
-                    <i class="ti-download"></i>
+                <a v-if="output && isMedia && mediaUrl" :href="mediaUrl" :download="`${slug}-output`" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
+                    <i class="ti ti-download"></i>
                     {{ t('Download') }}
                 </a>
-                <button v-else-if="output" type="button" @click="downloadOutput" class="px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
-                    <i class="ti-download"></i>
+                <button v-else-if="output" type="button" @click="downloadOutput" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
+                    <i class="ti ti-download"></i>
                     {{ t('Export') }}
                 </button>
             </div>
@@ -207,65 +207,65 @@ const saveDocument = async () => {
             <div v-if="reasoning || isReasoning" class="mb-4">
                 <button
                     type="button"
-                    class="flex items-center gap-2 text-xs font-medium text-amber-400 hover:text-amber-300 transition-colors w-full px-3 py-2 rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.04]"
+                    class="flex items-center gap-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors w-full px-3 py-2 rounded-lg bg-amber-50 dark:bg-white/[0.02] border border-amber-200 dark:border-white/5 hover:bg-amber-100 dark:hover:bg-white/[0.04]"
                     @click="showReasoning = !showReasoning"
                 >
                     <svg v-if="isReasoning" class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    <i v-else class="ti-brain"></i>
+                    <i v-else class="ti ti-brain"></i>
                     <span>{{ isReasoning ? t('Thinking...') : t('Reasoning') }}</span>
                     <i :class="showReasoning ? 'ti-chevron-up' : 'ti-chevron-down'" class="text-xs ml-auto"></i>
                 </button>
-                <div v-if="reasoningVisible" class="mt-2 rounded-xl border border-amber-500/10 bg-amber-500/[0.03] p-4 text-xs text-amber-200/80 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
+                <div v-if="reasoningVisible" class="mt-2 rounded-xl border border-amber-500/10 bg-amber-500/[0.03] p-4 text-xs text-amber-700 dark:text-amber-200/80 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
                     {{ reasoning }}
                 </div>
             </div>
 
-            <pre v-if="output && outputKind === 'text'" class="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap font-mono bg-black/20 rounded-xl p-4 overflow-x-auto">{{ output }}</pre>
+            <pre v-if="output && outputKind === 'text'" class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 dark:bg-black/20 rounded-xl p-4 overflow-x-auto">{{ output }}</pre>
 
-            <div v-else-if="output && outputKind === 'markdown'" class="prose prose-invert prose-sm max-w-none text-gray-300 leading-relaxed" v-html="renderedMarkdown"></div>
+            <div v-else-if="output && outputKind === 'markdown'" class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed" v-html="renderedMarkdown"></div>
 
-            <div v-else-if="output && outputKind === 'html'" class="rounded-xl overflow-hidden border border-white/10 bg-white">
+            <div v-else-if="output && outputKind === 'html'" class="rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 bg-white">
                 <iframe :srcdoc="output" sandbox="" class="w-full min-h-[420px] bg-white"></iframe>
             </div>
 
-            <div v-else-if="output && outputKind === 'code'" class="rounded-xl overflow-hidden border border-white/10 bg-black/20">
-                <div class="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/10 text-xs text-gray-500">
+            <div v-else-if="output && outputKind === 'code'" class="rounded-xl overflow-hidden border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-black/20">
+                <div class="flex items-center justify-between gap-3 px-4 py-2 border-b border-gray-200 dark:border-white/10 text-xs text-gray-500">
                     <span>{{ t('Code output') }}</span>
-                    <button type="button" class="text-gray-400 hover:text-white" @click="copyOutput">{{ copied ? t('Copied') : t('Copy code') }}</button>
+                    <button type="button" class="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" @click="copyOutput">{{ copied ? t('Copied') : t('Copy code') }}</button>
                 </div>
-                <pre class="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap font-mono p-4 overflow-x-auto">{{ output }}</pre>
+                <pre class="text-sm text-gray-800 dark:text-gray-200 leading-relaxed whitespace-pre-wrap font-mono p-4 overflow-x-auto">{{ output }}</pre>
             </div>
 
             <ul v-else-if="output && outputKind === 'list'" class="space-y-3">
-                <li v-for="(item, index) in listItems" :key="`${index}-${item}`" class="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-sm text-gray-300">
+                <li v-for="(item, index) in listItems" :key="`${index}-${item}`" class="flex items-start justify-between gap-3 rounded-xl border border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-white/[0.02] px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                     <span class="leading-relaxed">{{ item }}</span>
-                    <button type="button" class="shrink-0 text-xs text-gray-500 hover:text-white" @click="copyListItem(item, index)">
+                    <button type="button" class="shrink-0 text-xs text-gray-500 hover:text-gray-900 dark:hover:text-white" @click="copyListItem(item, index)">
                         {{ copiedItem === index ? t('Copied') : t('Copy') }}
                     </button>
                 </li>
             </ul>
 
             <div v-else-if="output && outputKind === 'image'" class="space-y-4">
-                <img :src="mediaUrl" :alt="t('Generated image')" class="max-h-[520px] w-full rounded-xl border border-white/10 object-contain bg-black/20" />
-                <a :href="mediaUrl" target="_blank" rel="noopener" class="text-sm text-primary-300 hover:text-primary-200 break-all">{{ mediaUrl }}</a>
+                <img :src="mediaUrl" :alt="t('Generated image')" class="max-h-[520px] w-full rounded-xl border border-gray-200 dark:border-white/10 object-contain bg-gray-100 dark:bg-black/20" />
+                <a :href="mediaUrl" target="_blank" rel="noopener" class="text-sm text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 break-all">{{ mediaUrl }}</a>
             </div>
 
-            <div v-else-if="output && outputKind === 'audio'" class="space-y-4 rounded-xl border border-white/5 bg-white/[0.02] p-4">
+            <div v-else-if="output && outputKind === 'audio'" class="space-y-4 rounded-xl border border-gray-200 dark:border-white/5 bg-gray-50 dark:bg-white/[0.02] p-4">
                 <audio :src="mediaUrl" controls class="w-full"></audio>
-                <a :href="mediaUrl" target="_blank" rel="noopener" class="text-sm text-primary-300 hover:text-primary-200 break-all">{{ mediaUrl }}</a>
+                <a :href="mediaUrl" target="_blank" rel="noopener" class="text-sm text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 break-all">{{ mediaUrl }}</a>
             </div>
 
             <div v-else-if="output && outputKind === 'video'" class="space-y-4">
-                <video :src="mediaUrl" controls class="max-h-[520px] w-full rounded-xl border border-white/10 bg-black"></video>
-                <a :href="mediaUrl" target="_blank" rel="noopener" class="text-sm text-primary-300 hover:text-primary-200 break-all">{{ mediaUrl }}</a>
+                <video :src="mediaUrl" controls class="max-h-[520px] w-full rounded-xl border border-gray-200 dark:border-white/10 bg-black"></video>
+                <a :href="mediaUrl" target="_blank" rel="noopener" class="text-sm text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 break-all">{{ mediaUrl }}</a>
             </div>
 
-            <pre v-else-if="output && outputKind === 'json'" class="text-sm leading-relaxed whitespace-pre-wrap font-mono bg-black/20 rounded-xl p-4 overflow-x-auto text-gray-200" v-html="highlightedJson"></pre>
+            <pre v-else-if="output && outputKind === 'json'" class="text-sm leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 dark:bg-black/20 rounded-xl p-4 overflow-x-auto text-gray-800 dark:text-gray-200" v-html="highlightedJson"></pre>
 
-            <div v-else-if="output" class="prose prose-invert prose-sm max-w-none text-gray-300 leading-relaxed" v-html="renderedMarkdown"></div>
+            <div v-else-if="output" class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300 leading-relaxed" v-html="renderedMarkdown"></div>
 
             <div v-else-if="loading" class="flex items-center justify-center h-full py-16">
                 <div class="text-center">
@@ -273,53 +273,53 @@ const saveDocument = async () => {
                         <div class="absolute inset-0 border-2 border-primary-500/20 rounded-full"></div>
                         <div class="absolute inset-0 border-2 border-transparent border-t-primary-500 rounded-full animate-spin"></div>
                     </div>
-                    <p class="text-gray-400 text-sm animate-pulse">{{ t('AI is writing your content...') }}</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm animate-pulse">{{ t('AI is writing your content...') }}</p>
                 </div>
             </div>
 
             <div v-else class="flex items-center justify-center h-full py-16 opacity-50">
                 <div class="text-center">
-                    <i class="ti-edit text-5xl text-gray-600 mb-4 block"></i>
-                    <p class="text-gray-400 text-sm">{{ t('Your generated content will appear here') }}</p>
-                    <p class="text-gray-500 text-xs mt-2">{{ t('Fill the form and click Generate') }}</p>
+                    <i class="ti ti-edit text-5xl text-gray-400 dark:text-gray-600 mb-4 block"></i>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">{{ t('Your generated content will appear here') }}</p>
+                    <p class="text-gray-400 dark:text-gray-500 text-xs mt-2">{{ t('Fill the form and click Generate') }}</p>
                 </div>
             </div>
         </div>
 
-        <div v-if="output" class="mt-4 pt-4 border-t border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+        <div v-if="output" class="mt-4 pt-4 border-t border-gray-200 dark:border-white/5 flex flex-wrap items-center gap-4 text-xs text-gray-500">
             <span>{{ t(':count words', { count: words }) }}</span>
             <span>{{ t(':count min read', { count: readingTime }) }}</span>
             <span v-if="showCreditCosts && usage?.credits_used !== undefined">{{ t('Used :count credits', { count: Number(usage.credits_used) }) }}</span>
             <span v-if="showCreditCosts && usage?.input_tokens !== undefined && usage?.output_tokens !== undefined">
                 {{ t(':count tokens', { count: Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0) }) }}
             </span>
-            <span v-if="savedDocument" class="text-primary-300">{{ t('Saved to documents') }}</span>
-            <span v-if="saveMessage" class="text-primary-300">{{ saveMessage }}</span>
+            <span v-if="savedDocument" class="text-primary-600 dark:text-primary-300">{{ t('Saved to documents') }}</span>
+            <span v-if="saveMessage" class="text-primary-600 dark:text-primary-300">{{ saveMessage }}</span>
         </div>
 
         <div v-if="showSaveModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-            <div class="w-full max-w-md rounded-2xl border border-white/10 bg-surface-950 p-5 shadow-2xl">
+            <div class="w-full max-w-md rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-surface-950 p-5 shadow-2xl">
                 <div class="flex items-center justify-between gap-3 mb-4">
-                    <h4 class="text-sm font-semibold text-white">{{ t('Save to Documents') }}</h4>
-                    <button type="button" class="text-gray-500 hover:text-white" @click="showSaveModal = false">
-                        <i class="ti-x"></i>
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Save to Documents') }}</h4>
+                    <button type="button" class="text-gray-500 hover:text-gray-900 dark:hover:text-white" @click="showSaveModal = false">
+                        <i class="ti ti-x"></i>
                     </button>
                 </div>
 
-                <label class="block text-xs font-medium text-gray-400 mb-2">{{ t('Document title') }}</label>
+                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{{ t('Document title') }}</label>
                 <input
                     v-model="saveTitle"
                     type="text"
-                    class="w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-primary-500 focus:ring-primary-500/20"
+                    class="w-full rounded-xl border border-gray-300 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] px-4 py-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600 focus:border-primary-500 focus:ring-primary-500/20"
                     :placeholder="t('Document title')"
                     @keyup.enter="saveDocument"
                 />
 
-                <p v-if="saveMessage" class="mt-3 text-xs text-danger-400">{{ saveMessage }}</p>
+                <p v-if="saveMessage" class="mt-3 text-xs text-danger-500 dark:text-danger-400">{{ saveMessage }}</p>
 
                 <div class="mt-5 flex justify-end gap-2">
-                    <button type="button" class="px-4 py-2 text-xs font-medium text-gray-400 hover:text-white" @click="showSaveModal = false">{{ t('Cancel') }}</button>
-                    <button type="button" :disabled="saving || !saveTitle.trim()" class="px-4 py-2 text-xs font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl disabled:opacity-50" @click="saveDocument">
+                    <button type="button" class="px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" @click="showSaveModal = false">{{ t('Cancel') }}</button>
+                    <button type="button" :disabled="saving || !saveTitle.trim()" class="px-4 py-2 text-xs font-semibold text-white btn-primary rounded-xl disabled:opacity-50" @click="saveDocument">
                         {{ saving ? t('Saving') : t('Save') }}
                     </button>
                 </div>

@@ -320,7 +320,7 @@ const dragOptions = computed(() => getDragOptions(activeSection.value))
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Header Builder') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure separate top, main, and mobile headers with independent blocks and behavior.') }}</p>
             </div>
-            <button type="button" :disabled="form.processing" class="rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-500 disabled:opacity-60" @click="submit">
+            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:opacity-60" @click="submit">
                 {{ form.processing ? t('Saving...') : t('Save Configuration') }}
             </button>
         </div>
@@ -473,7 +473,7 @@ const dragOptions = computed(() => getDragOptions(activeSection.value))
                             <h2 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t(':section Elements', { section: t(activeSectionMeta.label) }) }}</h2>
                             <p class="mt-1 text-xs text-gray-500">{{ t('Reorder and configure the blocks for the selected header section.') }}</p>
                         </div>
-                        <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary-500" @click="openAddElementModal(activeSection)">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg btn-primary transition" @click="openAddElementModal(activeSection)">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" /></svg>
                             {{ t('Add Element') }}
                         </button>
@@ -509,7 +509,7 @@ const dragOptions = computed(() => getDragOptions(activeSection.value))
                                 <button type="button" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300" @click="openBlockSettings(activeSection, Number(index))">
                                     {{ t('Settings') }}
                                 </button>
-                                <button type="button" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" :class="block.enabled ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500 dark:bg-surface-700'" @click="block.enabled = !block.enabled">
+                                <button type="button" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" :class="block.enabled ? 'btn-primary' : 'bg-gray-200 text-gray-500 dark:bg-surface-700'" @click="block.enabled = !block.enabled">
                                     {{ block.enabled ? t('On') : t('Off') }}
                                 </button>
                                 <button type="button" class="rounded-lg p-2 text-gray-400 hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-900/20" :aria-label="t('Remove element')" @click="removeBlock(Number(index), activeSection)">
@@ -526,7 +526,7 @@ const dragOptions = computed(() => getDragOptions(activeSection.value))
                             <h2 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Mobile Bottom Header Elements') }}</h2>
                             <p class="mt-1 text-xs text-gray-500">{{ t('Reorder and configure the fixed bottom mobile bar.') }}</p>
                         </div>
-                        <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-primary-500" @click="openAddElementModal('mobile_bottom')">
+                        <button type="button" class="inline-flex items-center gap-2 rounded-lg btn-primary transition" @click="openAddElementModal('mobile_bottom')">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" /></svg>
                             {{ t('Add Element') }}
                         </button>
@@ -562,7 +562,7 @@ const dragOptions = computed(() => getDragOptions(activeSection.value))
                                 <button type="button" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300" @click="openBlockSettings('mobile_bottom', Number(index))">
                                     {{ t('Settings') }}
                                 </button>
-                                <button type="button" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" :class="block.enabled ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500 dark:bg-surface-700'" @click="block.enabled = !block.enabled">
+                                <button type="button" class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors" :class="block.enabled ? 'btn-primary' : 'bg-gray-200 text-gray-500 dark:bg-surface-700'" @click="block.enabled = !block.enabled">
                                     {{ block.enabled ? t('On') : t('Off') }}
                                 </button>
                                 <button type="button" class="rounded-lg p-2 text-gray-400 hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-900/20" :aria-label="t('Remove element')" @click="removeBlock(Number(index), 'mobile_bottom')">
@@ -851,7 +851,7 @@ const dragOptions = computed(() => getDragOptions(activeSection.value))
                     </div>
 
                     <div class="flex justify-end border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-800">
-                        <button type="button" class="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-500" @click="selectedBlockIndex = null">
+                        <button type="button" class="rounded-lg btn-primary" @click="selectedBlockIndex = null">
                             {{ t('Done') }}
                         </button>
                     </div>

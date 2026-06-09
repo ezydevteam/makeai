@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\AppearanceSetting;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\Setting;
@@ -15,6 +16,7 @@ class FoundationSeeder extends Seeder
     public function run(): void
     {
         $this->seedSettings();
+        $this->seedAppearanceSettings();
         $this->seedCurrencies();
         $this->seedLanguages();
     }
@@ -84,9 +86,25 @@ class FoundationSeeder extends Seeder
             ['key' => 'require_email_verification', 'value' => '1', 'type' => 'boolean', 'group' => 'security'],
             ['key' => 'two_factor_admin', 'value' => '0', 'type' => 'boolean', 'group' => 'security'],
 
-            // Appearance
-            ['key' => 'primary_color', 'value' => '#6366f1', 'type' => 'string', 'group' => 'appearance'],
-            ['key' => 'admin_font', 'value' => 'Inter', 'type' => 'string', 'group' => 'appearance'],
+            // Appearance (seeded via AppearanceSetting model, not generic settings)
+
+
+            // GDPR Cookie Consent
+            ['key' => 'gdpr_enabled', 'value' => '1', 'type' => 'boolean', 'group' => 'gdpr'],
+            ['key' => 'gdpr_eu_only', 'value' => '1', 'type' => 'boolean', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_position', 'value' => 'bottom', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_title', 'value' => 'Cookie Preferences', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_description', 'value' => 'We use cookies to enhance your experience, analyze site usage, and show relevant content.', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_accept_all_text', 'value' => 'Accept All', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_customize_text', 'value' => 'Customize', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_necessary_text', 'value' => 'Necessary Only', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_save_text', 'value' => 'Save Preferences', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_bg_color', 'value' => '#ffffff', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_text_color', 'value' => '#374151', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_button_color', 'value' => '#4f46e5', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_banner_button_text_color', 'value' => '#ffffff', 'type' => 'string', 'group' => 'gdpr'],
+            ['key' => 'gdpr_show_policy_links', 'value' => '1', 'type' => 'boolean', 'group' => 'gdpr'],
+            ['key' => 'gdpr_cookie_policy_url', 'value' => '/cookie-policy', 'type' => 'string', 'group' => 'gdpr'],
 
             // Social sharing
             ['key' => 'social_share_networks', 'value' => json_encode(['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'pinterest', 'reddit', 'email', 'copy']), 'type' => 'json', 'group' => 'social'],
@@ -177,6 +195,51 @@ class FoundationSeeder extends Seeder
             Setting::firstOrCreate(
                 ['key' => $setting['key']],
                 $setting
+            );
+        }
+    }
+
+    private function seedAppearanceSettings(): void
+    {
+        $appearance = [
+            // Admin panel
+            ['scope' => 'admin', 'key' => 'primary_color', 'value' => '#6366f1'],
+            ['scope' => 'admin', 'key' => 'sidebar_bg', 'value' => '#ffffff'],
+            ['scope' => 'admin', 'key' => 'sidebar_text_color', 'value' => '#ffffff'],
+            ['scope' => 'admin', 'key' => 'navbar_bg', 'value' => '#ffffff'],
+            ['scope' => 'admin', 'key' => 'navbar_text_color', 'value' => '#111827'],
+            ['scope' => 'admin', 'key' => 'accent_color', 'value' => '#a855f7'],
+            ['scope' => 'admin', 'key' => 'font_family', 'value' => 'Inter'],
+            ['scope' => 'admin', 'key' => 'base_font_size', 'value' => '14px'],
+            ['scope' => 'admin', 'key' => 'heading_weight', 'value' => '600'],
+
+            // Frontend theme defaults
+            ['scope' => 'theme_default', 'key' => 'primary_color', 'value' => '#6366f1'],
+            ['scope' => 'theme_default', 'key' => 'secondary_color', 'value' => '#6366f1'],
+            ['scope' => 'theme_default', 'key' => 'accent_color', 'value' => '#a855f7'],
+            ['scope' => 'theme_default', 'key' => 'bg_color', 'value' => '#f9fafb'],
+            ['scope' => 'theme_default', 'key' => 'surface_color', 'value' => '#ffffff'],
+            ['scope' => 'theme_default', 'key' => 'text_primary_color', 'value' => '#111827'],
+            ['scope' => 'theme_default', 'key' => 'text_secondary_color', 'value' => '#6b7280'],
+            ['scope' => 'theme_default', 'key' => 'link_color', 'value' => '#6366f1'],
+            ['scope' => 'theme_default', 'key' => 'button_color', 'value' => '#6366f1'],
+            ['scope' => 'theme_default', 'key' => 'button_hover_color', 'value' => '#4338ca'],
+            ['scope' => 'theme_default', 'key' => 'header_background', 'value' => '#ffffff'],
+            ['scope' => 'theme_default', 'key' => 'footer_background', 'value' => '#f9fafb'],
+            ['scope' => 'theme_default', 'key' => 'font_body', 'value' => 'Inter'],
+            ['scope' => 'theme_default', 'key' => 'heading_font', 'value' => 'Inter'],
+            ['scope' => 'theme_default', 'key' => 'base_font_size', 'value' => '16px'],
+            ['scope' => 'theme_default', 'key' => 'heading_weight', 'value' => '700'],
+            ['scope' => 'theme_default', 'key' => 'line_height', 'value' => '1.5'],
+            ['scope' => 'theme_default', 'key' => 'letter_spacing', 'value' => 'normal'],
+            ['scope' => 'theme_default', 'key' => 'border_radius', 'value' => '12px'],
+            ['scope' => 'theme_default', 'key' => 'container_width', 'value' => '1280px'],
+        ];
+
+        foreach ($appearance as $setting) {
+            AppearanceSetting::firstOrCreate(
+                ['scope' => $setting['scope'], 'key' => $setting['key']],
+                ['value' => $setting['value']]
             );
         }
     }

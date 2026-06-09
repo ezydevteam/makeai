@@ -202,6 +202,14 @@ const enabledBottomColumns = computed<FooterBottomColumn[]>(() => {
     ]
 })
 
+const hasFooterContent = computed(() => {
+    const hasColumns = footerColumns.value.some((column) => (column.blocks ?? []).some((block) => block.enabled !== false))
+    const hasBottom = enabledBottomColumns.value.some((column) => (column.blocks ?? []).some((block) => block.enabled !== false))
+    const hasBottomMenu = Boolean(footerConfig.value?.bottom_bar?.menu_slug && getMenu(footerConfig.value.bottom_bar.menu_slug)?.items.length)
+
+    return hasColumns || hasBottom || hasBottomMenu
+})
+
 const parsedCopyright = computed(() => {
     const text = footerConfig.value?.bottom_bar?.copyright_text || ''
 
@@ -241,6 +249,7 @@ const scrollToTop = () => {
 const legalLinks = [
     { key: 'privacy', label: t('Privacy Policy'), href: '/privacy-policy' },
     { key: 'terms', label: t('Terms of Service'), href: '/terms' },
+    { key: 'cookies', label: t('Cookie Preferences'), href: '#' },
     { key: 'refund', label: t('Refund Policy'), href: '/refund-policy' },
     { key: 'contact', label: t('Contact'), href: '/contact' },
 ]
@@ -266,7 +275,7 @@ const bottomPaddingStyle = computed(() => ({
 </script>
 
 <template>
-    <footer v-if="footerConfig" class="mt-auto border-t border-gray-100 bg-white dark:border-surface-800 dark:bg-surface-900">
+    <footer v-if="footerConfig && hasFooterContent" class="mt-auto border-t border-gray-100 bg-white dark:border-surface-800 dark:bg-surface-900">
         <div class="mx-auto max-w-7xl px-6 py-16">
             <div class="grid gap-12" :class="layoutClass">
                 <div v-for="(column, index) in footerColumns" :key="column.id ?? index" class="space-y-8">
@@ -324,7 +333,7 @@ const bottomPaddingStyle = computed(() => ({
                             <p v-if="block.config.description" class="mb-4 text-sm text-gray-500 dark:text-gray-400">{{ block.config.description }}</p>
                             <form method="post" action="/newsletter/subscribe" class="flex gap-2">
                                 <input type="email" name="email" required :placeholder="t('Enter your email')" class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200">
-                                <button type="submit" class="rounded-lg bg-primary-600 px-3 text-white transition hover:bg-primary-500" :aria-label="t('Subscribe')">
+                                <button type="submit" class="rounded-lg btn-primary transition" :aria-label="t('Subscribe')">
                                     <i class="ti ti-arrow-right"></i>
                                 </button>
                             </form>

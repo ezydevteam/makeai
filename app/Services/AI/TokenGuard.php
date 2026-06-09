@@ -5,6 +5,7 @@ namespace App\Services\AI;
 use App\Exceptions\AI\CreditLimitException;
 use App\Exceptions\AI\GlobalBudgetExceededException;
 use App\Exceptions\AI\InsufficientCreditsException;
+use App\Jobs\SendCreditAlertJob;
 use App\Models\AiModel;
 use App\Models\AiTool;
 use App\Models\AiUsageLog;
@@ -128,6 +129,17 @@ class TokenGuard
                 'output_tokens' => $outputTokens,
                 'cost_usd' => $costUsd,
             ]);
+
+            if ($deducted && function_exists('isProAvailable') && isProAvailable()) {
+                $threshold = (int) settings('credit_alert_threshold', 100);
+                if ($user->fresh()->credits <= $threshold) {
+                    $cacheKey = "credit_alert_sent_{$user->id}";
+                    if (! Cache::has($cacheKey)) {
+                        SendCreditAlertJob::dispatch($user)->onQueue('mail');
+                        Cache::put($cacheKey, true, now()->addDays((int) settings('credit_alert_cooldown_days', 7)));
+                    }
+                }
+            }
         }
 
         // Update global spend tracker — only for completed requests
@@ -159,6 +171,10 @@ class TokenGuard
                 ])
                 : $metadata,
         ]);
+
+        if ($user) {
+            Cache::forget("usage_stats_{$user->id}");
+        }
 
         return ($success && $deductCredits && $deducted) ? $credits : 0.0;
     }

@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\SocialFollowCount;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SocialService
 {
@@ -82,7 +84,7 @@ class SocialService
                 if ($count === null) {
                     $profile->forceFill([
                         'last_fetched_at' => now(),
-                        'last_error' => translate('API fetching is not configured for this platform.'),
+                        'last_error' => translate('API fetching is not yet supported for :platform. Contact the developer for custom integration.', ['platform' => $profile->platform]),
                     ])->save();
 
                     return;
@@ -102,6 +104,183 @@ class SocialService
      */
     protected function fetchCount(string $platform, ?string $profileUrl = null): ?int
     {
+        return match ($platform) {
+            'facebook' => $this->fetchFacebookCount($profileUrl),
+            'youtube' => $this->fetchYoutubeCount($profileUrl),
+            'github' => $this->fetchGithubCount($profileUrl),
+            default => null,
+        };
+    }
+
+    private function fetchFacebookCount(?string $profileUrl): ?int
+    {
+        if (! $profileUrl) {
+            return null;
+        }
+
+        $pageId = $this->extractFacebookPageId($profileUrl);
+        if (! $pageId) {
+            return null;
+        }
+
+        $apiToken = settings($this->apiKeySettingKey('facebook'), '');
+
+        try {
+            $response = Http::timeout(10)
+                ->get("https://graph.facebook.com/v21.0/{$pageId}", [
+                    'fields' => 'fan_count',
+                    'access_token' => $apiToken,
+                ]);
+
+            if ($response->successful() && isset($response['fan_count'])) {
+                return (int) $response['fan_count'];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Facebook Graph API fetch failed for page.', [
+                'page_id' => $pageId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    private function extractFacebookPageId(?string $profileUrl): ?string
+    {
+        if (! $profileUrl) {
+            return null;
+        }
+
+        if (preg_match('/facebook\.com\/([^\/\?\s]+)/', $profileUrl, $m)) {
+            $slug = $m[1];
+            if (is_numeric($slug)) {
+                return $slug;
+            }
+        }
+
+        $externalId = settings($this->externalIdSettingKey('facebook'));
+        if ($externalId) {
+            return (string) $externalId;
+        }
+
+        return null;
+    }
+
+    private function fetchYoutubeCount(?string $profileUrl): ?int
+    {
+        if (! $profileUrl) {
+            return null;
+        }
+
+        $channelId = $this->extractYoutubeChannelId($profileUrl);
+        if (! $channelId) {
+            return null;
+        }
+
+        $apiKey = settings($this->apiKeySettingKey('youtube'), '');
+
+        try {
+            $response = Http::timeout(10)
+                ->get('https://www.googleapis.com/youtube/v3/channels', [
+                    'id' => $channelId,
+                    'part' => 'statistics',
+                    'key' => $apiKey,
+                ]);
+
+            if ($response->successful()) {
+                $count = data_get($response->json(), 'items.0.statistics.subscriberCount');
+                if ($count !== null) {
+                    return (int) $count;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('YouTube API fetch failed for channel.', [
+                'channel_id' => $channelId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    private function extractYoutubeChannelId(?string $profileUrl): ?string
+    {
+        if (! $profileUrl) {
+            return null;
+        }
+
+        if (preg_match('/youtube\.com\/channel\/([^\/\?\s]+)/', $profileUrl, $m)) {
+            return $m[1];
+        }
+
+        if (preg_match('/youtube\.com\/@([^\/\?\s]+)/', $profileUrl, $m)) {
+            $handle = $m[1];
+            $apiKey = settings($this->apiKeySettingKey('youtube'), '');
+
+            try {
+                $response = Http::timeout(10)
+                    ->get('https://www.googleapis.com/youtube/v3/channels', [
+                        'forHandle' => $handle,
+                        'part' => 'id',
+                        'key' => $apiKey,
+                    ]);
+
+                if ($response->successful()) {
+                    $id = data_get($response->json(), 'items.0.id');
+                    if ($id) {
+                        return $id;
+                    }
+                }
+            } catch (\Throwable) {
+                // Continue to external ID fallback
+            }
+        }
+
+        $externalId = settings($this->externalIdSettingKey('youtube'));
+        if ($externalId) {
+            return (string) $externalId;
+        }
+
+        return null;
+    }
+
+    private function fetchGithubCount(?string $profileUrl): ?int
+    {
+        if (! $profileUrl) {
+            return null;
+        }
+
+        if (! preg_match('/github\.com\/([^\/\?\s]+)/', $profileUrl, $m)) {
+            return null;
+        }
+
+        $username = $m[1];
+        $apiToken = settings($this->apiKeySettingKey('github'), '');
+
+        try {
+            $req = Http::timeout(10);
+            if ($apiToken) {
+                $req = $req->withToken($apiToken);
+            }
+
+            $response = $req->get("https://api.github.com/users/{$username}");
+
+            if ($response->successful() && isset($response['followers'])) {
+                return (int) $response['followers'];
+            }
+
+            if ($response->status() === 403) {
+                Log::warning('GitHub API rate limit hit. Add a token to increase limits.', [
+                    'username' => $username,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('GitHub API fetch failed for user.', [
+                'username' => $username,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return null;
     }
 
@@ -147,6 +326,12 @@ class SocialService
         $networks = settings('social_share_networks', array_keys(self::SHARE_NETWORKS));
 
         if (! is_array($networks)) {
+            \Illuminate\Support\Facades\Log::warning('social_share_networks setting is corrupted, falling back to defaults.', [
+                'value' => $networks,
+            ]);
+
+            settings_set('social_share_networks', array_keys(self::SHARE_NETWORKS), 'json', 'social');
+
             $networks = array_keys(self::SHARE_NETWORKS);
         }
 
@@ -171,7 +356,70 @@ class SocialService
             return [];
         }
 
-        return [];
+        $counts = [];
+
+        if (in_array('facebook', $networks, true)) {
+            $counts['facebook'] = $this->fetchFacebookShareCount($url);
+        }
+
+        if (in_array('pinterest', $networks, true)) {
+            $counts['pinterest'] = $this->fetchPinterestShareCount($url);
+        }
+
+        return $counts;
+    }
+
+    private function fetchFacebookShareCount(string $url): ?int
+    {
+        $apiToken = settings('social_follow_facebook_api_key', '');
+
+        if (! $apiToken) {
+            return null;
+        }
+
+        try {
+            $response = Http::timeout(10)
+                ->get('https://graph.facebook.com/v21.0/', [
+                    'id' => $url,
+                    'fields' => 'engagement',
+                    'access_token' => $apiToken,
+                ]);
+
+            if ($response->successful() && isset($response['engagement']['share_count'])) {
+                return (int) $response['engagement']['share_count'];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Facebook share count fetch failed.', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
+    }
+
+    private function fetchPinterestShareCount(string $url): ?int
+    {
+        try {
+            $response = Http::timeout(10)
+                ->get('https://api.pinterest.com/v1/urls/count.json', [
+                    'url' => $url,
+                ]);
+
+            if ($response->successful()) {
+                $body = $response->body();
+                if (preg_match('/"count":(\d+)/', $body, $m)) {
+                    return (int) $m[1];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Pinterest share count fetch failed.', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return null;
     }
 
     public function followPayload(?string $displayMode = null): array

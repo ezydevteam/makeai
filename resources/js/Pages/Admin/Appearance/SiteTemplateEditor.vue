@@ -254,7 +254,7 @@
 
         <!-- Only show general Save Changes when NOT on chatbot tab -->
         <div v-if="activeTab !== 'chatbot'" class="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-surface-700">
-          <button type="submit" class="inline-flex items-center rounded-lg bg-primary-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-600 transition-colors shadow-sm">
+          <button type="submit" class="inline-flex items-center rounded-lg btn-primary transition-colors shadow-sm">
             {{ t('Save Changes') }}
           </button>
         </div>

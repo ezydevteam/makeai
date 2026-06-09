@@ -1,1 +1,0 @@
-import{g as e,i as t}from"./app-pmitwu4T.js";function n(){let n=t(),r=e(()=>n.props.translations??{});return{t:(e,t)=>{let n=r.value[e]??e;return t&&Object.entries(t).forEach(([e,t])=>{n=n.replace(RegExp(`:${e}`,`g`),String(t))}),n}}}export{n as t};

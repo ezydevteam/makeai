@@ -11,6 +11,7 @@ use App\Services\AI\PromptBuilder;
 use App\Services\AI\ToolAccessService;
 use App\Services\AI\ToolCatalogCacheService;
 use App\Services\AI\ToolSeoService;
+use App\Services\AI\ToolViewTrackingService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -20,6 +21,7 @@ class TemplateController extends Controller
         private ToolSeoService $seoService,
         private ToolCatalogCacheService $toolCatalog,
         private ToolAccessService $toolAccess,
+        private ToolViewTrackingService $viewTracker,
     ) {}
 
     public function index(Request $request)
@@ -42,7 +44,7 @@ class TemplateController extends Controller
 
         $featured = $tools->where('is_featured', true)->take(6)->values();
 
-        return Inertia::render('AI/Templates', [
+        return Inertia::render('AI/ToolsDirectory', [
             'tools' => $tools,
             'categories' => $categories,
             'featured' => $featured,
@@ -56,7 +58,9 @@ class TemplateController extends Controller
 
         $tool = AiTool::find($toolData['id']);
 
-        if (! $tool || ! $tool->is_active || ! $tool->category?->is_active) {
+        $isAdminPreview = request()->query('preview') === '1' && auth('admin')->check();
+
+        if (! $tool || (! $tool->is_active && ! $isAdminPreview) || (! $tool->category?->is_active && ! $isAdminPreview)) {
             abort(404);
         }
 
@@ -66,6 +70,11 @@ class TemplateController extends Controller
 
         if ($tool->isProRequired() && ! auth()->user()?->isPro()) {
             return redirect()->back()->with('error', translate('This tool requires a Pro plan. Please upgrade to continue.'));
+        }
+
+        // Track view (only for real visits, not admin preview)
+        if (! $isAdminPreview) {
+            $this->viewTracker->record($tool->slug);
         }
 
         $seo = $this->seoService->getMeta($tool);
@@ -89,16 +98,34 @@ class TemplateController extends Controller
 
         $estimatedCredits = null;
         $showCreditCosts = (bool) settings('show_tool_credit_costs', true);
-        if ($showCreditCosts && auth()->check()) {
+        if ($showCreditCosts) {
             $model = $tool->model_override ?? settings('default_ai_model', 'gpt-4o-mini');
             $promptBuilder = app(PromptBuilder::class);
-            $estimatedCredits = $promptBuilder->estimateCost($tool, $model);
+            $estimatedCredits = $promptBuilder->estimateCost($tool, $model, null);
         }
 
         $toolData['favorites_count'] = $tool->favorites()->count();
         $toolData['is_favorited'] = auth()->check()
             ? $tool->favorites()->where('user_id', auth()->id())->exists()
             : false;
+
+        $restoredHistory = null;
+        $restoreUlid = request()->query('restore');
+        if ($restoreUlid && auth()->check()) {
+            $history = \App\Models\GenerationHistory::where('ulid', $restoreUlid)
+                ->where('user_id', auth()->id())
+                ->first();
+            if ($history) {
+                $fullContent = $history->document ? $history->document->content : $history->output_preview;
+                $restoredHistory = [
+                    'ulid' => $history->ulid,
+                    'field_values' => $history->field_values ?? [],
+                    'output' => $fullContent,
+                    'model' => $history->model,
+                    'provider' => $history->provider,
+                ];
+            }
+        }
 
         return Inertia::render('AI/ToolPage', [
             'tool' => $toolData,
@@ -126,6 +153,7 @@ class TemplateController extends Controller
                 ->where('status', 'completed')
                 ->where('metadata->tool_slug', $tool->slug)
                 ->exists(),
+            'restoredHistory' => $restoredHistory,
         ]);
     }
 

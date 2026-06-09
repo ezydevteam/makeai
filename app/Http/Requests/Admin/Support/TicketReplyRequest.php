@@ -2,13 +2,21 @@
 
 namespace App\Http\Requests\Admin\Support;
 
+use App\Traits\HasAttachmentValidation;
 use Illuminate\Foundation\Http\FormRequest;
 
 class TicketReplyRequest extends FormRequest
 {
+    use HasAttachmentValidation;
+
     public function authorize(): bool
     {
-        return auth('admin')->check() && auth('admin')->user()->hasPermission('support.respond');
+        $ticket = $this->route('ticket');
+
+        return auth('admin')->check()
+            && auth('admin')->user()->hasPermission('support.respond')
+            && $ticket
+            && ! in_array($ticket->status, ['closed'], true);
     }
 
     public function rules(): array
@@ -24,13 +32,5 @@ class TicketReplyRequest extends FormRequest
                 'mimes:'.$this->allowedMimes(),
             ],
         ];
-    }
-
-    private function allowedMimes(): string
-    {
-        return collect(explode(',', (string) settings('allowed_attachment_types', 'jpg,png,gif,pdf,txt,zip,mp4')))
-            ->map(fn ($type) => trim($type))
-            ->filter()
-            ->implode(',');
     }
 }

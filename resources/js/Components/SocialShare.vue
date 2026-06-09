@@ -53,7 +53,7 @@ const networkClasses: Record<ShareNetwork, string> = {
     telegram: 'hover:border-sky-500 hover:bg-sky-500 hover:text-white',
     pinterest: 'hover:border-red-600 hover:bg-red-600 hover:text-white',
     reddit: 'hover:border-orange-500 hover:bg-orange-500 hover:text-white',
-    email: 'hover:border-primary-500 hover:bg-primary-500 hover:text-white',
+    email: 'hover:border-primary-500 hover:text-white',
     copy: 'hover:border-gray-900 hover:bg-gray-900 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-gray-950',
 }
 

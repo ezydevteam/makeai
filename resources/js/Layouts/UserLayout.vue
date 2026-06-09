@@ -45,7 +45,7 @@ useFlashToasts()
         <AdSection zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
 
         <!-- Content -->
-        <main class="flex-1">
+        <main class="flex-1 flex flex-col">
             <AdSection zone="content_top" class="mx-auto mt-4 w-full max-w-7xl px-6" />
             <slot />
             <AdSection zone="content_bottom" class="mx-auto mb-4 w-full max-w-7xl px-6" />

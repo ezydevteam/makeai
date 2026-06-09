@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SendUserNotificationRequest;
+use App\Http\Requests\Admin\StoreUserRequest;
 use App\Jobs\SendAdminNotificationEmail;
+use App\Models\AiUsageLog;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\InAppNotificationService;
@@ -24,15 +26,6 @@ class UserManagementController extends Controller
     {
         $query = User::query()->with('plan');
 
-        // Search
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->search}%")
-                    ->orWhere('email', 'like', "%{$request->search}%")
-                    ->orWhere('ulid', 'like', "%{$request->search}%");
-            });
-        }
-
         // Status Filter
         if ($request->status !== null && $request->status !== '') {
             $query->where('is_active', $request->status);
@@ -47,9 +40,69 @@ class UserManagementController extends Controller
 
         return Inertia::render('Admin/Users/Index', [
             'users' => $users,
-            'filters' => $request->only(['search', 'status', 'plan']),
+            'filters' => $request->only(['status', 'plan']),
+            'plans' => Plan::active()->get(['id', 'name']),
+            'hasTrashedUsers' => User::onlyTrashed()->exists(),
+        ]);
+    }
+
+    /**
+     * Display trashed users.
+     */
+    public function trash(Request $request)
+    {
+        $query = User::onlyTrashed()->with('plan');
+
+        if ($request->status !== null && $request->status !== '') {
+            $query->where('is_active', $request->status);
+        }
+
+        if ($request->plan) {
+            $query->where('plan_id', $request->plan);
+        }
+
+        $users = $query
+            ->latest('deleted_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return Inertia::render('Admin/Users/Trash', [
+            'users' => $users,
+            'filters' => $request->only(['status', 'plan']),
             'plans' => Plan::active()->get(['id', 'name']),
         ]);
+    }
+
+    /**
+     * Show the form for creating a new user.
+     */
+    public function create()
+    {
+        return Inertia::render('Admin/Users/Create', [
+            'plans' => Plan::active()->get(['id', 'name']),
+        ]);
+    }
+
+    /**
+     * Store a newly created user.
+     */
+    public function store(StoreUserRequest $request)
+    {
+        $validated = $request->validated();
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'credits' => $validated['credits'],
+            'plan_id' => $validated['plan_id'] ?? null,
+            'is_active' => $validated['is_active'],
+            'email_verified_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('admin.users.show', $user)
+            ->with('success', translate('User created successfully.'));
     }
 
     /**
@@ -60,6 +113,21 @@ class UserManagementController extends Controller
         return Inertia::render('Admin/Users/Show', [
             'user' => $user->load(['plan', 'loginHistory' => fn ($q) => $q->latest()->limit(5)]),
             'plans' => Plan::active()->get(['id', 'name']),
+            'usageHistory' => AiUsageLog::query()
+                ->where('user_id', $user->id)
+                ->latest()
+                ->limit(10)
+                ->get([
+                    'id',
+                    'tool_slug',
+                    'model',
+                    'provider',
+                    'input_tokens',
+                    'output_tokens',
+                    'credits_used',
+                    'status',
+                    'created_at',
+                ]),
         ]);
     }
 
@@ -152,6 +220,40 @@ class UserManagementController extends Controller
     }
 
     /**
+     * Soft delete the specified user.
+     */
+    public function destroy(User $user)
+    {
+        $userName = $user->name;
+        $user->delete();
+
+        return redirect()
+            ->route('admin.users.index')
+            ->with('success', translate('User :name moved to trash.', ['name' => $userName]));
+    }
+
+    /**
+     * Restore the specified user from trash.
+     */
+    public function restore(User $user)
+    {
+        $user->restore();
+
+        return back()->with('success', translate('User restored successfully.'));
+    }
+
+    /**
+     * Permanently delete the specified user.
+     */
+    public function forceDelete(User $user)
+    {
+        $userName = $user->name;
+        $user->forceDelete();
+
+        return back()->with('success', translate('User :name permanently deleted.', ['name' => $userName]));
+    }
+
+    /**
      * Bulk actions.
      */
     public function bulkAction(Request $request)
@@ -186,6 +288,29 @@ class UserManagementController extends Controller
     }
 
     /**
+     * Bulk actions for trashed users.
+     */
+    public function bulkTrashAction(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'action' => 'required|string|in:restore,force_delete',
+        ]);
+
+        $query = User::onlyTrashed()->whereIn('id', $request->ids);
+
+        if ($request->action === 'restore') {
+            $query->restore();
+        }
+
+        if ($request->action === 'force_delete') {
+            $query->forceDelete();
+        }
+
+        return back()->with('success', translate('Bulk action completed.'));
+    }
+
+    /**
      * Impersonate a user.
      */
     public function impersonate(User $user)
@@ -196,7 +321,7 @@ class UserManagementController extends Controller
         // Log in as user in web guard
         Auth::guard('web')->login($user);
 
-        return redirect()->route('dashboard')->with('success', translate('Now impersonating :name', ['name' => $user->name]));
+        return redirect()->route('user.dashboard')->with('success', translate('Now logged in as :name', ['name' => $user->name]));
     }
 
     /**

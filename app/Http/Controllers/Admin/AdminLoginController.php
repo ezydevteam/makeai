@@ -288,41 +288,6 @@ class AdminLoginController extends Controller
     /**
      * Log the admin out.
      */
-    public function showChangePassword(): Response
-    {
-        return Inertia::render('Admin/Auth/ChangePassword');
-    }
-
-    public function changePassword(Request $request)
-    {
-        $admin = auth('admin')->user();
-        if (! $admin) {
-            return redirect()->route('admin.login');
-        }
-
-        $validated = $request->validate([
-            'current_password' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
-
-        if (! Hash::check($validated['current_password'], $admin->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => translate('The current password is incorrect.'),
-            ]);
-        }
-
-        $admin->update([
-            'password' => Hash::make($validated['password']),
-            'must_change_password' => false,
-        ]);
-
-        // Re-authenticate after password change
-        Auth::guard('admin')->login($admin);
-
-        return redirect()->route('admin.dashboard')
-            ->with('success', translate('Password changed successfully.'));
-    }
-
     public function logout(Request $request)
     {
         Auth::guard('admin')->logout();

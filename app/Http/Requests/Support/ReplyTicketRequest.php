@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Support;
 
+use App\Traits\HasAttachmentValidation;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ReplyTicketRequest extends FormRequest
 {
+    use HasAttachmentValidation;
+
     public function authorize(): bool
     {
         $ticket = $this->route('ticket');
@@ -27,13 +30,5 @@ class ReplyTicketRequest extends FormRequest
                 'mimes:'.$this->allowedMimes(),
             ],
         ];
-    }
-
-    private function allowedMimes(): string
-    {
-        return collect(explode(',', (string) settings('allowed_attachment_types', 'jpg,png,gif,pdf,txt,zip,mp4')))
-            ->map(fn ($type) => trim($type))
-            ->filter()
-            ->implode(',');
     }
 }

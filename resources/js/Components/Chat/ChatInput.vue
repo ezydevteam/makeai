@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, ref } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import type { useChat } from '@/Composables/useChat'
 import ModelSelector from '@/Components/Chat/ModelSelector.vue'
 
 const { t } = useTranslate()
 const chat = inject<ReturnType<typeof useChat>>('chat')!
+const sidebarMobileOpen = inject<Ref<boolean>>('sidebarMobileOpen', ref(false))
 
 const inputText = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -19,6 +20,7 @@ const send = () => {
     attachedFile.value = null
     resetTextareaHeight()
     chat.sendMessage(text, chat.selectedProduct.value?.slug ?? undefined)
+    void focusTextarea()
 }
 
 const autoResize = () => {
@@ -62,24 +64,46 @@ const removeFile = () => {
     attachedFile.value = null
     if (fileInputRef.value) fileInputRef.value.value = ''
 }
+
+const focusTextarea = async () => {
+    await nextTick()
+    textareaRef.value?.focus({ preventScroll: true })
+}
+
+onMounted(() => {
+    void focusTextarea()
+})
+
+watch(
+    () => [chat.activeConversation.value?.ulid, chat.selectedProduct.value?.slug],
+    () => {
+        void focusTextarea()
+    },
+    { flush: 'post' },
+)
+
+watch(
+    () => sidebarMobileOpen.value,
+    (open, previousOpen) => {
+        if (previousOpen && !open) {
+            void focusTextarea()
+        }
+    },
+    { flush: 'post' },
+)
 </script>
 
 <template>
-    <div class="shrink-0 px-6 pb-6 pt-2">
-        <div class="max-w-[768px] mx-auto">
+    <div class="shrink-0 px-4 sm:px-6 pb-4 sm:pb-6 pt-2">
+        <div class="mx-auto max-w-[768px]">
             <!-- File preview -->
-            <div v-if="attachedFile" class="flex items-center gap-2 px-3 py-1.5 mb-1.5 bg-black/5 dark:bg-white/5 rounded-lg">
+            <div v-if="attachedFile" class="mb-2 flex items-center gap-2 rounded-2xl border border-black/5 bg-black/[0.03] px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.04]">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="text-[#6e6a65] dark:text-white/40"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-5.7l-1.415-1.414" /></svg>
                 <span class="text-xs text-[#6e6a65] dark:text-white/50 truncate flex-1">{{ attachedFile.name }}</span>
                 <button class="text-[#b0aca8] dark:text-white/30 hover:text-[#1a1a1a] dark:hover:text-white/70 transition-colors" @click="removeFile">&times;</button>
             </div>
 
-            <div class="flex items-end gap-2 px-4 py-3 rounded-2xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 transition-colors focus-within:border-black/10 dark:focus-within:border-white/20">
-                <button class="shrink-0 w-7 h-7 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center text-[#b0aca8] dark:text-white/30 hover:text-[#6e6a65] dark:hover:text-white/50 transition-colors" title="Attach file" @click="fileInputRef?.click()">
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-5.7l-1.415-1.414" /></svg>
-                </button>
-                <input ref="fileInputRef" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,.md" @change="onFileSelect" />
-
+            <div class="rounded-[1.5rem] border border-black/10 bg-white px-3 py-3 shadow-[0_10px_30px_rgba(17,24,39,0.06)] transition-colors dark:border-white/10 dark:bg-[#1c1c1c] dark:shadow-[0_10px_30px_rgba(0,0,0,0.25)] focus-within:border-primary-500/30 dark:focus-within:border-primary-500/30">
                 <textarea
                     ref="textareaRef"
                     v-model="inputText"
@@ -87,28 +111,38 @@ const removeFile = () => {
                         ? t('Ask anything in :product mode...', { product: chat.selectedProduct.value.name })
                         : t('Ask anything...')
                     "
-                    class="chat-textarea flex-1 min-h-[44px] resize-none leading-relaxed text-[15px] text-[#1a1a1a] dark:text-[#e8e6e3] placeholder:text-[#b0aca8] dark:placeholder:text-white/25"
+                    class="chat-textarea w-full resize-none rounded-2xl border border-transparent bg-transparent px-1 py-2 text-[15px] leading-relaxed text-gray-900 placeholder:text-gray-400 dark:text-white/90 dark:placeholder:text-white/25"
                     rows="1"
                     @keydown="onKeydown"
                     @input="autoResize"
                 ></textarea>
 
-                <ModelSelector />
+                <div class="flex items-center justify-between gap-3 dark:border-white/10">
+                    <button class="flex h-9 items-center justify-center gap-2 rounded-xl px-3 text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70" title="Attach file" @click="fileInputRef?.click()">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-5.7l-1.415-1.414" /></svg>
+                        <span class="text-sm font-medium">{{ t('Attach') }}</span>
+                    </button>
+                    <input ref="fileInputRef" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,.md" @change="onFileSelect" />
 
-                <template v-if="chat.isStreaming.value">
-                    <button class="w-[34px] h-[34px] rounded-full bg-red-100 dark:bg-red-500/15 hover:bg-red-200 dark:hover:bg-red-500/25 text-red-500 dark:text-red-400 flex items-center justify-center shrink-0 transition-colors" title="Stop" @click="stop">
-                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-                    </button>
-                </template>
-                <template v-else>
-                    <button
-                        class="w-[34px] h-[34px] rounded-full bg-[#d9cec7] hover:bg-[#cfc3bb] dark:bg-white/10 dark:hover:bg-white/15 text-[#1a1a1a] dark:text-white/80 flex items-center justify-center shrink-0 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                        :disabled="!inputText.trim()"
-                        @click="send"
-                    >
-                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" /></svg>
-                    </button>
-                </template>
+                    <div class="flex items-center gap-2">
+                        <ModelSelector />
+
+                        <template v-if="chat.isStreaming.value">
+                            <button class="flex h-9 min-w-9 items-center justify-center rounded-xl bg-red-500/10 px-3 text-red-600 transition-colors hover:bg-red-500/15 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25" title="Stop" @click="stop">
+                                <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                            </button>
+                        </template>
+                        <template v-else>
+                            <button
+                                class="flex h-9 min-w-9 items-center justify-center rounded-xl bg-primary-500 px-3 text-white shadow-sm transition-all hover:bg-primary-600 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-30 dark:bg-primary-500 dark:hover:bg-primary-600"
+                                :disabled="!inputText.trim()"
+                                @click="send"
+                            >
+                                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18" /></svg>
+                            </button>
+                        </template>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -116,15 +150,20 @@ const removeFile = () => {
 
 <style scoped>
 .chat-textarea {
-    border: none;
     outline: none;
-    background: transparent;
     box-shadow: none;
+    caret-color: var(--color-primary-500);
 }
 
 .chat-textarea:focus {
     outline: none;
-    border: none;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.chat-textarea:focus-visible {
+    outline: none;
+    border-color: transparent;
     box-shadow: none;
 }
 </style>

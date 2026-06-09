@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import RichEditor from '@/Components/RichEditor.vue'
@@ -27,6 +28,28 @@ const form = useForm({
     folder_id: props.document.folder_id || null,
 })
 
+const countWords = (html: string | null | undefined): number => {
+    if (!html) return 0
+
+    // Replace closing block tags with a space to prevent words from running together
+    const spacedHtml = html.replace(/<\/(p|h1|h2|h3|h4|h5|h6|div|li|tr|th|td|blockquote|pre)>/gi, ' ')
+
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = spacedHtml
+
+    let text = tempDiv.textContent || tempDiv.innerText || ''
+    text = text.trim()
+
+    if (!text) return 0
+
+    const words = text.split(/\s+/)
+    return words.filter((word) => word.length > 0).length
+}
+
+const currentWordCount = computed(() => {
+    return countWords(form.content)
+})
+
 const saveDocument = () => {
     form.patch(routeTo('documents.update', props.document.id), {
         preserveScroll: true,
@@ -42,7 +65,7 @@ const saveDocument = () => {
             <div>
                 <div class="flex items-center gap-2 text-sm mb-2">
                     <Link :href="routeTo('ai.tools.index')" class="text-gray-500 hover:text-primary-500 transition-colors">{{ t('AI Tools') }}</Link>
-                    <i class="ti-chevron-right text-gray-400 text-xs"></i>
+                    <i class="ti ti-chevron-right text-gray-400 text-xs"></i>
                     <span class="text-gray-500">{{ t('Documents') }}</span>
                 </div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Edit Document') }}</h1>
@@ -59,10 +82,10 @@ const saveDocument = () => {
                 <button
                     type="button"
                     :disabled="form.processing"
-                    class="px-5 py-2 text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 rounded-xl disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+                    class="px-5 py-2 text-sm font-semibold text-white bg-primary-600 rounded-xl disabled:opacity-50 transition-colors inline-flex items-center gap-2"
                     @click="saveDocument"
                 >
-                    <i class="ti-device-floppy"></i>
+                    <i class="ti ti-device-floppy"></i>
                     {{ form.processing ? t('Saving') : t('Save') }}
                 </button>
             </div>
@@ -84,7 +107,7 @@ const saveDocument = () => {
             <div class="flex flex-wrap items-center justify-between gap-3 mt-5 pt-5 border-t border-gray-100 dark:border-surface-800 text-xs text-gray-500">
                 <div class="flex flex-wrap items-center gap-3">
                     <span v-if="document.tool_slug">Tool: {{ document.tool_slug }}</span>
-                    <span v-if="document.word_count !== null && document.word_count !== undefined">{{ t(':count words', { count: document.word_count }) }}</span>
+                    <span>{{ t(':count words', { count: currentWordCount }) }}</span>
                 </div>
                 <span v-if="form.recentlySuccessful" class="text-primary-600 dark:text-primary-400">{{ t('Saved') }}</span>
             </div>

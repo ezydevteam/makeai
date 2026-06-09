@@ -39,6 +39,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'login_attempts', 'locked_until',
         'oauth_provider', 'oauth_id',
         'last_login_at', 'last_login_ip', 'email_marketing',
+        'cookie_consent', 'allow_data_improve', 'scheduled_deletion_at',
+        'onboarding_completed_at', 'use_case', 'dismissed_tooltips',
     ];
 
     protected $hidden = [
@@ -60,7 +62,11 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_banned' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_recovery_codes' => 'array',
+            'preferences' => 'array',
             'email_marketing' => 'boolean',
+            'cookie_consent' => 'array',
+            'allow_data_improve' => 'boolean',
+            'scheduled_deletion_at' => 'datetime',
             'otp_expires_at' => 'datetime',
             'otp_locked_until' => 'datetime',
             'last_login_at' => 'datetime',
@@ -68,6 +74,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'trial_ends_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
             'locked_until' => 'datetime',
+            'onboarding_completed_at' => 'datetime',
+            'dismissed_tooltips' => 'array',
         ];
     }
 

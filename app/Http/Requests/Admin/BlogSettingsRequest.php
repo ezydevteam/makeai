@@ -31,6 +31,13 @@ class BlogSettingsRequest extends FormRequest
             'social_share_networks.*' => ['required', 'string', Rule::in(array_keys(SocialService::SHARE_NETWORKS))],
             'social_share_blog_style' => ['required', 'string', Rule::in(SocialService::SHARE_STYLES)],
             'social_share_show_counts' => ['required', 'boolean'],
+            'comments_enabled' => ['required', 'boolean'],
+            'comments_auto_approve_users' => ['required', 'boolean'],
+            'comments_allow_guests' => ['required', 'boolean'],
+            'comments_require_approval' => ['required', 'boolean'],
+            'comments_notify_admin' => ['required', 'boolean'],
+            'comments_poll_seconds' => ['required', 'integer', 'min:10', 'max:300'],
+            'comments_akismet_key' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

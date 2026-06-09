@@ -57,7 +57,20 @@ class RoleController extends Controller
     {
         abort_unless(auth('admin')->user()->hasPermission('roles.view'), 403);
 
-        $roles = AdminRole::withCount('admins')->get();
+        $roles = AdminRole::with(['permissions:id'])->withCount('admins')->get()
+            ->map(function (AdminRole $role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'slug' => $role->slug,
+                    'description' => $role->description,
+                    'is_system' => $role->is_system,
+                    'admins_count' => $role->admins_count,
+                    'permissions' => $role->permissions->map(fn (AdminPermission $permission) => ['id' => $permission->id])->values(),
+                    'default_permission_slugs' => $role->defaultPermissionSlugs(),
+                    'has_default_permissions' => $role->hasDefaultPermissions(),
+                ];
+            });
         $permissions = AdminPermission::all()->groupBy('group');
 
         return Inertia::render('Admin/RBAC/Roles', [
@@ -139,6 +152,22 @@ class RoleController extends Controller
         }
 
         return back()->with('success', translate('Role updated successfully.'));
+    }
+
+    /**
+     * Restore a role's seeded default permissions.
+     */
+    public function restoreDefault(AdminRole $role)
+    {
+        abort_unless(auth('admin')->user()->hasPermission('roles.edit'), 403);
+
+        if (! $role->hasDefaultPermissions()) {
+            return back()->with('error', translate('This role does not have a default permission set.'));
+        }
+
+        $role->syncDefaultPermissions();
+
+        return back()->with('success', translate('Default permissions restored successfully.'));
     }
 
     /**

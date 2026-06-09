@@ -25,7 +25,7 @@ class CheckCredits
 {
     public function handle(Request $request, Closure $next)
     {
-        $user = $this->currentUser();
+        $user = $this->currentUser($request);
         $access = app(ToolAccessService::class);
 
         $template = null;
@@ -112,13 +112,17 @@ class CheckCredits
         return $response;
     }
 
-    private function currentUser(): ?User
+    private function currentUser(Request $request): ?User
     {
-        if (array_key_exists('sanctum', config('auth.guards', []))) {
-            return Auth::guard('sanctum')->user() ?? Auth::user();
+        // With 'web' middleware applied, Laravel's session is already started
+        // and Auth::guard('web') is populated from the session.
+        $user = Auth::guard('web')->user();
+
+        if ($user instanceof User) {
+            return $user;
         }
 
-        return Auth::user();
+        return null;
     }
 
     private function statusForException(\Throwable $exception): int

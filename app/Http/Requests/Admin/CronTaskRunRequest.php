@@ -20,6 +20,13 @@ class CronTaskRunRequest extends FormRequest
                 'notifications-subscription-reminders',
                 'subscriptions-expire-past-due',
                 'scheduler-heartbeat',
+                'notes-prune-expired',
+                'tools-flush-views',
+                'exports-cleanup',
+                'license-reverify',
+                'blog-publish-scheduled',
+                'support-auto-close',
+                'social-refresh',
             ])],
         ];
     }

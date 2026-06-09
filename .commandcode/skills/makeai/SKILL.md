@@ -800,27 +800,12 @@ Every card must follow this exact pattern:
 
 ### BUTTONS
 
-**Primary button (green gradient):**
-```css
-background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
-color: white;
-border: none;
-border-radius: var(--radius-md);
-padding: 0.5rem 1.25rem;
-font-size: var(--text-sm);
-font-weight: 500;
-transition: all 0.15s ease;
-```
-Hover: darker gradient + `var(--shadow-glow-green)` + `translateY(-1px)`
-Active: `translateY(0)` + remove shadow
-
-**Secondary button (blue gradient):** Same pattern, use blue colors.
-
-**Outline button:** `transparent bg` + `1.5px solid var(--color-primary-500)` + `color: var(--color-primary-600)`. Hover: `background: var(--color-primary-50)`.
-
-**Ghost button:** No border, no background. `color: var(--color-gray-600)`. Hover: `background: var(--color-gray-100)`.
-
-**Danger button:** Red gradient `#ef4444 → #dc2626`.
+**css class from app.css**
+primary -> btn-primary
+secondary -> btn-secondary
+success -> btn-success
+warning -> btn-warning
+danger -> btn-danger
 
 **Button sizes:**
 ```

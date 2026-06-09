@@ -81,7 +81,42 @@ class BlogController extends Controller
         $post = $this->blog->publishedQuery()
             ->where('slug', $slug)
             ->withCount('favorites')
-            ->firstOrFail();
+            ->first();
+
+        if (! $post && auth('admin')->check()) {
+            $previewPost = BlogPost::query()
+                ->where('slug', $slug)
+                ->with(['author:id,name,avatar', 'categories:id,name,slug,color', 'tags:id,name,slug'])
+                ->firstOrFail();
+
+            $this->authorize('preview', $previewPost);
+
+            $previewPost->setAttribute('comments_count', $previewPost->comments()->approved()->count());
+
+            return Inertia::render('Blog/Show', [
+                'post' => $previewPost,
+                'relatedPosts' => $previewPost->show_related_posts ? $this->blog->relatedPosts($previewPost) : [],
+                'share' => null,
+                'comments' => [
+                    'data' => [],
+                    'links' => [],
+                    'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0],
+                ],
+                'commentSettings' => [
+                    'enabled' => false,
+                    'allow_guests' => false,
+                    'poll_seconds' => 60,
+                ],
+                'schema' => [],
+                'meta' => $this->meta(
+                    $previewPost->title.' ['.translate('Preview').']',
+                    $previewPost->excerpt ?? '',
+                    true
+                ),
+            ]);
+        }
+
+        abort_if(! $post, 404);
 
         $post->setAttribute('is_favorited', $request->user()
             ? $post->favorites()->where('user_id', $request->user()->id)->exists()

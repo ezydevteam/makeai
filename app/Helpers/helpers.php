@@ -78,6 +78,10 @@ if (! function_exists('translate')) {
      * Translate a string using the active language.
      * Falls back to the $text itself if no translation found.
      *
+     * Supports pluralization with pipe syntax:
+     *   translate('One item|:count items', ['count' => 5])   → "5 items"
+     *   translate('No items|One item|:count items', ['count' => 0]) → "No items"
+     *
      * @param  string  $text  The text to translate (used as key)
      * @param  array  $replace  Placeholder replacements
      *
@@ -96,6 +100,17 @@ if (! function_exists('translate')) {
             }
         } catch (Exception $e) {
             // DB not ready yet, use original text
+        }
+
+        // Pluralization: split on | based on count
+        if (array_key_exists('count', $replace)) {
+            $count = (int) $replace['count'];
+            $parts = explode('|', $translated);
+            if (count($parts) === 2) {
+                $translated = $count === 1 ? $parts[0] : $parts[1];
+            } elseif (count($parts) === 3) {
+                $translated = $count === 0 ? $parts[0] : ($count === 1 ? $parts[1] : $parts[2]);
+            }
         }
 
         // Apply replacements
@@ -293,7 +308,16 @@ if (! function_exists('theme_setting')) {
      */
     function theme_setting(string $key, mixed $default = null): mixed
     {
-        return app(ThemeService::class)->getSetting($key, $default);
+        $value = app(ThemeService::class)->getSetting($key, $default);
+
+        if ($value === $default || $value === null) {
+            $appearance = \App\Models\AppearanceSetting::getForScope('theme_default');
+            if (array_key_exists($key, $appearance) && $appearance[$key] !== null) {
+                return $appearance[$key];
+            }
+        }
+
+        return $value;
     }
 }
 

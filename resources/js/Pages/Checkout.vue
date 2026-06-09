@@ -257,7 +257,7 @@ const applyCoupon = async () => {
                             <span class="mb-1 block text-sm font-bold text-gray-700">{{ t('Coupon code') }}</span>
                             <div class="flex gap-2">
                                 <input v-model="coupon" type="text" class="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm uppercase focus:border-primary-400 focus:ring-primary-100" :placeholder="t('Optional')" @input="couponPreview = null; couponError = ''" />
-                                <button type="button" :disabled="applyingCoupon" class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white transition hover:bg-primary-600 disabled:opacity-60" @click="applyCoupon">
+                                <button type="button" :disabled="applyingCoupon" class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white transition disabled:opacity-60" @click="applyCoupon">
                                     {{ applyingCoupon ? t('Applying...') : t('Apply') }}
                                 </button>
                             </div>
@@ -294,7 +294,7 @@ const applyCoupon = async () => {
                         {{ t(':days days trial starts now. Renewal uses the selected billing cycle.', { days: String(pricing.cycle.trial_days ?? 0) }) }}
                     </p>
 
-                    <button type="button" :disabled="!selectedGateway || submitting" @click="createCheckoutSession" class="mt-6 w-full rounded-xl bg-primary-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-500 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">
+                    <button type="button" :disabled="!selectedGateway || submitting" @click="createCheckoutSession" class="mt-6 w-full rounded-xl btn-primary shadow-lg shadow-primary-600/20 transition disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none">
                         {{ submitting ? t('Creating session...') : selectedGateway ? t('Continue with :gateway', { gateway: selectedGateway.name }) : t('No gateway available') }}
                     </button>
 

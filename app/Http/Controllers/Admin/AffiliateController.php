@@ -66,12 +66,30 @@ class AffiliateController extends Controller
         abort_unless(isProAvailable(), 404);
         abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
-        AffiliateProgram::current()->update([
-            ...$request->validated(),
-            'marketing_banners' => [],
-            'promotional_emails' => [],
-            'social_posts' => [],
-        ]);
+        $data = $request->validated();
+
+        if ($request->has('marketing_banners')) {
+            $data['marketing_banners'] = array_values(array_filter(
+                $request->input('marketing_banners', []),
+                fn ($b) => is_array($b) && ! empty($b['url'])
+            ));
+        }
+
+        if ($request->has('promotional_emails')) {
+            $data['promotional_emails'] = array_values(array_filter(
+                $request->input('promotional_emails', []),
+                fn ($e) => is_array($e) && ! empty($e['subject'])
+            ));
+        }
+
+        if ($request->has('social_posts')) {
+            $data['social_posts'] = array_values(array_filter(
+                $request->input('social_posts', []),
+                fn ($p) => is_array($p) && ! empty($p['text'])
+            ));
+        }
+
+        AffiliateProgram::current()->update($data);
 
         return back()->with('success', translate('Affiliate settings updated successfully.'));
     }

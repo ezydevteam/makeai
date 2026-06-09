@@ -54,6 +54,10 @@ Schedule::command('notes:prune-expired')
     ->hourly()
     ->withoutOverlapping();
 
+Schedule::command('tools:flush-views')
+    ->hourly()
+    ->withoutOverlapping();
+
 Schedule::command('exports:cleanup')
     ->daily()
     ->withoutOverlapping();
@@ -61,6 +65,27 @@ Schedule::command('exports:cleanup')
 Schedule::command('license:reverify')
     ->daily()
     ->withoutOverlapping();
+
+Schedule::command('blog:publish-scheduled')
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command('support:auto-close')
+    ->dailyAt('01:00')
+    ->withoutOverlapping();
+
+Schedule::command('social:refresh')
+    ->dailyAt('04:00')
+    ->withoutOverlapping();
+
+Schedule::command('updates:check')
+    ->daily()
+    ->withoutOverlapping();
+
+Schedule::command('demo:reset --force')
+    ->hourly()
+    ->withoutOverlapping()
+    ->when(fn () => config('demo.enabled'));
 
 Schedule::call(function (): void {
     $timestamp = now()->toDateTimeString();

@@ -161,7 +161,7 @@ const regenerateRecoveryCodes = () => {
                         <p v-if="enableForm.errors.code" class="mt-1 text-sm text-danger-500">{{ enableForm.errors.code }}</p>
                     </div>
 
-                    <button type="submit" :disabled="enableForm.processing || enableForm.code.length !== 6" class="w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:opacity-60">
+                    <button type="submit" :disabled="enableForm.processing || enableForm.code.length !== 6" class="w-full rounded-lg btn-primary shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                         {{ enableForm.processing ? $t('Enabling...') : $t('Enable Two-Factor') }}
                     </button>
                 </form>
@@ -197,7 +197,7 @@ const regenerateRecoveryCodes = () => {
                     <input v-model="disableForm.code" type="text" required class="w-full rounded-xl border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="$t('Authenticator or recovery code')" />
                     <p v-if="disableForm.errors.code" class="text-sm text-danger-500">{{ disableForm.errors.code }}</p>
 
-                    <button type="submit" :disabled="disableForm.processing" class="rounded-lg bg-danger-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-danger-500 disabled:cursor-not-allowed disabled:opacity-60">
+                    <button type="submit" :disabled="disableForm.processing" class="rounded-lg btn-danger shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                         {{ disableForm.processing ? $t('Disabling...') : $t('Disable Two-Factor') }}
                     </button>
                 </form>

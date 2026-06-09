@@ -41,6 +41,8 @@
         </div>
       </section>
 
+      <AdSection zone="template_page" class="mx-auto mb-8 w-full max-w-7xl px-6" />
+
       <article v-if="template.custom_html_body" v-html="template.custom_html_body" />
       <component :is="'style'" v-if="template.custom_css" v-text="template.custom_css" />
     </div>
@@ -51,6 +53,7 @@
 import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
+import AdSection from '@/Components/AdSection.vue'
 
 const props = defineProps<{
   template: Record<string, any>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useIntersectionObserver } from '@vueuse/core'
 
-type AdZone = 'header_banner' | 'sidebar_top' | 'sidebar_bottom' | 'content_top' | 'content_bottom' | 'content-injection' | 'between_posts' | 'chat_banner' | 'dashboard_top' | 'footer_banner'
+type AdZone = 'header_banner' | 'sidebar_top' | 'sidebar_bottom' | 'content_top' | 'content_bottom' | 'content-injection' | 'between_posts' | 'between_ai_tools' | 'tool_page_top' | 'tool_page_bottom' | 'template_page' | 'chat_banner' | 'dashboard_top' | 'footer_banner' | 'custom_zone_1' | 'custom_zone_2'
 
 interface AdPayload {
     id: number
@@ -26,6 +26,23 @@ const props = defineProps<{
 const ad = ref<AdPayload | null>(null)
 const adRef = ref<HTMLElement | null>(null)
 const hasTrackedView = ref(false)
+const hasRenderableAd = computed(() => {
+    if (!ad.value) return false
+
+    if (ad.value.type === 'image_link') {
+        return Boolean(ad.value.image_url && ad.value.click_url)
+    }
+
+    if (ad.value.type === 'custom_html') {
+        return Boolean(ad.value.custom_html && String(ad.value.custom_html).trim())
+    }
+
+    if (ad.value.type === 'adsense') {
+        return Boolean(ad.value.adsense_client && ad.value.adsense_slot)
+    }
+
+    return false
+})
 
 const fetchAd = async () => {
     const response = await fetch(route('ads.active', { zone: props.zone }), {
@@ -72,7 +89,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div v-if="ad" ref="adRef" class="ad-container overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900">
+    <div v-if="hasRenderableAd" ref="adRef" class="ad-container overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900">
         <a v-if="ad.type === 'image_link' && ad.image_url && ad.click_url" :href="ad.click_url" :target="ad.link_target" rel="noopener noreferrer" class="block">
             <img :src="ad.image_url" :alt="ad.title" class="h-auto w-full object-cover" loading="lazy" />
         </a>

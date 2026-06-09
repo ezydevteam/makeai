@@ -9,21 +9,36 @@ use App\Models\Page;
 use App\Models\User;
 use App\Services\AI\AiService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class PageController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $pages = Page::with('creator')
+        $query = Page::query()->with('creator');
+
+        if ($request->string('status')->toString() === 'trashed') {
+            $query->onlyTrashed();
+        } else {
+            $query->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()));
+            $query->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim($request->string('search')->toString());
+                $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
+            });
+        }
+
+        $pages = $query
             ->orderBy('is_system', 'desc')
             ->orderBy('sort_order')
-            ->paginate(25);
+            ->paginate(25)
+            ->withQueryString();
 
         return Inertia::render('Admin/CMS/Pages/Index', [
             'pages' => $pages,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 
@@ -102,7 +117,8 @@ class PageController extends Controller
             ], 422);
         }
 
-        $user = User::query()->first();
+        $admin = auth('admin')->user();
+        $user = User::where('email', $admin?->email)->first() ?? User::query()->first();
 
         if (! $user) {
             return response()->json([
@@ -128,6 +144,23 @@ class PageController extends Controller
         ]);
     }
 
+    public function preview(Page $page)
+    {
+        return Inertia::render('Page', [
+            'page' => $page,
+            'seo' => [
+                'title' => $page->title.' ['.translate('Preview').']',
+                'description' => $page->meta_description ?: $page->excerpt,
+                'keywords' => $page->meta_keywords,
+                'canonical' => route('page.show', $page->slug),
+                'robots' => 'noindex,nofollow',
+                'og_image' => $page->og_image ? asset('storage/'.$page->og_image) : null,
+                'schema' => [],
+            ],
+            'contactSettings' => null,
+        ]);
+    }
+
     public function destroy(Page $page)
     {
         if ($page->is_system) {
@@ -137,6 +170,24 @@ class PageController extends Controller
         $page->delete();
 
         return redirect()->route('admin.pages.index')->with('success', translate('Page moved to trash.'));
+    }
+
+    public function restore(Page $page)
+    {
+        $page->restore();
+
+        return back()->with('success', translate('Page restored.'));
+    }
+
+    public function forceDelete(Page $page)
+    {
+        if ($page->is_system) {
+            return back()->with('error', translate('System pages cannot be permanently deleted.'));
+        }
+
+        $page->forceDelete();
+
+        return back()->with('success', translate('Page permanently deleted.'));
     }
 
     private function aiAssistPrompt(string $action, string $title, string $content, string $selectedText): string
@@ -172,7 +223,7 @@ class PageController extends Controller
 
         if (in_array($action, ['generate_content', ...$this->selectionAiActions()], true)) {
             return [
-                'content' => strip_tags($content, '<p><br><strong><b><em><i><u><ul><ol><li><blockquote><h2><h3><h4><h5>'),
+                'content' => \App\Services\TiptapHtmlSanitizer::sanitize($content, \App\Services\TiptapHtmlSanitizer::BASIC_TAGS),
             ];
         }
 
@@ -237,10 +288,6 @@ class PageController extends Controller
 
     private function sanitizeHtml(string $html): string
     {
-        $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html) ?? '';
-        $html = preg_replace('/\son\w+=("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
-        $html = preg_replace('/javascript:/i', '', $html) ?? '';
-
-        return strip_tags($html, '<p><br><strong><b><em><i><u><s><ul><ol><li><blockquote><h2><h3><h4><h5><a><img><table><thead><tbody><tr><th><td><pre><code><hr>');
+        return \App\Services\TiptapHtmlSanitizer::sanitize($html);
     }
 }

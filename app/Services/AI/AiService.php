@@ -6,6 +6,7 @@ use App\DTO\CompletionResponse;
 use App\DTO\EmbeddingResult;
 use App\DTO\RagResult;
 use App\Exceptions\AI\IntegrationNotConfiguredException;
+use App\Jobs\RecordGenerationHistoryJob;
 use App\Models\AiChat;
 use App\Models\AiChatMessage;
 use App\Models\AiTool;
@@ -139,7 +140,7 @@ class AiService
         }
         $messages[] = ['role' => 'user', 'content' => $prompt];
 
-        return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options) {
+        return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options, $systemPrompt, $prompt) {
             $result = $adapter->chatCompletion($messages, $modelName, $options);
 
             TokenGuard::after(
@@ -150,6 +151,20 @@ class AiService
                 $providerName,
                 'chat'
             );
+
+            RecordGenerationHistoryJob::dispatch($user, [
+                'tool_slug' => 'direct',
+                'prompt_system' => $systemPrompt ?? '',
+                'prompt_user' => $prompt,
+                'field_values' => [],
+                'model' => $result['model'],
+                'provider' => $providerName,
+                'temperature' => $options['temperature'] ?? 0.7,
+                'max_tokens' => $options['max_tokens'] ?? 2000,
+                'output_preview' => Str::limit($result['content'], 500),
+                'tokens_input' => $result['input_tokens'],
+                'tokens_output' => $result['output_tokens'],
+            ])->onQueue('ai');
 
             return new CompletionResponse(
                 content: $result['content'],
@@ -205,6 +220,20 @@ class AiService
                 'template',
                 ['template_slug' => $template->slug]
             );
+
+            RecordGenerationHistoryJob::dispatch($user, [
+                'tool_slug' => $template->slug,
+                'prompt_system' => $completion->systemPrompt,
+                'prompt_user' => $completion->userMessage,
+                'field_values' => $inputs,
+                'model' => $result['model'],
+                'provider' => $providerName,
+                'temperature' => $completion->temperature,
+                'max_tokens' => $completion->maxTokens,
+                'output_preview' => Str::limit($result['content'], 500),
+                'tokens_input' => $result['input_tokens'],
+                'tokens_output' => $result['output_tokens'],
+            ])->onQueue('ai');
         } catch (Throwable $e) {
             TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
                 'template_slug' => $template->slug,

@@ -12,6 +12,8 @@ defineOptions({ layout: AdminLayout })
 const { t } = useTranslate()
 const page = usePage()
 
+const isDemo = computed(() => (page.props.app as any)?.demo ?? false)
+
 interface DashboardStats {
     totalUsers: number; newUsersToday: number; newUsersThisMonth: number; newUsersLastMonth: number
     activeUsers: number; bannedUsers: number
@@ -324,6 +326,19 @@ const activityTypeLabels: Record<string, string> = {
             <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">{{ t('Overview of your platform') }}</p>
         </div>
 
+        <!-- Demo Mode Indicator -->
+        <div v-if="isDemo" class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+            <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                <div class="flex-1">
+                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ t('Demo Mode Active') }}</p>
+                    <p class="mt-1 text-sm text-amber-700 dark:text-amber-400">{{ t('Destructive write operations are blocked. AI generation, login/logout, and preferences remain functional. To change demo settings, edit the .env file.') }}</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Notes Reminder Alert -->
         <div v-if="notesReminders.length" class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
             <div class="flex items-start gap-3">
@@ -358,7 +373,7 @@ const activityTypeLabels: Record<string, string> = {
                 <span class="text-xs text-gray-400 mr-2">{{ t('Chart range') }}:</span>
                 <button v-for="opt in periodOptions" :key="opt" @click="chartPeriod = opt"
                     class="px-3 py-1 text-xs rounded-lg border transition-colors"
-                    :class="chartPeriod === opt ? 'bg-primary-600 text-white border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-surface-700 hover:border-primary-300'">
+                    :class="chartPeriod === opt ? 'btn-primary border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-surface-700 hover:border-primary-300'">
                     {{ (periodLabels as any)[opt] }}
                 </button>
             </div>

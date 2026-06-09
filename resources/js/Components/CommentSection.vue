@@ -192,7 +192,7 @@ onUnmounted(() => {
 
                 <textarea v-model="form.content" rows="3" class="w-full resize-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm transition-all focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Share your thoughts...')" required></textarea>
                 <div class="flex justify-end">
-                    <button type="submit" :disabled="form.processing" class="rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition-all hover:bg-primary-500 disabled:opacity-50">
+                    <button type="submit" :disabled="form.processing" class="rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:opacity-50">
                         {{ form.processing ? t('Posting...') : t('Post Comment') }}
                     </button>
                 </div>
@@ -211,7 +211,7 @@ onUnmounted(() => {
                         <form v-if="editingComment?.id === comment.id" class="space-y-3" @submit.prevent="updateComment">
                             <textarea v-model="editForm.content" rows="3" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" required></textarea>
                             <div class="flex gap-2">
-                                <button type="submit" class="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white">{{ t('Save') }}</button>
+                                <button type="submit" class="rounded-lg btn-primary">{{ t('Save') }}</button>
                                 <button type="button" class="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold" @click="editingComment = null">{{ t('Cancel') }}</button>
                             </div>
                         </form>
@@ -244,7 +244,7 @@ onUnmounted(() => {
             </div>
 
             <div v-if="comments.links.length > 3" class="flex flex-wrap gap-2">
-                <Link v-for="link in comments.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="[link.active ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600', !link.url ? 'pointer-events-none opacity-50' : '']" class="rounded-lg px-3 py-1 text-xs font-semibold" v-html="link.label" />
+                <Link v-for="link in comments.links" :key="link.label" :href="link.url || '#'" preserve-scroll :class="[link.active ? 'btn-primary' : 'bg-gray-100 text-gray-600', !link.url ? 'pointer-events-none opacity-50' : '']" class="rounded-lg px-3 py-1 text-xs font-semibold" v-html="link.label" />
             </div>
         </div>
 
@@ -257,7 +257,7 @@ onUnmounted(() => {
                 </div>
                 <div class="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 p-4">
                     <button type="button" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600" @click="reportingComment = null">{{ t('Cancel') }}</button>
-                    <button type="submit" :disabled="reportForm.processing" class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{{ reportForm.processing ? t('Sending...') : t('Submit report') }}</button>
+                    <button type="submit" :disabled="reportForm.processing" class="rounded-lg btn-primary disabled:opacity-60">{{ reportForm.processing ? t('Sending...') : t('Submit report') }}</button>
                 </div>
             </form>
         </div>

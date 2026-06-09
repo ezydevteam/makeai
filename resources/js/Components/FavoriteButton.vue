@@ -73,15 +73,14 @@ const toggle = () => {
     <button
         type="button"
         :aria-label="label"
-        :title="label"
         :disabled="processing"
         :class="[
             favorited
-                ? 'border-danger-100 bg-danger-50 text-danger-500 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-300'
-                : 'border-gray-100 bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200',
+                ? 'border-danger-100 bg-danger-50 text-danger-600 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-200'
+                : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-gray-100',
             processing ? 'cursor-wait opacity-70' : '',
         ]"
-        class="group inline-flex items-center gap-1.5 rounded-xl border p-2 transition-all"
+        class="group inline-flex items-center gap-1.5 rounded-xl border p-2 shadow-sm transition-all"
         @click.stop.prevent="toggle"
     >
         <svg :class="iconSize" viewBox="0 0 24 24" stroke="currentColor" :stroke-width="favorited ? '0' : '2'" :fill="favorited ? 'currentColor' : 'none'">

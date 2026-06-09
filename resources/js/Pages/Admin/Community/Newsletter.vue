@@ -23,8 +23,15 @@ const { t } = useTranslate();
 const { formatDate } = useDateFormat();
 
 const showCampaignModal = ref(false);
+const editingCampaignId = ref<number | null>(null);
 const sendTargetId = ref<number | null>(null);
+const deleteTargetId = ref<number | null>(null);
+const testTargetId = ref<number | null>(null);
 const deleteSubscriberId = ref<number | null>(null);
+const subscriberSearch = ref(props.subscribers?.search ?? '')
+const filterSubscribers = () => {
+    window.location.href = route('admin.newsletter.index') + '?search=' + encodeURIComponent(subscriberSearch.value)
+}
 const campaignForm = useForm({
     subject: '',
     audience: 'subscribers',
@@ -46,6 +53,26 @@ const submitCampaign = () => {
     campaignForm.post(route('admin.newsletter.campaign.store'), {
         onSuccess: () => {
             showCampaignModal.value = false;
+            editingCampaignId.value = null;
+            campaignForm.reset();
+        }
+    });
+};
+
+const editCampaign = (camp: any) => {
+    editingCampaignId.value = camp.id;
+    campaignForm.subject = camp.subject;
+    campaignForm.audience = camp.audience;
+    campaignForm.content = camp.content;
+    showCampaignModal.value = true;
+};
+
+const updateCampaign = () => {
+    if (editingCampaignId.value === null) return;
+    campaignForm.post(route('admin.newsletter.campaign.update', editingCampaignId.value), {
+        onSuccess: () => {
+            showCampaignModal.value = false;
+            editingCampaignId.value = null;
             campaignForm.reset();
         }
     });
@@ -83,6 +110,25 @@ const confirmDeleteSubscriber = () => {
     });
 };
 
+const deleteCampaign = (id: number) => {
+    deleteTargetId.value = id;
+};
+
+const confirmDeleteCampaign = () => {
+    if (deleteTargetId.value === null) return;
+    useForm({}).delete(route('admin.newsletter.campaign.delete', deleteTargetId.value), {
+        onFinish: () => { deleteTargetId.value = null; },
+    });
+};
+
+const testCampaign = (id: number) => {
+    useForm({}).post(route('admin.newsletter.campaign.test', id));
+};
+
+const retryCampaign = (id: number) => {
+    useForm({}).post(route('admin.newsletter.campaign.retry', id));
+};
+
 const settingsForm = useForm({
     newsletter_driver: props.settings.newsletter_driver || 'internal',
     mailchimp_api_key: '',
@@ -90,6 +136,7 @@ const settingsForm = useForm({
     mailchimp_list_id: props.settings.mailchimp_list_id || '',
     mailchimp_double_optin: props.settings.mailchimp_double_optin ?? false,
     mailchimp_tags: props.settings.mailchimp_tags || '',
+    newsletter_double_optin: props.settings.newsletter_double_optin ?? false,
     
     newsletter_enable_popup: props.settings.newsletter_enable_popup ?? false,
     newsletter_popup_trigger: props.settings.newsletter_popup_trigger || 'time_delay',
@@ -118,10 +165,10 @@ const saveSettings = () => {
                 <h1 class="text-2xl font-bold text-gray-900">{{ t('Newsletter System') }}</h1>
                 <p class="text-sm text-gray-500 mt-1">{{ t('Manage subscribers, campaigns, and Mailchimp integration.') }}</p>
             </div>
-            <button v-if="activeTab === 'campaigns'" @click="showCampaignModal = true" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/20">
+            <button v-if="activeTab === 'campaigns'" @click="showCampaignModal = true" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-500/20">
                 {{ t('CREATE CAMPAIGN') }}
             </button>
-            <button v-if="activeTab === 'settings' || activeTab === 'popup'" @click="saveSettings" :disabled="settingsForm.processing" class="px-5 py-2.5 bg-primary-600 text-white rounded-xl text-sm font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/20 disabled:opacity-50">
+            <button v-if="activeTab === 'settings' || activeTab === 'popup'" @click="saveSettings" :disabled="settingsForm.processing" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-500/20 disabled:opacity-50">
                 {{ t('SAVE SETTINGS') }}
             </button>
         </div>
@@ -159,6 +206,9 @@ const saveSettings = () => {
         </div>
 
         <div v-if="activeTab === 'subscribers'">
+            <div class="mb-4">
+                <input v-model="subscriberSearch" @keyup.enter="filterSubscribers" type="text" :placeholder="t('Search subscribers...')" class="w-full max-w-sm bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
+            </div>
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse">
@@ -177,7 +227,11 @@ const saveSettings = () => {
                                     <div class="text-[10px] text-gray-400">{{ sub.name || t('Anonymous') }}</div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span :class="sub.status === 'subscribed' ? 'bg-success-50 text-success-600 border-success-100' : 'bg-danger-50 text-danger-600 border-danger-100'" class="px-2 py-0.5 text-[10px] font-bold rounded-full border">
+                                    <span :class="{
+                                        'bg-success-50 text-success-600 border-success-100': sub.status === 'subscribed',
+                                        'bg-warning-50 text-warning-600 border-warning-100': sub.status === 'pending',
+                                        'bg-danger-50 text-danger-600 border-danger-100': sub.status === 'unsubscribed' || sub.status === 'bounced'
+                                    }" class="px-2 py-0.5 text-[10px] font-bold rounded-full border">
                                         {{ t(sub.status).toUpperCase() }}
                                     </span>
                                 </td>
@@ -194,6 +248,7 @@ const saveSettings = () => {
                     </table>
                 </div>
             </div>
+            <Pagination class="mt-6" :links="subscribers.links" />
         </div>
 
         <div v-if="activeTab === 'campaigns'">
@@ -214,15 +269,29 @@ const saveSettings = () => {
                             <p class="text-xs text-gray-500">
                                 {{ t('Created: :date', { date: formatDate(camp.created_at) }) }}
                                 <span v-if="camp.sent_at">{{ t(' • Sent: :date', { date: formatDate(camp.sent_at) }) }}</span>
-                                {{ t(' • :audience • :recipients recipients • :sent sent • :failed failed', { audience: audienceLabel(camp.audience), recipients: camp.recipient_count, sent: camp.sent_count || 0, failed: camp.failed_count || 0 }) }}
+                                {{ t(' • :audience • :recipients recipients • :sent sent • :failed failed • :opened opened', { audience: audienceLabel(camp.audience), recipients: camp.recipient_count, sent: camp.sent_count || 0, failed: camp.failed_count || 0, opened: camp.opened_count || 0 }) }}
                             </p>
                         </div>
-                        <button v-if="camp.status === 'draft'" @click="sendCampaign(camp.id)" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-xs font-bold hover:bg-primary-500 transition-all">
-                            {{ t('QUEUE SEND') }}
-                        </button>
-                        <span v-else-if="camp.status === 'sending'" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
-                            {{ t('SENDING IN QUEUE') }}
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <button v-if="camp.status === 'draft'" @click="editCampaign(camp)" class="p-2 text-gray-400 hover:text-gray-600 transition-colors" :title="t('Edit campaign')">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button v-if="camp.status !== 'sending'" @click="testCampaign(camp.id)" class="p-2 text-gray-400 hover:text-blue-600 transition-colors" :title="t('Send test')">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            </button>
+                            <button v-if="camp.status === 'draft'" @click="sendCampaign(camp.id)" class="px-4 py-2 btn-primary rounded-lg text-xs font-bold transition-all">
+                                {{ t('QUEUE SEND') }}
+                            </button>
+                            <span v-else-if="camp.status === 'sending'" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
+                                {{ t('SENDING IN QUEUE') }}
+                            </span>
+                            <button v-if="camp.status !== 'sending'" @click="deleteCampaign(camp.id)" class="p-2 text-gray-400 hover:text-danger-600 transition-colors" :title="t('Delete campaign')">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                            <button v-if="camp.status === 'sent' && (camp.failed_count || 0) > 0" @click="retryCampaign(camp.id)" class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors" :title="t('Retry failed recipients')">
+                                {{ t('RETRY FAILED') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div v-if="campaigns.data.length === 0" class="p-10 bg-white rounded-2xl border border-gray-100 shadow-sm text-center text-sm text-gray-400">
@@ -269,6 +338,14 @@ const saveSettings = () => {
                         </div>
 
                         <label class="flex items-center gap-3 cursor-pointer">
+                            <input v-model="settingsForm.newsletter_double_optin" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                            <div>
+                                <span class="block text-sm font-bold text-gray-900">{{ t('Double Opt-In') }}</span>
+                                <span class="block text-xs text-gray-500">{{ t('Require email confirmation before adding subscribers.') }}</span>
+                            </div>
+                        </label>
+
+                        <label v-if="settingsForm.newsletter_driver !== 'internal'" class="flex items-center gap-3 cursor-pointer">
                             <input v-model="settingsForm.mailchimp_double_optin" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                             <div>
                                 <span class="block text-sm font-bold text-gray-900">{{ t('Require Double Opt-in') }}</span>
@@ -367,12 +444,12 @@ const saveSettings = () => {
         <div v-if="showCampaignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
             <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="font-bold text-gray-900">{{ t('Create Campaign') }}</h3>
-                    <button @click="showCampaignModal = false" class="text-gray-400 hover:text-gray-600">
+                    <h3 class="font-bold text-gray-900">{{ editingCampaignId ? t('Edit Campaign') : t('Create Campaign') }}</h3>
+                    <button @click="showCampaignModal = false; editingCampaignId = null; campaignForm.reset()" class="text-gray-400 hover:text-gray-600">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
-                <form @submit.prevent="submitCampaign" class="p-6 space-y-4">
+                <form @submit.prevent="editingCampaignId ? updateCampaign() : submitCampaign()" class="p-6 space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('Subject') }}</label>
                         <input v-model="campaignForm.subject" type="text" :placeholder="t('Weekly AI Updates')" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
@@ -392,8 +469,8 @@ const saveSettings = () => {
                         <p class="text-[10px] text-gray-400 mt-2">{{ t('Available variables: {user_name}, {user_email}, {unsubscribe_url}, {site_name}, {site_url}') }}</p>
                     </div>
                     <div class="pt-4">
-                        <button type="submit" :disabled="campaignForm.processing" class="w-full py-3 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
-                            {{ t('SAVE AS DRAFT') }}
+                        <button type="submit" :disabled="campaignForm.processing" class="w-full py-3 btn-primary rounded-xl font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
+                            {{ editingCampaignId ? t('UPDATE CAMPAIGN') : t('SAVE AS DRAFT') }}
                         </button>
                     </div>
                 </form>
@@ -408,6 +485,15 @@ const saveSettings = () => {
             variant="primary"
             @cancel="sendTargetId = null"
             @confirm="confirmSendCampaign"
+        />
+
+        <ActionConfirmModal
+            :open="deleteTargetId !== null"
+            :title="t('Delete campaign?')"
+            :message="t('This campaign and all its recipient records will be permanently deleted.')"
+            :confirm-label="t('Delete')"
+            @cancel="deleteTargetId = null"
+            @confirm="confirmDeleteCampaign"
         />
 
         <ActionConfirmModal

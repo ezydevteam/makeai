@@ -83,7 +83,7 @@ const executeDelete = () => {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tools') }}</h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Manage AI tools, prompts, and configurations.') }}</p>
             </div>
-            <Link :href="route('admin.ai.tools.create')" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl shadow-lg shadow-primary-500/20 transition-all">
+            <Link :href="route('admin.ai.tools.create')" class="inline-flex items-center gap-2 btn-primary">
                 <i class="ti ti-plus text-lg"></i>
                 {{ t('New Tool') }}
             </Link>
@@ -134,7 +134,7 @@ const executeDelete = () => {
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <div :style="{ background: tool.color || '#6366f1' }" class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm shrink-0 shadow-sm overflow-hidden">
-                                    <i v-if="tool.icon" :class="['ti', tool.icon]"></i>
+                                    <i v-if="tool.icon" :class="tool.icon"></i>
                                     <span v-else class="font-bold leading-none">{{ String(tool.name || '?').charAt(0).toUpperCase() }}</span>
                                 </div>
                                 <div>

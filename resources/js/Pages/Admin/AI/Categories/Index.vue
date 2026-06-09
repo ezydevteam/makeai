@@ -383,7 +383,7 @@ const closeAllMenus = () => {
                             <button
                                 :disabled="form.processing"
                                 type="submit"
-                                class="flex-1 rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white hover:bg-primary-600 disabled:opacity-50"
+                                class="flex-1 rounded-lg btn-primary disabled:opacity-50"
                             >
                                 {{ form.processing ? t('Saving...') : t('Save') }}
                             </button>

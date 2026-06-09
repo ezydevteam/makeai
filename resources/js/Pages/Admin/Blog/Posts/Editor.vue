@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onClickOutside } from '@vueuse/core'
+import AppSelect from '@/Components/AppSelect.vue'
+import TagsInput from '@/Components/TagsInput.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -10,7 +13,7 @@ defineOptions({ layout: AdminLayout })
 
 declare const route: (name: string, params?: unknown) => string
 
-interface Category { id: number; name: string }
+interface Category { id: number; name: string; color?: string | null }
 interface Author { id: number; name: string }
 interface ExistingTag { name: string }
 interface Revision { id: number; title: string; created_at: string; admin?: { name: string } | null }
@@ -61,6 +64,11 @@ interface AiAssistAction {
     key: string
     label: string
     description: string
+}
+
+interface SelectOption {
+    value: string
+    label: string
 }
 
 const props = defineProps<{
@@ -180,6 +188,61 @@ const selectionAiActions = [
     'summarize_selection',
     'fix_grammar',
 ]
+
+const authorOptions = computed<SelectOption[]>(() => [
+    { value: '', label: t('Select author') },
+    ...props.authors.map((author) => ({
+        value: String(author.id),
+        label: author.name,
+    })),
+])
+
+const categoryOptions = computed<SelectOption[]>(() => props.categories.map((category) => ({
+    value: category.id,
+    label: category.name,
+})))
+
+const schemaTypeOptions = computed<SelectOption[]>(() => [
+    { value: 'BlogPosting', label: 'Blog Posting' },
+    { value: 'Article', label: 'Article' },
+    { value: 'NewsArticle', label: 'News Article' },
+])
+
+const templateOptions = computed<SelectOption[]>(() => [
+    { value: 'default', label: t('Default') },
+    { value: 'full_width', label: t('Full Width') },
+    { value: 'sidebar_left', label: t('Sidebar Left') },
+    { value: 'sidebar_right', label: t('Sidebar Right') },
+    { value: 'no_sidebar', label: t('No Sidebar') },
+])
+
+const publishMenuOpen = ref(false)
+const publishMenuRef = ref<HTMLElement | null>(null)
+
+const primaryActionLabel = computed(() => {
+    if (form.status === 'published') {
+        return t('Publish')
+    }
+
+    if (form.status === 'draft') {
+        return t('Save Draft')
+    }
+
+    if (form.status === 'scheduled') {
+        return t('Schedule')
+    }
+
+    return t('Save Private')
+})
+
+const setStatus = (value: BlogPost['status']) => {
+    form.status = value
+    publishMenuOpen.value = false
+}
+
+onClickOutside(publishMenuRef, () => {
+    publishMenuOpen.value = false
+})
 
 const makeSlug = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 
@@ -388,15 +451,77 @@ onBeforeUnmount(() => {
                 </div>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Write content and configure SEO, layout, and publishing details.') }}</p>
             </div>
-            <Link :href="route('admin.blog.posts.index')" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-primary-300 dark:bg-surface-900 dark:border-surface-800 dark:text-gray-300">{{ t('Back') }}</Link>
-        </div>
+                <div class="flex flex-col gap-3 sm:flex-row">
+                    <Link :href="route('admin.blog.posts.index')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-primary-300 dark:bg-surface-900 dark:border-surface-800 dark:text-gray-300">
+                        <i class="ti ti-arrow-left text-base"></i>
+                        {{ t('Back') }}
+                    </Link>
+                    <a v-if="currentPostUlid" :href="route('admin.blog.posts.preview', currentPostUlid)" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-primary-300 dark:bg-surface-900 dark:border-surface-800 dark:text-gray-300">
+                        <i class="ti ti-eye text-base"></i>
+                        {{ t('Preview') }}
+                    </a>
+                    <div ref="publishMenuRef" class="relative">
+                        <div class="inline-flex overflow-hidden rounded-lg shadow-sm ring-1 ring-primary-600/20">
+                            <button @click="submit" :disabled="form.processing" type="button" class="inline-flex items-center justify-center gap-2 bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
+                                <i class="ti ti-device-floppy text-base"></i>
+                                {{ form.processing ? t('Saving...') : primaryActionLabel }}
+                            </button>
+                            <button
+                                type="button"
+                                class="inline-flex items-center justify-center bg-primary-600 px-3 text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+                                :aria-label="t('Change post status')"
+                                @click="publishMenuOpen = !publishMenuOpen"
+                            >
+                                <i class="ti ti-chevron-down text-base"></i>
+                            </button>
+                        </div>
+
+                        <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Save as Draft') }}
+                                </span>
+                                <i v-if="form.status === 'draft'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('scheduled')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-calendar-time text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Schedule Post') }}
+                                </span>
+                                <i v-if="form.status === 'scheduled'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('private')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-lock-star text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Save as Private') }}
+                                </span>
+                                <i v-if="form.status === 'private'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('published')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-rocket text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Publish Now') }}
+                                </span>
+                                <i v-if="form.status === 'published'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
             <main class="space-y-5">
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</label>
-                    <input v-model="form.title" @input="syncSlug" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-lg font-semibold dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                    <input v-model="form.title" @input="syncSlug" :placeholder="t('Enter blog post title')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-lg font-semibold dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                     <p v-if="form.errors.title" class="mt-1 text-sm text-danger-600">{{ form.errors.title }}</p>
+
+                    <div class="mt-5">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
+                        <input v-model="form.slug" @input="markSlugTouched" :placeholder="t('blog-post-slug')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                        <p class="mt-1 text-xs text-gray-400">{{ t('Generated from title. You can edit it.') }}</p>
+                    </div>
 
                     <label class="mt-5 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Content') }}</label>
                     <RichEditor
@@ -418,25 +543,56 @@ onBeforeUnmount(() => {
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <div class="mb-2 flex justify-between text-sm"><label class="font-medium text-gray-700 dark:text-gray-300">{{ t('Meta Title') }}</label><span class="text-gray-400">{{ form.meta_title.length }}/60</span></div>
-                            <input v-model="form.meta_title" maxlength="255" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                            <input v-model="form.meta_title" maxlength="255" :placeholder="t('Write an SEO title')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                         </div>
                         <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Schema Type') }}</label>
-                            <select v-model="form.schema_type" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                                <option value="BlogPosting">BlogPosting</option>
-                                <option value="Article">Article</option>
-                                <option value="NewsArticle">NewsArticle</option>
-                            </select>
+                            <AppSelect v-model="form.schema_type" :options="schemaTypeOptions" :label="t('Schema Type')" />
                         </div>
                         <div class="md:col-span-2">
                             <div class="mb-2 flex justify-between text-sm"><label class="font-medium text-gray-700 dark:text-gray-300">{{ t('Meta Description') }}</label><span class="text-gray-400">{{ form.meta_description.length }}/160</span></div>
-                            <textarea v-model="form.meta_description" rows="3" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
+                            <textarea v-model="form.meta_description" :placeholder="t('Write a concise meta description')" rows="3" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
                         </div>
-                        <input v-model="form.meta_keywords" :placeholder="t('Meta keywords')" type="text" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                        <input v-model="form.canonical_url" :placeholder="t('Canonical URL')" type="url" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                        <input v-model="form.og_title" :placeholder="t('Open Graph title')" type="text" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                        <input v-model="form.og_image" :placeholder="t('Open Graph image URL')" type="text" class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                        <textarea v-model="form.og_description" :placeholder="t('Open Graph description')" rows="2" class="md:col-span-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta Keywords') }}</label>
+                            <input v-model="form.meta_keywords" :placeholder="t('Add comma separated meta keywords')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Canonical URL') }}</label>
+                            <input v-model="form.canonical_url" :placeholder="t('https://example.com/blog/post')" type="url" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Open Graph Title') }}</label>
+                            <input v-model="form.og_title" :placeholder="t('Write an Open Graph title')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Open Graph Image URL') }}</label>
+                            <input v-model="form.og_image" :placeholder="t('Paste an Open Graph image URL')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Open Graph Description') }}</label>
+                            <textarea v-model="form.og_description" :placeholder="t('Write an Open Graph description')" rows="2" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout') }}</h2>
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div v-for="field in toggles" :key="field.key" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/60">
+                            <div class="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    class="relative h-6 w-12 rounded-full transition-colors"
+                                    :class="form[field.key] ? 'bg-emerald-500 dark:bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'"
+                                    @click="form[field.key] = !form[field.key]"
+                                >
+                                    <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="form[field.key] ? 'translate-x-6' : 'translate-x-0'"></span>
+                                </button>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t(field.label) }}</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
             </main>
@@ -445,20 +601,6 @@ onBeforeUnmount(() => {
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Publishing') }}</h2>
                     <div class="space-y-4">
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
-                            <input v-model="form.slug" @input="markSlugTouched" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                            <p class="mt-1 text-xs text-gray-400">{{ t('Generated from title. You can edit it.') }}</p>
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Status') }}</label>
-                            <select v-model="form.status" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                                <option value="draft">{{ t('Draft') }}</option>
-                                <option value="published">{{ t('Published') }}</option>
-                                <option value="scheduled">{{ t('Scheduled') }}</option>
-                                <option value="private">{{ t('Private') }}</option>
-                            </select>
-                        </div>
                         <div v-if="form.status === 'scheduled'">
                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Scheduled At') }}</label>
                             <input v-model="form.scheduled_at" type="datetime-local" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
@@ -468,10 +610,10 @@ onBeforeUnmount(() => {
                             <input v-model="form.published_at" type="datetime-local" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                         </div>
                         <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Author') }}</label>
-                            <select v-model="form.author_id" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                                <option v-for="author in authors" :key="author.id" :value="author.id">{{ author.name }}</option>
-                            </select>
+                            <AppSelect v-model="form.author_id" :options="authorOptions" :label="t('Author')" :placeholder="t('Select author')" />
+                        </div>
+                        <div>
+                            <AppSelect v-model="form.template" :options="templateOptions" :label="t('Template')" />
                         </div>
                     </div>
                 </section>
@@ -479,47 +621,37 @@ onBeforeUnmount(() => {
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('General') }}</h2>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Excerpt') }}</label>
-                    <textarea v-model="form.excerpt" rows="4" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
+                    <textarea v-model="form.excerpt" :placeholder="t('Write a short excerpt for listing pages and sharing')" rows="4" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
                     <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Featured Image') }}</label>
                     <div v-if="form.featured_image" class="mb-3 overflow-hidden rounded-lg border border-gray-200 dark:border-surface-700">
                         <img :src="form.featured_image" :alt="form.featured_image_alt || form.title" class="h-32 w-full object-cover">
                     </div>
-                    <input @change="setFeaturedImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                    <input @change="setFeaturedImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="w-full rounded-lg border border-gray-200 bg-gray-50 ps-3 pe-3 py-2 text-sm text-gray-600 file:me-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-700 file:transition-colors hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:file:bg-primary-900/30 dark:file:text-primary-300 dark:hover:file:bg-primary-900/40">
                     <p v-if="form.errors.featured_image_file" class="mt-1 text-sm text-danger-600">{{ form.errors.featured_image_file }}</p>
                     <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image Alt Text') }}</label>
-                    <input v-model="form.featured_image_alt" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                    <input v-model="form.featured_image_alt" :placeholder="t('Describe the image for accessibility')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                     <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Reading Time') }}</label>
-                    <input v-model="form.reading_time" type="number" min="0" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                    <input v-model="form.reading_time" :placeholder="t('Estimated reading time in minutes')" type="number" min="0" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
                 </section>
 
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Categories and Tags') }}</h2>
-                    <select v-if="categories.length" v-model="form.category_ids" multiple class="min-h-40 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                        <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-                    </select>
+                    <AppSelect
+                        v-if="categories.length"
+                        v-model="form.category_ids"
+                        :options="categoryOptions"
+                        :label="t('Categories')"
+                        :placeholder="t('Select categories')"
+                        multiple
+                        compact-multiple
+                        live-search
+                    />
                     <div v-else class="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500 dark:border-surface-700">
                         <p>{{ t('No active blog categories yet.') }}</p>
                         <Link :href="route('admin.blog.categories.index')" class="mt-2 inline-flex text-primary-600 hover:text-primary-500">{{ t('Create category') }}</Link>
                     </div>
-                    <p v-if="categories.length" class="mt-1 text-xs text-gray-400">{{ t('Hold Ctrl or Command to choose multiple categories.') }}</p>
-                    <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Tags') }}</label>
-                    <input v-model="form.tags" type="text" :placeholder="t('Comma separated tags')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                </section>
-
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
-                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout') }}</h2>
-                    <select v-model="form.template" class="mb-4 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                        <option value="default">{{ t('Default') }}</option>
-                        <option value="full_width">{{ t('Full Width') }}</option>
-                        <option value="sidebar_left">{{ t('Sidebar Left') }}</option>
-                        <option value="sidebar_right">{{ t('Sidebar Right') }}</option>
-                        <option value="no_sidebar">{{ t('No Sidebar') }}</option>
-                    </select>
-                    <div class="space-y-3">
-                        <label v-for="field in toggles" :key="field.key" class="flex items-center justify-between text-sm text-gray-700 dark:text-gray-300">
-                            <span>{{ t(field.label) }}</span>
-                            <input v-model="form[field.key]" type="checkbox" class="rounded border-gray-300 text-primary-600">
-                        </label>
+                    <div class="mt-4">
+                        <TagsInput v-model="form.tags" :label="t('Tags')" :placeholder="t('Type a tag and press Enter')" :suggestions="tags.map((tag) => tag.name)" />
                     </div>
                 </section>
 
@@ -533,9 +665,9 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <button @click="submit" :disabled="form.processing" type="button" class="w-full rounded-lg bg-primary-600 px-5 py-3 text-sm font-medium text-white hover:bg-primary-500 disabled:opacity-60">
-                    {{ form.processing ? t('Saving...') : t('Save Blog Post') }}
-                </button>
+                <div class="rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-gray-600 shadow-sm dark:border-primary-900/30 dark:bg-primary-900/10 dark:text-gray-300">
+                    {{ t('Use preview to review unpublished changes, then save when the post content, SEO, and layout are ready.') }}
+                </div>
             </aside>
         </div>
     </div>

@@ -30,6 +30,14 @@ class BlogSettingsController extends Controller
                 'social_share_networks' => settings('social_share_networks', array_keys(SocialService::SHARE_NETWORKS)),
                 'social_share_blog_style' => settings('social_share_blog_style', 'icon-label'),
                 'social_share_show_counts' => (bool) settings('social_share_show_counts', false),
+                'comments_enabled' => (bool) settings('comments_enabled', true),
+                'comments_auto_approve_users' => (bool) settings('comments_auto_approve_users', true),
+                'comments_allow_guests' => (bool) settings('comments_allow_guests', false),
+                'comments_require_approval' => (bool) settings('comments_require_approval', false),
+                'comments_notify_admin' => (bool) settings('comments_notify_admin', false),
+                'comments_poll_seconds' => (int) settings('comments_poll_seconds', 60),
+                'comments_akismet_key' => '',
+                'comments_akismet_configured' => filled(settings('comments_akismet_key')),
             ],
             'authors' => Admin::orderBy('name')->get(['id', 'name']),
             'shareNetworks' => collect(SocialService::SHARE_NETWORKS)
@@ -40,12 +48,20 @@ class BlogSettingsController extends Controller
 
     public function update(BlogSettingsRequest $request)
     {
-        foreach ($request->validated() as $key => $value) {
+        foreach ($request->safe()->except('comments_akismet_key') as $key => $value) {
             $type = is_bool($value) ? 'boolean' : (is_int($value) ? 'integer' : (is_array($value) ? 'json' : 'string'));
-            $settingKey = str_starts_with($key, 'social_share_') ? $key : 'blog_'.$key;
-            $group = str_starts_with($key, 'social_share_') ? 'social' : 'blog';
+            $settingKey = str_starts_with($key, 'social_share_')
+                ? $key
+                : (str_starts_with($key, 'comments_') ? $key : 'blog_'.$key);
+            $group = str_starts_with($key, 'social_share_')
+                ? 'social'
+                : (str_starts_with($key, 'comments_') ? 'comments' : 'blog');
 
             settings_set($settingKey, $value, $type, $group);
+        }
+
+        if ($request->filled('comments_akismet_key')) {
+            settings_set('comments_akismet_key', $request->validated('comments_akismet_key'), 'encrypted', 'comments');
         }
 
         return back()->with('success', translate('Blog settings saved.'));

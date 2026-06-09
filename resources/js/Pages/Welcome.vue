@@ -152,7 +152,6 @@ const defaultHomepage: HomepageConfig = {
 const homepageConfig = computed<HomepageConfig>(() => props.homepage ?? defaultHomepage)
 const enabledSections = computed(() => homepageConfig.value.sections.filter((section) => section.enabled))
 const showScrollButton = ref(false)
-const cookieAccepted = ref(false)
 const openFaqId = ref<number | null>(null)
 const toggleFaq = (id: number) => { openFaqId.value = openFaqId.value === id ? null : id }
 
@@ -205,13 +204,7 @@ const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-const acceptCookies = () => {
-    cookieAccepted.value = true
-    localStorage.setItem('makeai_cookie_consent', 'accepted')
-}
-
 onMounted(() => {
-    cookieAccepted.value = localStorage.getItem('makeai_cookie_consent') === 'accepted'
     window.addEventListener('scroll', onScroll, { passive: true })
     onScroll()
 })
@@ -290,7 +283,7 @@ onUnmounted(() => {
                         </div>
                     </div>
                     <div v-if="asString(section.config.cta_text) && asString(section.config.cta_link)" class="text-center mt-12">
-                        <Link :href="asString(section.config.cta_link)" class="inline-flex px-8 py-4 rounded-2xl bg-primary-600 text-white font-black hover:bg-primary-500 transition-colors">{{ asString(section.config.cta_text) }}</Link>
+                        <Link :href="asString(section.config.cta_link)" class="inline-flex px-8 py-4 rounded-2xl btn-primary font-black transition-colors">{{ asString(section.config.cta_text) }}</Link>
                     </div>
                 </div>
             </section>
@@ -416,7 +409,7 @@ onUnmounted(() => {
                     </div>
                     <form v-if="section.type === 'newsletter'" method="post" action="/newsletter/subscribe" class="max-w-xl mx-auto mt-10 flex flex-col sm:flex-row gap-3">
                         <input name="email" type="email" required :placeholder="t('Enter your email')" class="flex-1 bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-2xl px-5 py-4 text-gray-900 dark:text-white">
-                        <button type="submit" class="bg-primary-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-primary-500 transition-colors">{{ t('Subscribe') }}</button>
+                        <button type="submit" class="btn-primary px-8 py-4 rounded-2xl font-black transition-colors">{{ t('Subscribe') }}</button>
                     </form>
                 </div>
             </section>
@@ -424,15 +417,7 @@ onUnmounted(() => {
             <section v-else-if="section.type === 'custom_html'" class="bg-white dark:bg-surface-950" v-html="asString(section.config.content)"></section>
         </template>
 
-        <button v-if="homepageConfig.settings.scroll_to_top.enabled && showScrollButton" @click="scrollToTop" type="button" :class="homepageConfig.settings.scroll_to_top.position === 'left' ? 'left-6' : 'right-6'" class="fixed bottom-6 z-40 w-12 h-12 rounded-full bg-primary-600 text-white shadow-xl shadow-primary-600/30 hover:bg-primary-500 transition-colors">↑</button>
-
-        <div v-if="homepageConfig.settings.cookie_consent.enabled && !cookieAccepted" class="fixed left-6 right-6 bottom-6 z-50 max-w-4xl mx-auto bg-white dark:bg-surface-900 border border-gray-100 dark:border-surface-700 rounded-2xl p-5 shadow-2xl flex flex-col md:flex-row md:items-center gap-4">
-            <p class="flex-1 text-sm text-gray-600 dark:text-gray-300">{{ homepageConfig.settings.cookie_consent.message }}</p>
-            <div class="flex items-center gap-3">
-                <Link :href="homepageConfig.settings.cookie_consent.policy_url" class="text-sm font-bold text-primary-600 dark:text-primary-400">{{ t('Learn more') }}</Link>
-                <button @click="acceptCookies" type="button" class="px-5 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-bold hover:bg-primary-500 transition-colors">{{ homepageConfig.settings.cookie_consent.accept_text }}</button>
-            </div>
-        </div>
+        <button v-if="homepageConfig.settings.scroll_to_top.enabled && showScrollButton" @click="scrollToTop" type="button" :class="homepageConfig.settings.scroll_to_top.position === 'left' ? 'left-6' : 'right-6'" class="fixed bottom-6 z-40 w-12 h-12 rounded-full btn-primary shadow-xl shadow-primary-600/30 transition-colors">↑</button>
 
         <div v-if="homepageConfig.settings.chat_widget_embed" v-html="homepageConfig.settings.chat_widget_embed"></div>
     </Layout>

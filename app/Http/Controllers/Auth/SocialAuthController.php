@@ -73,13 +73,20 @@ class SocialAuthController extends Controller
         }
 
         if ($user) {
+            $foundByEmail = $user->oauth_provider !== $provider || $user->oauth_id !== $providerId;
+
             $user->forceFill([
                 'name' => $user->name ?: $name,
                 'avatar' => $user->avatar ?: $avatar,
-                'oauth_provider' => $provider,
-                'oauth_id' => $providerId,
                 'email_verified_at' => $user->email_verified_at ?: now(),
-            ])->save();
+            ]);
+
+            if (! $foundByEmail) {
+                $user->oauth_provider = $provider;
+                $user->oauth_id = $providerId;
+            }
+
+            $user->save();
         } else {
             $user = User::create([
                 'name' => $name,

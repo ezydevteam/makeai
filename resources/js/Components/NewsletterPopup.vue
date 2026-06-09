@@ -134,7 +134,7 @@ const submit = () => {
                         <div>
                             <input v-model="form.email" type="email" :placeholder="settings.newsletter_popup_placeholder || t('Enter your email address')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 transition-all" required />
                         </div>
-                        <button type="submit" :disabled="form.processing" class="w-full py-3.5 bg-primary-600 text-white rounded-xl font-bold hover:bg-primary-500 transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50">
+                        <button type="submit" :disabled="form.processing" class="w-full py-3.5 btn-primary rounded-xl font-bold transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50">
                             <span v-if="form.processing">{{ t('Subscribing...') }}</span>
                             <span v-else>{{ settings.newsletter_popup_submit_text || t('Subscribe') }}</span>
                         </button>

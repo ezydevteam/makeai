@@ -158,7 +158,7 @@ const mobileCtaClass = (block: any, bottom = false) => [
     block.config?.style === 'outline' ? 'border border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
     block.config?.style === 'ghost' ? 'text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
     block.config?.style === 'bg_light' ? 'bg-gray-50 text-gray-600 hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300' : '',
-    !block.config?.style || block.config?.style === 'filled' ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20 hover:bg-primary-500' : '',
+    !block.config?.style || block.config?.style === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
 ]
 const blockIconClass = (block: any, fallback = '') => String(block.config?.icon_class || fallback)
 const ctaIconSizeClass = (bottom = false) => bottom ? 'text-xl leading-none' : 'text-[20px] leading-none'
@@ -222,7 +222,7 @@ const blockVisualStyle = (block: any): CSSProperties => {
 const iconSurfaceClass = (block: any, baseClass: string) => [
     baseClass,
     block.config?.bg_style === 'transparent' ? 'bg-transparent dark:bg-transparent' : '',
-    block.config?.bg_style === 'filled' ? 'bg-primary-600 text-white hover:bg-primary-500 hover:text-white dark:bg-primary-600 dark:text-white dark:hover:bg-primary-500' : '',
+    block.config?.bg_style === 'filled' ? 'btn-primary hover:text-white dark:bg-primary-600 dark:text-white dark:hover:bg-primary-600' : '',
     block.config?.bg_style === 'custom' ? 'hover:opacity-90' : '',
 ]
 const searchLiveEnabled = (config?: Record<string, unknown>) => configBoolean(config, 'enable_live_search', true)
@@ -417,7 +417,7 @@ onUnmounted(() => {
                 <!-- CTA BUTTON -->
                 <Link v-else-if="block.type === 'cta_button'" :href="block.config.link" class="rounded-xl text-sm font-bold transition-all whitespace-nowrap shrink-0" :style="blockVisualStyle(block)" :class="[
                     isIconOnly(block) ? 'flex h-10 w-10 items-center justify-center' : 'px-5 py-2',
-                    block.config.style === 'filled' ? 'bg-primary-600 text-white hover:bg-primary-500 shadow-lg shadow-primary-600/20' : '',
+                    block.config.style === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
                     block.config.style === 'bg_light' ? 'bg-gray-50 text-gray-600 hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300' : '',
                     block.config.style === 'outline' ? 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
                     block.config.style === 'ghost' ? 'text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : ''
@@ -456,7 +456,7 @@ onUnmounted(() => {
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
                                     {{ t('Dashboard') }}
                                 </Link>
-                                <Link v-if="affiliateEnabled" :href="route('affiliate.dashboard')" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
+                                <Link v-if="affiliateEnabled" :href="route('user.dashboard.affiliate')" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v7.5A2.25 2.25 0 005.25 18h8.25m0-12l-3 3m3-3l-3-3m0 15l3-3m-3 3l3 3M15.75 9h3A2.25 2.25 0 0121 11.25v1.5A2.25 2.25 0 0118.75 15h-3" /></svg>
                                     {{ t('Affiliate') }}
                                 </Link>
@@ -471,7 +471,7 @@ onUnmounted(() => {
                         <Link href="/login" class="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors px-4 py-2">
                             {{ t('Sign In') }}
                         </Link>
-                        <Link href="/register" class="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary-600/20 whitespace-nowrap">
+                        <Link href="/register" class="btn-primary px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary-600/20 whitespace-nowrap">
                             {{ t('Get Started') }}
                         </Link>
                     </div>

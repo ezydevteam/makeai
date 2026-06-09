@@ -25,4 +25,33 @@ class Document extends Model
     {
         return $this->morphMany(Favorite::class, 'favoriteable');
     }
+
+    public static function calculateWordCount(?string $content): int
+    {
+        if (empty($content)) {
+            return 0;
+        }
+
+        // Replace closing block tags with a space to prevent words from running together
+        $spacedContent = preg_replace('/<\/(p|h1|h2|h3|h4|h5|h6|div|li|tr|th|td|blockquote|pre)>/i', ' ', $content);
+
+        // Strip HTML tags
+        $text = strip_tags($spacedContent);
+
+        // Decode HTML entities (e.g. &nbsp; or &amp;)
+        $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+
+        // Trim whitespace
+        $text = trim($text);
+
+        if (empty($text)) {
+            return 0;
+        }
+
+        // Split by any Unicode whitespace
+        $words = preg_split('/\s+/u', $text);
+
+        return $words ? count($words) : 0;
+    }
 }
+

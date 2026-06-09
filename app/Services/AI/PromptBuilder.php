@@ -41,10 +41,10 @@ class PromptBuilder
         // 3. Apply length instruction
         $system .= $this->getLengthInstruction($fields['length'] ?? 'medium');
 
-        // 4. Resolve model
+        // 4. Resolve model — respects default_ai_provider setting
         $model = $template->model_override
             ?? ($fields['model'] ?? null)
-            ?? settings('default_ai_model', 'gpt-4o-mini');
+            ?? $this->resolveDefaultModel();
 
         // 5. Resolve API key (user personal → admin pool)
         $apiKey = $this->resolveApiKey($model, $user);
@@ -142,6 +142,38 @@ class PromptBuilder
     }
 
     /**
+     * Resolve the default model slug, ensuring it matches the admin's default_ai_provider.
+     *
+     * Handles the case where admin changed default_ai_provider (e.g. to 'google')
+     * but default_ai_model still points to a different provider's model (e.g. 'gpt-4o-mini').
+     */
+    private function resolveDefaultModel(): string
+    {
+        $defaultModel = settings('default_ai_model', 'gpt-4o-mini');
+        $defaultProvider = settings('default_ai_provider', 'openai');
+
+        // Check if the stored default model actually belongs to the default provider
+        $resolvedProvider = $this->resolveProvider($defaultModel);
+
+        if ($resolvedProvider === $defaultProvider) {
+            return $defaultModel;
+        }
+
+        // Provider/model mismatch — pick the first active model for the correct provider
+        $providerModel = AiModel::where('provider', $defaultProvider)
+            ->where('is_active', true)
+            ->orderBy('slug')
+            ->first();
+
+        if ($providerModel) {
+            return $providerModel->slug;
+        }
+
+        // No models found for the provider — fall back to stored model
+        return $defaultModel;
+    }
+
+    /**
      * Determine provider from model slug.
      */
     private function resolveProvider(string $model): string
@@ -171,9 +203,16 @@ class PromptBuilder
     /**
      * Estimate credit cost before generation.
      */
-    public function estimateCost(AiTool $template, string $model): array
+    public function estimateCost(AiTool $template, string $model, ?string $outputLength = null): array
     {
         $estimatedTokens = $template->avg_output_tokens ?? 400;
+
+        // Apply output length multiplier
+        if ($outputLength) {
+            $multipliers = ['short' => 0.5, 'medium' => 1, 'long' => 2, 'very_long' => 4];
+            $estimatedTokens = (int) round($estimatedTokens * ($multipliers[$outputLength] ?? 1));
+        }
+
         $dbModel = AiModel::where('slug', $model)->first();
 
         if (! $dbModel) {
@@ -193,5 +232,33 @@ class PromptBuilder
             'estimated_tokens' => $estimatedTokens,
             'estimated_usd' => round($totalUsd, 6),
         ];
+    }
+
+    /**
+     * Build a CompletionRequest for refining/improving existing content.
+     */
+    public function buildRefine(AiTool $template, string $content, string $instruction, ?string $model, ?User $user): CompletionRequest
+    {
+        $system = "You are an AI assistant designed to refine and improve text. Rewrite the provided content following the user's instructions. Maintain the same formatting (markdown, code, etc.) where appropriate. Return ONLY the refined content, no preamble.";
+        $userMessage = "Content to refine:\n\n" . $content . "\n\nInstruction: " . $instruction;
+
+        $model = $model
+            ?? $template->model_override
+            ?? $this->resolveDefaultModel();
+
+        $apiKey = $this->resolveApiKey($model, $user);
+
+        $maxTokens = $template->max_tokens_override
+            ?? (int) settings('default_max_tokens', 2000);
+
+        return new CompletionRequest(
+            model: $model,
+            systemPrompt: $system,
+            userMessage: $userMessage,
+            maxTokens: $maxTokens,
+            temperature: 0.6,
+            apiKey: $apiKey,
+            provider: $this->resolveProvider($model),
+        );
     }
 }

@@ -21,9 +21,12 @@ class AdminController extends Controller
 
         $query = Admin::with('role');
 
-        if ($request->search) {
-            $query->where('name', 'like', "%{$request->search}%")
-                ->orWhere('email', 'like', "%{$request->search}%");
+        if ($request->status !== null && $request->status !== '') {
+            $query->where('is_active', $request->status);
+        }
+
+        if ($request->role) {
+            $query->where('role_id', $request->role);
         }
 
         $admins = $query->paginate(20)->withQueryString();
@@ -32,7 +35,34 @@ class AdminController extends Controller
         return Inertia::render('Admin/RBAC/Admins', [
             'admins' => $admins,
             'roles' => $roles,
-            'filters' => $request->only('search'),
+            'filters' => $request->only(['status', 'role']),
+            'hasTrashedAdmins' => Admin::onlyTrashed()->exists(),
+        ]);
+    }
+
+    /**
+     * Display trashed administrators.
+     */
+    public function trash(Request $request)
+    {
+        abort_unless(auth('admin')->user()->hasPermission('admins.view'), 403);
+
+        $query = Admin::onlyTrashed()->with('role');
+
+        if ($request->status !== null && $request->status !== '') {
+            $query->where('is_active', $request->status);
+        }
+
+        if ($request->role) {
+            $query->where('role_id', $request->role);
+        }
+
+        $admins = $query->latest('deleted_at')->paginate(20)->withQueryString();
+
+        return Inertia::render('Admin/RBAC/AdminTrash', [
+            'admins' => $admins,
+            'roles' => AdminRole::all(),
+            'filters' => $request->only(['status', 'role']),
         ]);
     }
 
@@ -143,6 +173,67 @@ class AdminController extends Controller
 
         $admin->delete();
 
-        return back()->with('success', translate('Administrator deleted successfully.'));
+        return back()->with('success', translate('Administrator moved to trash.'));
+    }
+
+    /**
+     * Restore a trashed administrator.
+     */
+    public function restore(Admin $admin)
+    {
+        abort_unless(auth('admin')->user()->hasPermission('admins.delete'), 403);
+
+        $admin->restore();
+
+        return back()->with('success', translate('Administrator restored successfully.'));
+    }
+
+    /**
+     * Permanently delete a trashed administrator.
+     */
+    public function forceDelete(Admin $admin)
+    {
+        abort_unless(auth('admin')->user()->hasPermission('admins.delete'), 403);
+
+        if ($admin->isSuperAdmin()) {
+            return back()->with('error', translate('Super Admin cannot be permanently deleted.'));
+        }
+
+        if (auth('admin')->id() === $admin->id) {
+            return back()->with('error', translate('You cannot permanently delete your own account.'));
+        }
+
+        $admin->forceDelete();
+
+        return back()->with('success', translate('Administrator permanently deleted.'));
+    }
+
+    /**
+     * Bulk actions for trashed administrators.
+     */
+    public function bulkTrashAction(Request $request)
+    {
+        abort_unless(auth('admin')->user()->hasPermission('admins.delete'), 403);
+
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'action' => 'required|string|in:restore,force_delete',
+        ]);
+
+        $query = Admin::onlyTrashed()
+            ->whereIn('id', $validated['ids'])
+            ->whereDoesntHave('role', function ($roleQuery) {
+                $roleQuery->where('slug', config('auth.providers.admins.super_admin_slug', 'super-admin'));
+            });
+
+        if ($validated['action'] === 'restore') {
+            $query->restore();
+        }
+
+        if ($validated['action'] === 'force_delete') {
+            $query->whereKeyNot(auth('admin')->id())->forceDelete();
+        }
+
+        return back()->with('success', translate('Bulk action completed.'));
     }
 }

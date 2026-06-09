@@ -4,3 +4,12 @@ command = "node"
 
 [mcp_servers.brainsync.env]
 BRAINSYNC_ENV_FILE = 'C:\Users\Qbits\.bsync_core\makeai\mcp-secret-env.json'
+
+[mcp_servers.brainsync.tools.sys_core_01]
+approval_mode = "approve"
+
+[mcp_servers.brainsync.tools.sys_core_28]
+approval_mode = "approve"
+
+[mcp_servers.brainsync.tools.sys_core_20]
+approval_mode = "approve"

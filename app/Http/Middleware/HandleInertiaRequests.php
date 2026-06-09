@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\AffiliateProgram;
 use App\Models\AiTool;
 use App\Models\Announcement;
+use App\Models\AppearanceSetting;
 use App\Models\BlogPost;
 use App\Models\Category;
 use App\Models\Comment;
@@ -12,6 +13,7 @@ use App\Models\Coupon;
 use App\Models\Language;
 use App\Models\Menu;
 use App\Models\Setting;
+use App\Services\CountryDetectionService;
 use App\Services\InAppNotificationService;
 use App\Services\SocialService;
 use App\Services\TranslationService;
@@ -137,9 +139,37 @@ class HandleInertiaRequests extends Middleware
             'socialLoginProviders' => fn () => $this->getSocialLoginProviders(),
 
             'app' => [
-                'demo' => config('app.demo'),
+                'demo' => config('demo.enabled'),
+                'demo_banner_color' => config('demo.banner_color', 'amber'),
+                'envato_url' => config('demo.envato_url', 'https://codecanyon.net'),
+                'demo_credentials' => config('demo.enabled') ? [
+                    'admin' => ['email' => config('demo.admin_email', 'admin@demo.com'), 'password' => config('demo.admin_password', 'demo12345')],
+                    'user' => ['email' => config('demo.user_email', 'user@demo.com'), 'password' => config('demo.user_password', 'demo12345')],
+                ] : null,
                 'name' => $siteName,
             ],
+
+            'gdpr' => fn (Request $request) => [
+                'enabled' => (bool) settings('gdpr_enabled', false),
+                'eu_only' => (bool) settings('gdpr_eu_only', true),
+                'is_eu' => app(CountryDetectionService::class)->isEuEea($request),
+                'banner_position' => settings('gdpr_banner_position', 'bottom'),
+                'banner_title' => settings('gdpr_banner_title', 'Cookie Preferences'),
+                'banner_description' => settings('gdpr_banner_description', 'We use cookies to enhance your experience, analyze site usage, and show relevant content.'),
+                'banner_accept_all_text' => settings('gdpr_banner_accept_all_text', 'Accept All'),
+                'banner_customize_text' => settings('gdpr_banner_customize_text', 'Customize'),
+                'banner_necessary_text' => settings('gdpr_banner_necessary_text', 'Necessary Only'),
+                'banner_save_text' => settings('gdpr_banner_save_text', 'Save Preferences'),
+                'banner_bg_color' => settings('gdpr_banner_bg_color', '#ffffff'),
+                'banner_text_color' => settings('gdpr_banner_text_color', '#374151'),
+                'banner_button_color' => settings('gdpr_banner_button_color', '#4f46e5'),
+                'banner_button_text_color' => settings('gdpr_banner_button_text_color', '#ffffff'),
+                'show_policy_links' => (bool) settings('gdpr_show_policy_links', true),
+                'privacy_policy_url' => settings('site_privacy_url', '/privacy-policy'),
+                'cookie_policy_url' => settings('gdpr_cookie_policy_url', '/cookie-policy'),
+            ],
+
+            'updateAvailable' => fn () => (bool) settings('update_available'),
 
             'auth' => fn () => $this->getAuthProps($request),
 
@@ -397,6 +427,10 @@ class HandleInertiaRequests extends Middleware
             }])->get(),
 
             'affiliateEnabled' => fn () => isProAvailable() && (bool) AffiliateProgram::current()->is_active,
+
+            'appearanceAdminSettings' => fn () => auth('admin')->check()
+                ? AppearanceSetting::getForScope('admin')
+                : null,
         ];
     }
 
@@ -467,7 +501,33 @@ class HandleInertiaRequests extends Middleware
                 'affiliate_custom_slug' => $user->affiliate_custom_slug,
                 'theme_preference' => $user->theme_preference,
                 'isImpersonating' => $request->session()->has('admin_impersonator_id'),
+                'onboarding_completed_at' => $user->onboarding_completed_at?->toISOString(),
+                'use_case' => $user->use_case,
+                'dismissed_tooltips' => $user->dismissed_tooltips,
             ],
+            'paletteTools' => fn () => \App\Models\AiTool::where('is_active', true)
+                ->select('name', 'slug', 'description', 'icon', 'color', 'category_id')
+                ->with('category:id,name')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (\App\Models\AiTool $tool) => [
+                    'name' => $tool->name,
+                    'slug' => $tool->slug,
+                    'description' => $tool->description,
+                    'icon' => $tool->icon,
+                    'color' => $tool->color,
+                    'category' => $tool->category?->name,
+                ])
+                ->all(),
+            'paletteDocuments' => fn () => $user->documents()
+                ->latest()
+                ->take(20)
+                ->get(['id', 'title', 'tool_slug']),
+            'paletteChats' => fn () => $user->conversations()
+                ->latest('last_message_at')
+                ->take(10)
+                ->get(['id', 'ulid', 'title']),
         ];
     }
 

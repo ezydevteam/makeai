@@ -27,15 +27,18 @@ class BlogPostController extends Controller
 
     public function index(Request $request)
     {
-        $this->authorizeBlog();
+        $this->authorize('viewAny', BlogPost::class);
 
-        $posts = BlogPost::query()
-            ->with(['author:id,name', 'categories:id,name,slug'])
+        $query = BlogPost::query()
+            ->with(['author:id,name', 'categories:id,name,slug']);
+
+        $query->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()));
+
+        $posts = $query
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = trim($request->string('search')->toString());
                 $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
             })
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->when($request->filled('category'), fn ($query) => $query->whereHas('categories', fn ($q) => $q->where('blog_categories.id', $request->integer('category'))))
             ->when($request->filled('author'), fn ($query) => $query->where('author_id', $request->integer('author')))
             ->latest()
@@ -47,12 +50,42 @@ class BlogPostController extends Controller
             'categories' => BlogCategory::orderBy('sort_order')->get(['id', 'name']),
             'authors' => Admin::orderBy('name')->get(['id', 'name']),
             'filters' => $request->only(['search', 'status', 'category', 'author']),
+            'hasTrashedPosts' => BlogPost::onlyTrashed()->exists(),
+            'trashMode' => false,
+        ]);
+    }
+
+    public function trash(Request $request)
+    {
+        $query = BlogPost::onlyTrashed()
+            ->with(['author:id,name', 'categories:id,name,slug']);
+
+        $query
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = $request->string('search')->toString();
+                $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
+            })
+            ->when($request->filled('category'), fn ($query) => $query->whereHas('categories', fn ($q) => $q->where('blog_categories.id', $request->integer('category'))))
+            ->when($request->filled('author'), fn ($query) => $query->where('author_id', $request->integer('author')))
+            ->latest('deleted_at');
+
+        $posts = $query
+            ->paginate(25)
+            ->withQueryString();
+
+        return Inertia::render('Admin/Blog/Posts/Index', [
+            'posts' => $posts,
+            'categories' => BlogCategory::orderBy('sort_order')->get(['id', 'name']),
+            'authors' => Admin::orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['search', 'category', 'author']),
+            'hasTrashedPosts' => BlogPost::onlyTrashed()->exists(),
+            'trashMode' => true,
         ]);
     }
 
     public function create()
     {
-        $this->authorizeBlog();
+        $this->authorize('create', BlogPost::class);
 
         return Inertia::render('Admin/Blog/Posts/Editor', [
             'post' => null,
@@ -82,7 +115,7 @@ class BlogPostController extends Controller
 
     public function edit(BlogPost $post)
     {
-        $this->authorizeBlog();
+        $this->authorize('update', $post);
         $post->load(['categories:id,name', 'tags:id,name', 'revisions.admin:id,name']);
 
         return Inertia::render('Admin/Blog/Posts/Editor', [
@@ -96,8 +129,12 @@ class BlogPostController extends Controller
 
     public function update(BlogPostRequest $request, BlogPost $post)
     {
-        $validated = $this->blog->normalizePostData($request->validated());
+        $validated = $this->blog->normalizePostData($request->validated(), $post->id);
+        $oldImage = $post->featured_image;
         $validated = $this->storeUploadedFeaturedImage($request, $validated);
+        if (! empty($validated['featured_image']) && $oldImage && $oldImage !== $validated['featured_image']) {
+            $this->deleteStoredImage($oldImage);
+        }
         $categoryIds = $validated['category_ids'] ?? [];
         $tagNames = $validated['tags'] ?? [];
         unset($validated['category_ids'], $validated['tags'], $validated['featured_image_file']);
@@ -173,7 +210,8 @@ class BlogPostController extends Controller
             ], 422);
         }
 
-        $user = User::query()->first();
+        $admin = auth('admin')->user();
+        $user = User::where('email', $admin?->email)->first();
 
         if (! $user) {
             return response()->json([
@@ -202,16 +240,66 @@ class BlogPostController extends Controller
 
     public function destroy(BlogPost $post)
     {
-        $this->authorizeBlog();
+        $this->authorize('delete', $post);
         $post->delete();
         $this->blog->refreshCounters();
 
         return back()->with('success', translate('Blog post moved to trash.'));
     }
 
-    public function duplicate(BlogPost $post)
+    public function restore(BlogPost $post)
     {
-        $this->authorizeBlog();
+        $this->authorize('restore', $post);
+        $post->restore();
+        $this->blog->refreshCounters();
+
+        return back()->with('success', translate('Blog post restored.'));
+    }
+
+    public function forceDelete(BlogPost $post)
+    {
+        $this->authorize('forceDelete', $post);
+        $post->forceDelete();
+        $this->blog->refreshCounters();
+
+        return back()->with('success', translate('Blog post permanently deleted.'));
+    }
+
+    public function preview(BlogPost $post)
+    {
+        $this->authorize('preview', $post);
+
+        $post->load(['author:id,name,avatar', 'categories:id,name,slug,color', 'tags:id,name,slug']);
+
+        $post->setAttribute('comments_count', $post->comments()->approved()->count());
+
+        return Inertia::render('Blog/Show', [
+            'post' => $post,
+            'relatedPosts' => $post->show_related_posts ? $this->blog->relatedPosts($post) : [],
+            'share' => null,
+            'comments' => [
+                'data' => [],
+                'links' => [],
+                'meta' => ['current_page' => 1, 'last_page' => 1, 'total' => 0],
+            ],
+            'commentSettings' => [
+                'enabled' => false,
+                'allow_guests' => false,
+                'poll_seconds' => 60,
+            ],
+            'schema' => [],
+            'meta' => [
+                'title' => $post->title.' ['.translate('Preview').']',
+                'description' => $post->excerpt ?? '',
+                'no_index' => true,
+                'rss' => '',
+            ],
+        ]);
+    }
+
+    public function duplicate(Request $request, BlogPost $post)
+    {
+        $this->authorize('create', BlogPost::class);
 
         $copy = $post->replicate(['ulid', 'views_count']);
         $copy->title = $post->title.' '.translate('Copy');
@@ -223,27 +311,36 @@ class BlogPostController extends Controller
         $copy->save();
         $copy->categories()->sync($post->categories()->pluck('blog_categories.id'));
         $copy->tags()->sync($post->tags()->pluck('blog_tags.id'));
-        $this->blog->saveRevision($copy, auth('admin')->id());
+        $this->blog->saveRevision($copy, $request->user('admin')?->id);
 
         return redirect()->route('admin.blog.posts.edit', $copy)->with('success', translate('Blog post duplicated.'));
     }
 
     public function bulk(Request $request)
     {
-        $this->authorizeBlog();
+        $this->authorize('update', BlogPost::class);
 
         $validated = $request->validate([
             'ids' => ['required', 'array'],
-            'ids.*' => ['required', 'string', 'exists:blog_posts,ulid'],
-            'action' => ['required', 'in:publish,draft,delete'],
+            'ids.*' => ['required', 'string'],
+            'action' => ['required', 'in:publish,draft,delete,restore,force-delete'],
         ]);
 
-        $query = BlogPost::whereIn('ulid', $validated['ids']);
+        $query = BlogPost::query();
+
+        if (in_array($validated['action'], ['restore', 'force-delete'], true)) {
+            $query->onlyTrashed();
+            $query->whereIn('ulid', $validated['ids']);
+        } else {
+            $query->whereIn('ulid', $validated['ids']);
+        }
 
         match ($validated['action']) {
             'publish' => $query->update(['status' => 'published', 'published_at' => now()]),
             'draft' => $query->update(['status' => 'draft']),
             'delete' => $query->delete(),
+            'restore' => $query->restore(),
+            'force-delete' => $query->forceDelete(),
         };
 
         $this->blog->refreshCounters();
@@ -253,7 +350,7 @@ class BlogPostController extends Controller
 
     public function export(): StreamedResponse
     {
-        $this->authorizeBlog();
+        $this->authorize('viewAny', BlogPost::class);
 
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
@@ -362,7 +459,7 @@ class BlogPostController extends Controller
 
         if (in_array($action, $this->selectionAiActions(), true)) {
             return [
-                'content' => strip_tags($content, '<p><br><strong><b><em><i><u><ul><ol><li><blockquote><h2><h3><h4>'),
+                'content' => \App\Services\TiptapHtmlSanitizer::sanitize($content, \App\Services\TiptapHtmlSanitizer::BASIC_TAGS),
             ];
         }
 
@@ -410,10 +507,5 @@ class BlogPostController extends Controller
         $validated['featured_image'] = Storage::url($path);
 
         return $validated;
-    }
-
-    private function authorizeBlog(): void
-    {
-        abort_unless(auth('admin')->user()?->hasPermission('content.blog'), 403);
     }
 }

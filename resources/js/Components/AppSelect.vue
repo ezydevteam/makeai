@@ -5,6 +5,7 @@ export interface SelectOption {
     value: string | number
     label: string
     icon?: string
+    color?: string
     disabled?: boolean
 }
 
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
     liveSearch?: boolean
     size?: number
     multiple?: boolean
+    compactMultiple?: boolean
     disabled?: boolean
     required?: boolean
     id?: string
@@ -31,6 +33,7 @@ const props = withDefaults(defineProps<{
     liveSearch: false,
     size: 8,
     multiple: false,
+    compactMultiple: false,
     disabled: false,
     required: false,
     id: undefined,
@@ -67,17 +70,21 @@ const filtered = computed(() => {
     )
 })
 
-const showSearch = computed(() => props.liveSearch && props.options.length > props.size)
+const showSearch = computed(() => props.liveSearch && (props.options.length > props.size || props.multiple))
 
 const selectedOptions = computed(() =>
     props.options.filter((o) => isSelected(o.value)),
 )
 
 const displayText = computed(() => {
+    if (props.multiple && props.compactMultiple && selectedOptions.value.length > 0) {
+        return selectedOptions.value.map((option) => option.label).join(', ')
+    }
+
     if (props.multiple && selectedOptions.value.length > 0) {
         return ''
     }
-    if (!props.multiple && selectedOptions.value.length === 1) {
+    if (!props.multiple && selectedOptions.value.length >= 1) {
         return selectedOptions.value[0]?.label ?? props.placeholder
     }
     return props.placeholder
@@ -213,15 +220,20 @@ watch(isOpen, (val) => {
         >
             <span class="flex items-center gap-1.5 flex-wrap truncate">
                 <i v-if="!multiple && displayText && selectedOptions[0]?.icon" :class="selectedOptions[0].icon" class="text-base shrink-0" aria-hidden="true" />
-                <template v-if="multiple && selectedOptions.length > 0">
+                <template v-if="multiple && selectedOptions.length > 0 && !compactMultiple">
                     <span
                         v-for="opt in selectedOptions"
                         :key="String(opt.value)"
                         class="inline-flex items-center gap-1 rounded-md bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
                     >
+                        <span
+                            v-if="opt.color"
+                            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                            :style="{ backgroundColor: opt.color }"
+                        ></span>
                         <i v-if="opt.icon" :class="opt.icon" class="text-xs" />
                         {{ opt.label }}
-                        <button type="button" class="ml-0.5 rounded-full hover:bg-primary-200 dark:hover:bg-primary-800 p-0.5" @click="removeTag(opt.value, $event as any)">
+                        <button type="button" class="ml-0.5 rounded-full p-0.5 hover:bg-primary-200 dark:hover:bg-primary-800" @click="removeTag(opt.value, $event as any)">
                             <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </span>
@@ -277,7 +289,7 @@ watch(isOpen, (val) => {
                                 ? 'opacity-40 cursor-not-allowed'
                                 : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
                             isSelected(option.value)
-                                ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 font-semibold'
+                                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
                                 : 'text-gray-700 dark:text-gray-200',
                             highlightedIndex === index && !option.disabled && !isSelected(option.value)
                                 ? 'bg-gray-100 dark:bg-surface-700'
@@ -287,21 +299,18 @@ watch(isOpen, (val) => {
                         @mouseenter="highlightedIndex = index"
                         @mouseleave="highlightedIndex = -1"
                     >
-                        <svg v-if="multiple" class="h-4 w-4 shrink-0 rounded border-2 transition-colors" :class="isSelected(option.value) ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-300 dark:border-surface-600 text-transparent'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
+                        <span
+                            v-if="option.color"
+                            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                            :style="{ backgroundColor: option.color }"
+                        ></span>
                         <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
                         <span class="truncate">{{ option.label }}</span>
-                        <svg
-                            v-if="!multiple && isSelected(option.value)"
-                            class="ml-auto h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            stroke-width="2.5"
-                        >
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
+                        <i
+                            v-if="isSelected(option.value)"
+                            class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
+                            aria-hidden="true"
+                        ></i>
                     </div>
 
                     <div
