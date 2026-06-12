@@ -6,11 +6,15 @@ use App\Models\Payment;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
+use Maatwebsite\Excel\Events\AfterSheet;
 
-class RevenueExport implements FromQuery, WithHeadings, WithMapping, WithChunkReading
+class RevenueExport implements FromQuery, WithHeadings, WithMapping, WithChunkReading, WithStrictNullComparison, ShouldAutoSize, WithEvents
 {
     use Exportable;
 
@@ -19,7 +23,7 @@ class RevenueExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
     public function __construct(
         private string $dateFrom,
         private string $dateTo,
-        private ?string $gateway = null,
+        private array|string|null $gateway = null,
         private ?string $status = null,
     ) {}
 
@@ -27,7 +31,7 @@ class RevenueExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
     {
         return Payment::query()
             ->with('user:id,name,email', 'plan:id,name')
-            ->when($this->gateway, fn ($q) => $q->where('gateway', $this->gateway))
+            ->when($this->gateway, fn ($q) => $q->whereIn('gateway', (array) $this->gateway))
             ->when($this->status, fn ($q) => $q->where('status', $this->status))
             ->whereBetween('created_at', [$this->dateFrom, $this->dateTo])
             ->orderBy('created_at', 'desc');
@@ -35,7 +39,7 @@ class RevenueExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
 
     public function headings(): array
     {
-        return ['Date', 'Transaction ID', 'User', 'Plan', 'Amount', 'Currency', 'Gateway', 'Status'];
+        return [translate('Date'), translate('Transaction ID'), translate('User'), translate('Plan'), translate('Amount'), translate('Currency'), translate('Gateway'), translate('Status')];
     }
 
     public function map($payment): array
@@ -55,5 +59,15 @@ class RevenueExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
     public function chunkSize(): int
     {
         return $this->chunkSize;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $event->sheet->getDelegate()->getStyle('A1:' . $event->sheet->getHighestColumn() . '1')
+                    ->getFont()->setBold(true);
+            },
+        ];
     }
 }

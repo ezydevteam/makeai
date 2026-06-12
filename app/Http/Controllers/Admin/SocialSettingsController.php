@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SocialSettingsRequest;
 use App\Models\SocialFollowCount;
 use App\Services\SocialService;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class SocialSettingsController extends Controller
 {
@@ -19,28 +21,18 @@ class SocialSettingsController extends Controller
         'twitter' => 'Twitter',
     ];
 
-    public function edit(SocialService $socialService)
+    public function editFollow(SocialService $socialService): Response
     {
         $this->authorizeSocialSettings();
 
-        return Inertia::render('Admin/Social/Settings', [
-            'platforms' => $socialService->followPlatforms(),
-            'profiles' => $socialService->configuredFollowProfiles(),
-            'settings' => [
-                'social_follow_display_mode' => $socialService->followDisplayMode(),
-                'social_follow_refresh_hours' => (int) settings('social_follow_refresh_hours', 24),
-            ],
-            'socialLoginProviders' => $this->socialLoginProviders(),
-        ]);
+        return $this->renderSettingsPage('follow', $socialService);
     }
 
-    public function update(SocialSettingsRequest $request)
+    public function updateFollow(SocialSettingsRequest $request)
     {
         $validated = $request->validated();
 
         DB::transaction(function () use ($validated) {
-            $socialService = app(SocialService::class);
-
             settings_set(
                 'social_follow_display_mode',
                 $validated['settings']['social_follow_display_mode'],
@@ -54,45 +46,15 @@ class SocialSettingsController extends Controller
                 'social'
             );
 
-            foreach ($validated['social_login_providers'] as $provider) {
-                $slug = $provider['provider'];
-
-                settings_set(
-                    "social_login_{$slug}_enabled",
-                    (bool) $provider['enabled'],
-                    'boolean',
-                    'social_login'
-                );
-
-                settings_set(
-                    "social_login_{$slug}_client_id",
-                    $provider['client_id'] ?? '',
-                    'encrypted',
-                    'social_login'
-                );
-
-                if (! empty($provider['client_secret'])) {
-                    settings_set(
-                        "social_login_{$slug}_client_secret",
-                        $provider['client_secret'],
-                        'encrypted',
-                        'social_login'
-                    );
-                }
-            }
-
             foreach ($validated['profiles'] as $profile) {
-                if (! empty($profile['api_key'])) {
-                    settings_set(
-                        $socialService->apiKeySettingKey($profile['platform']),
-                        $profile['api_key'],
-                        'encrypted',
-                        'social'
-                    );
-                }
-
                 settings_set(
-                    $socialService->externalIdSettingKey($profile['platform']),
+                    "social_follow_api_key_{$profile['platform']}",
+                    $profile['api_key'] ?? '',
+                    'encrypted',
+                    'social'
+                );
+                settings_set(
+                    "social_follow_external_id_{$profile['platform']}",
                     $profile['external_id'] ?? '',
                     'string',
                     'social'
@@ -116,6 +78,84 @@ class SocialSettingsController extends Controller
         return back()->with('success', translate('Social follow counters saved.'));
     }
 
+    public function editOAuth(SocialService $socialService): Response
+    {
+        $this->authorizeSocialSettings();
+
+        return $this->renderSettingsPage('oauth', $socialService);
+    }
+
+    public function updateOAuth(SocialSettingsRequest $request)
+    {
+        $validated = $request->validated();
+        $providerErrors = [];
+
+        foreach ($validated['social_login_providers'] as $index => $provider) {
+            $savedClientId = (string) settings("social_login_{$provider['provider']}_client_id", '');
+            $savedClientSecret = (string) settings("social_login_{$provider['provider']}_client_secret", '');
+            $effectiveClientId = trim((string) ($provider['client_id'] ?: $savedClientId));
+            $effectiveClientSecret = trim((string) ($provider['client_secret'] ?: $savedClientSecret));
+
+            if ((bool) $provider['enabled'] && ($effectiveClientId === '' || $effectiveClientSecret === '')) {
+                $providerErrors["social_login_providers.{$index}.enabled"] = translate('Client ID and client secret are required before enabling this provider.');
+            }
+        }
+
+        if ($providerErrors !== []) {
+            throw ValidationException::withMessages($providerErrors);
+        }
+
+        DB::transaction(function () use ($validated) {
+            settings_set(
+                'social_share_blog_style',
+                $validated['settings']['social_share_blog_style'],
+                'string',
+                'social'
+            );
+
+            foreach ($validated['social_login_providers'] as $provider) {
+                settings_set(
+                    "social_login_{$provider['provider']}_enabled",
+                    (bool) $provider['enabled'],
+                    'boolean',
+                    'social'
+                );
+                settings_set(
+                    "social_login_{$provider['provider']}_client_id",
+                    $provider['client_id'] ?? '',
+                    'string',
+                    'social'
+                );
+
+                if (filled($provider['client_secret'] ?? null)) {
+                    settings_set(
+                        "social_login_{$provider['provider']}_client_secret",
+                        $provider['client_secret'],
+                        'encrypted',
+                        'social'
+                    );
+                }
+            }
+        });
+
+        return back()->with('success', translate('OAuth settings saved.'));
+    }
+
+    private function renderSettingsPage(string $mode, SocialService $socialService): Response
+    {
+        return Inertia::render('Admin/Social/Settings', [
+            'mode' => $mode,
+            'platforms' => $socialService->followPlatforms(),
+            'profiles' => $socialService->configuredFollowProfiles(),
+            'settings' => [
+                'social_follow_display_mode' => $socialService->followDisplayMode(),
+                'social_follow_refresh_hours' => (int) settings('social_follow_refresh_hours', 24),
+                'social_share_blog_style' => (string) settings('social_share_blog_style', 'icon-label'),
+            ],
+            'socialLoginProviders' => $this->socialLoginProviders(),
+        ]);
+    }
+
     private function authorizeSocialSettings(): void
     {
         abort_unless(auth('admin')->user()?->hasPermission('settings.manage'), 403);
@@ -128,12 +168,32 @@ class SocialSettingsController extends Controller
                 'provider' => $provider,
                 'label' => $label,
                 'enabled' => (bool) settings("social_login_{$provider}_enabled", false),
-                'client_id' => (string) settings("social_login_{$provider}_client_id", ''),
+                'client_id' => '',
+                'client_id_configured' => filled(settings("social_login_{$provider}_client_id", '')),
+                'client_id_masked' => $this->maskValue((string) settings("social_login_{$provider}_client_id", '')),
                 'client_secret' => '',
                 'client_secret_configured' => filled(settings("social_login_{$provider}_client_secret", '')),
+                'client_secret_masked' => $this->maskValue((string) settings("social_login_{$provider}_client_secret", '')),
                 'redirect_url' => route('social.callback', $provider),
             ])
             ->values()
             ->all();
+    }
+
+    private function maskValue(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        $length = mb_strlen($value);
+
+        if ($length <= 8) {
+            return str_repeat('*', max(4, $length));
+        }
+
+        return mb_substr($value, 0, 4)
+            . str_repeat('*', max(4, $length - 8))
+            . mb_substr($value, -4);
     }
 }

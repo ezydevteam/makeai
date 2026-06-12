@@ -7,13 +7,17 @@ use App\Exports\Admin\AiUsageExport;
 use App\Exports\Admin\RevenueExport;
 use App\Exports\Admin\UsersExport;
 use App\Http\Controllers\Controller;
+use App\Models\AiTool;
 use App\Models\AiUsageLog;
 use App\Models\Payment;
+use App\Models\PaymentGateway;
+use App\Models\Plan;
 use App\Models\User;
 use App\Services\ExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -27,11 +31,14 @@ class ExportCenterController extends Controller
         $disk = Storage::disk('local');
         $files = collect($disk->files('exports/' . auth('admin')->id()))
             ->map(function ($path) use ($disk) {
+                $filename = basename($path);
                 return [
                     'path' => $path,
-                    'filename' => basename($path),
+                    'filename' => $filename,
                     'size' => $disk->size($path),
                     'modified' => $disk->lastModified($path),
+                    'type' => $this->guessExportType($filename),
+                    'format' => $this->guessExportFormat($filename),
                 ];
             })
             ->sortByDesc('modified')
@@ -45,6 +52,22 @@ class ExportCenterController extends Controller
                 ['value' => 'affiliates', 'label' => translate('Affiliate Commissions')],
             ],
             'isProAvailable' => (bool) $this->isProAvailable(),
+            'plans' => Plan::where('is_active', true)->select('id', 'name')->get()
+                ->map(fn ($p) => ['value' => (string) $p->id, 'label' => $p->name])->values()->all(),
+            'gateways' => array_values(array_map(
+                fn ($slug) => ['value' => $slug, 'label' => config("payment-gateways.{$slug}.name", $slug)],
+                array_keys(config('payment-gateways', []))
+            )),
+            'providers' => array_values(array_map(
+                fn ($p) => ['value' => $p, 'label' => ucfirst($p)],
+                array_keys(config('ai.providers', []))
+            )),
+            'toolSlugs' => AiTool::where('is_active', true)
+                ->select('slug', 'name')
+                ->get()
+                ->map(fn ($t) => ['value' => $t->slug, 'label' => $t->name])
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -55,6 +78,12 @@ class ExportCenterController extends Controller
             'format' => 'required|in:xlsx,csv,pdf',
             'date_from' => 'nullable|date',
             'date_to' => 'nullable|date',
+            'provider' => 'nullable|array',
+            'provider.*' => 'string',
+            'gateway' => 'nullable|array',
+            'gateway.*' => 'string',
+            'tool_slug' => 'nullable|array',
+            'tool_slug.*' => 'string',
         ]);
 
         $type = $request->type;
@@ -62,6 +91,9 @@ class ExportCenterController extends Controller
         $dateFrom = $request->date_from ?? now()->subDays(30)->toDateString();
         $dateTo = $request->date_to ?? now()->toDateString();
         $filename = $type . '-' . $dateFrom . '-to-' . $dateTo;
+        $provider = $request->provider;
+        $gateway = $request->gateway;
+        $toolSlug = $request->tool_slug;
 
         if ($type === 'revenue' && ! $this->isProAvailable()) {
             return response()->json(['message' => translate('Revenue export is only available with Pro')], 422);
@@ -80,15 +112,15 @@ class ExportCenterController extends Controller
             ['ai-usage', 'xlsx'] => $this->smartExcel(
                 new AiUsageExport(
                     userId: $request->user_id,
-                    toolSlug: $request->tool_slug,
-                    provider: $request->provider,
+                    toolSlug: $toolSlug,
+                    provider: $provider,
                     dateFrom: $dateFrom,
                     dateTo: $dateTo,
                 ),
                 $filename
             ),
             ['revenue', 'xlsx'] => $this->smartExcel(
-                new RevenueExport($dateFrom, $dateTo, $request->gateway, $request->status),
+                new RevenueExport($dateFrom, $dateTo, $gateway, $request->status),
                 $filename
             ),
             ['affiliates', 'xlsx'] => $this->exportService->downloadExcel(
@@ -114,6 +146,11 @@ class ExportCenterController extends Controller
             ['revenue', 'pdf'] => $this->exportService->downloadPdf(
                 'admin.reports.pdf.revenue',
                 $this->getRevenuePdfData($dateFrom, $dateTo, $request),
+                $filename
+            ),
+            ['affiliates', 'pdf'] => $this->exportService->downloadPdf(
+                'admin.reports.pdf.affiliates',
+                $this->getAffiliatesPdfData($dateFrom, $dateTo),
                 $filename
             ),
 
@@ -145,6 +182,10 @@ class ExportCenterController extends Controller
 
     private function smartExcel(object $exportClass, string $filename): mixed
     {
+        if (! method_exists($exportClass, 'query')) {
+            return $this->exportService->downloadExcel($exportClass, $filename);
+        }
+
         $query = $exportClass->query();
         $estimatedRows = $query->count();
 
@@ -194,8 +235,8 @@ class ExportCenterController extends Controller
     {
         $query = AiUsageLog::query()
             ->with('user:id,name,email')
-            ->when($request->tool_slug, fn ($q) => $q->where('tool_slug', $request->tool_slug))
-            ->when($request->provider, fn ($q) => $q->where('provider', $request->provider))
+            ->when($request->tool_slug, fn ($q) => $q->whereIn('tool_slug', (array) $request->tool_slug))
+            ->when($request->provider, fn ($q) => $q->whereIn('provider', (array) $request->provider))
             ->whereBetween('created_at', [$dateFrom, $dateTo]);
 
         $rows = $query->latest()->limit(5000)->get();
@@ -220,8 +261,8 @@ class ExportCenterController extends Controller
     {
         $query = Payment::query()
             ->with('user:id,name,email', 'plan:id,name')
-            ->where('status', 'completed')
-            ->when($request->gateway, fn ($q) => $q->where('gateway', $request->gateway))
+            ->when($request->status, fn ($q) => $q->where('status', $request->status))
+            ->when($request->gateway, fn ($q) => $q->whereIn('gateway', (array) $request->gateway))
             ->whereBetween('created_at', [$dateFrom, $dateTo]);
 
         $rows = $query->latest()->limit(5000)->get();
@@ -240,6 +281,31 @@ class ExportCenterController extends Controller
                 'avg_transaction' => $count > 0 ? $revenue / $count : 0,
                 'total_refunds' => (float) Payment::where('status', 'refunded')
                     ->whereBetween('created_at', [$dateFrom, $dateTo])->sum('amount'),
+            ],
+        ];
+    }
+
+    private function getAffiliatesPdfData(string $dateFrom, string $dateTo): array
+    {
+        $query = \App\Models\AffiliateCommission::query()
+            ->with('referrer:id,name,email', 'referred:id,name,email')
+            ->whereBetween('created_at', [$dateFrom, $dateTo]);
+
+        $rows = $query->latest()->limit(5000)->get();
+        $total = (float) $rows->sum('amount');
+        $count = $rows->count();
+
+        return [
+            'appName' => settings('app_name', translate('Application')),
+            'adminName' => auth('admin')->user()->name,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'rows' => $rows,
+            'stats' => [
+                'total_commissions' => $total,
+                'transaction_count' => $count,
+                'unique_referrers' => $rows->pluck('referrer_id')->unique()->count(),
+                'avg_commission' => $count > 0 ? $total / $count : 0,
             ],
         ];
     }
@@ -263,8 +329,8 @@ class ExportCenterController extends Controller
     {
         $query = AiUsageLog::query()
             ->with('user:id,name,email')
-            ->when($request->tool_slug, fn ($q) => $q->where('tool_slug', $request->tool_slug))
-            ->when($request->provider, fn ($q) => $q->where('provider', $request->provider))
+            ->when($request->tool_slug, fn ($q) => $q->whereIn('tool_slug', (array) $request->tool_slug))
+            ->when($request->provider, fn ($q) => $q->whereIn('provider', (array) $request->provider))
             ->whereBetween('created_at', [$dateFrom, $dateTo]);
 
         return $this->exportService->streamCsv(
@@ -290,7 +356,7 @@ class ExportCenterController extends Controller
     {
         $query = Payment::query()
             ->with('user:id,name,email')
-            ->when($request->gateway, fn ($q) => $q->where('gateway', $request->gateway))
+            ->when($request->gateway, fn ($q) => $q->whereIn('gateway', (array) $request->gateway))
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->whereBetween('created_at', [$dateFrom, $dateTo]);
 
@@ -328,8 +394,58 @@ class ExportCenterController extends Controller
         );
     }
 
+    public function estimate(Request $request): JsonResponse
+    {
+        $request->validate([
+            'type' => 'required|in:users,ai-usage,revenue,affiliates',
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
+        ]);
+
+        $from = $request->date_from ?? now()->subDays(30)->toDateString();
+        $to = $request->date_to ?? now()->toDateString();
+
+        $count = match ($request->type) {
+            'users' => User::query()
+                ->when($request->status, fn ($q) => $q->where('is_active', $request->status === 'active'))
+                ->when($request->plan_id, fn ($q) => $q->where('plan_id', $request->plan_id))
+                ->whereBetween('created_at', [$from, $to])->count(),
+            'ai-usage' => AiUsageLog::query()
+                ->when($request->tool_slug, fn ($q) => $q->whereIn('tool_slug', (array) $request->tool_slug))
+                ->when($request->provider, fn ($q) => $q->whereIn('provider', (array) $request->provider))
+                ->whereBetween('created_at', [$from, $to])->count(),
+            'revenue' => Payment::query()
+                ->when($request->status, fn ($q) => $q->where('status', $request->status))
+                ->when($request->gateway, fn ($q) => $q->whereIn('gateway', (array) $request->gateway))
+                ->whereBetween('created_at', [$from, $to])->count(),
+            'affiliates' => \App\Models\AffiliateCommission::query()
+                ->whereBetween('created_at', [$from, $to])->count(),
+            default => 0,
+        };
+
+        return response()->json(['count' => $count]);
+    }
+
     private function isProAvailable(): bool
     {
         return (bool) (settings('is_pro_available', true) ?? true);
+    }
+
+    private function guessExportType(string $filename): string
+    {
+        foreach (['users', 'ai-usage', 'revenue', 'affiliates'] as $type) {
+            if (str_starts_with($filename, $type . '-')) {
+                return $type;
+            }
+        }
+        return 'unknown';
+    }
+
+    private function guessExportFormat(string $filename): string
+    {
+        if (str_ends_with($filename, '.xlsx')) return 'xlsx';
+        if (str_ends_with($filename, '.csv')) return 'csv';
+        if (str_ends_with($filename, '.pdf')) return 'pdf';
+        return 'unknown';
     }
 }

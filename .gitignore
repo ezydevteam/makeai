@@ -61,3 +61,6 @@ caveman/
 
 # Auto-generated agent rules (personalized per developer)
 .brainsync/agent-rules.md
+
+# Export files
+storage/app/exports/

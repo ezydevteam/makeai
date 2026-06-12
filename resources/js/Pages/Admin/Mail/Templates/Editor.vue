@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
-import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 

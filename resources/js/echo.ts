@@ -55,22 +55,38 @@ export function getNotificationEcho(config: NotificationRealtimeConfig | null | 
 
     window.Pusher = Pusher
     activeSignature = signature
-    activeEcho = new Echo({
-        broadcaster: 'reverb',
-        key: config.key,
-        wsHost: host,
-        wsPort: port,
-        wssPort: port,
-        forceTLS: scheme === 'https',
-        enabledTransports: ['ws', 'wss'],
-        cluster: config.cluster ?? 'mt1',
-        authEndpoint: '/broadcasting/auth',
-        auth: {
-            headers: {
-                'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
+    const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
+
+    if (config.driver === 'pusher') {
+        activeEcho = new Echo({
+            broadcaster: 'pusher',
+            key: config.key,
+            cluster: config.cluster ?? 'mt1',
+            forceTLS: scheme === 'https',
+            authEndpoint: '/broadcasting/auth',
+            auth: {
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                },
             },
-        },
-    })
+        })
+    } else {
+        activeEcho = new Echo({
+            broadcaster: 'reverb',
+            key: config.key,
+            wsHost: host,
+            wsPort: port,
+            wssPort: port,
+            forceTLS: scheme === 'https',
+            enabledTransports: ['ws', 'wss'],
+            authEndpoint: '/broadcasting/auth',
+            auth: {
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+            },
+        })
+    }
 
     window.Echo = activeEcho
 

@@ -23,9 +23,9 @@ interface HistoryItem {
   createdAt: string
 }
 
-const defaultPanel = (): PanelState => ({
-  provider: 'openai',
-  model: 'gpt-4o-mini',
+const defaultPanel = (provider = 'openai', model = 'gpt-4o-mini'): PanelState => ({
+  provider,
+  model,
   systemPrompt: '',
   temperature: 0.7,
   maxTokens: 1000,

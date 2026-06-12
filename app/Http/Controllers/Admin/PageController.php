@@ -132,14 +132,12 @@ class PageController extends Controller
             $user,
             $this->aiAssistPrompt($action, $title, $content, $selectedText),
             'You are an editorial assistant for a CMS page builder. Return only the requested content, with no preamble.',
-            settings('default_ai_provider', 'openai'),
-            settings('default_ai_model', 'gpt-4o-mini'),
-            ['max_tokens' => 900, 'temperature' => 0.45]
+            options: ['max_tokens' => 900, 'temperature' => 0.45]
         );
 
         return response()->json([
             'success' => true,
-            'data' => $this->formatAiAssistResult($action, trim($result['content'] ?? '')),
+            'data' => $this->formatAiAssistResult($action, trim($result->content ?? '')),
             'message' => translate('AI assist completed.'),
         ]);
     }

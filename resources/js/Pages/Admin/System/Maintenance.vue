@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { defineAsyncComponent, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -76,11 +77,23 @@ const removeBackground = () => {
     <div class="mx-auto max-w-7xl px-6 py-8">
         <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Maintenance Mode') }}</h1>
+                <div class="flex flex-wrap items-center gap-3">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Maintenance Mode') }}</h1>
+                    <span
+                        :class="status.is_maintenance
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-white text-gray-600 dark:bg-surface-800 dark:text-gray-300'"
+                        class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em]"
+                    >
+                        {{ status.is_maintenance ? t('On') : t('Off') }}
+                    </span>
+                </div>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Customize the page visitors see while the platform is temporarily unavailable.') }}</p>
             </div>
             <button type="button"
-                :class="status.is_maintenance ? 'btn-primary' : 'btn-danger'"
+                :class="status.is_maintenance
+                    ? 'btn-primary'
+                    : 'bg-danger-600 hover:bg-danger-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-300 dark:bg-danger-600 dark:hover:bg-danger-500'"
                 class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-60"
                 :disabled="toggleForm.processing"
                 @click="confirmOpen = true">
@@ -88,14 +101,26 @@ const removeBackground = () => {
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
                 </svg>
-                <span>{{ status.is_maintenance ? t('Go Live') : t('Enter Maintenance') }}</span>
+                <span v-else>
+                    <i :class="status.is_maintenance ? 'ti ti-tools' : 'ti ti-tools-off'" class="mr-1"></i>
+                    {{ status.is_maintenance ? t('Go Live') : t('Go Maintenance') }}
+                </span>
             </button>
         </div>
 
         <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="mb-5">
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Settings') }}</h2>
-                <p class="mt-1 text-sm text-gray-500">{{ t('Configure the maintenance page content and access controls.') }}</p>
+            <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Settings') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500">{{ t('Configure the maintenance page content and access controls.') }}</p>
+                </div>
+                <button type="button" :disabled="maintenanceForm.processing" class="inline-flex items-center gap-2 rounded-lg btn-primary disabled:opacity-60" @click="saveMaintenance">
+                    <svg v-if="maintenanceForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    <span>{{ maintenanceForm.processing ? t('Saving...') : t('Save Settings') }}</span>
+                </button>
             </div>
 
             <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -139,19 +164,6 @@ const removeBackground = () => {
                 <img v-if="backgroundPreview" :src="backgroundPreview" :alt="t('Maintenance background preview')" class="mt-4 h-36 w-full rounded-lg object-cover">
                 <span v-if="maintenanceForm.errors.maintenance_background_image" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_background_image }}</span>
             </div>
-
-            <button type="button" :disabled="maintenanceForm.processing" class="mt-6 inline-flex items-center gap-2 rounded-lg btn-primary disabled:opacity-60" @click="saveMaintenance">
-                <svg v-if="maintenanceForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-                <span>{{ maintenanceForm.processing ? t('Saving...') : t('Save Maintenance Settings') }}</span>
-            </button>
-        </div>
-
-        <div class="mt-6 rounded-xl border border-primary-100 bg-primary-50 p-6 text-primary-900 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-100">
-            <h2 class="text-lg font-bold">{{ t('Recommendation') }}</h2>
-            <p class="mt-2 text-sm leading-relaxed">{{ t('Save maintenance content before enabling maintenance mode so Laravel can prerender the latest standalone page.') }}</p>
         </div>
     </div>
 

@@ -6,11 +6,15 @@ use App\Models\AiUsageLog;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
+use Maatwebsite\Excel\Events\AfterSheet;
 
-class AiUsageExport implements FromQuery, WithHeadings, WithMapping, WithChunkReading
+class AiUsageExport implements FromQuery, WithHeadings, WithMapping, WithChunkReading, WithStrictNullComparison, ShouldAutoSize, WithEvents
 {
     use Exportable;
 
@@ -18,8 +22,8 @@ class AiUsageExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
 
     public function __construct(
         private ?string $userId = null,
-        private ?string $toolSlug = null,
-        private ?string $provider = null,
+        private array|string|null $toolSlug = null,
+        private array|string|null $provider = null,
         private string $dateFrom = '',
         private string $dateTo = '',
     ) {}
@@ -29,8 +33,8 @@ class AiUsageExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
         return AiUsageLog::query()
             ->with('user:id,name,email')
             ->when($this->userId, fn ($q) => $q->where('user_id', $this->userId))
-            ->when($this->toolSlug, fn ($q) => $q->where('tool_slug', $this->toolSlug))
-            ->when($this->provider, fn ($q) => $q->where('provider', $this->provider))
+            ->when($this->toolSlug, fn ($q) => $q->whereIn('tool_slug', (array) $this->toolSlug))
+            ->when($this->provider, fn ($q) => $q->whereIn('provider', (array) $this->provider))
             ->whereBetween('created_at', [$this->dateFrom, $this->dateTo])
             ->select(['id', 'user_id', 'tool_slug', 'model', 'provider', 'input_tokens', 'output_tokens', 'cost_usd', 'credits_used', 'status', 'response_time_ms', 'created_at'])
             ->orderBy('created_at', 'desc');
@@ -38,7 +42,7 @@ class AiUsageExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
 
     public function headings(): array
     {
-        return ['Date', 'User', 'Tool', 'Model', 'Provider', 'Input Tokens', 'Output Tokens', 'Cost (USD)', 'Credits Used', 'Status', 'Response Time (ms)'];
+        return [translate('Date'), translate('User'), translate('Tool'), translate('Model'), translate('Provider'), translate('Input Tokens'), translate('Output Tokens'), translate('Cost (USD)'), translate('Credits Used'), translate('Status'), translate('Response Time (ms)')];
     }
 
     public function map($log): array
@@ -61,5 +65,15 @@ class AiUsageExport implements FromQuery, WithHeadings, WithMapping, WithChunkRe
     public function chunkSize(): int
     {
         return $this->chunkSize;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $event->sheet->getDelegate()->getStyle('A1:' . $event->sheet->getHighestColumn() . '1')
+                    ->getFont()->setBold(true);
+            },
+        ];
     }
 }

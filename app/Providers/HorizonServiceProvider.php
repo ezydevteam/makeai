@@ -28,9 +28,17 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     protected function gate(): void
     {
         Gate::define('viewHorizon', function ($user = null) {
-            return in_array(optional($user)->email, [
-                //
-            ]);
+            // Only allow access when Redis is available (Horizon requires Redis)
+            if (! app(\App\Services\BroadcastingService::class)->isRedisAvailable()) {
+                return false;
+            }
+
+            // Super-admins can access when Redis is available
+            if ($user instanceof \App\Models\Admin && $user->isActive()) {
+                return true;
+            }
+
+            return false;
         });
     }
 }

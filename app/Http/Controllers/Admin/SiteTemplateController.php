@@ -109,7 +109,7 @@ class SiteTemplateController extends Controller
 
         $template->update($validated);
 
-        return redirect()->route('admin.site-templates.edit', $template)
+        return redirect()->route('admin.ai.templates.edit', $template)
             ->with('success', translate('Template updated successfully.'));
     }
 

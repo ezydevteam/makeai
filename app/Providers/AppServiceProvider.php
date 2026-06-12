@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configureInfrastructureFallbacks();
         $this->configureBroadcasting();
         $this->registerAddons();
 
@@ -34,6 +35,46 @@ class AppServiceProvider extends ServiceProvider
         Blade::directive('ads', function ($zone) {
             return "<?php echo app(\\App\\Services\\AdsService::class)->render($zone); ?>";
         });
+    }
+
+    /**
+     * Auto-detect Redis availability and fall back cache/queue/sessions
+     * to file/database when Redis is unavailable. Zero-downtime swap.
+     */
+    private function configureInfrastructureFallbacks(): void
+    {
+        try {
+            $broadcasting = app(\App\Services\BroadcastingService::class);
+            $redisAvailable = $broadcasting->isRedisAvailable();
+        } catch (\Throwable) {
+            $redisAvailable = false;
+        }
+
+        if ($redisAvailable) {
+            return;
+        }
+
+        $cacheStore = env('CACHE_STORE', 'database');
+        $queueConn = env('QUEUE_CONNECTION', 'database');
+        $sessionDriver = env('SESSION_DRIVER', 'database');
+
+        // Cache: if configured for Redis but Redis is down, swap to file
+        if ($cacheStore === 'redis') {
+            config(['cache.default' => 'file']);
+            \Illuminate\Support\Facades\Log::warning('Infrastructure fallback: Cache driver degraded from redis to file.');
+        }
+
+        // Queue: if configured for Redis but Redis is down, swap to database
+        if ($queueConn === 'redis') {
+            config(['queue.default' => 'database']);
+            \Illuminate\Support\Facades\Log::warning('Infrastructure fallback: Queue driver degraded from redis to database.');
+        }
+
+        // Sessions: if configured for Redis but Redis is down, swap to file
+        if ($sessionDriver === 'redis') {
+            config(['session.driver' => 'file']);
+            \Illuminate\Support\Facades\Log::warning('Infrastructure fallback: Session driver degraded from redis to file.');
+        }
     }
 
     private function registerAddons(): void
@@ -47,50 +88,27 @@ class AppServiceProvider extends ServiceProvider
 
     private function configureBroadcasting(): void
     {
-        $setting = fn (string $key, mixed $fallback): mixed => filled(settings($key)) ? settings($key) : $fallback;
-
-        $reverb = [
-            'key' => (string) $setting('notifications_reverb_app_key', env('REVERB_APP_KEY', '')),
-            'secret' => (string) $setting('notifications_reverb_app_secret', env('REVERB_APP_SECRET', '')),
-            'app_id' => (string) $setting('notifications_reverb_app_id', env('REVERB_APP_ID', '')),
-            'host' => (string) $setting('notifications_reverb_host', env('REVERB_HOST', '127.0.0.1')),
-            'port' => (int) $setting('notifications_reverb_port', env('REVERB_PORT', 8080)),
-            'scheme' => (string) $setting('notifications_reverb_scheme', env('REVERB_SCHEME', 'http')),
-        ];
-
-        $pusher = [
-            'key' => (string) $setting('notifications_pusher_key', env('PUSHER_APP_KEY', '')),
-            'secret' => (string) $setting('notifications_pusher_secret', env('PUSHER_APP_SECRET', '')),
-            'app_id' => (string) $setting('notifications_pusher_app_id', env('PUSHER_APP_ID', '')),
-            'cluster' => (string) $setting('notifications_pusher_cluster', env('PUSHER_APP_CLUSTER', 'mt1')),
-        ];
-
-        config([
-            'broadcasting.connections.reverb.key' => $reverb['key'],
-            'broadcasting.connections.reverb.secret' => $reverb['secret'],
-            'broadcasting.connections.reverb.app_id' => $reverb['app_id'],
-            'broadcasting.connections.reverb.options.host' => $reverb['host'],
-            'broadcasting.connections.reverb.options.port' => $reverb['port'],
-            'broadcasting.connections.reverb.options.scheme' => $reverb['scheme'],
-            'broadcasting.connections.reverb.options.useTLS' => $reverb['scheme'] === 'https',
-            'broadcasting.connections.pusher.key' => $pusher['key'],
-            'broadcasting.connections.pusher.secret' => $pusher['secret'],
-            'broadcasting.connections.pusher.app_id' => $pusher['app_id'],
-            'broadcasting.connections.pusher.options.cluster' => $pusher['cluster'],
-        ]);
-
-        $requestedDriver = (string) settings('notifications_driver', env('BROADCAST_CONNECTION', 'reverb'));
-        $effectiveDriver = match ($requestedDriver) {
-            'pusher' => filled($pusher['key']) && filled($pusher['secret']) && filled($pusher['app_id']) ? 'pusher' : 'reverb',
-            'polling' => 'null',
-            'log', 'null' => $requestedDriver,
-            default => 'reverb',
-        };
-
-        if ($effectiveDriver === 'reverb' && (! filled($reverb['key']) || ! filled($reverb['secret']) || ! filled($reverb['app_id']))) {
-            $effectiveDriver = 'log';
+        try {
+            $broadcasting = app(\App\Services\BroadcastingService::class);
+        } catch (\Throwable) {
+            return;
         }
 
-        config(['broadcasting.default' => $effectiveDriver]);
+        config([
+            'broadcasting.connections.reverb.key' => $broadcasting->reverbKey(),
+            'broadcasting.connections.reverb.secret' => $broadcasting->reverbSecret(),
+            'broadcasting.connections.reverb.app_id' => $broadcasting->reverbAppId(),
+            'broadcasting.connections.reverb.options.host' => $broadcasting->reverbHost(),
+            'broadcasting.connections.reverb.options.port' => $broadcasting->reverbPort(),
+            'broadcasting.connections.reverb.options.scheme' => $broadcasting->reverbScheme(),
+            'broadcasting.connections.reverb.options.useTLS' => $broadcasting->reverbScheme() === 'https',
+            'broadcasting.connections.pusher.key' => $broadcasting->pusherKey(),
+            'broadcasting.connections.pusher.secret' => $broadcasting->pusherSecret(),
+            'broadcasting.connections.pusher.app_id' => $broadcasting->pusherAppId(),
+            'broadcasting.connections.pusher.options.cluster' => $broadcasting->pusherCluster(),
+        ]);
+
+        $effectiveDriver = $broadcasting->resolveDriver();
+        config(['broadcasting.default' => $effectiveDriver === 'polling' ? 'log' : $effectiveDriver]);
     }
 }

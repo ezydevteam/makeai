@@ -128,6 +128,10 @@ class AiService
         try {
             TokenGuard::before($user, null, $modelName);
         } catch (Throwable $e) {
+            $fallback = $this->resolveFallback($providerName);
+            if ($fallback) {
+                return $this->complete($user, $prompt, $systemPrompt, $fallback['provider'], $fallback['model'], $options);
+            }
             TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
                 'preflight_error' => class_basename($e),
             ]);
@@ -140,39 +144,63 @@ class AiService
         }
         $messages[] = ['role' => 'user', 'content' => $prompt];
 
-        return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options, $systemPrompt, $prompt) {
-            $result = $adapter->chatCompletion($messages, $modelName, $options);
+        try {
+            return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options, $systemPrompt, $prompt) {
+                $result = $adapter->chatCompletion($messages, $modelName, $options);
 
-            TokenGuard::after(
-                $user,
-                $result['input_tokens'],
-                $result['output_tokens'],
-                $result['model'],
-                $providerName,
-                'chat'
-            );
+                TokenGuard::after(
+                    $user,
+                    $result['input_tokens'],
+                    $result['output_tokens'],
+                    $result['model'],
+                    $providerName,
+                    'chat'
+                );
 
-            RecordGenerationHistoryJob::dispatch($user, [
-                'tool_slug' => 'direct',
-                'prompt_system' => $systemPrompt ?? '',
-                'prompt_user' => $prompt,
-                'field_values' => [],
-                'model' => $result['model'],
-                'provider' => $providerName,
-                'temperature' => $options['temperature'] ?? 0.7,
-                'max_tokens' => $options['max_tokens'] ?? 2000,
-                'output_preview' => Str::limit($result['content'], 500),
-                'tokens_input' => $result['input_tokens'],
-                'tokens_output' => $result['output_tokens'],
-            ])->onQueue('ai');
+                RecordGenerationHistoryJob::dispatch($user, [
+                    'tool_slug' => 'direct',
+                    'prompt_system' => $systemPrompt ?? '',
+                    'prompt_user' => $prompt,
+                    'field_values' => [],
+                    'model' => $result['model'],
+                    'provider' => $providerName,
+                    'temperature' => $options['temperature'] ?? 0.7,
+                    'max_tokens' => $options['max_tokens'] ?? 2000,
+                    'output_preview' => Str::limit($result['content'], 500),
+                    'tokens_input' => $result['input_tokens'],
+                    'tokens_output' => $result['output_tokens'],
+                ])->onQueue('ai');
 
-            return new CompletionResponse(
-                content: $result['content'],
-                inputTokens: $result['input_tokens'],
-                outputTokens: $result['output_tokens'],
-                model: $result['model'],
-            );
-        }, $user, $providerName, $modelName, 'chat');
+                return new CompletionResponse(
+                    content: $result['content'],
+                    inputTokens: $result['input_tokens'],
+                    outputTokens: $result['output_tokens'],
+                    model: $result['model'],
+                );
+            }, $user, $providerName, $modelName, 'chat');
+        } catch (Throwable $e) {
+            $fallback = $this->resolveFallback($providerName);
+            if ($fallback && $e->getMessage() !== $providerName) {
+                return $this->complete($user, $prompt, $systemPrompt, $fallback['provider'], $fallback['model'], $options);
+            }
+            throw $e;
+        }
+    }
+
+    private function resolveFallback(string $primaryProvider): ?array
+    {
+        $fbProvider = settings('fallback_ai_provider', '');
+        $fbModel = settings('fallback_ai_model', '');
+
+        if (empty($fbProvider) || empty($fbModel)) {
+            return null;
+        }
+
+        if ($fbProvider === $primaryProvider) {
+            return null;
+        }
+
+        return ['provider' => $fbProvider, 'model' => $fbModel];
     }
 
     /**

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, computed } from 'vue'
+import { watch, computed, onMounted } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { usePlayground, playgroundState } from '@/composables/usePlayground'
@@ -16,6 +16,20 @@ interface ProviderOption {
 }
 
 const rawProviders = (page.props.providers as ProviderOption[]) ?? []
+const defaultProvider = (page.props.defaultProvider as string) || 'openai'
+const defaultModel = (page.props.defaultModel as string) || 'gpt-4o-mini'
+
+// Initialize panels with server-side defaults
+onMounted(() => {
+  if (!playgroundState.leftPanel.provider || playgroundState.leftPanel.provider === 'openai') {
+    playgroundState.leftPanel.provider = defaultProvider
+    playgroundState.leftPanel.model = defaultModel
+  }
+  if (!playgroundState.rightPanel.provider || playgroundState.rightPanel.provider === 'openai') {
+    playgroundState.rightPanel.provider = defaultProvider
+    playgroundState.rightPanel.model = defaultModel
+  }
+})
 
 const providerOptions = computed(() =>
   rawProviders.map(p => ({ value: p.slug, label: p.name }))

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import AppSelect from '@/Components/AppSelect.vue'
 import TagsInput from '@/Components/TagsInput.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 

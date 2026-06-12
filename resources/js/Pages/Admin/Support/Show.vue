@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { defineAsyncComponent } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { sanitizeHtml } from '@/Composables/useSanitize'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 declare const route: (name: string, params?: unknown) => string

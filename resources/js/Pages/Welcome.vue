@@ -44,20 +44,10 @@ interface HomepageSettings {
         meta_description: string
         og_image: string
     }
-    preloader: {
-        enabled: boolean
-        animation_url: string
-    }
     scroll_to_top: {
         enabled: boolean
         position: 'left' | 'right'
         show_after_px: number
-    }
-    cookie_consent: {
-        enabled: boolean
-        message: string
-        accept_text: string
-        policy_url: string
     }
     chat_widget_embed: string
 }
@@ -130,20 +120,10 @@ const defaultHomepage: HomepageConfig = {
             meta_description: t('Create content, images, chat responses, and code with one powerful AI platform.'),
             og_image: '',
         },
-        preloader: {
-            enabled: false,
-            animation_url: '',
-        },
         scroll_to_top: {
             enabled: true,
             position: 'right',
             show_after_px: 500,
-        },
-        cookie_consent: {
-            enabled: false,
-            message: t('We use cookies to improve your experience.'),
-            accept_text: t('Accept'),
-            policy_url: '/privacy-policy',
         },
         chat_widget_embed: '',
     },
@@ -221,11 +201,6 @@ onUnmounted(() => {
     </Head>
 
     <Layout>
-        <div v-if="homepageConfig.settings.preloader.enabled" class="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-surface-950">
-            <img v-if="homepageConfig.settings.preloader.animation_url" :src="homepageConfig.settings.preloader.animation_url" :alt="t('Loading')" class="w-20 h-20 object-contain">
-            <div v-else class="w-12 h-12 rounded-full border-4 border-primary-100 border-t-primary-600 animate-spin"></div>
-        </div>
-
         <template v-for="section in enabledSections" :key="section.id">
             <section v-if="section.type === 'hero'" class="relative overflow-hidden bg-white dark:bg-surface-950 transition-colors duration-300">
                 <div :class="asString(section.config.layout) === 'split' ? 'grid lg:grid-cols-2 gap-12 items-center text-left' : 'text-center'" class="relative z-10 max-w-7xl mx-auto px-6 pt-20 pb-32 md:pt-32 md:pb-48">
@@ -290,9 +265,9 @@ onUnmounted(() => {
 
             <section v-else-if="section.type === 'stats_bar'" class="py-16 bg-white dark:bg-surface-950 border-y border-gray-100 dark:border-surface-800">
                 <div class="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                    <div v-for="item in asItems(section.config.items).length ? asItems(section.config.items) : asItems(section.config.stats)" :key="`${item.number}_${item.label}`">
-                        <p class="text-4xl font-black text-gray-900 dark:text-white">{{ item.number }}</p>
-                        <p class="text-xs text-gray-400 font-black uppercase tracking-widest mt-2">{{ item.label }}</p>
+                    <div v-for="stat in asItems(section.config.stats)" :key="`${stat.number}_${stat.label}`">
+                        <p class="text-4xl font-black text-gray-900 dark:text-white">{{ stat.number }}</p>
+                        <p class="text-xs text-gray-400 font-black uppercase tracking-widest mt-2">{{ stat.label }}</p>
                     </div>
                 </div>
             </section>

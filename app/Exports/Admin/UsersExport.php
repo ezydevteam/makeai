@@ -6,11 +6,15 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
+use Maatwebsite\Excel\Events\AfterSheet;
 
-class UsersExport implements FromQuery, WithHeadings, WithMapping, WithChunkReading
+class UsersExport implements FromQuery, WithHeadings, WithMapping, WithChunkReading, WithStrictNullComparison, ShouldAutoSize, WithEvents
 {
     use Exportable;
 
@@ -61,5 +65,15 @@ class UsersExport implements FromQuery, WithHeadings, WithMapping, WithChunkRead
     public function chunkSize(): int
     {
         return $this->chunkSize;
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $event->sheet->getDelegate()->getStyle('A1:' . $event->sheet->getHighestColumn() . '1')
+                    ->getFont()->setBold(true);
+            },
+        ];
     }
 }

@@ -96,11 +96,13 @@ class InAppNotificationService
      */
     public function summary(Model $notifiable): array
     {
+        $broadcasting = app(BroadcastingService::class);
+
         if (! $this->enabled()) {
             return [
                 'enabled' => false,
                 'driver' => 'disabled',
-                'polling_interval' => 30000,
+                'polling_interval' => $broadcasting->pollingIntervalSeconds() * 1000,
                 'unread_count' => 0,
                 'items' => [],
             ];
@@ -108,8 +110,8 @@ class InAppNotificationService
 
         return [
             'enabled' => true,
-            'driver' => settings('notifications_driver', 'reverb'),
-            'polling_interval' => (int) settings('notifications_polling_interval', 30000),
+            'driver' => $broadcasting->resolveDriver(),
+            'polling_interval' => $broadcasting->pollingIntervalSeconds() * 1000,
             'unread_count' => $notifiable->unreadNotifications()->count(),
             'items' => $notifiable->notifications()
                 ->latest()
@@ -127,27 +129,7 @@ class InAppNotificationService
      */
     public function settingsPayload(): array
     {
-        $setting = fn (string $key, mixed $fallback): mixed => filled(settings($key)) ? settings($key) : $fallback;
-
-        return [
-            'notifications_enabled' => (bool) settings('notifications_enabled', true),
-            'notifications_driver' => settings('notifications_driver', 'reverb'),
-            'notifications_polling_interval' => (int) settings('notifications_polling_interval', 30000),
-            'reverb' => [
-                'app_id' => $setting('notifications_reverb_app_id', env('REVERB_APP_ID', '')),
-                'app_key' => $setting('notifications_reverb_app_key', env('REVERB_APP_KEY', '')),
-                'host' => $setting('notifications_reverb_host', env('REVERB_HOST', '127.0.0.1')),
-                'port' => (int) $setting('notifications_reverb_port', env('REVERB_PORT', 8080)),
-                'scheme' => $setting('notifications_reverb_scheme', env('REVERB_SCHEME', 'http')),
-                'secret_configured' => filled($setting('notifications_reverb_app_secret', env('REVERB_APP_SECRET', ''))),
-            ],
-            'pusher' => [
-                'app_id' => $setting('notifications_pusher_app_id', env('PUSHER_APP_ID', '')),
-                'key' => $setting('notifications_pusher_key', env('PUSHER_APP_KEY', '')),
-                'cluster' => $setting('notifications_pusher_cluster', env('PUSHER_APP_CLUSTER', 'mt1')),
-                'secret_configured' => filled($setting('notifications_pusher_secret', env('PUSHER_APP_SECRET', ''))),
-            ],
-        ];
+        return app(BroadcastingService::class)->configPayload();
     }
 
     /**
@@ -155,23 +137,7 @@ class InAppNotificationService
      */
     public function publicRealtimeConfig(): array
     {
-        $setting = fn (string $key, mixed $fallback): mixed => filled(settings($key)) ? settings($key) : $fallback;
-        $driver = settings('notifications_driver', 'reverb');
-        if ($driver === 'pusher' && ! filled($setting('notifications_pusher_key', env('PUSHER_APP_KEY', '')))) {
-            $driver = 'reverb';
-        }
-
-        return [
-            'driver' => $driver,
-            'broadcast_connection' => config('broadcasting.default'),
-            'key' => $driver === 'pusher'
-                ? $setting('notifications_pusher_key', env('PUSHER_APP_KEY', ''))
-                : $setting('notifications_reverb_app_key', env('VITE_REVERB_APP_KEY', env('REVERB_APP_KEY', ''))),
-            'host' => $setting('notifications_reverb_host', env('VITE_REVERB_HOST', env('REVERB_HOST', '127.0.0.1'))),
-            'port' => (int) $setting('notifications_reverb_port', env('VITE_REVERB_PORT', env('REVERB_PORT', 8080))),
-            'scheme' => $setting('notifications_reverb_scheme', env('VITE_REVERB_SCHEME', env('REVERB_SCHEME', 'http'))),
-            'cluster' => $setting('notifications_pusher_cluster', env('PUSHER_APP_CLUSTER', 'mt1')),
-        ];
+        return app(BroadcastingService::class)->frontendConfig();
     }
 
     /**

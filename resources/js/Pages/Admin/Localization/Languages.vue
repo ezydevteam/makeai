@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import FlagIcon from '@/Components/FlagIcon.vue'
@@ -42,6 +42,12 @@ const deleteTarget = ref<LanguageItem | null>(null)
 const statusFilter = ref<'all' | 'active' | 'inactive' | 'rtl' | 'default'>('all')
 const searchQuery = ref('')
 const openActionMenuId = ref<number | null>(null)
+const actionMenuPosition = ref({ top: 0, left: 0, openUpward: false })
+
+const ACTION_MENU_WIDTH = 208
+const ACTION_MENU_ESTIMATED_HEIGHT = 188
+const ACTION_MENU_GAP = 8
+const VIEWPORT_PADDING = 16
 
 const dateFormatOptions = computed<SelectOption[]>(() => [
     { value: 'MMM D, YYYY', label: `${t('Jan 31, 2026')} - ${t('Month name, day, year')}` },
@@ -235,8 +241,35 @@ function clearSearch() {
     searchQuery.value = ''
 }
 
-function toggleActionMenu(id: number) {
-    openActionMenuId.value = openActionMenuId.value === id ? null : id
+async function toggleActionMenu(id: number, event: MouseEvent) {
+    if (openActionMenuId.value === id) {
+        openActionMenuId.value = null
+        return
+    }
+
+    const trigger = event.currentTarget
+
+    if (!(trigger instanceof HTMLElement)) {
+        return
+    }
+
+    const rect = trigger.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    const openUpward = spaceBelow < ACTION_MENU_ESTIMATED_HEIGHT && spaceAbove > spaceBelow
+    const top = openUpward
+        ? Math.max(VIEWPORT_PADDING, rect.top - ACTION_MENU_GAP)
+        : Math.min(window.innerHeight - VIEWPORT_PADDING, rect.bottom + ACTION_MENU_GAP)
+    const left = Math.min(window.innerWidth - VIEWPORT_PADDING, rect.right)
+
+    actionMenuPosition.value = {
+        top,
+        left,
+        openUpward,
+    }
+
+    openActionMenuId.value = id
+    await nextTick()
 }
 
 function handleWindowClick(event: MouseEvent) {
@@ -270,11 +303,11 @@ onUnmounted(() => {
 
             <button
                 type="button"
-                class="btn-primary inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-medium"
+                class="btn-primary"
                 @click="openCreateModal"
             >
                 <i class="ti ti-plus text-base" />
-                <span class="ml-2">{{ t('Add Language') }}</span>
+               {{ t('Add Language') }}
             </button>
         </section>
 
@@ -328,7 +361,8 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
+            <div class="overflow-visible">
+                <div class="overflow-x-auto overflow-y-visible">
                 <div class="min-w-[980px]">
                     <table class="min-w-full table-auto">
                         <thead class="bg-gray-50 dark:bg-surface-950/60">
@@ -387,20 +421,27 @@ onUnmounted(() => {
                                         <span v-if="language.is_rtl" class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-surface-800 dark:text-gray-300">{{ t('RTL') }}</span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="overflow-visible px-6 py-4 text-right">
                                     <div class="relative inline-flex" data-language-actions>
                                         <button
                                             type="button"
                                             class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:text-primary-300"
                                             :title="t('Open actions')"
-                                            @click.stop="toggleActionMenu(language.id)"
+                                            @click.stop="toggleActionMenu(language.id, $event)"
                                         >
                                             <i class="ti ti-dots-vertical text-lg" />
                                         </button>
-
+                                    </div>
+                                    <Teleport to="body">
                                         <div
                                             v-if="openActionMenuId === language.id"
-                                            class="absolute right-0 top-12 z-20 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 text-left shadow-lg dark:border-surface-700 dark:bg-surface-900"
+                                            data-language-actions
+                                            class="fixed z-[80] w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 text-left shadow-xl dark:border-surface-700 dark:bg-surface-900"
+                                            :style="{
+                                                top: `${actionMenuPosition.top}px`,
+                                                left: `${actionMenuPosition.left}px`,
+                                                transform: actionMenuPosition.openUpward ? `translate(-${ACTION_MENU_WIDTH}px, -100%)` : `translateX(-${ACTION_MENU_WIDTH}px)`,
+                                            }"
                                         >
                                             <Link
                                                 :href="route('admin.translations.index', language.id)"
@@ -436,7 +477,7 @@ onUnmounted(() => {
                                                 <span>{{ t('Delete Language') }}</span>
                                             </button>
                                         </div>
-                                    </div>
+                                    </Teleport>
                                 </td>
                             </tr>
 
@@ -458,6 +499,7 @@ onUnmounted(() => {
                         </tbody>
                     </table>
                 </div>
+            </div>
             </div>
         </section>
     </div>

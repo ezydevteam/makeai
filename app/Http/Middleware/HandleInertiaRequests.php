@@ -7,12 +7,14 @@ use App\Models\AiTool;
 use App\Models\Announcement;
 use App\Models\AppearanceSetting;
 use App\Models\BlogPost;
+use App\Models\BlogTag;
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\Coupon;
 use App\Models\Language;
 use App\Models\Menu;
 use App\Models\Setting;
+use App\Services\BroadcastingService;
 use App\Services\CountryDetectionService;
 use App\Services\InAppNotificationService;
 use App\Services\SocialService;
@@ -177,6 +179,8 @@ class HandleInertiaRequests extends Middleware
 
             'notifications' => fn () => $this->getNotificationProps($request),
 
+            'broadcasting' => fn () => app(BroadcastingService::class)->frontendConfig(),
+
             'cronStatus' => fn () => $this->getCronStatus($request),
 
             'flash' => [
@@ -213,6 +217,7 @@ class HandleInertiaRequests extends Middleware
             'socialFollow' => fn () => app(SocialService::class)->followPayload(),
 
             'headerConfig' => fn () => Setting::getValue('header_config', [
+                'layout' => 'classic',
                 'top' => [
                     'enabled' => false,
                     'sticky' => false,
@@ -226,6 +231,8 @@ class HandleInertiaRequests extends Middleware
                     'transition_enabled' => true,
                     'shadow' => false,
                     'progressbar' => false,
+                    'background' => ['color' => '', 'image_url' => '', 'overlay_opacity' => 0],
+                    'custom_css' => '',
                     'blocks' => [
                         ['id' => 'top_nav', 'type' => 'navigation', 'enabled' => true, 'config' => ['menu_slug' => 'top', 'alignment' => 'center', 'text_color' => '', 'hover_color' => '', 'hover_style' => 'underline', 'submenu_bg_color' => '', 'submenu_text_color' => '']],
                         ['id' => 'top_lang', 'type' => 'language_switcher', 'enabled' => true, 'config' => []],
@@ -244,8 +251,10 @@ class HandleInertiaRequests extends Middleware
                     'transition_enabled' => true,
                     'shadow' => false,
                     'progressbar' => false,
+                    'background' => ['color' => '', 'image_url' => '', 'overlay_opacity' => 0],
+                    'custom_css' => '',
                     'blocks' => [
-                        ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
+                        ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'mobile_image' => null, 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
                         ['id' => 'nav', 'type' => 'navigation', 'enabled' => true, 'config' => ['menu_slug' => 'main', 'alignment' => 'center', 'text_color' => '', 'hover_color' => '', 'hover_style' => 'underline', 'submenu_bg_color' => '', 'submenu_text_color' => '']],
                         ['id' => 'search', 'type' => 'search', 'enabled' => false, 'config' => ['compact' => false, 'search_style' => 'box', 'enable_live_search' => true, 'show_suggestions' => true, 'icon_class' => 'ti ti-search', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                         ['id' => 'lang', 'type' => 'language_switcher', 'enabled' => false, 'config' => []],
@@ -271,9 +280,11 @@ class HandleInertiaRequests extends Middleware
                     'transition_enabled' => true,
                     'shadow' => false,
                     'progressbar' => false,
+                    'background' => ['color' => '', 'image_url' => '', 'overlay_opacity' => 0],
+                    'custom_css' => '',
                     'blocks' => [
                         ['id' => 'mobile_hamburger', 'type' => 'hamburger', 'enabled' => true, 'config' => ['menu_slug' => 'mobile', 'label' => translate('Menu'), 'icon_class' => 'ti ti-menu-2', 'show_label' => true, 'drawer_title' => '', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
-                        ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
+                        ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'mobile_image' => null, 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
                         ['id' => 'mobile_notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => []],
                         ['id' => 'mobile_dark', 'type' => 'dark_mode', 'enabled' => true, 'config' => ['label' => translate('Theme'), 'icon_class' => '', 'show_label' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                     ],
@@ -291,6 +302,8 @@ class HandleInertiaRequests extends Middleware
                     'transition_enabled' => true,
                     'shadow' => true,
                     'progressbar' => false,
+                    'background' => ['color' => '', 'image_url' => '', 'overlay_opacity' => 0],
+                    'custom_css' => '',
                     'blocks' => [
                         ['id' => 'mobile_bottom_home', 'type' => 'home_link', 'enabled' => true, 'config' => ['link' => '/', 'label' => translate('Home'), 'icon_class' => 'ti ti-home', 'show_label' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                         ['id' => 'mobile_bottom_search', 'type' => 'search_icon', 'enabled' => true, 'config' => ['label' => translate('Search'), 'icon_class' => 'ti ti-search', 'show_label' => true, 'enable_live_search' => true, 'show_suggestions' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
@@ -407,6 +420,7 @@ class HandleInertiaRequests extends Middleware
                 ],
                 'position' => 'right',
                 'sticky' => true,
+                'show_on_pages' => [],
             ]),
 
             'sidebarData' => [
@@ -417,9 +431,22 @@ class HandleInertiaRequests extends Middleware
                     ->map(fn (Category $cat) => [
                         'name' => $cat->name,
                         'slug' => $cat->slug,
-                        'count' => $cat->active_tools_count ?? $cat->tools_count,
+                        'tools_count' => $cat->active_tools_count ?? $cat->tools_count,
                     ]),
-                'recentTools' => fn () => AiTool::latest()->limit(5)->get(['id', 'name', 'slug', 'description', 'color', 'icon']),
+                'recentTools' => fn () => AiTool::active()->latest()->limit(5)->get(['id', 'name', 'slug', 'description', 'color', 'icon']),
+                'popularTools' => fn () => AiTool::active()->orderByDesc('usage_count')->limit(10)->get(['id', 'name', 'slug', 'description', 'color', 'icon', 'usage_count']),
+                'recentPosts' => fn () => BlogPost::published()->latest('published_at')->limit(5)->get(['title', 'slug', 'published_at', 'featured_image'])->map(fn (BlogPost $post) => [
+                    'title' => $post->title,
+                    'slug' => $post->slug,
+                    'published_at' => $post->published_at?->toDateString(),
+                    'image' => $post->featured_image,
+                ]),
+                'tags' => fn () => BlogTag::where('posts_count', '>', 0)->orderByDesc('posts_count')->limit(30)->get(['name', 'slug', 'posts_count'])->map(fn (BlogTag $tag) => [
+                    'name' => $tag->name,
+                    'slug' => $tag->slug,
+                    'url' => route('blog.tag', $tag->slug),
+                    'count' => $tag->posts_count,
+                ]),
             ],
 
             'globalMenus' => fn () => Menu::with(['items' => function ($q) {
@@ -439,6 +466,8 @@ class HandleInertiaRequests extends Middleware
      */
     private function getSocialLoginProviders(): array
     {
+        $displayMode = (string) settings('social_share_blog_style', 'icon-label');
+
         return collect([
             'google' => translate('Google'),
             'github' => translate('GitHub'),
@@ -453,6 +482,7 @@ class HandleInertiaRequests extends Middleware
                 'provider' => $provider,
                 'label' => $label,
                 'url' => route('social.redirect', $provider),
+                'display_mode' => in_array($displayMode, ['icon', 'icon-label'], true) ? $displayMode : 'icon-label',
             ])
             ->values()
             ->all();

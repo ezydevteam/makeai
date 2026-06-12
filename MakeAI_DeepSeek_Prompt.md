@@ -51,7 +51,7 @@ if ($user->plan === 'pro') { ... }   // missing isProAvailable() check
 |---|---|---|
 | Language | PHP 8.3+ | Must also be compatible with PHP 8.4 |
 | Framework | Laravel 12+ | Latest stable |
-| AI Framework | **LLPhant** | RAG, Agents, Vector store — NOT LangChain or custom |
+| AI Framework | **Laravel AI SDK (laravel/ai)** | RAG, Agents, Vector store — NOT LangChain or custom |
 | Frontend | Vue 3 + TypeScript | `<script setup>` ONLY — Options API is FORBIDDEN |
 | SPA/SSR | Inertia.js with SSR | SSR is mandatory — Google must index tool pages |
 | Styling | Tailwind CSS v4 | CSS variables for theming |
@@ -434,46 +434,6 @@ ElevenLabs, OpenAI TTS, Azure Cognitive Speech, Amazon Polly, PlayHT, Whisper (S
 Kling AI, Google Veo, Runway ML, Sora (OpenAI), HeyGen, D-ID, Pika Labs
 
 ---
-
-## ══ DATABASE — MIGRATIONS ORDER ══
-
-Migrations MUST be created and run in this exact order to avoid FK constraint failures:
-
-```
-1.  users                    — core auth, has ulid column
-2.  admins                   — separate from users
-3.  settings                 — key/value config store
-4.  categories               — for ai_templates, blog posts, etc.
-5.  ai_templates             — 255 seeded tools
-6.  documents                — generated content per user
-7.  ai_usage_logs            — every AI request logged here
-8.  blog_posts               — CMS
-9.  pages                    — custom static pages
-10. plans                    — subscription plans (Pro only)
-11. subscriptions            — active user subscriptions
-12. credit_transactions      — credit additions/deductions
-13. support_tickets          — helpdesk
-14. support_messages         — ticket replies
-15. mail_templates           — 23 email templates
-16. announcements            — top bar + popup notices
-17. newsletter_subscribers
-18. newsletter_campaigns
-19. affiliate_referrals
-20. affiliate_commissions
-21. chatbots                 — custom chatbot builder
-22. knowledge_bases          — RAG document collections
-23. knowledge_documents
-24. social_accounts          — connected social media
-25. scheduled_posts
-26. admin_activity_logs      — audit trail (never deletable)
-27. notifications
-28. tool_reviews
-29. tool_favorites
-30. menus + menu_items
-31. homepage_sections
-32. testimonials
-33. faqs
-```
 
 ---
 

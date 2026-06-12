@@ -18,12 +18,11 @@ import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { useTranslate } from '@/Composables/useTranslate'
 import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import { RICH_EDITOR_FONT_OPTIONS } from '@/config/fontFamilies'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import { all, createLowlight } from 'lowlight'
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
-import html2pdf from 'html2pdf.js'
+import { common, createLowlight } from 'lowlight'
 
-const lowlight = createLowlight(all)
+const lowlight = createLowlight(common)
 
 interface AiAssistAction {
     key: string
@@ -230,47 +229,7 @@ let autosaveTimer: number | undefined
 const linkTooltip = ref({ visible: false, url: '', x: 0, y: 0 })
 const exporting = ref(false)
 
-const fontOptions = [
-    { label: 'Inter (Sans)', value: 'Inter, sans-serif' },
-    { label: 'Roboto', value: 'Roboto, sans-serif' },
-    { label: 'Open Sans', value: '"Open Sans", sans-serif' },
-    { label: 'Poppins', value: 'Poppins, sans-serif' },
-    { label: 'Montserrat', value: 'Montserrat, sans-serif' },
-    { label: 'Raleway', value: 'Raleway, sans-serif' },
-    { label: 'Nunito', value: 'Nunito, sans-serif' },
-    { label: 'Lato', value: 'Lato, sans-serif' },
-    { label: 'Source Sans 3', value: '"Source Sans 3", sans-serif' },
-    { label: 'DM Sans', value: '"DM Sans", sans-serif' },
-    { label: 'Merriweather', value: 'Merriweather, serif' },
-    { label: 'Playfair Display', value: '"Playfair Display", serif' },
-    { label: 'Lora', value: 'Lora, serif' },
-    { label: 'Libre Baskerville', value: '"Libre Baskerville", serif' },
-    { label: 'Georgia', value: 'Georgia, serif' },
-    { label: 'Courier New', value: '"Courier New", monospace' },
-    { label: 'Fira Code', value: '"Fira Code", monospace' },
-    { label: 'JetBrains Mono', value: '"JetBrains Mono", monospace' },
-    { label: 'Source Code Pro', value: '"Source Code Pro", monospace' },
-    { label: 'Noto Sans Bengali', value: '"Noto Sans Bengali", "Hind Siliguri", sans-serif' },
-    { label: 'Hind Siliguri (Bangla)', value: '"Hind Siliguri", "Noto Sans Bengali", sans-serif' },
-    { label: 'Noto Sans Devanagari', value: '"Noto Sans Devanagari", sans-serif' },
-    { label: 'Noto Naskh Arabic', value: '"Noto Naskh Arabic", "Scheherazade New", serif' },
-    { label: 'Noto Sans Arabic', value: '"Noto Sans Arabic", sans-serif' },
-    { label: 'Noto Sans SC (Chinese)', value: '"Noto Sans SC", "Microsoft YaHei", sans-serif' },
-    { label: 'Noto Sans JP (Japanese)', value: '"Noto Sans JP", "Hiragino Sans", sans-serif' },
-    { label: 'Noto Sans KR (Korean)', value: '"Noto Sans KR", "Malgun Gothic", sans-serif' },
-    { label: 'Noto Sans Thai', value: '"Noto Sans Thai", sans-serif' },
-    { label: 'Noto Sans Hebrew', value: '"Noto Sans Hebrew", sans-serif' },
-    { label: 'Noto Sans Tamil', value: '"Noto Sans Tamil", sans-serif' },
-    { label: 'Noto Sans Telugu', value: '"Noto Sans Telugu", sans-serif' },
-    { label: 'Roboto Condensed', value: '"Roboto Condensed", sans-serif' },
-    { label: 'Oswald', value: 'Oswald, sans-serif' },
-    { label: 'Ubuntu', value: 'Ubuntu, sans-serif' },
-    { label: 'Noto Serif', value: '"Noto Serif", serif' },
-    { label: 'PT Serif', value: '"PT Serif", serif' },
-    { label: 'Noto Sans', value: '"Noto Sans", sans-serif' },
-    { label: 'Rubik', value: 'Rubik, sans-serif' },
-    { label: 'Cairo', value: 'Cairo, sans-serif' },
-]
+const fontOptions: SelectOption[] = RICH_EDITOR_FONT_OPTIONS
 
 const codeLanguages = [
     'javascript', 'typescript', 'python', 'html', 'css', 'json', 'php', 'ruby', 'go', 'rust',

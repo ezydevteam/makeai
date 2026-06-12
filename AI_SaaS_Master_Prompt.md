@@ -5496,7 +5496,7 @@ Admin can place the newsletter section via Homepage Builder (see Part 31) and Si
 ---
 
 
-## PART 23 — IN-APP NOTIFICATIONS (Reverb)
+## PART 23 — IN-APP NOTIFICATIONS (Reverb) ✅
 
 ### 30.1 Architecture
 
@@ -5812,7 +5812,7 @@ Each gateway has its own Service class in `app/Services/Payment/`:
 - **PayPal** — subscriptions + one-time
 - **Paddle** — handles VAT automatically (using laravel cashier)
 - **Razorpay** — India market
-- **SSLCommerz** — Bangladesh market (already in your roadmap)
+- **SSLCommerz** — Bangladesh market
 - **CoinGate** — crypto payments
 - **Paystack** — Africa market
 - **Bank Transfer** — manual, admin approval
@@ -6101,7 +6101,7 @@ Translations are passed from `HandleInertiaRequests` as shared props (only curre
 
 ---
 
-## PART 30 — LOCALIZATION OF VUE COMPONENTS
+## PART 30 — LOCALIZATION OF VUE COMPONENTS ✅
 
 ### 30.1 Architecture Overview
 
@@ -6573,9 +6573,9 @@ Click on result → navigate to relevant page.
 
 ---
 
-## PART 32 — HOMEPAGE BUILDER
+## PART 32 — HOMEPAGE BUILDER ✅
 
-Admin → Appearance → Homepage
+Admin → Site builder → Homepage
 
 Visual section-based homepage builder. The homepage is composed of draggable sections — enable, disable, reorder, and configure each section from admin panel. No code editing required.
 
@@ -6926,7 +6926,7 @@ Custom maintenance view at `resources/views/maintenance.blade.php` — standalon
 
 ## PART 36 — ADMIN MENU STRUCTURE (Collapsible)
 
-### 17.1 Menu Builder
+### 17.1 Menu Builder ✅
 
 Admin → Appearance → Menus
 
@@ -6969,7 +6969,7 @@ created_at
 // or Vue prop via Inertia shared data: $page.props.menus.top_header
 ```
 
-### 17.2 Header Builder
+### 17.2 Header Builder ✅
 
 Admin → Appearance → Header
 
@@ -6995,7 +6995,7 @@ Layout options:
 
 Mobile header: separate simplified builder — logo + hamburger (opens `mobile_offcanvas` menu).
 
-### 17.3 Footer Builder
+### 17.3 Footer Builder ✅
 
 Admin → Appearance → Footer
 
@@ -7017,9 +7017,9 @@ Bottom bar (sub-footer):
 - Payment icons (Visa, Mastercard, PayPal, Stripe — toggleable)
 - Back to top button toggle
 
-### 17.4 Sidebar Builder
+### 17.4 Widget Builder ✅
 
-Admin → Appearance → Sidebar
+Admin → Appearance → Widget
 
 Available sidebar widgets:
 - Search box
@@ -7030,6 +7030,8 @@ Available sidebar widgets:
 - Ad zone (select from defined zones)
 - Social follow
 - Custom HTML
+- popular tools
+- recently added tools
 
 Drag-and-drop reorder. Each widget has its own settings (e.g. Recent Posts: how many, show thumbnail toggle).
 
@@ -7357,7 +7359,7 @@ Auto-generated with **Dedoc Scramble** (`dedoc/scramble`) — served at `/api/do
 ---
 
 
-## PART 39 — QUEUE & JOB ARCHITECTURE
+## PART 45 — QUEUE & JOB ARCHITECTURE
 
 ### 45.1 Queue Infrastructure
 
@@ -7840,11 +7842,6 @@ When demo mode is active:
 - [ ] PSR-12 passes: `./vendor/bin/pint --test`
 - [ ] PestPHP test suite: `./vendor/bin/pest` all green
 - [ ] Documentation covers: installation, admin guide, addon development, theme development, API reference
-
----
-
-*End of MakeAI Complete Development Master Prompt*
-*Version: 1.1 | Sections: 40 | AI Templates: 255 | Mail Templates: 23 | Integrations: 60+ | Name: MakeAI*
 
 ---
 
@@ -9798,1057 +9795,6 @@ Add `Ctrl+Shift+L` to the keyboard shortcut reference modal (`?` key).
 
 ---
 
----
-# PART P63 — FLOATING AI ASSISTANT (Admin Panel + Frontend)
-
-## Overview
-
-A floating AI assistant widget embedded site-wide — both in the admin panel and the user-facing frontend. Configured entirely from Admin → Settings → AI Assistant. Uses **Laravel AI SDK (`laravel/ai`)** for all AI calls with streaming via `ReadableStream` (POST-based, not EventSource).
-
----
-
-## Database
-
-### Migration: `create_assistant_settings_table`
-
-```php
-Schema::create('assistant_settings', function (Blueprint $table) {
-    $table->id();
-
-    // Global toggles
-    $table->boolean('enabled')->default(false);              // frontend on/off
-    $table->boolean('admin_enabled')->default(true);         // admin panel on/off
-
-    // AI model config
-    $table->string('model')->default('gpt-4o-mini');
-    $table->unsignedSmallInteger('max_tokens')->default(1024);
-    $table->decimal('temperature', 3, 2)->default(0.7);
-    $table->string('api_key_source')->default('global');     // global | custom
-    $table->text('custom_api_key')->nullable();              // encrypted if set
-
-    // Persona
-    $table->string('assistant_name')->default('AI Assistant');
-    $table->string('avatar_url')->nullable();
-    $table->string('designation')->default('Your AI Helper');
-    $table->text('greeting_message')->nullable();
-
-    // System prompts
-    $table->longText('system_prompt_frontend')->nullable();
-    $table->longText('system_prompt_admin')->nullable();
-
-    // Access control (frontend)
-    $table->enum('show_to', ['all', 'logged_in', 'pro_only'])->default('all');
-    $table->unsignedInteger('daily_message_limit')->default(20); // 0 = unlimited
-    $table->boolean('show_on_guest_pages')->default(true);
-
-    // UI options
-    $table->enum('position', ['bottom-right', 'bottom-left'])->default('bottom-right');
-    $table->string('accent_color')->default('#10b981');      // emerald
-
-    $table->timestamps();
-});
-```
-
-### Migration: `create_assistant_feedback_table`
-
-```php
-Schema::create('assistant_feedback', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-    $table->string('session_id', 64)->index();
-    $table->string('context_page')->nullable();             // e.g. '/tools/ai-writer'
-    $table->string('message_hash', 64);                     // sha256 of user message
-    $table->tinyInteger('rating');                          // 1 = thumbs up, -1 = thumbs down
-    $table->text('comment')->nullable();
-    $table->timestamps();
-});
-```
-
----
-
-## Backend
-
-### Model: `app/Models/AssistantSetting.php`
-
-```php
-<?php
-
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class AssistantSetting extends Model
-{
-    protected $fillable = [
-        'enabled', 'admin_enabled', 'model', 'max_tokens', 'temperature',
-        'api_key_source', 'custom_api_key', 'assistant_name', 'avatar_url',
-        'designation', 'greeting_message', 'system_prompt_frontend',
-        'system_prompt_admin', 'show_to', 'daily_message_limit',
-        'show_on_guest_pages', 'position', 'accent_color',
-    ];
-
-    protected $casts = [
-        'enabled'             => 'boolean',
-        'admin_enabled'       => 'boolean',
-        'temperature'         => 'float',
-        'show_on_guest_pages' => 'boolean',
-    ];
-
-    protected $hidden = ['custom_api_key'];
-
-    public static function current(): self
-    {
-        return static::firstOrCreate(['id' => 1]);
-    }
-}
-```
-
----
-
-### Service: `app/Services/AI/AssistantService.php`
-
-```php
-<?php
-
-namespace App\Services\AI;
-
-use App\Models\AssistantSetting;
-use App\Models\User;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
-
-class AssistantService
-{
-    public function __construct(private AiService $ai) {}
-
-    /**
-     * Build the system prompt for frontend users.
-     */
-    public function buildFrontendSystemPrompt(AssistantSetting $setting, ?User $user, string $currentPage): string
-    {
-        $appName = settings('app_name');
-        $base = $setting->system_prompt_frontend
-            ?? "You are {$setting->assistant_name}, a helpful AI assistant for {$appName}. "
-             . "You help users understand features, generate content, and get the most out of the platform. "
-             . "Be concise, friendly, and proactive. Never make up features that don't exist.";
-
-        $context = "\n\n[CONTEXT]\n";
-        $context .= "Platform: {$appName}\n";
-        $context .= "Current page: {$currentPage}\n";
-
-        if ($user) {
-            $context .= "User: {$user->name} | Plan: " . ($user->subscription_status === 'active' ? 'Pro' : 'Free') . "\n";
-            $context .= "Credits remaining: {$user->credits}\n";
-        } else {
-            $context .= "User: Guest (not logged in)\n";
-        }
-
-        return $base . $context;
-    }
-
-    /**
-     * Build the system prompt for admin panel — includes full site context.
-     */
-    public function buildAdminSystemPrompt(AssistantSetting $setting): string
-    {
-        $appName = settings('app_name');
-        $base = $setting->system_prompt_admin
-            ?? "You are {$setting->assistant_name}, an intelligent admin assistant for {$appName}. "
-             . "You have full visibility into the platform's performance metrics. "
-             . "Provide actionable insights, marketing advice, and optimization suggestions. "
-             . "Be direct and data-driven. Use the live site data provided to give specific, relevant advice.";
-
-        $siteData = $this->buildSiteContext();
-
-        return $base . "\n\n[LIVE SITE DATA]\n" . json_encode($siteData, JSON_PRETTY_PRINT);
-    }
-
-    /**
-     * Gather real-time site metrics for admin context.
-     * Cached for 2 minutes to avoid DB overload on every message.
-     */
-    public function buildSiteContext(): array
-    {
-        return Cache::remember('assistant.admin.site_context', 120, function () {
-            $now = now();
-            return [
-                'users' => [
-                    'total'       => DB::table('users')->count(),
-                    'verified'    => DB::table('users')->whereNotNull('email_verified_at')->count(),
-                    'new_today'   => DB::table('users')->whereDate('created_at', today())->count(),
-                    'new_7d'      => DB::table('users')->where('created_at', '>=', $now->copy()->subDays(7))->count(),
-                    'new_30d'     => DB::table('users')->where('created_at', '>=', $now->copy()->subDays(30))->count(),
-                ],
-                'subscriptions' => [
-                    'active'      => DB::table('subscriptions')->where('status', 'active')->count(),
-                    'trialing'    => DB::table('subscriptions')->where('status', 'trialing')->count(),
-                    'canceled_7d' => DB::table('subscriptions')
-                                      ->where('status', 'canceled')
-                                      ->where('updated_at', '>=', $now->copy()->subDays(7))
-                                      ->count(),
-                ],
-                'revenue' => [
-                    'today'       => DB::table('transactions')->whereDate('created_at', today())->where('status', 'paid')->sum('amount'),
-                    'this_month'  => DB::table('transactions')->whereMonth('created_at', $now->month)->where('status', 'paid')->sum('amount'),
-                    'last_month'  => DB::table('transactions')->whereMonth('created_at', $now->copy()->subMonth()->month)->where('status', 'paid')->sum('amount'),
-                ],
-                'ai_usage' => [
-                    'requests_today'    => DB::table('ai_usage_logs')->whereDate('created_at', today())->count(),
-                    'tokens_today'      => DB::table('ai_usage_logs')->whereDate('created_at', today())->sum('total_tokens'),
-                    'cost_today_usd'    => DB::table('ai_usage_logs')->whereDate('created_at', today())->sum('estimated_cost_usd'),
-                    'top_tools_7d'      => DB::table('ai_usage_logs')
-                                            ->select('tool', DB::raw('count(*) as uses'))
-                                            ->where('created_at', '>=', $now->copy()->subDays(7))
-                                            ->groupBy('tool')
-                                            ->orderByDesc('uses')
-                                            ->limit(5)
-                                            ->pluck('uses', 'tool'),
-                ],
-                'system' => [
-                    'failed_jobs'       => DB::table('failed_jobs')->count(),
-                    'pending_tickets'   => DB::table('support_tickets')->where('status', 'open')->count(),
-                    'queued_jobs'       => DB::table('jobs')->count(),
-                ],
-                'content' => [
-                    'total_ai_tools'    => DB::table('ai_tools')->where('is_active', true)->count(),
-                    'total_blog_posts'  => DB::table('posts')->where('status', 'published')->count(),
-                    'total_documents'   => DB::table('documents')->count(),
-                ],
-            ];
-        });
-    }
-
-    /**
-     * Check if the frontend assistant should be visible.
-     */
-    public function isVisibleForUser(AssistantSetting $setting, ?User $user): bool
-    {
-        if (!$setting->enabled) {
-            return false;
-        }
-
-        return match ($setting->show_to) {
-            'all'       => true,
-            'logged_in' => $user !== null,
-            'pro_only'  => $user !== null && isProAvailable() && $user->subscription_status === 'active',
-            default     => false,
-        };
-    }
-
-    /**
-     * Check daily message limit for a user/session.
-     */
-    public function checkDailyLimit(AssistantSetting $setting, ?User $user, string $sessionId): bool
-    {
-        if ($setting->daily_message_limit === 0) {
-            return true; // unlimited
-        }
-
-        $key = $user
-            ? "assistant.limit.user.{$user->id}." . today()->toDateString()
-            : "assistant.limit.session.{$sessionId}." . today()->toDateString();
-
-        $count = (int) Cache::get($key, 0);
-
-        return $count < $setting->daily_message_limit;
-    }
-
-    public function incrementDailyCount(?User $user, string $sessionId): void
-    {
-        $key = $user
-            ? "assistant.limit.user.{$user->id}." . today()->toDateString()
-            : "assistant.limit.session.{$sessionId}." . today()->toDateString();
-
-        Cache::increment($key);
-        Cache::expire($key, 86400);
-    }
-}
-```
-
----
-
-### Controller: `app/Http/Controllers/Api/AssistantController.php`
-
-```php
-<?php
-
-namespace App\Http\Controllers\Api;
-
-use App\Http\Controllers\Controller;
-use App\Models\AssistantFeedback;
-use App\Models\AssistantSetting;
-use App\Services\AI\AssistantService;
-use App\Services\AI\AiService;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-
-class AssistantController extends Controller
-{
-    public function __construct(
-        private AssistantService $assistantService,
-        private AiService $ai,
-    ) {}
-
-    /**
-     * Stream a chat response — frontend users.
-     * POST /api/assistant/chat
-     */
-    public function chat(Request $request): StreamedResponse
-    {
-        $request->validate([
-            'message'      => ['required', 'string', 'max:2000'],
-            'history'      => ['array', 'max:20'],
-            'history.*.role'    => ['required', 'in:user,assistant'],
-            'history.*.content' => ['required', 'string', 'max:4000'],
-            'current_page' => ['nullable', 'string', 'max:255'],
-            'session_id'   => ['required', 'string', 'max:64'],
-        ]);
-
-        $setting = AssistantSetting::current();
-        $user    = $request->user();
-
-        // Visibility check
-        if (!$this->assistantService->isVisibleForUser($setting, $user)) {
-            abort(403, 'Assistant is not available.');
-        }
-
-        // Daily limit check
-        if (!$this->assistantService->checkDailyLimit($setting, $user, $request->session_id)) {
-            return response()->json(['error' => 'daily_limit_reached', 'limit' => $setting->daily_message_limit], 429);
-        }
-
-        $systemPrompt = $this->assistantService->buildFrontendSystemPrompt(
-            $setting,
-            $user,
-            $request->current_page ?? '/'
-        );
-
-        $messages = $this->buildMessages($request->history ?? [], $request->message);
-
-        $this->assistantService->incrementDailyCount($user, $request->session_id);
-
-        return $this->streamResponse($setting, $systemPrompt, $messages);
-    }
-
-    /**
-     * Stream a chat response — admin panel (with site context).
-     * POST /api/admin/assistant/chat
-     */
-    public function adminChat(Request $request): StreamedResponse
-    {
-        $request->validate([
-            'message'  => ['required', 'string', 'max:4000'],
-            'history'  => ['array', 'max:30'],
-            'history.*.role'    => ['required', 'in:user,assistant'],
-            'history.*.content' => ['required', 'string', 'max:8000'],
-        ]);
-
-        $setting = AssistantSetting::current();
-
-        if (!$setting->admin_enabled) {
-            abort(403, 'Admin assistant is disabled.');
-        }
-
-        $systemPrompt = $this->assistantService->buildAdminSystemPrompt($setting);
-        $messages     = $this->buildMessages($request->history ?? [], $request->message);
-
-        return $this->streamResponse($setting, $systemPrompt, $messages);
-    }
-
-    /**
-     * Log message feedback (thumbs up/down).
-     * POST /api/assistant/feedback
-     */
-    public function feedback(Request $request)
-    {
-        $request->validate([
-            'session_id'   => ['required', 'string', 'max:64'],
-            'message_hash' => ['required', 'string', 'max:64'],
-            'rating'       => ['required', 'in:1,-1'],
-            'context_page' => ['nullable', 'string', 'max:255'],
-            'comment'      => ['nullable', 'string', 'max:500'],
-        ]);
-
-        AssistantFeedback::updateOrCreate(
-            [
-                'session_id'   => $request->session_id,
-                'message_hash' => $request->message_hash,
-            ],
-            [
-                'user_id'      => $request->user()?->id,
-                'rating'       => (int) $request->rating,
-                'context_page' => $request->current_page,
-                'comment'      => $request->comment,
-            ]
-        );
-
-        return response()->json(['ok' => true]);
-    }
-
-    // -------------------------------------------------------------------------
-
-    private function buildMessages(array $history, string $newMessage): array
-    {
-        $messages = [];
-        foreach ($history as $msg) {
-            $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
-        }
-        $messages[] = ['role' => 'user', 'content' => $newMessage];
-        return $messages;
-    }
-
-    private function streamResponse(AssistantSetting $setting, string $systemPrompt, array $messages): StreamedResponse
-    {
-        return response()->stream(function () use ($setting, $systemPrompt, $messages) {
-            // Use Laravel AI SDK (laravel/ai) streaming
-            $stream = $this->ai->stream(new \App\Services\AI\CompletionRequest(
-                model:        $setting->model,
-                messages:     $messages,
-                systemPrompt: $systemPrompt,
-                maxTokens:    $setting->max_tokens,
-                temperature:  $setting->temperature,
-            ));
-
-            foreach ($stream as $chunk) {
-                if (connection_aborted()) {
-                    break;
-                }
-                echo $chunk;
-                ob_flush();
-                flush();
-            }
-        }, 200, [
-            'Content-Type'      => 'text/event-stream',
-            'Cache-Control'     => 'no-cache',
-            'X-Accel-Buffering' => 'no',           // MANDATORY for Nginx streaming
-            'Connection'        => 'keep-alive',
-        ]);
-    }
-}
-```
-
----
-
-### Routes: `routes/api.php`
-
-```php
-// Frontend assistant — rate limited: 30/min
-Route::middleware(['throttle:30,1'])->group(function () {
-    Route::post('/assistant/chat',     [AssistantController::class, 'chat']);
-    Route::post('/assistant/feedback', [AssistantController::class, 'feedback']);
-});
-
-// Admin assistant — must be admin auth
-Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
-    Route::post('/assistant/chat', [AssistantController::class, 'adminChat']);
-});
-```
-
----
-
-### Admin Settings Controller: `app/Http/Controllers/Admin/AssistantSettingsController.php`
-
-```php
-public function update(Request $request)
-{
-    $validated = $request->validate([
-        'enabled'                  => ['boolean'],
-        'admin_enabled'            => ['boolean'],
-        'model'                    => ['required', 'string'],
-        'max_tokens'               => ['required', 'integer', 'min:128', 'max:8192'],
-        'temperature'              => ['required', 'numeric', 'min:0', 'max:2'],
-        'assistant_name'           => ['required', 'string', 'max:60'],
-        'avatar_url'               => ['nullable', 'url', 'max:500'],
-        'designation'              => ['nullable', 'string', 'max:80'],
-        'greeting_message'         => ['nullable', 'string', 'max:300'],
-        'system_prompt_frontend'   => ['nullable', 'string', 'max:5000'],
-        'system_prompt_admin'      => ['nullable', 'string', 'max:5000'],
-        'show_to'                  => ['required', 'in:all,logged_in,pro_only'],
-        'daily_message_limit'      => ['required', 'integer', 'min:0'],
-        'show_on_guest_pages'      => ['boolean'],
-        'position'                 => ['required', 'in:bottom-right,bottom-left'],
-        'accent_color'             => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-    ]);
-
-    AssistantSetting::current()->update($validated);
-
-    Cache::forget('assistant.admin.site_context');
-
-    return back()->with('success', 'Assistant settings saved.');
-}
-```
-
----
-
-## Frontend Vue Components
-
-### Component Tree
-
-```
-resources/js/Components/Assistant/
-├── FloatingAssistant.vue         ← main entry, injected in AppLayout & AdminLayout
-├── AssistantTrigger.vue          ← FAB button with unread badge
-├── AssistantWindow.vue           ← chat window container
-├── AssistantHeader.vue           ← avatar, name, designation, minimize/close
-├── AssistantMessages.vue         ← scrollable messages list
-├── AssistantMessage.vue          ← single message bubble + copy + rating
-├── AssistantInput.vue            ← textarea, send button, slash commands
-└── AssistantSuggestions.vue      ← context-aware prompt chips (shown when empty)
-```
-
----
-
-### `FloatingAssistant.vue`
-
-```vue
-<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { usePage } from '@inertiajs/vue3'
-import AssistantTrigger from './AssistantTrigger.vue'
-import AssistantWindow from './AssistantWindow.vue'
-
-const props = defineProps<{
-  isAdmin?: boolean
-}>()
-
-const page = usePage()
-const settings = computed(() => page.props.assistantSettings as AssistantSettings | null)
-
-const isOpen   = ref(false)
-const unread   = ref(0)
-
-const sessionId = computed(() =>
-  sessionStorage.getItem('assistant_session_id') ?? (() => {
-    const id = crypto.randomUUID()
-    sessionStorage.setItem('assistant_session_id', id)
-    return id
-  })()
-)
-
-function onNewMessage() {
-  if (!isOpen.value) unread.value++
-}
-
-function open() {
-  isOpen.value = true
-  unread.value = 0
-}
-</script>
-
-<template>
-  <template v-if="settings?.enabled || (isAdmin && settings?.admin_enabled)">
-    <AssistantTrigger
-      :is-open="isOpen"
-      :unread="unread"
-      :avatar-url="settings?.avatar_url"
-      :accent-color="settings?.accent_color"
-      :position="settings?.position"
-      @toggle="isOpen ? isOpen = false : open()"
-    />
-    <AssistantWindow
-      v-if="isOpen"
-      :settings="settings"
-      :session-id="sessionId"
-      :is-admin="isAdmin"
-      :position="settings?.position"
-      @close="isOpen = false"
-      @new-message="onNewMessage"
-    />
-  </template>
-</template>
-```
-
----
-
-### `AssistantWindow.vue` (core logic)
-
-```vue
-<script setup lang="ts">
-import { ref, nextTick, computed } from 'vue'
-import { usePage } from '@inertiajs/vue3'
-import axios from 'axios'
-import AssistantHeader from './AssistantHeader.vue'
-import AssistantMessages from './AssistantMessages.vue'
-import AssistantInput from './AssistantInput.vue'
-import AssistantSuggestions from './AssistantSuggestions.vue'
-
-interface Message {
-  id:        string
-  role:      'user' | 'assistant'
-  content:   string
-  streaming: boolean
-  error:     boolean
-}
-
-const props = defineProps<{
-  settings:  any
-  sessionId: string
-  isAdmin:   boolean
-  position:  string
-}>()
-
-const emit = defineEmits<{
-  close:       []
-  newMessage:  []
-}>()
-
-const page        = usePage()
-const messages    = ref<Message[]>([])
-const isStreaming = ref(false)
-const messagesRef = ref<HTMLElement | null>(null)
-
-// Admin slash command shortcuts
-const SLASH_COMMANDS = [
-  { command: '/review-site',       label: '🔍 Full site review' },
-  { command: '/marketing-tips',    label: '📣 Marketing tips' },
-  { command: '/revenue-analysis',  label: '💰 Revenue analysis' },
-  { command: '/top-tools',         label: '📊 Top performing tools' },
-  { command: '/seo-check',         label: '🔎 SEO check' },
-]
-
-// Context-aware suggestions for frontend
-const PAGE_SUGGESTIONS: Record<string, string[]> = {
-  '/tools':     ['What tools are available?', 'Which tool should I start with?'],
-  '/pricing':   ['What\'s included in Pro?', 'Can I try Pro for free?'],
-  '/dashboard': ['How do I earn more credits?', 'Show me my usage summary'],
-  'default':    ['How do I get started?', 'What can you help me with?', 'Show me popular features'],
-}
-
-function getSuggestions(): string[] {
-  const path = window.location.pathname
-  return PAGE_SUGGESTIONS[path] ?? PAGE_SUGGESTIONS['default']
-}
-
-async function send(text: string) {
-  if (!text.trim() || isStreaming.value) return
-
-  const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, streaming: false, error: false }
-  messages.value.push(userMsg)
-  emit('newMessage')
-  await scrollToBottom()
-
-  const assistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: '', streaming: true, error: false }
-  messages.value.push(assistantMsg)
-  isStreaming.value = true
-
-  try {
-    const endpoint = props.isAdmin ? '/api/admin/assistant/chat' : '/api/assistant/chat'
-    const history  = messages.value
-      .slice(0, -2)   // exclude current pair
-      .filter(m => !m.error)
-      .map(m => ({ role: m.role, content: m.content }))
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'X-CSRF-TOKEN':  (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-        'Accept':        'text/event-stream',
-      },
-      body: JSON.stringify({
-        message:      text,
-        history,
-        current_page: window.location.pathname,
-        session_id:   props.sessionId,
-      }),
-    })
-
-    if (!response.ok) {
-      const data = await response.json()
-      if (data.error === 'daily_limit_reached') {
-        assistantMsg.content = `You've reached the daily message limit (${props.settings.daily_message_limit} messages). Please try again tomorrow.`
-      } else {
-        assistantMsg.content = 'Something went wrong. Please try again.'
-        assistantMsg.error   = true
-      }
-      return
-    }
-
-    // ReadableStream consumption (POST streaming — NOT EventSource)
-    const reader = response.body!.getReader()
-    const decoder = new TextDecoder()
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      assistantMsg.content += decoder.decode(value, { stream: true })
-      await scrollToBottom()
-    }
-
-    assistantMsg.streaming = false
-
-  } catch {
-    assistantMsg.content = 'Connection error. Please try again.'
-    assistantMsg.error   = true
-    assistantMsg.streaming = false
-  } finally {
-    isStreaming.value = false
-    await scrollToBottom()
-  }
-}
-
-async function scrollToBottom() {
-  await nextTick()
-  if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
-  }
-}
-
-async function regenerate() {
-  const lastUser = [...messages.value].reverse().find(m => m.role === 'user')
-  if (!lastUser) return
-  // Remove last assistant message
-  const idx = messages.value.findLastIndex(m => m.role === 'assistant')
-  if (idx !== -1) messages.value.splice(idx, 1)
-  await send(lastUser.content)
-}
-</script>
-
-<template>
-  <div
-    class="fixed z-[9999] flex flex-col bg-background shadow-xl border border-border rounded-2xl overflow-hidden"
-    :class="[
-      position === 'bottom-left' ? 'bottom-6 left-6' : 'bottom-6 right-6',
-      'w-[380px] h-[560px]'
-    ]"
-  >
-    <AssistantHeader
-      :name="settings.assistant_name"
-      :designation="settings.designation"
-      :avatar-url="settings.avatar_url"
-      @close="emit('close')"
-    />
-
-    <div ref="messagesRef" class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-      <!-- Greeting + suggestions when empty -->
-      <template v-if="messages.length === 0">
-        <div class="text-sm text-muted-foreground text-center pt-4">
-          {{ settings.greeting_message || `Hi! I'm ${settings.assistant_name}. How can I help?` }}
-        </div>
-        <AssistantSuggestions
-          :suggestions="isAdmin ? SLASH_COMMANDS.map(c => c.label) : getSuggestions()"
-          @select="send"
-        />
-      </template>
-
-      <AssistantMessages
-        :messages="messages"
-        :session-id="sessionId"
-        :context-page="$page.url"
-        @regenerate="regenerate"
-      />
-    </div>
-
-    <!-- Pro upsell banner (frontend non-pro users) -->
-    <div
-      v-if="!isAdmin && settings.show_to === 'pro_only' && !$page.props.auth?.user?.is_pro"
-      class="px-4 py-2 bg-amber-50 dark:bg-amber-950 border-t border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between"
-    >
-      <span>Upgrade for unlimited messages</span>
-      <a :href="route('pricing')" class="font-medium underline">Go Pro →</a>
-    </div>
-
-    <AssistantInput
-      :disabled="isStreaming"
-      :is-admin="isAdmin"
-      :slash-commands="SLASH_COMMANDS"
-      @send="send"
-    />
-  </div>
-</template>
-```
-
----
-
-### `AssistantMessage.vue`
-
-```vue
-<script setup lang="ts">
-import { ref } from 'vue'
-import axios from 'axios'
-
-const props = defineProps<{
-  message:     { id: string; role: string; content: string; streaming: boolean; error: boolean }
-  sessionId:   string
-  contextPage: string
-}>()
-
-const emit        = defineEmits(['regenerate'])
-const copied      = ref(false)
-const rated       = ref<1 | -1 | null>(null)
-
-function copy() {
-  navigator.clipboard.writeText(props.message.content)
-  copied.value = true
-  setTimeout(() => copied.value = false, 2000)
-}
-
-async function rate(rating: 1 | -1) {
-  if (rated.value !== null) return
-  rated.value = rating
-  await axios.post('/api/assistant/feedback', {
-    session_id:   props.sessionId,
-    message_hash: await hashMessage(props.message.content),
-    rating,
-    context_page: props.contextPage,
-  })
-}
-
-async function hashMessage(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
-}
-</script>
-
-<template>
-  <div :class="['flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start']">
-    <!-- Assistant avatar -->
-    <div v-if="message.role === 'assistant'" class="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center mt-1">
-      <i class="ti ti-robot text-emerald-600 text-sm"></i>
-    </div>
-
-    <div class="max-w-[85%] group">
-      <!-- Bubble -->
-      <div
-        :class="[
-          'rounded-2xl px-3 py-2 text-sm leading-relaxed',
-          message.role === 'user'
-            ? 'bg-emerald-600 text-white rounded-br-sm'
-            : message.error
-              ? 'bg-red-50 dark:bg-red-950 text-red-600 rounded-bl-sm'
-              : 'bg-muted text-foreground rounded-bl-sm'
-        ]"
-        v-html="message.role === 'assistant' ? renderMarkdown(message.content) : message.content"
-      />
-
-      <!-- Typing indicator -->
-      <div v-if="message.streaming && !message.content" class="flex gap-1 px-3 py-2">
-        <span v-for="i in 3" :key="i"
-          class="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
-          :style="`animation-delay: ${(i-1) * 0.15}s`"
-        />
-      </div>
-
-      <!-- Actions (assistant messages only, on hover) -->
-      <div v-if="message.role === 'assistant' && !message.streaming" class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button @click="copy" class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" :title="copied ? 'Copied!' : 'Copy'">
-          <i :class="['ti text-xs', copied ? 'ti-check text-emerald-500' : 'ti-copy']"></i>
-        </button>
-        <button @click="$emit('regenerate')" class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Regenerate">
-          <i class="ti ti-refresh text-xs"></i>
-        </button>
-        <span class="flex-1" />
-        <button @click="rate(1)" :class="['p-1 rounded transition-colors', rated === 1 ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted']">
-          <i class="ti ti-thumb-up text-xs"></i>
-        </button>
-        <button @click="rate(-1)" :class="['p-1 rounded transition-colors', rated === -1 ? 'text-red-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted']">
-          <i class="ti ti-thumb-down text-xs"></i>
-        </button>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script lang="ts">
-// Simple markdown renderer (bold, inline code, line breaks only — no heavy deps)
-function renderMarkdown(text: string): string {
-  return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.*?)`/g, '<code class="bg-muted px-1 rounded text-xs font-mono">$1</code>')
-    .replace(/\n/g, '<br>')
-}
-</script>
-```
-
----
-
-### `AssistantInput.vue`
-
-```vue
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-
-const props = defineProps<{
-  disabled:      boolean
-  isAdmin:       boolean
-  slashCommands: { command: string; label: string }[]
-}>()
-
-const emit = defineEmits<{ send: [text: string] }>()
-
-const input         = ref('')
-const showSlashMenu = ref(false)
-
-const filteredCommands = computed(() =>
-  input.value.startsWith('/')
-    ? props.slashCommands.filter(c => c.command.startsWith(input.value))
-    : []
-)
-
-function onInput() {
-  showSlashMenu.value = props.isAdmin && filteredCommands.value.length > 0
-}
-
-function selectCommand(command: string) {
-  input.value     = command
-  showSlashMenu.value = false
-  submit()
-}
-
-function submit() {
-  const text = input.value.trim()
-  if (!text || props.disabled) return
-  emit('send', text)
-  input.value = ''
-  showSlashMenu.value = false
-}
-
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    submit()
-  }
-  if (e.key === 'Escape') showSlashMenu.value = false
-}
-</script>
-
-<template>
-  <div class="px-3 pb-3 pt-2 border-t border-border relative">
-    <!-- Slash command menu -->
-    <div v-if="showSlashMenu" class="absolute bottom-full left-3 right-3 mb-1 bg-background border border-border rounded-xl shadow-lg overflow-hidden">
-      <button
-        v-for="cmd in filteredCommands"
-        :key="cmd.command"
-        @click="selectCommand(cmd.command)"
-        class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 transition-colors"
-      >
-        <span class="font-mono text-xs text-muted-foreground">{{ cmd.command }}</span>
-        <span>{{ cmd.label }}</span>
-      </button>
-    </div>
-
-    <div class="flex items-end gap-2">
-      <textarea
-        v-model="input"
-        @input="onInput"
-        @keydown="onKeydown"
-        rows="1"
-        :disabled="disabled"
-        placeholder="Ask anything... (/ for commands)"
-        class="flex-1 resize-none rounded-xl bg-muted px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 min-h-[38px] max-h-[120px]"
-        style="field-sizing: content"
-      />
-      <button
-        @click="submit"
-        :disabled="disabled || !input.trim()"
-        class="flex-shrink-0 w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
-      >
-        <i v-if="!disabled" class="ti ti-send-2 text-sm"></i>
-        <i v-else class="ti ti-loader-2 text-sm animate-spin"></i>
-      </button>
-    </div>
-  </div>
-</template>
-```
-
----
-
-## Admin Settings UI — `resources/js/Pages/Admin/Settings/AssistantSettings.vue`
-
-Settings page with tabs: General | AI Model | Persona | Access Control | System Prompts
-
-Key sections:
-
-```vue
-<!-- Tab: General -->
-<SettingToggle v-model="form.enabled"       label="Enable on Frontend" />
-<SettingToggle v-model="form.admin_enabled" label="Enable in Admin Panel" />
-<SettingSelect v-model="form.position"      label="Widget Position" :options="['bottom-right','bottom-left']" />
-<ColorPicker   v-model="form.accent_color"  label="Accent Color" />
-
-<!-- Tab: AI Model -->
-<ModelSelector   v-model="form.model"       label="Model" :providers="availableModels" />
-<RangeInput      v-model="form.max_tokens"  label="Max Tokens" :min="128" :max="8192" />
-<RangeInput      v-model="form.temperature" label="Temperature" :min="0" :max="2" :step="0.1" />
-
-<!-- Tab: Persona -->
-<TextInput  v-model="form.assistant_name"   label="Assistant Name" />
-<AvatarUpload v-model="form.avatar_url"     label="Avatar" />
-<TextInput  v-model="form.designation"      label="Designation" placeholder="Your AI Helper" />
-<Textarea   v-model="form.greeting_message" label="Greeting Message" />
-
-<!-- Tab: Access Control -->
-<SelectInput v-model="form.show_to"         label="Show To" :options="['all','logged_in','pro_only']" />
-<NumberInput v-model="form.daily_message_limit" label="Daily Message Limit (0 = unlimited)" />
-
-<!-- Tab: System Prompts -->
-<Textarea v-model="form.system_prompt_frontend" label="Frontend System Prompt" rows="8" />
-<Textarea v-model="form.system_prompt_admin"    label="Admin System Prompt" rows="8" />
-<!-- Info box: available variables: {app_name}, {assistant_name} -->
-```
-
----
-
-## Admin Dashboard — Feedback Widget
-
-A small card in Admin → Dashboard showing assistant performance:
-
-```vue
-<!-- AssistantFeedbackCard.vue -->
-<!-- Shows: Total messages today, thumbs up %, top feedback pages, recent negative comments -->
-```
-
-Query:
-```php
-AssistantFeedback::selectRaw('
-    COUNT(*) as total,
-    SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as positive,
-    SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) as negative
-')->whereDate('created_at', today())->first()
-```
-
----
-
-## Inertia Shared Data (AppServiceProvider)
-
-```php
-// In HandleInertiaRequests middleware
-'assistantSettings' => fn () => AssistantSetting::current()->only([
-    'enabled', 'admin_enabled', 'assistant_name', 'avatar_url', 'designation',
-    'greeting_message', 'show_to', 'daily_message_limit', 'position', 'accent_color',
-    // NOTE: never expose system_prompt or custom_api_key to frontend
-]),
-```
-
----
-
-## Layout Integration
-
-```vue
-<!-- AppLayout.vue (frontend) -->
-<FloatingAssistant v-if="$page.props.assistantSettings?.enabled" />
-
-<!-- AdminLayout.vue (admin panel) -->
-<FloatingAssistant v-if="$page.props.assistantSettings?.admin_enabled" :is-admin="true" />
-```
-
----
-
-## Key Rules (non-negotiable)
-
-1. **Laravel AI SDK exclusively** (`laravel/ai`) — no raw OpenAI SDK, no LLPhant.
-2. **Streaming is POST + ReadableStream** — never EventSource.
-3. **`X-Accel-Buffering: no`** header is mandatory for all streaming responses.
-4. **`system_prompt` and `custom_api_key` are NEVER exposed** to the frontend via Inertia shared data.
-5. **`isProAvailable()`** must be checked before gating on `pro_only` access.
-6. **`settings('app_name')`** — never hardcode the app name anywhere.
-7. **No AI calls in the HTTP request cycle** — assistant streaming is the only exception (it IS the streaming response itself).
-8. **Admin context is cached for 2 minutes** — `Cache::remember('assistant.admin.site_context', 120, ...)`.
-9. **Session ID from `sessionStorage`** — not `localStorage` — resets per tab, preventing stale history.
-10. **Feedback uses `updateOrCreate`** — prevents duplicate ratings on same message.
-
----
-
 ## PART 64 — EXPORT CENTER (EXCEL/CSV & PDF) ✅
 
 > **Packages (non-negotiable):**
@@ -11555,7 +10501,7 @@ public function handle(): void
 
 ---
 
-## 🔷 LAYER 10 — API & INFRASTRUCTURE (continued)
+## 🔷 LAYER 10 — API & INFRASTRUCTURE (continued) ✅
 
 ## PART 66 — BROADCASTING & INFRASTRUCTURE FALLBACKS (Redis-Optional)
 
@@ -11821,71 +10767,6 @@ export function useNotifications() {
 
 ---
 
-### 66.7 Admin Panel — Broadcasting Settings Page
-
-**Route:** `Admin → Settings → Broadcasting`
-**Controller:** `Admin\Settings\BroadcastingSettingsController`
-
-```
-Broadcasting Settings
-─────────────────────────────────────────────────
-Broadcasting Driver
-  ○ Laravel Reverb    Self-hosted WebSocket (requires Redis)
-  ● Pusher            Third-party WebSocket service
-  ○ HTTP Polling      No WebSocket — notifications refresh every N seconds
-
-[Shows/hides section based on selection]
-
-── Pusher Configuration ──────────────────────── (visible when Pusher selected)
-  App ID         [____________]
-  App Key        [____________]
-  App Secret     [••••••••••••]  (encrypted storage)
-  Cluster        [mt1        ▼]
-  [Test Connection]  → shows ✅ Connected or ❌ Failed
-
-── Polling Configuration ─────────────────────── (visible when Polling selected)
-  Refresh Interval   [30] seconds
-  (minimum 10s, maximum 300s)
-
-[Save Settings]
-```
-
-**Test Connection button** calls:
-```php
-// POST /admin/settings/broadcasting/test
-public function testConnection(Request $request): JsonResponse
-{
-    $driver = $request->input('driver');
-
-    if ($driver === 'pusher') {
-        $pusher = new \Pusher\Pusher(
-            $request->input('app_key'),
-            $request->input('app_secret'),
-            $request->input('app_id'),
-            ['cluster' => $request->input('cluster')]
-        );
-        try {
-            $pusher->get('/channels');
-            return response()->json(['success' => true, 'message' => 'Pusher connection successful.']);
-        } catch (\Throwable $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()]);
-        }
-    }
-
-    if ($driver === 'reverb') {
-        $isAvailable = app(BroadcastingService::class)->isRedisAvailable();
-        return response()->json([
-            'success' => $isAvailable,
-            'message' => $isAvailable ? 'Redis is available. Reverb can be used.' : 'Redis is not available on this server.',
-        ]);
-    }
-
-    return response()->json(['success' => true, 'message' => 'Polling requires no connection test.']);
-}
-```
-
----
-
 ### 66.8 Site Health Monitor Integration
 
 **`app/Services/SiteHealthService.php`** এ add করো:
@@ -11988,7 +10869,6 @@ Wizard এ Redis not found হলে:
 - [ ] `$page.props.broadcasting` always present in Inertia shared data
 - [ ] `useNotifications` composable: WebSocket path tested (Reverb + Pusher), polling path tested
 - [ ] Polling interval respects `polling_interval_seconds` setting (default 30s)
-- [ ] Broadcasting settings page: driver toggle shows/hides correct config sections
 - [ ] Pusher "Test Connection" returns clear success/error message
 - [ ] Reverb "Test Connection" correctly reports Redis availability
 - [ ] Site Health Monitor shows correct status for all 4 broadcasting states
@@ -12003,11 +10883,470 @@ Wizard এ Redis not found হলে:
 
 ---
 
+# PART 67 — RAG TOOLS SUITE (Chat with PDF / Website / YouTube / KB Writer)
+---
+
+## 67.1 Overview
+
+A suite of user-facing RAG-powered tools built **entirely on top of the existing Knowledge Base
+infrastructure** (P11 Knowledge Base, `embeddings` queue, `IngestDocument`, `IngestUrl`,
+`ProcessRagQuery`, `DeleteDocumentEmbeddings`). No new vector pipeline is created — every RAG tool
+is a thin UX layer over an **ephemeral, auto-created knowledge base collection**.
+
+**Tools shipped in this suite (8 tools):**
+
+| # | Name | Slug | Source type | Description |
+|---|------|------|-------------|-------------|
+| 1 | Chat with PDF | `chat-pdf` | file (pdf) | Upload PDF → chat with page-level citations |
+| 2 | Chat with Document | `chat-document` | file (docx/txt/md) | Same flow for Word/text/Markdown |
+| 3 | Chat with Spreadsheet | `chat-spreadsheet` | file (csv/xlsx) | Q&A over tabular data |
+| 4 | Chat with Website | `chat-website` | url | Enter URL → scrape → chat |
+| 5 | Chat with YouTube | `chat-youtube` | youtube | Transcript fetch → chat / summarize / chapters |
+| 6 | Long Document Summarizer | `long-doc-summarizer` | file | Map-reduce summary of docs too large for context |
+| 7 | Multi-Document Compare | `doc-compare` | files (2–3) | Side-by-side AI comparison with citations |
+| 8 | Write from Knowledge Base | `kb-writer` | existing collection | Generate content grounded ONLY in user's KB collection |
+
+**Core architectural rules (non-negotiable):**
+
+1. **Laravel AI SDK (`laravel/ai`) only** — embeddings + retrieval + completion all via `AiService`
+   and the SDK's RAG primitives. Never raw OpenAI SDK, never LLPhant.
+2. **Reuse the KB pipeline.** A RAG tool session = a hidden `knowledge_bases` row with
+   `is_ephemeral = true`. Ingestion dispatches the **existing** `IngestDocument` / `IngestUrl`
+   jobs on the `embeddings` queue. Deletion uses the **existing** `DeleteDocumentEmbeddings` job.
+3. **New tool type `rag`** in `ai_tools.type` enum — alongside existing types. RAG tools render a
+   different execution UI (source input → ingestion progress → chat) instead of the one-shot
+   form → output flow.
+4. **Streaming:** POST + `ReadableStream` (never `EventSource`), `X-Accel-Buffering: no` header,
+   `finally` block in every streaming controller method.
+5. **Citations are first-class:** standardized `sources` SSE event (see 67.7) rendered identically
+   across all 8 tools.
+6. `settings('app_name')` everywhere — never hardcode "MakeAI".
+7. `users.ulid` / session ULIDs in all public URLs.
+
+---
+
+## 67.2 Database
+
+```sql
+-- Extend existing ai_tools.type enum:
+ALTER TABLE ai_tools MODIFY type ENUM('text','image','audio','video','code','rag') NOT NULL;
+
+-- Extend existing knowledge_bases table:
+ALTER TABLE knowledge_bases
+  ADD COLUMN is_ephemeral  BOOLEAN DEFAULT FALSE AFTER name,
+  ADD COLUMN source_tool   VARCHAR(100) NULL AFTER is_ephemeral,   -- 'chat-pdf', 'chat-website', etc.
+  ADD COLUMN expires_at    TIMESTAMP NULL AFTER source_tool;       -- ephemeral cleanup target
+-- Ephemeral collections are HIDDEN from the user's Knowledge Base page
+-- (WHERE is_ephemeral = false in all KB list queries).
+
+-- New table: RAG tool sessions
+CREATE TABLE rag_sessions (
+  id                 CHAR(26) PRIMARY KEY,            -- ULID (public-facing)
+  user_id            BIGINT UNSIGNED NOT NULL,        -- FK → users.id
+  tool_slug          VARCHAR(100) NOT NULL,           -- FK → ai_tools.slug
+  knowledge_base_id  BIGINT UNSIGNED NOT NULL,        -- FK → knowledge_bases.id (ephemeral or user-picked)
+  title              VARCHAR(255) NULL,               -- auto: filename / page title / video title
+  source_meta        JSON NULL,                       -- { filename, pages, url, video_id, duration, file_size }
+  status             ENUM('ingesting','ready','failed') DEFAULT 'ingesting',
+  ingest_error       VARCHAR(500) NULL,
+  saved_to_kb        BOOLEAN DEFAULT FALSE,           -- user clicked "Save to Knowledge Base"
+  created_at         TIMESTAMP,
+  updated_at         TIMESTAMP,
+  INDEX (user_id, tool_slug),
+  INDEX (status, created_at)
+);
+
+-- New table: RAG session messages (chat history per session)
+CREATE TABLE rag_messages (
+  id           CHAR(26) PRIMARY KEY,                  -- ULID
+  session_id   CHAR(26) NOT NULL,                     -- FK → rag_sessions.id
+  role         ENUM('user','assistant') NOT NULL,
+  content      LONGTEXT NOT NULL,
+  sources      JSON NULL,                             -- [{ doc, page?, chunk_index, score }]
+  input_tokens  INT NULL,
+  output_tokens INT NULL,
+  credits_used  DECIMAL(10,4) NULL,
+  created_at   TIMESTAMP,
+  INDEX (session_id, created_at)
+);
+```
+
+**Migration notes:**
+- `rag_sessions.id` and `rag_messages.id` are ULIDs (consistent with platform rule — never expose
+  auto-increment integers).
+- `kb-writer` sessions point `knowledge_base_id` at a **user-selected permanent** collection —
+  no ephemeral KB is created for that tool.
+
+---
+
+## 67.3 Seeder — RAG Tools
+
+Add to the AI tools seeder. New category **📚 Document AI** (dynamic — created via the existing
+category system, never hardcoded in code):
+
+```php
+// Each tool row in ai_tools:
+[
+  'name'        => 'Chat with PDF',
+  'slug'        => 'chat-pdf',
+  'type'        => 'rag',
+  'description' => 'Upload any PDF and chat with it. Get instant answers with page citations.',
+  'icon'        => 'ti-file-type-pdf',
+  'fields'      => json_encode([
+      'source_type'   => 'file',
+      'accept'        => ['pdf'],
+      'max_file_mb'   => null,      // null = use settings('rag_max_file_mb')
+      'multi_file'    => false,
+  ]),
+  'is_active'   => true,
+],
+// ... repeat for all 8 tools with appropriate fields JSON:
+// chat-document:     source_type=file, accept=[docx,txt,md]
+// chat-spreadsheet:  source_type=file, accept=[csv,xlsx]
+// chat-website:      source_type=url
+// chat-youtube:      source_type=youtube
+// long-doc-summarizer: source_type=file, accept=[pdf,docx,txt,md], mode=summarize
+// doc-compare:       source_type=file, accept=[pdf,docx,txt,md], multi_file=true, min_files=2, max_files=3
+// kb-writer:         source_type=collection (picker of user's permanent KB collections), mode=generate
+```
+
+---
+
+## 67.4 Service — `RagToolService`
+
+**`app/Services/RagToolService.php`** — the ONLY class that orchestrates RAG tool flows.
+Uses `AiService` (Laravel AI SDK) for embeddings, retrieval, and completion. Controllers never
+touch the SDK directly.
+
+```php
+class RagToolService
+{
+    public function __construct(
+        private AiService $ai,
+        private CreditService $credits,
+    ) {}
+
+    // ── Session lifecycle ─────────────────────────────────────────────
+
+    /**
+     * Create a session + ephemeral KB, dispatch ingestion.
+     * For source_type=file: store upload → dispatch IngestDocument (queue: embeddings)
+     * For source_type=url: dispatch IngestUrl (queue: embeddings)
+     * For source_type=youtube: dispatch IngestYoutubeTranscript (NEW job, queue: embeddings)
+     * For source_type=collection (kb-writer): no ingestion — bind to existing KB, status='ready'
+     */
+    public function createSession(User $user, AiTool $tool, array $input): RagSession;
+
+    /** Poll-able status for the ingestion progress UI (also broadcast via Reverb — see 67.9). */
+    public function sessionStatus(RagSession $session): array;
+        // ['status' => ..., 'progress' => 0-100, 'error' => ?, 'source_meta' => [...]]
+
+    /** Promote ephemeral KB → permanent (visible in Knowledge Base page). */
+    public function saveToKnowledgeBase(RagSession $session, string $name): KnowledgeBase;
+        // Sets knowledge_bases.is_ephemeral = false, expires_at = null, rag_sessions.saved_to_kb = true
+
+    /** Delete session: dispatch DeleteDocumentEmbeddings for ephemeral KBs, delete rows + files. */
+    public function deleteSession(RagSession $session): void;
+
+    // ── Query (streaming) ─────────────────────────────────────────────
+
+    /**
+     * RAG chat turn:
+     *  1. Embed query (AiService → SDK embeddings, model from settings('rag_embedding_model'))
+     *  2. Retrieve top-K chunks from session's KB (K = settings('rag_top_k', 6))
+     *  3. Build grounded prompt: system instruction + retrieved chunks + chat history (last N turns)
+     *  4. Stream completion via AiService (CompletionRequest DTO)
+     *  5. Yield 'sources' event FIRST, then token events, then usage/done
+     *  6. Persist both messages to rag_messages with sources + token usage
+     *  7. Deduct credits via CreditService (completion tokens only — retrieval is free)
+     */
+    public function streamQuery(RagSession $session, string $message): \Generator;
+
+    /** Long-doc summarizer: map-reduce. Chunk summaries (queued batches) → final merge summary. */
+    public function summarizeLong(RagSession $session, array $options): \Generator;
+
+    /** Doc-compare: retrieve per-document, prompt enforces per-doc citation tags [A]/[B]/[C]. */
+    public function streamCompare(RagSession $session, string $aspect): \Generator;
+
+    /** KB-writer: retrieval-grounded long-form generation. System prompt HARD-constrains the model
+     *  to use ONLY retrieved context; instructs "say 'not found in your knowledge base' otherwise". */
+    public function streamKbWrite(RagSession $session, array $brief): \Generator;
+}
+```
+
+**Grounding system prompt rule (all tools):** retrieved chunks injected as numbered context blocks
+`[1] … [2] …`; model instructed to reference chunk numbers; service maps chunk numbers back to
+`{doc, page, score}` for the `sources` event. The grounding system prompt is stored in
+`settings('rag_system_prompt')` (admin-editable) — **never exposed to frontend** (P-rule: no
+`system_prompt` in Inertia shared data).
+
+---
+
+## 67.5 New Job — `IngestYoutubeTranscript` (queue: `embeddings`)
+
+```php
+// app/Jobs/IngestYoutubeTranscript.php
+// 1. Extract video ID from URL (supports youtube.com/watch, youtu.be, shorts)
+// 2. Fetch transcript: youtube captions endpoint (timedtext) — no API key needed for public CC;
+//    fallback: settings-configurable Whisper transcription of audio (admin toggle
+//    settings('rag_youtube_whisper_fallback'), default OFF — costs credits)
+// 3. Chunk transcript WITH timestamps preserved in chunk metadata: { start: 123.4, end: 156.2 }
+// 4. Generate embeddings via Laravel AI SDK → store in vector DB (same pipeline as IngestDocument)
+// 5. Update rag_sessions: status='ready', source_meta={ video_id, title, duration, channel }
+// failed(): rag_sessions.status='failed', ingest_error='No captions available for this video.'
+```
+
+YouTube citations render as **clickable timestamps** (`12:34`) that link to
+`https://youtube.com/watch?v={id}&t={seconds}`.
+
+---
+
+## 67.6 Controllers & Routes
+
+**`app/Http/Controllers/RagToolController.php`**
+
+```php
+// GET /tools/rag/{slug} — render RAG tool page (Inertia: Tools/RagTool.vue)
+public function show(string $slug): Response
+    // Tool must exist, type='rag', is_active. Pass: tool config (fields JSON),
+    // user's recent sessions for THIS tool (last 10), settings: rag_max_file_mb, allowed types.
+
+// POST /tools/rag/{slug}/sessions — create session (multipart for files)
+public function store(Request $request, string $slug): JsonResponse
+    // Validate per fields JSON (mimes, max size from settings('rag_max_file_mb', 25)).
+    // Rate limited (sliding window — P rate-limit system, key: rag-ingest).
+    // Returns: { session: { id, status: 'ingesting' } }
+
+// GET /tools/rag/sessions/{ulid}/status — ingestion progress (polling fallback per P66)
+public function status(string $ulid): JsonResponse
+
+// POST /tools/rag/sessions/{ulid}/chat — streaming RAG chat
+public function chat(Request $request, string $ulid): StreamedResponse
+    // Guard: session belongs to auth user, status='ready'.
+    // Pre-check credits (CreditService::canAfford estimate) → 402-style JSON if insufficient.
+    // StreamedResponse with headers:
+    //   Content-Type: text/event-stream
+    //   X-Accel-Buffering: no
+    //   Cache-Control: no-cache
+    // try { foreach ($ragToolService->streamQuery(...) as $event) { echo ...; flush(); } }
+    // finally { /* persist partial output, close stream, release lock */ }   ← MANDATORY
+
+// POST /tools/rag/sessions/{ulid}/save-to-kb   { name }
+// DELETE /tools/rag/sessions/{ulid}
+// GET /tools/rag/sessions/{ulid}               — session + messages (reopen past session)
+```
+
+```php
+// routes/web.php
+Route::middleware(['auth', 'verified'])->prefix('tools/rag')->name('rag.')->group(function () {
+    Route::get('/{slug}',                    [RagToolController::class, 'show'])->name('show');
+    Route::post('/{slug}/sessions',          [RagToolController::class, 'store'])->name('sessions.store');
+    Route::get('/sessions/{ulid}',           [RagToolController::class, 'session'])->name('sessions.show');
+    Route::get('/sessions/{ulid}/status',    [RagToolController::class, 'status'])->name('sessions.status');
+    Route::post('/sessions/{ulid}/chat',     [RagToolController::class, 'chat'])->name('sessions.chat');
+    Route::post('/sessions/{ulid}/save-to-kb', [RagToolController::class, 'saveToKb'])->name('sessions.save');
+    Route::delete('/sessions/{ulid}',        [RagToolController::class, 'destroy'])->name('sessions.destroy');
+});
+```
+
+**Mobile API (extend P44.7):**
+
+```
+POST   /api/v1/rag-tools/{slug}/sessions          -- create session (multipart)
+GET    /api/v1/rag-tools/sessions/{ulid}/status
+POST   /api/v1/rag-tools/sessions/{ulid}/chat     -- SSE stream
+POST   /api/v1/rag-tools/sessions/{ulid}/save-to-kb
+DELETE /api/v1/rag-tools/sessions/{ulid}
+GET    /api/v1/rag-tools/sessions                 -- list user's sessions { tool_slug? }
+```
+
+---
+
+## 67.7 SSE Event Contract (standard across ALL RAG tools)
+
+```
+data: {"type":"sources","items":[{"doc":"report.pdf","page":12,"chunk":4,"score":0.89},{"doc":"report.pdf","page":31,"chunk":11,"score":0.84}]}
+data: {"type":"token","content":"According"}
+data: {"type":"token","content":" to"}
+...
+data: {"type":"usage","input_tokens":1450,"output_tokens":230,"credits":1.2,"model":"gpt-4o"}
+data: {"type":"done"}
+
+-- on error mid-stream:
+data: {"type":"error","message":"Generation failed. You were not charged."}
+```
+
+- `sources` is ALWAYS emitted before the first token (retrieval completes before generation).
+- For `chat-youtube`, source items carry `{"start":754}` instead of `page`.
+- For `doc-compare`, source items carry `{"doc_label":"A"}`.
+- Frontend renders source chips under each assistant message; identical component everywhere.
+
+---
+
+## 67.8 Vue Pages & Components
+
+```
+resources/js/Pages/Tools/
+  RagTool.vue                 → GET /tools/rag/{slug} — orchestrates the 3 states below
+
+resources/js/Components/Rag/
+  RagSourceInput.vue          → state 1: dropzone (file) / URL input / YouTube input / KB picker
+                                 - drag-drop + click upload, file type + size validation client-side
+                                 - shows settings-driven limits: "PDF up to 25 MB"
+  RagIngestProgress.vue       → state 2: progress card
+                                 - listens on Reverb private channel rag.session.{ulid}
+                                 - P66 fallback: polls /status every 2.5s when broadcasting = polling driver
+                                 - stages: Uploading → Extracting text → Embedding (n/m chunks) → Ready
+                                 - failed state: error message + [Try again]
+  RagChat.vue                 → state 3: chat interface
+                                 - POST + ReadableStream consumption (NEVER EventSource)
+                                 - message list with streaming tokens, stop button (AbortController)
+                                 - suggested starter questions (3 chips, generated from doc title/type)
+  RagSourceChips.vue          → citation chips under assistant messages
+                                 - PDF: "report.pdf · p.12" → opens PdfPreviewDrawer at that page
+                                 - YouTube: "12:34" → external link with &t=
+                                 - hover: chunk text preview tooltip (first 200 chars)
+  RagSessionList.vue          → recent sessions sidebar (last 10 for this tool, reopen/delete)
+  SaveToKbModal.vue           → name input → POST save-to-kb → success toast + link to KB page
+```
+
+**Layout (Chat with PDF — reference for all):**
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  ← Tools     📄 Chat with PDF                    [Recent ▾]      │
+├──────────────────────┬───────────────────────────────────────────┤
+│                      │  annual-report-2025.pdf · 48 pages        │
+│   PDF PREVIEW        │  ───────────────────────────────────────  │
+│   (pdf.js viewer,    │  💬 What was the total revenue in Q3?     │
+│    desktop only —    │                                           │
+│    hidden < lg)      │  🤖 According to the report, Q3 revenue   │
+│                      │     was $4.2M, up 18% YoY...              │
+│   citation click →   │     [📄 p.12] [📄 p.31]                   │
+│   scrolls to page    │  ───────────────────────────────────────  │
+│                      │  [Ask anything about this document…] [→]  │
+│                      │  [💾 Save to Knowledge Base]  [🗑 Delete]  │
+└──────────────────────┴───────────────────────────────────────────┘
+```
+
+- Mobile: preview pane hidden; citation chips open a bottom-sheet text preview instead.
+- `kb-writer` replaces chat UI with a brief form (topic, content type, tone, length) + streaming
+  long-form output with the standard sources panel + [Save to Documents] (existing documents flow).
+
+---
+
+## 67.9 Broadcasting (per P66)
+
+```php
+// Event: RagIngestProgressEvent — broadcast on PrivateChannel("rag.session.{ulid}")
+// Payload: { status, progress, stage, error? }
+// Driver resolved by BroadcastingService (P66): Reverb → polling fallback → Pusher override.
+// RagIngestProgress.vue uses the useNotifications/useEcho composable pattern from P66;
+// when frontendConfig().driver === 'polling', component polls the /status endpoint (2.5s interval).
+```
+
+---
+
+## 67.10 Credits Model
+
+| Action | Cost |
+|--------|------|
+| Ingestion (file/url/youtube) | `ceil(chunks / settings('rag_chunks_per_credit', 50))` credits, charged ONCE on successful ingest. Failed ingest = 0 charge. |
+| Retrieval (vector search) | Free |
+| Chat completion | Standard token-based credit calc (existing CreditService logic) |
+| Whisper fallback (YouTube) | Charged per audio minute (existing STT pricing) — only if admin enabled |
+
+- Pre-flight check before ingestion: estimate chunks from file size, block with friendly error if
+  insufficient credits ("This document needs ~4 credits to process. You have 2.").
+- All charges logged to `ai_usage_logs` with `tool_slug` so RAG tools appear in the Usage
+  Dashboard (P56) and admin analytics like every other tool.
+
+---
+
+## 67.11 Cleanup — Scheduled Task
+
+```php
+// routes/console.php — add scheduled task #14:
+Schedule::command('rag:cleanup-ephemeral')->daily();
+
+// app/Console/Commands/CleanupEphemeralRag.php
+// 1. Find knowledge_bases WHERE is_ephemeral = true AND expires_at < now()
+//    (expires_at = created_at + settings('rag_ephemeral_retention_days', 7))
+// 2. For each: dispatch DeleteDocumentEmbeddings (existing job), delete uploaded source files,
+//    delete rag_sessions + rag_messages rows (cascade), delete knowledge_bases row.
+// 3. Sessions with saved_to_kb = true: KB is permanent — only the source file in temp storage
+//    is removed; session chat history retained.
+```
+
+---
+
+## 67.12 Admin Settings (Admin → Settings → AI → RAG Tools)
+
+| Setting key | Default | Description |
+|-------------|---------|-------------|
+| `rag_max_file_mb` | 25 | Max upload size per file |
+| `rag_max_pages` | 300 | Max PDF pages (reject larger with clear error) |
+| `rag_top_k` | 6 | Retrieved chunks per query |
+| `rag_chunk_size` | 800 | Tokens per chunk |
+| `rag_chunk_overlap` | 100 | Token overlap |
+| `rag_embedding_model` | text-embedding-3-small | SDK embedding model (provider dropdown) |
+| `rag_system_prompt` | (grounding prompt) | Editable, never sent to frontend |
+| `rag_ephemeral_retention_days` | 7 | Auto-delete window for unsaved sessions |
+| `rag_chunks_per_credit` | 50 | Ingestion pricing knob |
+| `rag_youtube_whisper_fallback` | off | Whisper transcription when no captions |
+
+Plus per-tool enable/disable via the standard `ai_tools.is_active` toggle (already exists).
+Each RAG tool can be plan-gated via the existing plan→tools mapping; subscription gating respects
+`isProAvailable()` — **hidden, not disabled**, when false.
+
+---
+
+## 67.13 Tests (PestPHP)
+
+- Session create validates mimes + size from settings (not hardcoded)
+- Ingestion job failure sets `status='failed'` + `ingest_error`, charges 0 credits
+- Chat endpoint rejects sessions not owned by auth user (404 — never 403 to avoid ULID probing)
+- Chat endpoint rejects `status != 'ready'` with 422
+- `sources` SSE event emitted before first `token` event
+- Credits: ingestion charged once; retry after failure does not double-charge
+- `saveToKnowledgeBase` flips `is_ephemeral`, clears `expires_at`, KB appears in user's KB list
+- Cleanup command deletes expired ephemeral KBs + dispatches `DeleteDocumentEmbeddings`
+- `kb-writer` only lists the user's own permanent collections in picker
+
+---
+
+## 67.14 Implementation Checklist
+
+- [ ] `ai_tools.type` enum extended with `rag`; existing tool queries unaffected
+- [ ] `knowledge_bases` gains `is_ephemeral`, `source_tool`, `expires_at`; KB page queries filter `is_ephemeral = false`
+- [ ] `rag_sessions` + `rag_messages` migrations with ULID primary keys
+- [ ] 8 tools seeded under dynamic "Document AI" category (category created via category system, NOT hardcoded)
+- [ ] `RagToolService` is the only orchestrator; all SDK calls go through `AiService` + `CompletionRequest` DTO
+- [ ] Ingestion reuses existing `IngestDocument` / `IngestUrl` jobs on `embeddings` queue — no duplicate pipeline
+- [ ] New `IngestYoutubeTranscript` job on `embeddings` queue with timestamp-preserving chunks
+- [ ] Streaming: POST + `ReadableStream`, `X-Accel-Buffering: no`, `finally` block in chat controller
+- [ ] `sources` SSE event standardized and emitted before first token in all 8 tools
+- [ ] Citation chips component reused everywhere (page / timestamp / doc-label variants)
+- [ ] Ingest progress: Reverb private channel + P66 polling fallback (2.5s) — works without Redis
+- [ ] Credits: ingestion charged once on success, retrieval free, completion standard; pre-flight estimate blocks insufficient balance
+- [ ] All usage logged to `ai_usage_logs` with `tool_slug` (appears in P56 dashboard + admin analytics)
+- [ ] "Save to Knowledge Base" promotes ephemeral KB; unsaved sessions auto-deleted after retention window
+- [ ] `rag:cleanup-ephemeral` registered in scheduler (scheduled task count: 13 → 14)
+- [ ] All 10 admin settings live in `settings` table, editable without deployment
+- [ ] `settings('app_name')` in all UI strings — zero "MakeAI" hardcoding
+- [ ] Plan gating uses existing plan→tools mapping; `isProAvailable()` hides (not disables) gated tools
+- [ ] `system_prompt` (`rag_system_prompt`) never reaches frontend via Inertia shared data
+- [ ] Rate limiting: `rag-ingest` + `rag-chat` sliding-window limits in settings table
+- [ ] Mobile API endpoints added (P44.7 extension) with standard response envelope + rate-limit headers
+- [ ] PestPHP tests from 67.13 all passing
+
+---
+
 ---
 
 ## 🔷 FINAL STATS
 
-## PART 67 — FINAL COMPLETE STATS
+## PART 68 — FINAL COMPLETE STATS
 
 *End of MakeAI Complete Development Master Prompt*
 

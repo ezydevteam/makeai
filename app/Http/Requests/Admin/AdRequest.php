@@ -14,6 +14,8 @@ class AdRequest extends FormRequest
 
     public function rules(): array
     {
+        $ad = $this->route('ad');
+
         return [
             'title' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(['adsense', 'custom_html', 'image_link'])],
@@ -22,7 +24,14 @@ class AdRequest extends FormRequest
             'adsense_slot' => ['nullable', 'required_if:type,adsense', 'string', 'max:50'],
             'adsense_format' => ['nullable', 'string', 'max:50'],
             'custom_html' => ['nullable', 'required_if:type,custom_html', 'string'],
-            'image_url' => ['nullable', 'required_if:type,image_link', 'url', 'max:500'],
+            'image_file' => [
+                'nullable',
+                Rule::requiredIf(fn () => $this->input('type') === 'image_link' && blank($ad?->image_url) && ! $this->hasFile('image_file')),
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp,gif',
+                'max:5120',
+            ],
             'link_url' => ['nullable', 'required_if:type,image_link', 'url', 'max:500'],
             'link_target' => ['required', Rule::in(['_blank', '_self'])],
             'show_to' => ['required', Rule::in(['all', 'guests', 'logged_in', 'free_users', 'paid_users'])],

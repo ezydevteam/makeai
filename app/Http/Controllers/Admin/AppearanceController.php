@@ -14,14 +14,13 @@ class AppearanceController extends Controller
     {
         return Inertia::render('Admin/Appearance/Settings', [
             'admin_settings' => AppearanceSetting::getForScope('admin'),
-            'theme_settings' => AppearanceSetting::getForScope('theme_default'),
         ]);
     }
 
     public function update(Request $request)
     {
         $validated = $request->validate([
-            'scope' => ['required', 'string', 'in:admin,theme_default'],
+            'scope' => ['required', 'string', 'in:admin'],
             'settings' => ['required', 'array'],
             'settings.*' => ['nullable', 'string', 'max:500'],
         ]);

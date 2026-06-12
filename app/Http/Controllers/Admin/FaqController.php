@@ -178,12 +178,10 @@ class FaqController extends Controller
             $user,
             $prompt,
             'You generate FAQ entries for a SaaS CMS. Return JSON only.',
-            settings('default_ai_provider', 'openai'),
-            settings('default_ai_model', 'gpt-4o-mini'),
-            ['max_tokens' => 1600, 'temperature' => 0.45]
+            options: ['max_tokens' => 1600, 'temperature' => 0.45]
         );
 
-        $items = collect($this->decodeAiJsonArray((string) ($result['content'] ?? '')))
+        $items = collect($this->decodeAiJsonArray((string) ($result->content ?? '')))
             ->filter(fn ($item) => is_array($item))
             ->take((int) $validated['count'])
             ->map(function (array $item, int $index) use ($validated) {

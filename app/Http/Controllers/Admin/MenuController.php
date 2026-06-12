@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\Menu;
 use App\Models\MenuItem;
 use App\Models\Page;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -107,6 +108,65 @@ class MenuController extends Controller
         $menu->delete();
 
         return back()->with('success', translate('Menu deleted.'));
+    }
+
+    public function import(Request $request, Menu $menu)
+    {
+        $request->validate(['json' => ['required', 'string', 'max:100000']]);
+
+        $data = json_decode($request->input('json'), true);
+
+        if (! is_array($data) || empty($data['items'])) {
+            return back()->with('error', translate('Invalid menu JSON. An "items" array is required.'));
+        }
+
+        DB::transaction(function () use ($menu, $data) {
+            if (! empty($data['name'])) {
+                $menu->update(['name' => $data['name']]);
+            }
+            if (! empty($data['slug'])) {
+                $menu->update(['slug' => $data['slug']]);
+            }
+
+            $menu->items()->delete();
+
+            $idMap = [];
+
+            // First pass: create all items
+            foreach ($data['items'] as $index => $itemData) {
+                $item = $menu->items()->create([
+                    'label' => $itemData['label'] ?? 'Untitled',
+                    'type' => $itemData['type'] ?? 'url',
+                    'url' => ($itemData['type'] ?? 'url') === 'url' ? ($itemData['url'] ?? '') : null,
+                    'page_id' => ($itemData['type'] ?? 'url') === 'page' ? ($itemData['page_id'] ?? null) : null,
+                    'route_name' => ($itemData['type'] ?? 'url') === 'route' ? ($itemData['route_name'] ?? null) : null,
+                    'parent_id' => null,
+                    'target' => $itemData['target'] ?? '_self',
+                    'icon' => $itemData['icon'] ?? null,
+                    'badge_text' => $itemData['badge_text'] ?? null,
+                    'badge_color' => $itemData['badge_color'] ?? null,
+                    'is_active' => (bool) ($itemData['is_active'] ?? true),
+                    'requires_auth' => $itemData['requires_auth'] ?? 'none',
+                    'mega_menu' => (bool) ($itemData['mega_menu'] ?? false),
+                    'mega_menu_content' => $itemData['mega_menu_content'] ?? null,
+                    'sort_order' => (int) ($itemData['sort_order'] ?? $index),
+                ]);
+                $idMap[$itemData['id'] ?? $index] = $item->id;
+            }
+
+            // Second pass: resolve parent_ids
+            foreach ($data['items'] as $index => $itemData) {
+                $sourceId = $itemData['id'] ?? $index;
+                $newId = $idMap[$sourceId] ?? null;
+                $parentSourceId = $itemData['parent_id'] ?? null;
+
+                if ($newId && $parentSourceId && isset($idMap[$parentSourceId]) && $idMap[$parentSourceId] !== $newId) {
+                    MenuItem::whereKey($newId)->update(['parent_id' => $idMap[$parentSourceId]]);
+                }
+            }
+        });
+
+        return back()->with('success', translate('Menu items imported.'));
     }
 
     private function normalizeItemData(MenuItemRequest $request, ?MenuItem $item = null, ?Menu $menu = null): array

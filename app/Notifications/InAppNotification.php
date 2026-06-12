@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Services\BroadcastingService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\BroadcastMessage;
@@ -28,8 +29,10 @@ class InAppNotification extends Notification implements ShouldQueue
             return [];
         }
 
+        $driver = app(BroadcastingService::class)->resolveDriver();
         $channels = ['database'];
-        if (in_array(settings('notifications_driver', 'reverb'), ['reverb', 'pusher'], true)) {
+
+        if (in_array($driver, ['reverb', 'pusher'], true)) {
             $channels[] = 'broadcast';
         }
 

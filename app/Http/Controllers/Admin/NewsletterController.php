@@ -42,6 +42,10 @@ class NewsletterController extends Controller
             });
         }
 
+        if ($request->filled('status') && $request->string('status')->toString() !== 'all') {
+            $subscribersQuery->where('status', $request->string('status')->toString());
+        }
+
         return Inertia::render('Admin/Community/Newsletter', [
             'subscribers' => $subscribersQuery->paginate(20)->withQueryString(),
             'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->paginate(10),

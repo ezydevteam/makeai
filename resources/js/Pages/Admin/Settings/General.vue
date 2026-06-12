@@ -2,7 +2,8 @@
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import { ref, computed } from 'vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import { computed, ref } from 'vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -33,6 +34,18 @@ type GeneralSettings = {
 
 type LanguageOption = { code: string; name: string }
 type CurrencyOption = { code: string; name: string; symbol: string | null }
+type BrandAssetField =
+    | 'site_logo_light'
+    | 'site_logo_dark'
+    | 'site_favicon_ico'
+    | 'site_favicon_png'
+    | 'site_og_image'
+type BrandAssetErrorField =
+    | 'site_logo_light_file'
+    | 'site_logo_dark_file'
+    | 'site_favicon_ico_file'
+    | 'site_favicon_png_file'
+    | 'site_og_image_file'
 
 const props = defineProps<{
     settings: GeneralSettings
@@ -44,6 +57,7 @@ const props = defineProps<{
 const { t } = useTranslate()
 
 const form = useForm({ ...props.settings })
+const formErrors = computed(() => form.errors as Record<string, string | undefined>)
 
 const logoLightFile = ref<File | null>(null)
 const logoDarkFile = ref<File | null>(null)
@@ -52,32 +66,85 @@ const faviconPngFile = ref<File | null>(null)
 const ogImageFile = ref<File | null>(null)
 
 const languageOptions = computed(() =>
-    props.languages.map((l) => ({
-        value: l.code,
-        label: l.name,
+    props.languages.map((language) => ({
+        value: language.code,
+        label: language.name,
     })),
 )
 
 const currencyOptions = computed(() =>
-    props.currencies.map((c) => ({
-        value: c.code,
-        label: `${c.code} - ${c.name}`,
+    props.currencies.map((currency) => ({
+        value: currency.code,
+        label: `${currency.code} - ${currency.name}`,
     })),
 )
 
 const timezoneOptions = computed(() =>
-    props.timezones.map((t) => ({
-        value: t,
-        label: t,
+    props.timezones.map((timezone) => ({
+        value: timezone,
+        label: timezone,
     })),
 )
 
-const positionOptions = [
-    { value: 'before', label: 'Before amount' },
-    { value: 'before_with_space', label: 'Before amount with space' },
-    { value: 'after', label: 'After amount' },
-    { value: 'after_with_space', label: 'After amount with space' },
-]
+const positionOptions = computed(() => [
+    { value: 'before', label: t('Before amount') },
+    { value: 'before_with_space', label: t('Before amount with space') },
+    { value: 'after', label: t('After amount') },
+    { value: 'after_with_space', label: t('After amount with space') },
+])
+
+const brandAssetCards = computed(() => [
+    {
+        key: 'site_logo_light' as BrandAssetField,
+        title: t('Logo Light'),
+        description: t('Used on light surfaces, emails, and default navigation states.'),
+        accept: 'image/png,image/svg+xml,image/jpeg,image/webp',
+        previewClass: 'h-10 max-w-[160px] object-contain',
+        alt: t('Site logo for light mode'),
+        fileRef: logoLightFile,
+        errorKey: 'site_logo_light_file' as BrandAssetErrorField,
+    },
+    {
+        key: 'site_logo_dark' as BrandAssetField,
+        title: t('Logo Dark'),
+        description: t('Used on dark surfaces, sidebars, and dark-mode headers.'),
+        accept: 'image/png,image/svg+xml,image/jpeg,image/webp',
+        previewClass: 'h-10 max-w-[160px] object-contain',
+        alt: t('Site logo for dark mode'),
+        fileRef: logoDarkFile,
+        errorKey: 'site_logo_dark_file' as BrandAssetErrorField,
+    },
+    {
+        key: 'site_favicon_ico' as BrandAssetField,
+        title: t('Favicon ICO'),
+        description: t('Classic browser icon for broad desktop and legacy support.'),
+        accept: '.ico,image/x-icon',
+        previewClass: 'h-8 w-8 object-contain',
+        alt: t('Favicon ICO preview'),
+        fileRef: faviconIcoFile,
+        errorKey: 'site_favicon_ico_file' as BrandAssetErrorField,
+    },
+    {
+        key: 'site_favicon_png' as BrandAssetField,
+        title: t('Favicon PNG'),
+        description: t('Preferred high-resolution favicon for modern browsers and devices.'),
+        accept: 'image/png',
+        previewClass: 'h-8 w-8 object-contain',
+        alt: t('Favicon PNG preview'),
+        fileRef: faviconPngFile,
+        errorKey: 'site_favicon_png_file' as BrandAssetErrorField,
+    },
+    {
+        key: 'site_og_image' as BrandAssetField,
+        title: t('OG Image'),
+        description: t('Shown when your links are shared across social platforms and chat apps.'),
+        accept: 'image/png,image/jpeg,image/webp',
+        previewClass: 'h-12 max-w-[200px] rounded-lg object-cover',
+        alt: t('Open Graph image preview'),
+        fileRef: ogImageFile,
+        errorKey: 'site_og_image_file' as BrandAssetErrorField,
+    },
+])
 
 function fileUrl(path: string | null): string | null {
     if (!path) return null
@@ -103,182 +170,156 @@ const saveSettings = () => {
 <template>
     <Head :title="t('General Settings')" />
 
-    <div class="mx-auto max-w-5xl px-6 py-8">
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('General Settings') }}</h1>
-            <p class="mt-1 text-sm text-gray-500">{{ t('Manage your site identity, branding, locale, currency, and timezone defaults.') }}</p>
+    <div class="mx-auto max-w-7xl px-6 py-8">
+        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('General Settings') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage site identity, brand assets, support links, locale defaults, and pricing display from one unified admin surface.') }}</p>
+            </div>
+            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="saveSettings">
+                {{ form.processing ? t('Saving...') : t('Save Changes') }}
+            </button>
         </div>
 
         <form class="space-y-6" @submit.prevent="saveSettings">
-            <!-- Site Identity -->
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="mb-5">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Site Identity') }}</h2>
-                    <p class="mt-1 text-sm text-gray-500">{{ t('These values are shown to your visitors across the site, emails, and metadata.') }}</p>
-                </div>
-
-                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Site name') }}
-                        <input v-model="form.site_name" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                        <span v-if="form.errors.site_name" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_name }}</span>
-                    </label>
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Tagline') }}
-                        <input v-model="form.site_tagline" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-
-                    <label class="md:col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Description') }}
-                        <textarea v-model="form.site_description" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
-                    </label>
-
-                    <!-- Logo Light -->
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Logo (light mode)') }}
-                        <div v-if="form.site_logo_light" class="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800">
-                            <div class="flex items-center gap-3">
-                                <img :src="fileUrl(form.site_logo_light)!" alt="Logo light" class="h-10 max-w-[160px] object-contain">
-                                <button type="button" @click="form.site_logo_light = ''; logoLightFile = null" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>
-                            </div>
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                <div class="space-y-6">
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                        <div class="mb-5">
+                            <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Site Identity') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('These values define the public brand across navigation, emails, SEO surfaces, and footer areas.') }}</p>
                         </div>
-                        <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" @input="logoLightFile = ($event.target as HTMLInputElement).files?.[0] || null" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400">
-                        <span v-if="form.errors.site_logo_light_file" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_logo_light_file }}</span>
-                    </label>
 
-                    <!-- Logo Dark -->
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Logo (dark mode)') }}
-                        <div v-if="form.site_logo_dark" class="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800">
-                            <div class="flex items-center gap-3">
-                                <img :src="fileUrl(form.site_logo_dark)!" alt="Logo dark" class="h-10 max-w-[160px] object-contain">
-                                <button type="button" @click="form.site_logo_dark = ''; logoDarkFile = null" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>
-                            </div>
+                        <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Site name') }}
+                                <input v-model="form.site_name" type="text" :placeholder="t('Enter site name')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <span v-if="form.errors.site_name" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_name }}</span>
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Tagline') }}
+                                <input v-model="form.site_tagline" type="text" :placeholder="t('Enter site tagline')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                                {{ t('Description') }}
+                                <textarea v-model="form.site_description" rows="3" :placeholder="t('Describe your site for visitors and search previews')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                                {{ t('Copyright text') }}
+                                <input
+                                    v-model="form.site_copyright_text"
+                                    type="text"
+                                    :placeholder="t('Example: :copy :year :name. All rights reserved.', { copy: '©', year: '{year}', name: form.site_name || t('Your Site') })"
+                                    class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                >
+                            </label>
+
                         </div>
-                        <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" @input="logoDarkFile = ($event.target as HTMLInputElement).files?.[0] || null" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400">
-                        <span v-if="form.errors.site_logo_dark_file" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_logo_dark_file }}</span>
-                    </label>
+                    </section>
 
-                    <!-- Favicon ICO -->
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Favicon (ICO)') }}
-                        <div v-if="form.site_favicon_ico" class="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800">
-                            <div class="flex items-center gap-3">
-                                <img :src="fileUrl(form.site_favicon_ico)!" alt="Favicon ICO" class="h-8 w-8">
-                                <button type="button" @click="form.site_favicon_ico = ''; faviconIcoFile = null" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>
-                            </div>
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                        <div class="mb-5">
+                            <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Logos & Social Images') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Upload a complete asset set so the storefront, admin shell, browser tabs, and social cards stay visually consistent.') }}</p>
                         </div>
-                        <input type="file" accept=".ico,image/x-icon" @input="faviconIcoFile = ($event.target as HTMLInputElement).files?.[0] || null" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400">
-                        <span v-if="form.errors.site_favicon_ico_file" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_favicon_ico_file }}</span>
-                    </label>
 
-                    <!-- Favicon PNG -->
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Favicon (PNG)') }}
-                        <div v-if="form.site_favicon_png" class="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800">
-                            <div class="flex items-center gap-3">
-                                <img :src="fileUrl(form.site_favicon_png)!" alt="Favicon PNG" class="h-8 w-8">
-                                <button type="button" @click="form.site_favicon_png = ''; faviconPngFile = null" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>
-                            </div>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <article v-for="asset in brandAssetCards" :key="asset.key" class="rounded-2xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60" :class="{ 'md:col-span-2': asset.key === 'site_og_image' }">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ asset.title }}</h3>
+                                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ asset.description }}</p>
+                                    </div>
+                                </div>
+
+                                <div v-if="form[asset.key]" class="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-3 dark:border-surface-700 dark:bg-surface-900/80">
+                                    <div class="flex items-center gap-3">
+                                        <img :src="fileUrl(form[asset.key])!" :alt="asset.alt" :class="asset.previewClass">
+                                        <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="form[asset.key] = ''; asset.fileRef.value = null">
+                                            {{ t('Remove') }}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    :accept="asset.accept"
+                                    class="mt-4 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400"
+                                    @input="asset.fileRef.value = ($event.target as HTMLInputElement).files?.[0] || null"
+                                >
+                                <span v-if="formErrors[asset.errorKey]" class="mt-1 block text-xs text-danger-600">{{ formErrors[asset.errorKey] }}</span>
+                            </article>
                         </div>
-                        <input type="file" accept="image/png" @input="faviconPngFile = ($event.target as HTMLInputElement).files?.[0] || null" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400">
-                        <span v-if="form.errors.site_favicon_png_file" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_favicon_png_file }}</span>
-                    </label>
+                    </section>
 
-                    <!-- OG Image -->
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('OG / Social image') }}
-                        <div v-if="form.site_og_image" class="mb-2 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800">
-                            <div class="flex items-center gap-3">
-                                <img :src="fileUrl(form.site_og_image)!" alt="OG image" class="h-12 max-w-[200px] rounded object-cover">
-                                <button type="button" @click="form.site_og_image = ''; ogImageFile = null" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>
-                            </div>
+                </div>
+
+                <div class="space-y-6">
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                        <div class="mb-5">
+                            <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Site URL & Links') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Keep your canonical address, support entry points, and policy destinations easy to maintain from a single panel.') }}</p>
                         </div>
-                        <input type="file" accept="image/png,image/jpeg,image/webp" @input="ogImageFile = ($event.target as HTMLInputElement).files?.[0] || null" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400">
-                        <span v-if="form.errors.site_og_image_file" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_og_image_file }}</span>
-                    </label>
 
-                    <!-- Copyright -->
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Copyright text') }}
-                        <input v-model="form.site_copyright_text" type="text" :placeholder="'© {year} ' + (form.site_name || 'MySite') + '. All rights reserved.'" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
+                        <div class="grid grid-cols-1 gap-5">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Site URL') }}
+                                <input v-model="form.site_url" type="url" :placeholder="t('https://example.com')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                <span v-if="form.errors.site_url" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_url }}</span>
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Support email') }}
+                                <input v-model="form.site_support_email" type="email" :placeholder="t('support@example.com')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Support URL') }}
+                                <input v-model="form.site_support_url" type="url" :placeholder="t('https://example.com/support')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Terms of Service URL') }}
+                                <input v-model="form.site_terms_url" type="url" :placeholder="t('https://example.com/terms')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Privacy Policy URL') }}
+                                <input v-model="form.site_privacy_url" type="url" :placeholder="t('https://example.com/privacy')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+                        </div>
+                    </section>
+
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                        <div class="mb-5">
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Language, Currency & Timezone') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set sensible defaults for first-time visitors and keep price formatting aligned across the product.') }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-5">
+                            <AppSelect v-model="form.default_language" :label="t('Default language')" :options="languageOptions" :live-search="true" />
+
+                            <AppSelect v-model="form.app_timezone" :label="t('Timezone')" :options="timezoneOptions" :live-search="true" />
+
+                            <AppSelect v-model="form.default_currency" :label="t('Default currency')" :options="currencyOptions" :live-search="true" />
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Currency symbol') }}
+                                <input v-model="form.currency_symbol" type="text" :placeholder="t('Enter currency symbol')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+
+                            <AppSelect v-model="form.currency_position" :label="t('Currency position')" :options="positionOptions" />
+
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Currency decimals') }}
+                                <input v-model.number="form.currency_decimals" type="number" min="0" max="4" :placeholder="t('Enter decimal places')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            </label>
+                        </div>
+                    </section>
                 </div>
-            </section>
-
-            <!-- Site URL & Links -->
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="mb-5">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Site URL & Links') }}</h2>
-                    <p class="mt-1 text-sm text-gray-500">{{ t('Configure the base URL and support / legal page links.') }}</p>
-                </div>
-
-                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Site URL') }}
-                        <input v-model="form.site_url" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                        <span v-if="form.errors.site_url" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_url }}</span>
-                    </label>
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Support email') }}
-                        <input v-model="form.site_support_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Support URL') }}
-                        <input v-model="form.site_support_url" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Terms of Service URL') }}
-                        <input v-model="form.site_terms_url" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Privacy Policy URL') }}
-                        <input v-model="form.site_privacy_url" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-                </div>
-            </section>
-
-            <!-- Localization -->
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="mb-5">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Localization Defaults') }}</h2>
-                    <p class="mt-1 text-sm text-gray-500">{{ t('Choose the default language, currency display, and timezone for new visitors.') }}</p>
-                </div>
-
-                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                    <AppSelect v-model="form.default_language" :label="t('Default language')" :options="languageOptions" :live-search="true" />
-
-                    <AppSelect v-model="form.app_timezone" :label="t('Timezone')" :options="timezoneOptions" :live-search="true" />
-
-                    <AppSelect v-model="form.default_currency" :label="t('Default currency')" :options="currencyOptions" :live-search="true" />
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Currency symbol') }}
-                        <input v-model="form.currency_symbol" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-
-                    <AppSelect v-model="form.currency_position" :label="t('Currency position')" :options="positionOptions" />
-
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        {{ t('Currency decimals') }}
-                        <input v-model.number="form.currency_decimals" type="number" min="0" max="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                    </label>
-                </div>
-            </section>
-
-            <div class="flex justify-end">
-                <button type="submit" :disabled="form.processing" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg transition-colors disabled:opacity-60">
-                    <svg v-if="form.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    <span>{{ form.processing ? t('Saving...') : t('Save General Settings') }}</span>
-                </button>
             </div>
         </form>
     </div>

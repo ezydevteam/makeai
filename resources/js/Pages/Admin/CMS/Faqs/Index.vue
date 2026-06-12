@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
-import RichEditor from '@/Components/RichEditor.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
 
@@ -938,7 +939,7 @@ onBeforeUnmount(() => {
                         <input
                             v-model.number="aiForm.count"
                             type="number"
-                            min="5"
+                            min="1"
                             max="20"
                             class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                         >

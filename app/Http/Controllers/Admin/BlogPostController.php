@@ -226,14 +226,12 @@ class BlogPostController extends Controller
             $user,
             $prompt,
             'You are an editorial assistant for an AI SaaS blog CMS. Return only the requested content, with no preamble.',
-            settings('default_ai_provider', 'openai'),
-            settings('default_ai_model', 'gpt-4o-mini'),
-            ['max_tokens' => 700, 'temperature' => 0.4]
+            options: ['max_tokens' => 700, 'temperature' => 0.4]
         );
 
         return response()->json([
             'success' => true,
-            'data' => $this->formatAiAssistResult($action, trim($result['content'] ?? '')),
+            'data' => $this->formatAiAssistResult($action, trim($result->content ?? '')),
             'message' => translate('AI assist completed.'),
         ]);
     }

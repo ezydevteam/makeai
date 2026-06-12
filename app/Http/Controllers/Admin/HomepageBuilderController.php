@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\HomepageBuilderRequest;
 use App\Models\Setting;
 use App\Models\SiteTemplate;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -65,56 +65,9 @@ class HomepageBuilderController extends Controller
         return back()->with('success', translate('Homepage setting updated.'));
     }
 
-    public function update(Request $request)
+    public function update(HomepageBuilderRequest $request)
     {
-        $validated = $request->validate([
-            'sections' => ['required', 'array'],
-            'sections.*.id' => ['required', 'string', 'max:80'],
-            'sections.*.type' => ['required', 'string', Rule::in(self::SECTION_TYPES)],
-            'sections.*.enabled' => ['required', 'boolean'],
-            'sections.*.core' => ['required', 'boolean'],
-            'sections.*.config' => ['required', 'array'],
-            'sections.*.config.headline' => ['nullable', 'string', 'max:300'],
-            'sections.*.config.subheadline' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.title' => ['nullable', 'string', 'max:300'],
-            'sections.*.config.subtitle' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.primary_cta_text' => ['nullable', 'string', 'max:100'],
-            'sections.*.config.primary_cta_link' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.secondary_cta_text' => ['nullable', 'string', 'max:100'],
-            'sections.*.config.secondary_cta_link' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.cta_text' => ['nullable', 'string', 'max:100'],
-            'sections.*.config.cta_link' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.content' => ['nullable', 'string', 'max:20000'],
-            'sections.*.config.background_type' => ['nullable', 'string', 'max:50'],
-            'sections.*.config.background_value' => ['nullable', 'string', 'max:2048'],
-            'sections.*.config.layout' => ['nullable', 'string', 'max:50'],
-            'sections.*.config.items' => ['nullable', 'array'],
-            'sections.*.config.items.*.icon' => ['nullable', 'string', 'max:50'],
-            'sections.*.config.items.*.title' => ['nullable', 'string', 'max:200'],
-            'sections.*.config.items.*.description' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.items.*.image_url' => ['nullable', 'string', 'max:500'],
-            'sections.*.config.stats' => ['nullable', 'array'],
-            'sections.*.config.stats.*.number' => ['nullable', 'string', 'max:20'],
-            'sections.*.config.stats.*.label' => ['nullable', 'string', 'max:100'],
-            'settings' => ['required', 'array'],
-            'settings.seo' => ['required', 'array'],
-            'settings.seo.meta_title' => ['nullable', 'string', 'max:160'],
-            'settings.seo.meta_description' => ['nullable', 'string', 'max:255'],
-            'settings.seo.og_image' => ['nullable', 'string', 'max:2048'],
-            'settings.preloader' => ['required', 'array'],
-            'settings.preloader.enabled' => ['required', 'boolean'],
-            'settings.preloader.animation_url' => ['nullable', 'string', 'max:2048'],
-            'settings.scroll_to_top' => ['required', 'array'],
-            'settings.scroll_to_top.enabled' => ['required', 'boolean'],
-            'settings.scroll_to_top.position' => ['required', 'string', Rule::in(['left', 'right'])],
-            'settings.scroll_to_top.show_after_px' => ['required', 'integer', 'min:0', 'max:5000'],
-            'settings.cookie_consent' => ['required', 'array'],
-            'settings.cookie_consent.enabled' => ['required', 'boolean'],
-            'settings.cookie_consent.message' => ['nullable', 'string', 'max:500'],
-            'settings.cookie_consent.accept_text' => ['nullable', 'string', 'max:80'],
-            'settings.cookie_consent.policy_url' => ['nullable', 'string', 'max:2048'],
-            'settings.chat_widget_embed' => ['nullable', 'string', 'max:20000'],
-        ]);
+        $validated = $request->validated();
 
         Setting::setValue('homepage_config', $validated, 'json', 'appearance');
 
@@ -194,20 +147,10 @@ class HomepageBuilderController extends Controller
                     'meta_description' => translate('Create content, images, chat responses, and code with one powerful AI platform.'),
                     'og_image' => '',
                 ],
-                'preloader' => [
-                    'enabled' => false,
-                    'animation_url' => '',
-                ],
                 'scroll_to_top' => [
                     'enabled' => true,
                     'position' => 'right',
                     'show_after_px' => 500,
-                ],
-                'cookie_consent' => [
-                    'enabled' => false,
-                    'message' => translate('We use cookies to improve your experience.'),
-                    'accept_text' => translate('Accept'),
-                    'policy_url' => '/privacy-policy',
                 ],
                 'chat_widget_embed' => '',
             ],

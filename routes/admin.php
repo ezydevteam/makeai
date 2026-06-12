@@ -204,6 +204,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::middleware('admin.permission:reports.export')->group(function () {
         Route::get('reports/export-center', [ExportCenterController::class, 'index'])->name('admin.reports.export-center');
         Route::post('reports/export', [ExportCenterController::class, 'export'])->name('admin.reports.export');
+        Route::post('reports/export/estimate', [ExportCenterController::class, 'estimate'])->name('admin.reports.export.estimate');
         Route::get('reports/exports/{file}', [ExportCenterController::class, 'download'])->name('admin.reports.export.download');
         Route::delete('reports/exports/{file}', [ExportCenterController::class, 'deleteFile'])->name('admin.reports.export.delete');
     });
@@ -277,6 +278,7 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('appearance/menus/item/{item}', [MenuController::class, 'updateItem'])->name('admin.menus.item.update');
         Route::delete('appearance/menus/item/{item}', [MenuController::class, 'deleteItem'])->name('admin.menus.item.delete');
         Route::delete('appearance/menus/{menu}', [MenuController::class, 'destroy'])->name('admin.menus.delete');
+        Route::post('appearance/menus/{menu}/import', [MenuController::class, 'import'])->name('admin.menus.import');
     });
 
     // Appearance: Settings
@@ -292,6 +294,9 @@ Route::middleware('admin.auth')->group(function () {
         // Appearance: Header Builder
         Route::get('appearance/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
         Route::post('appearance/header', [HeaderBuilderController::class, 'update'])->name('admin.header.update');
+        Route::post('appearance/header/reset/{section}', [HeaderBuilderController::class, 'resetSection'])->name('admin.header.reset');
+        Route::get('appearance/header/export', [HeaderBuilderController::class, 'export'])->name('admin.header.export');
+        Route::post('appearance/header/upload-logo', [HeaderBuilderController::class, 'upload'])->name('admin.header.upload');
 
         // Appearance: Footer Builder
         Route::get('appearance/footer', [FooterBuilderController::class, 'index'])->name('admin.footer.index');
@@ -301,8 +306,8 @@ Route::middleware('admin.auth')->group(function () {
         Route::get('appearance/sidebar', [SidebarBuilderController::class, 'index'])->name('admin.sidebar.index');
         Route::post('appearance/sidebar', [SidebarBuilderController::class, 'update'])->name('admin.sidebar.update');
 
-        // Appearance: Site Templates
-        Route::prefix('appearance/site-templates')->name('admin.site-templates.')->group(function () {
+        // AI: Templates
+        Route::prefix('ai/templates')->name('admin.ai.templates.')->group(function () {
             Route::get('/', [SiteTemplateController::class, 'index'])->name('index');
             Route::get('{template}/edit', [SiteTemplateController::class, 'edit'])->name('edit');
             Route::post('{template}', [SiteTemplateController::class, 'update'])->name('update');
@@ -326,8 +331,10 @@ Route::middleware('admin.auth')->group(function () {
 
     // Social Media
     Route::middleware('admin.permission:settings.manage')->group(function () {
-        Route::get('marketing/social', [SocialSettingsController::class, 'edit'])->name('admin.social.settings.edit');
-        Route::post('marketing/social', [SocialSettingsController::class, 'update'])->name('admin.social.settings.update');
+        Route::get('marketing/social', [SocialSettingsController::class, 'editFollow'])->name('admin.social.settings.edit');
+        Route::post('marketing/social', [SocialSettingsController::class, 'updateFollow'])->name('admin.social.settings.update');
+        Route::get('settings/oauth', [SocialSettingsController::class, 'editOAuth'])->name('admin.oauth.settings.edit');
+        Route::post('settings/oauth', [SocialSettingsController::class, 'updateOAuth'])->name('admin.oauth.settings.update');
     });
 
     // General Settings
@@ -351,7 +358,7 @@ Route::middleware('admin.auth')->group(function () {
         Route::get('system', [SystemController::class, 'index'])->name('admin.system.index');
         Route::get('system/health', [SystemController::class, 'health'])->name('admin.system.health');
         Route::get('system/updates', [SystemController::class, 'updates'])->name('admin.system.updates');
-        Route::get('system/tools', [SystemController::class, 'tools'])->name('admin.system.tools');
+        Route::get('system/cron-jobs', [SystemController::class, 'tools'])->name('admin.system.cron-jobs');
         Route::get('system/maintenance', [SystemController::class, 'maintenance'])->name('admin.system.maintenance');
         Route::post('system/cache', [SystemController::class, 'clearCache'])->name('admin.system.cache.clear');
         Route::post('system/cron/run', [SystemController::class, 'runCronTask'])->name('admin.system.cron.run');

@@ -1,294 +1,467 @@
 <template>
   <AdminLayout>
+    <Head :title="pageTitle" />
+
     <div class="p-6">
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Edit Site Template') }} - {{ form.name }}</h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Slug') }}: <code class="text-xs bg-gray-100 dark:bg-surface-700 px-1.5 py-0.5 rounded">{{ props.template.slug }}</code> · {{ t('Layout') }}: <code class="text-xs bg-gray-100 dark:bg-surface-700 px-1.5 py-0.5 rounded">{{ props.template.layout_component }}</code></p>
-      </div>
-
-      <div class="flex items-center gap-1 border-b border-gray-200 dark:border-surface-700 mb-6">
-        <button
-          v-for="tab in tabs" :key="tab.key"
-          @click="activeTab = tab.key"
-          :class="activeTab === tab.key
-            ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'"
-          class="px-4 py-2.5 text-sm font-medium transition-colors -mb-px"
-        >{{ tab.label }}</button>
-      </div>
-
-      <form @submit.prevent="save" class="max-w-2xl space-y-8">
-        <!-- Appearance Tab -->
-        <div v-show="activeTab === 'appearance'" class="space-y-5">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Appearance') }}</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Leave blank to inherit global design system values.') }}</p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Primary Color') }}</span>
-              <input v-model="form.color_primary" type="color" class="h-10 w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 text-sm cursor-pointer" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Secondary Color') }}</span>
-              <input v-model="form.color_secondary" type="color" class="h-10 w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 text-sm cursor-pointer" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Background Color') }}</span>
-              <input v-model="form.color_bg" type="color" class="h-10 w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 text-sm cursor-pointer" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Surface/Card Color') }}</span>
-              <input v-model="form.color_surface" type="color" class="h-10 w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 text-sm cursor-pointer" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Text Color') }}</span>
-              <input v-model="form.color_text" type="color" class="h-10 w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 text-sm cursor-pointer" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Heading Font') }}</span>
-              <input v-model="form.font_heading" :placeholder="t('e.g. Inter')" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Body Font') }}</span>
-              <input v-model="form.font_body" :placeholder="t('e.g. Inter')" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white placeholder:text-gray-400" />
-            </label>
+      <div class="mx-auto flex max-w-7xl flex-col gap-6">
+        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Template Editor') }}</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ form.name || props.template.name }} · {{ props.template.slug }} · {{ props.template.layout_component }}
+            </p>
           </div>
-
-          <button type="button" @click="resetToDefaults" class="inline-flex items-center rounded-lg border border-gray-200 dark:border-surface-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-700 transition-colors">
-            {{ t('Reset to Defaults') }}
-          </button>
-        </div>
-
-        <!-- Content Tab -->
-        <div v-show="activeTab === 'content'" class="space-y-5">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Content') }}</h2>
-
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Template Name') }}</span>
-            <input v-model="form.name" required class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
-          </label>
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Tagline') }}</span>
-            <input v-model="form.tagline" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
-          </label>
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Hero Headline') }}</span>
-            <input v-model="form.hero_headline" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" :placeholder="t('Main heading on template landing')" />
-          </label>
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Hero Subheadline') }}</span>
-            <textarea v-model="form.hero_subheadline" rows="3" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
-          </label>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('CTA Text') }}</span>
-              <input v-model="form.hero_cta_text" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" :placeholder="t('Get Started')" />
-            </label>
-            <label class="block space-y-1">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('CTA URL') }}</span>
-              <input v-model="form.hero_cta_url" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" :placeholder="t('Leave empty for login/register')" />
-            </label>
+          <div class="flex flex-wrap items-center gap-3">
+            <Link :href="route('admin.ai.templates.index')" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
+              <i class="ti ti-arrow-left me-2 text-sm"></i>
+              {{ t('Back') }}
+            </Link>
+            <button type="button" class="inline-flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800" :disabled="activeTab === 'chatbot'" @click="resetToDefaults">
+              <i class="ti ti-restore me-2 text-sm"></i>
+              {{ t('Reset') }}
+            </button>
+            <button v-if="activeTab === 'chatbot'" type="button" class="inline-flex items-center rounded-lg btn-primary px-4 py-2.5 text-sm font-semibold" @click="saveChatbotSettings">
+              <i class="ti ti-device-floppy me-2 text-sm"></i>
+              {{ t('Save') }}
+            </button>
+            <button v-else type="button" class="inline-flex items-center rounded-lg btn-primary px-4 py-2.5 text-sm font-semibold" @click="save">
+              <i class="ti ti-device-floppy me-2 text-sm"></i>
+              {{ t('Save') }}
+            </button>
           </div>
-        </div>
+        </section>
 
-        <!-- Custom Code Tab -->
-        <div v-show="activeTab === 'code'" class="space-y-5">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Custom Code') }}</h2>
-          <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-            {{ t('Custom code can break the template. Test carefully.') }}
-          </div>
-
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Custom CSS') }}</span>
-            <textarea v-model="form.custom_css" rows="6" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-gray-50 dark:bg-surface-800 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white" :placeholder="t('Scoped to this template only')" />
-          </label>
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Custom HTML (head)') }}</span>
-            <textarea v-model="form.custom_html_head" rows="4" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-gray-50 dark:bg-surface-800 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white" :placeholder="t('Injected in <head> - scripts, fonts, analytics')" />
-          </label>
-          <label class="block space-y-1">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Custom HTML (body end)') }}</span>
-            <textarea v-model="form.custom_html_body" rows="4" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-gray-50 dark:bg-surface-800 px-3 py-2 text-sm font-mono text-gray-900 dark:text-white" :placeholder="t('Injected before </body> - chat widgets, pixels')" />
-          </label>
-        </div>
-
-        <!-- SEO Tab -->
-        <div v-show="activeTab === 'seo'" class="space-y-5">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('SEO') }}</h2>
-
-          <label class="block space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta Title') }}</span>
-              <span class="text-xs text-gray-400">{{ (form.meta_title ?? '').length }}/60</span>
-            </div>
-            <input v-model="form.meta_title" maxlength="60" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
-          </label>
-          <label class="block space-y-1">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta Description') }}</span>
-              <span class="text-xs text-gray-400">{{ (form.meta_description ?? '').length }}/160</span>
-            </div>
-            <textarea v-model="form.meta_description" maxlength="160" rows="3" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
-          </label>
-        </div>
-
-        <!-- Tools Tab -->
-        <div v-show="activeTab === 'tools'" class="space-y-5">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Bundled Tools') }}</h2>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('These tools are defined by the developer and cannot be changed here.') }}</p>
-
-          <div v-if="props.bundled_tools.length > 0" class="space-y-2">
-            <div v-for="tool in props.bundled_tools" :key="tool.slug" class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-4 py-3">
-              <i v-if="tool.icon" :class="tool.icon" class="text-lg text-primary-500 dark:text-primary-400" />
-              <span class="text-sm text-gray-900 dark:text-white flex-1">{{ tool.name }}</span>
-              <span v-if="!tool.is_active" class="inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-                {{ t('Disabled - enable in AI Tools') }}
-              </span>
-              <span v-else class="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
-                {{ t('Active') }}
-              </span>
+        <section class="border-b border-gray-200 dark:border-surface-700">
+          <div class="overflow-x-auto overflow-y-hidden">
+            <div class="flex min-w-max items-center gap-1">
+              <button
+                v-for="tab in tabs"
+                :key="tab.key"
+                type="button"
+                class="-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition"
+                :class="activeTab === tab.key
+                  ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'"
+                @click="activeTab = tab.key"
+              >
+                <i :class="tab.icon" class="text-base"></i>
+                {{ tab.label }}
+              </button>
             </div>
           </div>
-          <div v-else class="text-sm text-gray-400 dark:text-gray-500 py-4">{{ t('No bundled tools configured for this template.') }}</div>
+        </section>
 
-          <div v-if="props.missing_tool_slugs.length > 0" class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-            <strong>{{ t('Missing tools') }}:</strong> {{ props.missing_tool_slugs.join(', ') }}
-          </div>
-        </div>
+        <form class="space-y-6" @submit.prevent="save">
+          <section v-show="activeTab === 'appearance'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-2 border-b border-gray-100 pb-5 dark:border-surface-800">
+              <h2 class="font-heading text-2xl font-bold text-gray-900 dark:text-white">{{ t('Appearance') }}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Tune the visual system for this template only. Empty values inherit the global brand setup.') }}</p>
+            </div>
 
-        <!-- Chatbot Settings Tab (ai-chatbot only) -->
-        <div v-if="props.template.slug === 'ai-chatbot'" v-show="activeTab === 'chatbot'" class="space-y-6">
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Chatbot Settings') }}</h2>
-
-          <div class="rounded-xl border border-gray-200 dark:border-surface-700 p-5 space-y-4">
-            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('Page Layout') }}</h3>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input v-model="cs.hide_site_header" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <div>
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Hide site header') }}</span>
-                <p class="text-xs text-gray-400 mt-0.5">{{ t('Remove the global site header from the chatbot page.') }}</p>
+            <div class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <AppColorPicker v-model="form.color_primary" :label="t('Primary Color')" />
+                <AppColorPicker v-model="form.color_secondary" :label="t('Secondary Color')" />
+                <AppColorPicker v-model="form.color_bg" :label="t('Background Color')" />
+                <AppColorPicker v-model="form.color_surface" :label="t('Surface Color')" />
+                <AppColorPicker v-model="form.color_text" :label="t('Text Color')" />
+                <AppSelect v-model="form.font_heading" :label="t('Heading Font')" :options="fontFamilyOptions" :placeholder="t('Select heading font')" live-search />
+                <div class="md:col-span-2">
+                  <AppSelect v-model="form.font_body" :label="t('Body Font')" :options="fontFamilyOptions" :placeholder="t('Select body font')" live-search />
+                </div>
               </div>
-            </label>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input v-model="cs.hide_site_footer" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <div>
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Hide site footer') }}</span>
-                <p class="text-xs text-gray-400 mt-0.5">{{ t('Remove the global site footer from the chatbot page.') }}</p>
-              </div>
-            </label>
-          </div>
 
-          <div class="rounded-xl border border-gray-200 dark:border-surface-700 p-5 space-y-4">
-            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('Guest (not logged in)') }}</h3>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input v-model="cs.allow_guest_messages" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Allow guest messages (no login required)') }}</span>
-            </label>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label class="block space-y-1">
-                <span class="text-xs font-medium text-gray-500">{{ t('Max messages per guest session') }}</span>
-                <input v-model.number="cs.guest_max_messages" type="number" min="0" max="100" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
+              <div class="rounded-2xl border border-gray-100 bg-gray-50 p-5 dark:border-surface-800 dark:bg-surface-800/70">
+                <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Preview hints') }}</h3>
+                <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                  {{ t('Pair a vivid primary with a softer background to keep hero sections bright while preserving readable content cards.') }}
+                </p>
+                <button type="button" class="mt-5 inline-flex items-center rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800" @click="resetToDefaults">
+                  <i class="ti ti-restore me-2 text-base"></i>
+                  {{ t('Reset appearance') }}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section v-show="activeTab === 'content'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-2 border-b border-gray-100 pb-5 dark:border-surface-800">
+              <h2 class="font-heading text-2xl font-bold text-gray-900 dark:text-white">{{ t('Content') }}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Define the messaging layer that users will see first across the selected template experience.') }}</p>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('Template Name') }}
+                <input v-model="form.name" required :placeholder="t('Enter template name')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
               </label>
-              <label class="block space-y-1">
-                <span class="text-xs font-medium text-gray-500">{{ t('Max tokens per guest message') }}</span>
-                <input v-model.number="cs.guest_max_tokens" type="number" min="100" max="8000" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" />
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('Tagline') }}
+                <input v-model="form.tagline" :placeholder="t('A concise positioning line for this experience')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                {{ t('Hero Headline') }}
+                <input v-model="form.hero_headline" :placeholder="t('Main heading on template landing')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                {{ t('Hero Subheadline') }}
+                <textarea v-model="form.hero_subheadline" rows="4" :placeholder="t('Expand on the value proposition with a short support paragraph.')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('CTA Text') }}
+                <input v-model="form.hero_cta_text" :placeholder="t('Get Started')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('CTA URL') }}
+                <input v-model="form.hero_cta_url" :placeholder="t('Leave empty for login/register')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
               </label>
             </div>
-          </div>
+          </section>
 
-          <div class="rounded-xl border border-gray-200 dark:border-surface-700 p-5 space-y-4">
-            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('Free Plan Users') }}</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Credits per message') }}</span><input v-model.number="cs.free_credits_per_message" type="number" step="0.1" min="0" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Max tokens per message') }}</span><input v-model.number="cs.free_max_tokens" type="number" min="100" max="16000" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Max chat history stored') }}</span><input v-model.number="cs.free_max_chat_history" type="number" min="1" max="500" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Max file size for free (MB)') }}</span><input v-model.number="cs.free_max_file_size_mb" type="number" min="0" max="50" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
+          <section v-show="activeTab === 'code'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-2 border-b border-gray-100 pb-5 dark:border-surface-800">
+              <h2 class="font-heading text-2xl font-bold text-gray-900 dark:text-white">{{ t('Custom Code') }}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Inject template-specific CSS and HTML only when the global builders cannot handle the requirement.') }}</p>
             </div>
-          </div>
 
-          <div class="rounded-xl border border-gray-200 dark:border-surface-700 p-5 space-y-4">
-            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('Pro Plan Users') }}</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Credits per message') }}</span><input v-model.number="cs.pro_credits_per_message" type="number" step="0.1" min="0" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Max tokens per message') }}</span><input v-model.number="cs.pro_max_tokens" type="number" min="100" max="16000" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
-              <label class="block space-y-1"><span class="text-xs font-medium text-gray-500">{{ t('Max file size for pro (MB)') }}</span><input v-model.number="cs.pro_max_file_size_mb" type="number" min="0" max="100" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white" /></label>
-              <label class="flex items-center gap-3 cursor-pointer mt-6"><input v-model="cs.pro_unlimited_history" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" /><span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Unlimited chat history for Pro') }}</span></label>
+            <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
+              {{ t('Custom code can break the template rendering. Keep changes scoped and test them carefully before shipping.') }}
             </div>
-          </div>
 
-          <div class="rounded-xl border border-gray-200 dark:border-surface-700 p-5 space-y-3">
-            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('Model Selection') }}</h3>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input v-model="cs.allow_model_select" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <div>
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Allow users to select AI model') }}</span>
-                <p class="text-xs text-gray-400 mt-0.5">{{ t('Shows a model picker in the chat input area.') }}</p>
+            <div class="mt-5 space-y-5">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('Custom CSS') }}
+                <textarea v-model="form.custom_css" rows="7" :placeholder="t('Scoped to this template only')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('Custom HTML (head)') }}
+                <textarea v-model="form.custom_html_head" rows="5" :placeholder="t('Injected in <head> for fonts, analytics, or metadata fragments.')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('Custom HTML (body end)') }}
+                <textarea v-model="form.custom_html_body" rows="5" :placeholder="t('Injected before </body> for chat widgets, pixels, or footer embeds.')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section v-show="activeTab === 'seo'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-2 border-b border-gray-100 pb-5 dark:border-surface-800">
+              <h2 class="font-heading text-2xl font-bold text-gray-900 dark:text-white">{{ t('SEO') }}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Keep titles focused and descriptions persuasive so each template can rank as a credible standalone experience.') }}</p>
+            </div>
+
+            <div class="mt-6 grid grid-cols-1 gap-5">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span class="flex items-center justify-between">
+                  <span>{{ t('Meta Title') }}</span>
+                  <span class="text-xs text-gray-400">{{ metaTitleLength }}/60</span>
+                </span>
+                <input v-model="form.meta_title" maxlength="60" :placeholder="t('Template page title for search results')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+              </label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <span class="flex items-center justify-between">
+                  <span>{{ t('Meta Description') }}</span>
+                  <span class="text-xs text-gray-400">{{ metaDescriptionLength }}/160</span>
+                </span>
+                <textarea v-model="form.meta_description" maxlength="160" rows="4" :placeholder="t('Summarize the value of this template in a concise search snippet.')" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section v-show="activeTab === 'tools'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-2 border-b border-gray-100 pb-5 dark:border-surface-800">
+              <h2 class="font-heading text-2xl font-bold text-gray-900 dark:text-white">{{ t('Bundled Tools') }}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('These tools are assigned by the developer to shape the experience. Review their availability here.') }}</p>
+            </div>
+
+            <div v-if="props.bundled_tools.length > 0" class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <article v-for="tool in props.bundled_tools" :key="tool.slug" class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/70">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+                      <i :class="tool.icon || 'ti ti-sparkles'" class="text-lg"></i>
+                    </span>
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ tool.name }}</div>
+                      <div class="mt-1 truncate text-xs uppercase tracking-[0.16em] text-gray-400 dark:text-gray-500">{{ tool.slug }}</div>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold" :class="tool.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'">
+                    {{ tool.is_active ? t('Active') : t('Disabled') }}
+                  </span>
+                </div>
+              </article>
+            </div>
+            <div v-else class="mt-6 rounded-2xl border border-dashed border-gray-300 px-6 py-12 text-center text-sm text-gray-400 dark:border-surface-700 dark:text-gray-500">
+              {{ t('No bundled tools configured for this template.') }}
+            </div>
+
+            <div v-if="props.missing_tool_slugs.length > 0" class="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
+              <strong>{{ t('Missing tools') }}:</strong> {{ props.missing_tool_slugs.join(', ') }}
+            </div>
+          </section>
+
+          <section v-if="props.template.slug === 'ai-chatbot'" v-show="activeTab === 'chatbot'" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-2 border-b border-gray-100 pb-5 dark:border-surface-800">
+              <h2 class="font-heading text-2xl font-bold text-gray-900 dark:text-white">{{ t('Chatbot Settings') }}</h2>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control layout behavior, guest limits, model access, and token visibility for the chatbot template experience.') }}</p>
+            </div>
+
+            <div class="mt-6 space-y-6">
+              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800/70">
+                <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Page Layout') }}</h3>
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                  <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide site header') }}</div>
+                      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Remove the global site header from the chatbot page.') }}</div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="cs.hide_site_header" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.hide_site_header ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.hide_site_header = !cs.hide_site_header">
+                      <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.hide_site_header ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                    </button>
+                  </div>
+                  <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide site footer') }}</div>
+                      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Remove the global site footer from the chatbot page.') }}</div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="cs.hide_site_footer" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.hide_site_footer ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.hide_site_footer = !cs.hide_site_footer">
+                      <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.hide_site_footer ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </label>
-            <label v-if="cs.allow_model_select" class="flex items-center gap-3 cursor-pointer pl-1">
-              <input v-model="cs.show_friendly_model_names" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <div>
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show friendly model names') }}</span>
-                <p class="text-xs text-gray-400 mt-0.5">{{ t('Displays "ChatGPT" instead of "gpt-4o", "Claude" instead of "claude-3-opus", etc.') }}</p>
+
+              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800/70">
+                <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Guest Access') }}</h3>
+                <div class="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                  <div>
+                    <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Allow guest messages') }}</div>
+                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Let visitors try the chatbot before logging in.') }}</div>
+                  </div>
+                  <button type="button" role="switch" :aria-checked="cs.allow_guest_messages" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.allow_guest_messages ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.allow_guest_messages = !cs.allow_guest_messages">
+                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.allow_guest_messages ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                  </button>
+                </div>
+                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Max messages per guest session') }}
+                    <input v-model.number="cs.guest_max_messages" type="number" min="0" max="100" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                  </label>
+                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Max tokens per guest message') }}
+                    <input v-model.number="cs.guest_max_tokens" type="number" min="100" max="8000" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                  </label>
+                </div>
               </div>
-            </label>
-            <label class="block space-y-1">
-              <span class="text-xs font-medium text-gray-500">{{ t('Default model (seed)') }}</span>
-              <select v-model="cs.default_chat_model" class="w-full rounded-lg border border-gray-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-gray-900 dark:text-white">
-                <option v-for="(label, value) in (props.chatModels ?? {})" :key="value" :value="value">{{ label }}</option>
-              </select>
-              <p class="text-xs text-gray-400 mt-0.5">{{ t('Used when no user model is selected.') }}</p>
-            </label>
-          </div>
 
-          <div class="rounded-xl border border-gray-200 dark:border-surface-700 p-5 space-y-3">
-            <h3 class="font-semibold text-gray-900 dark:text-white">{{ t('Token Tracking') }}</h3>
-            <label class="flex items-center gap-3 cursor-pointer"><input v-model="cs.show_token_usage" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" /><span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Show token usage below each AI message') }}</span></label>
-            <label class="flex items-center gap-3 cursor-pointer"><input v-model="cs.show_credits_charged" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" /><span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Show credits charged below each AI message') }}</span></label>
-          </div>
+              <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800/70">
+                  <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Free Plan Users') }}</h3>
+                  <div class="mt-4 grid grid-cols-1 gap-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Credits per message') }}
+                      <input v-model.number="cs.free_credits_per_message" type="number" step="0.1" min="0" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Max tokens per message') }}
+                      <input v-model.number="cs.free_max_tokens" type="number" min="100" max="16000" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Max chat history stored') }}
+                      <input v-model.number="cs.free_max_chat_history" type="number" min="1" max="500" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Max file size for free (MB)') }}
+                      <input v-model.number="cs.free_max_file_size_mb" type="number" min="0" max="50" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                  </div>
+                </div>
 
-          <button type="button" @click="saveChatbotSettings" class="inline-flex items-center rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors shadow-sm">
-            {{ t('Save Chatbot Settings') }}
-          </button>
-        </div>
+                <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800/70">
+                  <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Pro Plan Users') }}</h3>
+                  <div class="mt-4 grid grid-cols-1 gap-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Credits per message') }}
+                      <input v-model.number="cs.pro_credits_per_message" type="number" step="0.1" min="0" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Max tokens per message') }}
+                      <input v-model.number="cs.pro_max_tokens" type="number" min="100" max="16000" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {{ t('Max file size for pro (MB)') }}
+                      <input v-model.number="cs.pro_max_file_size_mb" type="number" min="0" max="100" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
+                    </label>
+                    <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                      <div>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Unlimited chat history') }}</div>
+                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Allow unlimited stored history for Pro users.') }}</div>
+                      </div>
+                      <button type="button" role="switch" :aria-checked="cs.pro_unlimited_history" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.pro_unlimited_history ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.pro_unlimited_history = !cs.pro_unlimited_history">
+                        <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.pro_unlimited_history ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-        <!-- Only show general Save Changes when NOT on chatbot tab -->
-        <div v-if="activeTab !== 'chatbot'" class="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-surface-700">
-          <button type="submit" class="inline-flex items-center rounded-lg btn-primary transition-colors shadow-sm">
-            {{ t('Save Changes') }}
-          </button>
-        </div>
-      </form>
+              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800/70">
+                <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Model Selection') }}</h3>
+                <div class="mt-4 flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                  <div>
+                    <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Allow users to select AI model') }}</div>
+                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Shows a model picker in the chat input area.') }}</div>
+                  </div>
+                  <button type="button" role="switch" :aria-checked="cs.allow_model_select" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.allow_model_select ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.allow_model_select = !cs.allow_model_select">
+                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.allow_model_select ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                  </button>
+                </div>
+                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div v-if="cs.allow_model_select" class="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show friendly model names') }}</div>
+                      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Display simplified names like ChatGPT or Claude in the picker.') }}</div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="cs.show_friendly_model_names" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.show_friendly_model_names ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.show_friendly_model_names = !cs.show_friendly_model_names">
+                      <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.show_friendly_model_names ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                    </button>
+                  </div>
+                  <div :class="cs.allow_model_select ? '' : 'md:col-span-2'">
+                    <AppSelect
+                      v-model="cs.default_chat_model"
+                      :label="t('Default model')"
+                      :options="chatModelOptions"
+                      :placeholder="t('Select default model')"
+                      live-search
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800/70">
+                <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Token Tracking') }}</h3>
+                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show token usage') }}</div>
+                      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Display token usage below each AI message.') }}</div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="cs.show_token_usage" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.show_token_usage ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.show_token_usage = !cs.show_token_usage">
+                      <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.show_token_usage ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                    </button>
+                  </div>
+                  <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-white p-4 dark:border-surface-800 dark:bg-surface-900">
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show credits charged') }}</div>
+                      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Display credits deducted below each AI message.') }}</div>
+                    </div>
+                    <button type="button" role="switch" :aria-checked="cs.show_credits_charged" class="relative inline-flex h-6 w-11 rounded-full transition" :class="cs.show_credits_charged ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="cs.show_credits_charged = !cs.show_credits_charged">
+                      <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="cs.show_credits_charged ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </form>
+      </div>
     </div>
   </AdminLayout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { router } from '@inertiajs/vue3'
+import { computed, onMounted, ref } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import AppColorPicker from '@/Components/AppColorPicker.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { FONT_FAMILY_SELECT_OPTIONS } from '@/config/fontFamilies'
+
+type BundledTool = {
+  slug: string
+  name: string
+  icon: string | null
+  is_active: boolean
+}
+
+type TemplateRecord = {
+  slug: string
+  name: string
+  tagline?: string | null
+  icon?: string | null
+  layout_component: string
+  color_primary?: string | null
+  color_secondary?: string | null
+  color_bg?: string | null
+  color_surface?: string | null
+  color_text?: string | null
+  font_heading?: string | null
+  font_body?: string | null
+  hero_headline?: string | null
+  hero_subheadline?: string | null
+  hero_cta_text?: string | null
+  hero_cta_url?: string | null
+  custom_css?: string | null
+  custom_html_head?: string | null
+  custom_html_body?: string | null
+  meta_title?: string | null
+  meta_description?: string | null
+}
+
+type ChatbotSettings = {
+  hide_site_header: boolean
+  hide_site_footer: boolean
+  allow_guest_messages: boolean
+  guest_max_messages: number
+  guest_max_tokens: number
+  free_credits_per_message: number
+  free_max_tokens: number
+  free_max_chat_history: number
+  free_max_file_size_mb: number
+  pro_credits_per_message: number
+  pro_max_tokens: number
+  pro_max_file_size_mb: number
+  pro_unlimited_history: boolean
+  show_token_usage: boolean
+  show_credits_charged: boolean
+  allow_model_select: boolean
+  show_friendly_model_names: boolean
+  default_chat_model: string
+}
+
+type TabKey = 'appearance' | 'content' | 'code' | 'seo' | 'tools' | 'chatbot'
 
 const { t } = useTranslate()
 
 const props = defineProps<{
-  template: Record<string, any>
-  bundled_tools: Array<{ slug: string; name: string; icon: string | null; is_active: boolean }>
+  template: TemplateRecord
+  bundled_tools: BundledTool[]
   missing_tool_slugs: string[]
-  chatbotSettings?: Record<string, any>
+  chatbotSettings?: Partial<ChatbotSettings>
   chatModels?: Record<string, string>
 }>()
 
-const tabs = [
-  { key: 'appearance', label: t('Appearance') },
-  { key: 'content', label: t('Content') },
-  { key: 'code', label: t('Custom Code') },
-  { key: 'seo', label: t('SEO') },
-  { key: 'tools', label: t('Tools') },
-  ...(props.template.slug === 'ai-chatbot' ? [{ key: 'chatbot', label: t('Chatbot Settings') }] : []),
-]
+const tabs = computed<Array<{ key: TabKey; label: string; icon: string }>>(() => ([
+  { key: 'appearance', label: t('Appearance'), icon: 'ti ti-palette' },
+  { key: 'content', label: t('Content'), icon: 'ti ti-text-caption' },
+  { key: 'code', label: t('Custom Code'), icon: 'ti ti-code' },
+  { key: 'seo', label: t('SEO'), icon: 'ti ti-world-search' },
+  { key: 'tools', label: t('Tools'), icon: 'ti ti-tool' },
+  ...(props.template.slug === 'ai-chatbot'
+    ? [{ key: 'chatbot' as TabKey, label: t('Chatbot Settings'), icon: 'ti ti-message-2-cog' }]
+    : []),
+]))
 
-const activeTab = ref('appearance')
+const activeTab = ref<TabKey>('appearance')
+const pageTitle = computed(() => t('Template Editor'))
+const metaTitleLength = computed(() => form.value.meta_title.length)
+const metaDescriptionLength = computed(() => form.value.meta_description.length)
+const fontFamilyOptions = computed(() => FONT_FAMILY_SELECT_OPTIONS)
+const chatModelOptions = computed(() =>
+  Object.entries(props.chatModels ?? {}).map(([value, label]) => ({ value, label }))
+)
 
 const form = ref({
   name: props.template.name ?? '',
@@ -313,13 +486,13 @@ const form = ref({
 })
 
 function save() {
-  router.post(route('admin.site-templates.update', props.template.slug), form.value, {
+  router.post(route('admin.ai.templates.update', props.template.slug), form.value, {
     preserveScroll: true,
   })
 }
 
 function resetToDefaults() {
-  router.post(route('admin.site-templates.reset', props.template.slug), {}, {
+  router.post(route('admin.ai.templates.reset', props.template.slug), {}, {
     preserveScroll: true,
     onSuccess: () => {
       form.value.color_primary = ''
@@ -333,13 +506,13 @@ function resetToDefaults() {
   })
 }
 
-const cs = ref({
+const cs = ref<ChatbotSettings>({
   hide_site_header: false,
   hide_site_footer: false,
   allow_guest_messages: false,
   guest_max_messages: 3,
   guest_max_tokens: 500,
-  free_credits_per_message: 1.0,
+  free_credits_per_message: 1,
   free_max_tokens: 2000,
   free_max_chat_history: 30,
   free_max_file_size_mb: 5,
@@ -361,7 +534,7 @@ onMounted(() => {
 })
 
 function saveChatbotSettings() {
-  router.post(route('admin.site-templates.chatbot-settings', props.template.slug), cs.value, {
+  router.post(route('admin.ai.templates.chatbot-settings', props.template.slug), cs.value, {
     preserveScroll: true,
   })
 }

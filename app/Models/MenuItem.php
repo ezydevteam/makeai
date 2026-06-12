@@ -14,6 +14,8 @@ class MenuItem extends Model
         'badge_color', 'is_active', 'requires_auth', 'mega_menu', 'mega_menu_content', 'sort_order',
     ];
 
+    protected $appends = ['final_url'];
+
     protected $casts = [
         'is_active' => 'boolean',
         'mega_menu' => 'boolean',

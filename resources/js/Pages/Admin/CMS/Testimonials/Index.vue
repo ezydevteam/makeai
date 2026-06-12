@@ -21,7 +21,7 @@ interface Testimonial {
     is_active: boolean
     is_featured: boolean
     sort_order: number
-    source: 'manual' | 'google' | 'trustpilot' | 'import'
+    source: 'manual' | 'google' | 'trustpilot' | 'import' | 'ai'
 }
 
 interface TestimonialForm {
@@ -49,7 +49,7 @@ const aiGenerating = ref(false)
 const editingId = ref<number | null>(null)
 const deleteTargetId = ref<number | null>(null)
 const openActionMenuId = ref<number | null>(null)
-const actionMenuPosition = ref({ top: 0, left: 0 })
+const actionMenuPosition = ref({ top: 0, left: 0, placement: 'bottom' as 'top' | 'bottom' })
 const importInput = ref<HTMLInputElement | null>(null)
 const avatarPreview = ref<string | null>(null)
 
@@ -79,6 +79,7 @@ const sourceOptions = [
     { value: 'google', label: t('Google') },
     { value: 'trustpilot', label: t('Trustpilot') },
     { value: 'import', label: t('Import') },
+    { value: 'ai', label: t('AI') },
 ]
 
 const sourceClasses: Record<Testimonial['source'], string> = {
@@ -86,6 +87,7 @@ const sourceClasses: Record<Testimonial['source'], string> = {
     google: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
     trustpilot: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
     import: 'bg-gray-100 text-gray-700 dark:bg-surface-800 dark:text-gray-300',
+    ai: 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300',
 }
 
 const blank = (): TestimonialForm => ({
@@ -218,11 +220,19 @@ const toggleActionMenu = async (id: number, event: MouseEvent) => {
     }
 
     const rect = trigger.getBoundingClientRect()
+    const menuWidth = 176
+    const menuHeight = 170
+    const menuOffset = 8
+    const viewportPadding = 12
+    const hasBottomSpace = window.innerHeight - rect.bottom >= menuHeight + viewportPadding
 
     openActionMenuId.value = id
     actionMenuPosition.value = {
-        top: rect.bottom + window.scrollY + 8,
-        left: rect.right + window.scrollX,
+        top: hasBottomSpace
+            ? rect.bottom + menuOffset
+            : Math.max(viewportPadding, rect.top - menuHeight - menuOffset),
+        left: Math.max(viewportPadding, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - viewportPadding)),
+        placement: hasBottomSpace ? 'bottom' : 'top',
     }
 
     await nextTick()
@@ -306,6 +316,7 @@ const sourceLabel = (source: Testimonial['source']) => {
         google: t('Google'),
         trustpilot: t('Trustpilot'),
         import: t('Import'),
+        ai: t('AI'),
     })[source]
 }
 
@@ -369,18 +380,10 @@ const generateTestimonials = async () => {
                         class="hidden"
                         @change="handleImport"
                     >
-                    <Tooltip :content="t('Homepage Builder')" placement="top">
-                        <Link
-                            :href="route('admin.homepage.index')"
-                            class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                        >
-                            <i class="ti ti-layout-dashboard text-lg"></i>
-                        </Link>
-                    </Tooltip>
                     <Tooltip :content="t('Import CSV')" placement="top">
                         <button
                             type="button"
-                            class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                             @click="importFile"
                         >
                             <i class="ti ti-file-import text-lg"></i>
@@ -389,7 +392,7 @@ const generateTestimonials = async () => {
                     <Tooltip :content="t('AI Generate')" placement="top">
                         <button
                             type="button"
-                            class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
+                            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
                             @click="showAiForm = true"
                         >
                             <i class="ti ti-sparkles text-lg"></i>
@@ -397,7 +400,7 @@ const generateTestimonials = async () => {
                     </Tooltip>
                     <button
                         type="button"
-                        class="btn-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                        class="btn-primary"
                         @click="openCreate"
                     >
                         <i class="ti ti-plus text-base"></i>
@@ -429,7 +432,7 @@ const generateTestimonials = async () => {
                 </div>
             </div>
 
-            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+            <div class="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
                 <div v-if="sortedTestimonials.length === 0" class="px-6 py-16 text-center">
                     <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl dark:bg-emerald-900/20">
                         <span>💬</span>
@@ -552,7 +555,7 @@ const generateTestimonials = async () => {
                                                 :style="{
                                                     top: `${actionMenuPosition.top}px`,
                                                     left: `${actionMenuPosition.left}px`,
-                                                    transform: 'translateX(-100%)',
+                                                    transformOrigin: actionMenuPosition.placement === 'bottom' ? 'top right' : 'bottom right',
                                                 }"
                                             >
                                                 <button
@@ -870,12 +873,11 @@ const generateTestimonials = async () => {
 
                     <div>
                         <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Tone') }}</label>
-                        <select
+                        <AppSelect
                             v-model="aiForm.tone"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                            <option v-for="option in toneOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-                        </select>
+                            :options="toneOptions"
+                            :placeholder="t('Select tone')"
+                        />
                     </div>
 
                     <div>

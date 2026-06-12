@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm } from '@inertiajs/vue3'
+import { VueDraggable } from 'vue-draggable-plus'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -28,20 +29,10 @@ interface HomepageSettings {
         meta_description: string
         og_image: string
     }
-    preloader: {
-        enabled: boolean
-        animation_url: string
-    }
     scroll_to_top: {
         enabled: boolean
         position: 'left' | 'right'
         show_after_px: number
-    }
-    cookie_consent: {
-        enabled: boolean
-        message: string
-        accept_text: string
-        policy_url: string
     }
     chat_widget_embed: string
 }
@@ -103,14 +94,13 @@ const settingsModalOpen = ref(false)
 const mobilePreview = ref(false)
 const editingSection = ref<EditingSection | null>(null)
 const removeTargetIndex = ref<number | null>(null)
-const draggedIndex = ref<number | null>(null)
-const dragOverIndex = ref<number | null>(null)
-const dragPosition = ref({ x: 0, y: 0 })
+const importJsonText = ref('')
+const showImportModal = ref(false)
+const isDragging = ref(false)
 
 const availableSections = computed(() => sectionCatalog.filter((section) => props.sectionTypes.includes(section.type)))
 
 const enabledSectionsCount = computed(() => form.sections.filter((section) => section.enabled).length)
-const draggedSection = computed(() => draggedIndex.value === null ? null : form.sections[draggedIndex.value] ?? null)
 
 const getSectionMeta = (type: SectionType): SectionMeta => sectionCatalog.find((section) => section.type === type) ?? sectionCatalog[0]
 const configLabel = (key: string | number): string => t(String(key).replaceAll('_', ' '))
@@ -127,65 +117,36 @@ const openPreview = () => {
     window.open(route('home'), '_blank', 'noopener,noreferrer')
 }
 
-const moveDraggedSection = (targetIndex: number) => {
-    if (draggedIndex.value === null || draggedIndex.value === targetIndex) {
-        draggedIndex.value = null
-        dragOverIndex.value = null
-        return
+const resetToDefaults = () => {
+    if (!confirm(t('Reset all homepage sections and settings to defaults? This cannot be undone.'))) return
+    form.sections = JSON.parse(JSON.stringify(props.config.sections))
+    form.settings = JSON.parse(JSON.stringify(props.config.settings))
+}
+
+const exportConfig = () => {
+    const data = {
+        sections: form.sections,
+        settings: form.settings,
     }
-
-    const sourceIndex = draggedIndex.value
-    const movedSection = form.sections.splice(sourceIndex, 1)[0]
-    const adjustedTargetIndex = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex
-    form.sections.splice(adjustedTargetIndex, 0, movedSection)
-    draggedIndex.value = null
-    dragOverIndex.value = null
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'homepage-config.json'
+    a.click()
+    URL.revokeObjectURL(url)
 }
 
-const startPointerDrag = (event: PointerEvent, index: number) => {
-    const target = event.target as HTMLElement
-
-    if (target.closest('button')) return
-
-    draggedIndex.value = index
-    dragOverIndex.value = index
-    dragPosition.value = { x: event.clientX, y: event.clientY }
-    window.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('pointerup', onPointerUp, { once: true })
-}
-
-const onPointerMove = (event: PointerEvent) => {
-    if (draggedIndex.value === null) return
-    dragPosition.value = { x: event.clientX, y: event.clientY }
-}
-
-const onPointerUp = () => {
-    moveDraggedSection(dragOverIndex.value ?? draggedIndex.value ?? 0)
-    window.removeEventListener('pointermove', onPointerMove)
-}
-
-const onDragOver = (index: number) => {
-    if (draggedIndex.value === null) return
-    dragOverIndex.value = index
-}
-
-const onCardDragOver = (index: number) => {
-    if (draggedIndex.value === null) return
-    dragOverIndex.value = index > draggedIndex.value ? index + 1 : index
-}
-
-const moveSectionUp = (index: number) => {
-    if (index === 0) return
-    const previous = form.sections[index - 1]
-    form.sections[index - 1] = form.sections[index]
-    form.sections[index] = previous
-}
-
-const moveSectionDown = (index: number) => {
-    if (index >= form.sections.length - 1) return
-    const next = form.sections[index + 1]
-    form.sections[index + 1] = form.sections[index]
-    form.sections[index] = next
+const importConfig = () => {
+    try {
+        const data = JSON.parse(importJsonText.value)
+        if (Array.isArray(data.sections)) form.sections = data.sections
+        if (data.settings) form.settings = { ...form.settings, ...data.settings }
+        importJsonText.value = ''
+        showImportModal.value = false
+    } catch (e) {
+        alert(t('Invalid JSON format.'))
+    }
 }
 
 const toggleSection = (index: number) => {
@@ -340,6 +301,13 @@ const setHomepageTemplate = (slug: string) => {
                     <button @click="mobilePreview = !mobilePreview" type="button" :class="mobilePreview ? 'btn-primary' : 'bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700'" class="px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">
                         {{ mobilePreview ? t('Mobile Preview On') : t('Mobile Preview') }}
                     </button>
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Export JSON')" @click="exportConfig">
+                        <i class="ti ti-file-export text-base"></i>
+                    </button>
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Import JSON')" @click="showImportModal = true">
+                        <i class="ti ti-file-import text-base"></i>
+                    </button>
+                    <button type="button" class="px-4 py-2 border border-gray-200 dark:border-surface-700 text-gray-600 dark:text-gray-400 rounded-lg text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-colors" @click="resetToDefaults">{{ t('Reset') }}</button>
                     <button @click="settingsModalOpen = true" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-all shadow-sm">{{ t('General Settings') }}</button>
                     <button @click="openPreview" type="button" class="px-4 py-2.5 bg-white dark:bg-surface-900 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-bold hover:bg-gray-50 dark:hover:bg-surface-800 transition-all shadow-sm">{{ t('Live Preview') }}</button>
                     <button @click="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
@@ -395,19 +363,10 @@ const setHomepageTemplate = (slug: string) => {
                             <button @click="addSectionModalOpen = true" type="button" class="px-4 py-2 btn-primary rounded-lg text-sm font-bold">{{ t('Add first section') }}</button>
                         </div>
 
-                        <div class="space-y-2">
-                            <template v-for="(section, index) in form.sections" :key="section.id">
-                                <div
-                                    @pointerenter="onDragOver(index)"
-                                    :class="draggedIndex !== null && dragOverIndex === index ? 'h-14 border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 shadow-sm' : draggedIndex !== null ? 'h-8 border-gray-300 dark:border-surface-600 bg-gray-50 dark:bg-surface-800 text-gray-400 dark:text-gray-500' : 'h-3 border-transparent text-transparent'"
-                                    class="flex items-center justify-center rounded-xl border-2 border-dashed text-xs font-black uppercase tracking-widest transition-all duration-150"
-                                >
-                                    {{ t('Drop section here') }}
-                                </div>
-                                <div @pointerdown="startPointerDrag($event, index)" @pointerenter="onCardDragOver(index)" :class="draggedIndex === index ? 'border-primary-500 bg-white dark:bg-surface-900 ring-2 ring-primary-500 ring-dashed shadow-xl opacity-60' : section.enabled ? 'border-primary-200 bg-primary-50 dark:border-primary-900/50 dark:bg-surface-900' : 'border-gray-200 bg-gray-50 dark:border-surface-700 dark:bg-surface-800'" class="group flex items-center gap-4 rounded-2xl border p-4 transition-all hover:shadow-md cursor-grab active:cursor-grabbing select-none touch-none">
-                                <div class="flex flex-col gap-1 text-gray-400">
-                                    <button @click.prevent="moveSectionUp(index)" :disabled="index === 0" class="hover:text-primary-500 disabled:opacity-30 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></button>
-                                    <button @click.prevent="moveSectionDown(index)" :disabled="index === form.sections.length - 1" class="hover:text-primary-500 disabled:opacity-30 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg></button>
+                        <VueDraggable v-model="form.sections" handle=".drag-handle" ghostClass="opacity-50" :animation="150" @start="isDragging = true" @end="isDragging = false" class="space-y-2">
+                            <div v-for="(section, index) in form.sections" :key="section.id" :class="section.enabled ? 'border-primary-200 bg-primary-50 dark:border-primary-900/50 dark:bg-surface-900' : 'border-gray-200 bg-gray-50 dark:border-surface-700 dark:bg-surface-800'" class="group flex items-center gap-4 rounded-2xl border p-4 transition-all hover:shadow-md">
+                                <div class="drag-handle cursor-grab active:cursor-grabbing text-gray-400 hover:text-primary-500 transition-colors shrink-0">
+                                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16" /></svg>
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">
@@ -424,27 +383,8 @@ const setHomepageTemplate = (slug: string) => {
                                     <button @click="editSection(index)" type="button" class="w-9 h-9 flex items-center justify-center rounded-lg bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:border-primary-300 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
                                     <button @click="removeSection(index)" :disabled="section.core" type="button" class="w-9 h-9 flex items-center justify-center rounded-lg bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 text-danger-500 hover:bg-danger-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                                 </div>
-                                </div>
-                            </template>
-                            <div
-                                @pointerenter="onDragOver(form.sections.length)"
-                                :class="draggedIndex !== null && dragOverIndex === form.sections.length ? 'h-14 border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 shadow-sm' : draggedIndex !== null ? 'h-8 border-gray-300 dark:border-surface-600 bg-gray-50 dark:bg-surface-800 text-gray-400 dark:text-gray-500' : 'h-3 border-transparent text-transparent'"
-                                class="flex items-center justify-center rounded-xl border-2 border-dashed text-xs font-black uppercase tracking-widest transition-all duration-150"
-                            >
-                                {{ t('Drop section here') }}
                             </div>
-                            <div v-if="draggedSection" :style="{ left: `${dragPosition.x + 18}px`, top: `${dragPosition.y + 18}px` }" class="fixed z-[9999] pointer-events-none w-[420px] max-w-[calc(100vw-2rem)] rounded-2xl border-2 border-primary-500 bg-white dark:bg-surface-900 p-4 shadow-2xl shadow-primary-900/20 ring-2 ring-primary-500 ring-dashed">
-                                <div class="flex items-center gap-4">
-                                    <div class="text-gray-400">
-                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" /></svg>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="font-bold text-sm text-gray-900 dark:text-white truncate">{{ getSectionMeta(draggedSection.type).label }}</div>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{{ getSectionMeta(draggedSection.type).description }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        </VueDraggable>
                     </div>
                 </div>
 
@@ -593,11 +533,6 @@ const setHomepageTemplate = (slug: string) => {
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-surface-800">
-                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Preloader') }}</span>
-                            <input v-model="form.settings.preloader.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
-                        </label>
-                        <input v-model="form.settings.preloader.animation_url" type="text" :placeholder="t('Lottie/GIF URL')" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-surface-800">
                             <span class="text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Scroll to top') }}</span>
                             <input v-model="form.settings.scroll_to_top.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
                         </label>
@@ -609,24 +544,19 @@ const setHomepageTemplate = (slug: string) => {
                             <input v-model.number="form.settings.scroll_to_top.show_after_px" type="number" min="0" max="5000" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
                         </div>
                     </div>
-                    <div class="space-y-4">
-                        <label class="flex items-center justify-between p-4 rounded-xl bg-gray-50 dark:bg-surface-800">
-                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">{{ t('Cookie consent banner') }}</span>
-                            <input v-model="form.settings.cookie_consent.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
-                        </label>
-                        <input v-model="form.settings.cookie_consent.message" type="text" :placeholder="t('Cookie message')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input v-model="form.settings.cookie_consent.accept_text" type="text" :placeholder="t('Accept button text')" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                            <input v-model="form.settings.cookie_consent.policy_url" type="text" :placeholder="t('Cookie policy URL')" class="bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                    </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Chat Widget Embed') }}</label>
                         <textarea v-model="form.settings.chat_widget_embed" rows="5" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white font-mono"></textarea>
                     </div>
+                    <div class="pt-3 border-t border-gray-100 dark:border-surface-800">
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Cookie consent banner is configured in') }} <Link :href="route('admin.gdpr.settings')" class="font-bold text-primary-600 hover:underline">{{ t('Settings → GDPR') }}</Link>.</p>
+                    </div>
                 </div>
-                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end">
-                    <button @click="settingsModalOpen = false" type="button" class="px-5 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all">{{ t('Done') }}</button>
+                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
+                    <button @click="settingsModalOpen = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">{{ t('Cancel') }}</button>
+                    <button @click="submit(); settingsModalOpen = false" type="button" :disabled="form.processing" class="px-5 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
+                        {{ form.processing ? t('Saving...') : t('Save Settings') }}
+                    </button>
                 </div>
             </div>
         </div>
@@ -643,7 +573,7 @@ const setHomepageTemplate = (slug: string) => {
                     </p>
                     <a
                         v-if="props.activeHomepageTemplate !== 'default'"
-                        :href="route('admin.site-templates.edit', props.activeHomepageTemplate)"
+                        :href="route('admin.ai.templates.edit', props.activeHomepageTemplate)"
                         class="inline-flex items-center gap-2 mt-4 px-4 py-2 btn-primary rounded-lg text-sm font-bold transition-colors"
                     >
                         {{ t('Edit Template Settings') }}
@@ -660,5 +590,19 @@ const setHomepageTemplate = (slug: string) => {
             @cancel="removeTargetIndex = null"
             @confirm="confirmRemoveSection"
         />
+
+        <!-- Import Modal -->
+        <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <div class="p-6 overflow-y-auto">
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">{{ t('Import Homepage Configuration') }}</h3>
+                    <textarea v-model="importJsonText" rows="10" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Paste JSON here...')"></textarea>
+                    <div class="mt-6 flex items-center justify-end gap-3">
+                        <button @click="showImportModal = false" class="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">{{ t('Cancel') }}</button>
+                        <button @click="importConfig" class="rounded-lg btn-primary px-4 py-2 text-sm font-bold">{{ t('Import') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </AdminLayout>
 </template>

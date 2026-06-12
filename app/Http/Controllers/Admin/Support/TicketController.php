@@ -120,14 +120,12 @@ class TicketController extends Controller
             $user,
             "Draft a helpful support reply.\n\nSubject: {$ticket->subject}\nDepartment: {$ticket->department?->name}\nCustomer: {$ticket->user?->name}\n\nConversation:\n{$history}",
             'You are a concise SaaS support agent. Return clean HTML paragraphs only, no greeting if one already exists.',
-            settings('default_ai_provider', 'openai'),
-            settings('default_ai_model', 'gpt-4o-mini'),
-            ['max_tokens' => 500, 'temperature' => 0.35]
+            options: ['max_tokens' => 500, 'temperature' => 0.35]
         );
 
         return response()->json([
             'success' => true,
-            'data' => ['content' => strip_tags($result['content'] ?? '', '<p><br><strong><em><ul><ol><li><code><pre><a>')],
+            'data' => ['content' => strip_tags($result->content ?? '', '<p><br><strong><em><ul><ol><li><code><pre><a>')],
             'message' => translate('AI reply suggestion generated.'),
         ]);
     }

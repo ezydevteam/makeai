@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { computed, ref, watch } from 'vue'
+import { Head, router, useForm } from '@inertiajs/vue3'
+import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
@@ -7,9 +11,32 @@ import { useNumberFormat } from '@/Composables/useNumberFormat'
 defineOptions({ layout: AdminLayout })
 
 interface PlanOption { id: number; name: string }
+interface AdItem {
+    id: number
+    title: string
+    type: string
+    zone: string
+    show_to: string
+    impressions: number | string | null
+    clicks: number | string | null
+    ctr: number | string
+    is_active: boolean
+    adsense_client?: string | null
+    adsense_slot?: string | null
+    adsense_format?: string | null
+    custom_html?: string | null
+    image_url?: string | null
+    link_url?: string | null
+    link_target?: string | null
+    start_at?: string | null
+    end_at?: string | null
+    sort_order?: number | null
+}
+
+type AdEditorMode = 'create' | 'edit'
 
 const props = defineProps<{
-    ads: any[]
+    ads: AdItem[]
     zones: Record<string, string>
     settings: {
         ads_enabled: boolean
@@ -19,10 +46,35 @@ const props = defineProps<{
         ads_disabled_plan_ids: number[]
     }
     plans: PlanOption[]
+    editorAd?: AdItem | null
+    editorMode?: AdEditorMode | null
 }>()
 
 const { t } = useTranslate()
 const { formatNumber } = useNumberFormat()
+const deleteTarget = ref<AdItem | null>(null)
+const settingsModalOpen = ref(false)
+const adModalOpen = ref(Boolean(props.editorMode))
+const imagePreviewUrl = ref<string | null>(props.editorAd?.image_url ?? null)
+const zoneOptions = computed<SelectOption[]>(() =>
+    Object.entries(props.zones).map(([value, label]) => ({ value, label })),
+)
+const adTypeOptions = computed<SelectOption[]>(() => [
+    { value: 'image_link', label: t('Image link') },
+    { value: 'custom_html', label: t('Custom HTML') },
+    { value: 'adsense', label: t('AdSense') },
+])
+const audienceOptions = computed<SelectOption[]>(() => [
+    { value: 'all', label: t('All visitors') },
+    { value: 'guests', label: t('Guests only') },
+    { value: 'logged_in', label: t('Logged in users') },
+    { value: 'free_users', label: t('Free users') },
+    { value: 'paid_users', label: t('Paid users') },
+])
+const linkTargetOptions = computed<SelectOption[]>(() => [
+    { value: '_blank', label: t('New tab') },
+    { value: '_self', label: t('Same tab') },
+])
 const settingsForm = useForm({
     ads_enabled: props.settings.ads_enabled,
     adsense_publisher_id: props.settings.adsense_publisher_id,
@@ -30,15 +82,62 @@ const settingsForm = useForm({
     ads_disable_for_subscribed_users: props.settings.ads_disable_for_subscribed_users,
     ads_disabled_plan_ids: props.settings.ads_disabled_plan_ids ?? [],
 })
+const adForm = useForm({
+    title: props.editorAd?.title ?? '',
+    type: props.editorAd?.type ?? 'image_link',
+    zone: props.editorAd?.zone ?? 'header_banner',
+    adsense_client: props.editorAd?.adsense_client ?? '',
+    adsense_slot: props.editorAd?.adsense_slot ?? '',
+    adsense_format: props.editorAd?.adsense_format ?? 'auto',
+    custom_html: props.editorAd?.custom_html ?? '',
+    image_file: null as File | null,
+    link_url: props.editorAd?.link_url ?? '',
+    link_target: props.editorAd?.link_target ?? '_blank',
+    show_to: props.editorAd?.show_to ?? 'all',
+    is_active: props.editorAd?.is_active ?? true,
+    start_at: props.editorAd?.start_at ? new Date(props.editorAd.start_at).toISOString().slice(0, 16) : '',
+    end_at: props.editorAd?.end_at ? new Date(props.editorAd.end_at).toISOString().slice(0, 16) : '',
+    sort_order: props.editorAd?.sort_order ?? 0,
+})
+
+const resetAdForm = (ad: AdItem | null = null) => {
+    adForm.defaults({
+        title: ad?.title ?? '',
+        type: ad?.type ?? 'image_link',
+        zone: ad?.zone ?? 'header_banner',
+        adsense_client: ad?.adsense_client ?? '',
+        adsense_slot: ad?.adsense_slot ?? '',
+        adsense_format: ad?.adsense_format ?? 'auto',
+        custom_html: ad?.custom_html ?? '',
+        image_file: null,
+        link_url: ad?.link_url ?? '',
+        link_target: ad?.link_target ?? '_blank',
+        show_to: ad?.show_to ?? 'all',
+        is_active: ad?.is_active ?? true,
+        start_at: ad?.start_at ? new Date(ad.start_at).toISOString().slice(0, 16) : '',
+        end_at: ad?.end_at ? new Date(ad.end_at).toISOString().slice(0, 16) : '',
+        sort_order: ad?.sort_order ?? 0,
+    })
+    adForm.reset()
+    adForm.clearErrors()
+    imagePreviewUrl.value = ad?.image_url ?? null
+}
 
 const toggleAd = (id: number) => {
     router.post(route('admin.ads.toggle', id), {}, { preserveScroll: true })
 }
 
-const deleteAd = (id: number) => {
-    if (confirm(t('Are you sure you want to delete this advertisement?'))) {
-        router.delete(route('admin.ads.delete', id), { preserveScroll: true })
+const deleteAd = () => {
+    if (!deleteTarget.value) {
+        return
     }
+
+    router.delete(route('admin.ads.delete', deleteTarget.value.id), {
+        preserveScroll: true,
+        onFinish: () => {
+            deleteTarget.value = null
+        },
+    })
 }
 
 const togglePlan = (planId: number) => {
@@ -47,106 +146,381 @@ const togglePlan = (planId: number) => {
         : [...settingsForm.ads_disabled_plan_ids, planId]
 }
 
-const saveSettings = () => settingsForm.post(route('admin.ads.settings'), { preserveScroll: true })
+const openCreateModal = () => {
+    resetAdForm()
+    adModalOpen.value = true
+    router.get(route('admin.ads.create'), {}, { preserveState: false, preserveScroll: true })
+}
+
+const openEditModal = (ad: AdItem) => {
+    resetAdForm(ad)
+    adModalOpen.value = true
+    router.get(route('admin.ads.edit', ad.id), {}, { preserveState: false, preserveScroll: true })
+}
+
+const closeAdModal = () => {
+    adModalOpen.value = false
+    adForm.clearErrors()
+    router.get(route('admin.ads.index'), {}, { preserveState: false, preserveScroll: true })
+}
+
+const submitAdForm = () => {
+    const url = props.editorMode === 'edit' && props.editorAd
+        ? route('admin.ads.update', props.editorAd.id)
+        : route('admin.ads.store')
+
+    adForm.transform((data) => ({
+        ...data,
+        start_at: data.start_at || null,
+        end_at: data.end_at || null,
+        adsense_client: data.adsense_client || null,
+        adsense_format: data.adsense_format || 'auto',
+    })).post(url, {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            adModalOpen.value = false
+        },
+    })
+}
+
+const handleImageUpload = (event: Event) => {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0] ?? null
+
+    adForm.image_file = file
+    adForm.clearErrors('image_file')
+    imagePreviewUrl.value = file ? URL.createObjectURL(file) : (props.editorAd?.image_url ?? null)
+}
+
+const saveSettings = () => settingsForm.post(route('admin.ads.settings'), {
+    preserveScroll: true,
+    onSuccess: () => {
+        settingsModalOpen.value = false
+    },
+})
+const adModalTitle = computed(() => props.editorMode === 'edit' ? t('Edit Advertisement') : t('Create Advertisement'))
+const adSubmitLabel = computed(() => {
+    if (adForm.processing) {
+        return t('Saving...')
+    }
+
+    return props.editorMode === 'edit' ? t('Save Ad') : t('Create Ad')
+})
+
+watch(() => props.editorAd, (ad) => {
+    resetAdForm(ad ?? null)
+})
+
+watch(() => props.editorMode, (mode) => {
+    adModalOpen.value = Boolean(mode)
+})
 </script>
 
 <template>
     <Head :title="t('Ads')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
-        <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <div class="mx-auto max-w-7xl space-y-6 px-6 py-8">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Ads') }}</h1>
-                <p class="mt-1 text-sm text-gray-500">{{ t('Manage zones, AdSense, custom HTML, image links, and audience rules.') }}</p>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Advertisements') }}</h1>
+                <p class="mt-2 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Manage ad zones, delivery rules, AdSense settings, and performance from one unified admin workspace.') }}</p>
             </div>
-            <Link :href="route('admin.ads.create')" class="rounded-lg btn-primary">
-                {{ t('Create ad') }}
-            </Link>
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" @click="settingsModalOpen = true">
+                    <i class="ti ti-settings text-base"></i>
+                    <span>{{ t('Settings') }}</span>
+                </button>
+                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all" @click="openCreateModal">
+                    <i class="ti ti-plus text-base"></i>
+                    <span>{{ t('Create Ad') }}</span>
+                </button>
+            </div>
         </div>
 
-        <form class="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900" @submit.prevent="saveSettings">
-            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Global Ad Settings') }}</h2>
-                    <p class="mt-1 text-sm text-gray-500">{{ t('Set publisher ID, auto ads, and subscriber visibility rules.') }}</p>
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-surface-800">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Advertisements') }}</h2>
+                <div class="inline-flex flex-wrap items-center gap-2 text-xs font-semibold">
+                    <span class="rounded-full bg-primary-100 px-3 py-1 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">{{ t(':count total', { count: ads.length }) }}</span>
+                    <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ settingsForm.ads_enabled ? t('Ads enabled') : t('Ads disabled') }}</span>
                 </div>
-                <button type="submit" :disabled="settingsForm.processing" class="rounded-lg btn-primary disabled:opacity-60">
-                    {{ settingsForm.processing ? t('Saving...') : t('Save settings') }}
+            </div>
+            <table class="w-full text-left text-sm">
+                <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500 dark:bg-surface-950/40 dark:text-gray-400">
+                    <tr>
+                        <th class="px-6 py-3">{{ t('Ad') }}</th>
+                        <th class="px-6 py-3">{{ t('Zone') }}</th>
+                        <th class="px-6 py-3">{{ t('Audience') }}</th>
+                        <th class="px-6 py-3 text-center">{{ t('Stats') }}</th>
+                        <th class="px-6 py-3 text-center">{{ t('Status') }}</th>
+                        <th class="px-6 py-3 text-right">{{ t('Actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                    <tr v-for="ad in ads" :key="ad.id" class="hover:bg-primary-50/30 dark:hover:bg-primary-900/10">
+                        <td class="px-6 py-4">
+                            <div class="font-semibold text-gray-900 dark:text-white">{{ ad.title }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ ad.type.replace('_', ' ') }}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ zones[ad.zone] || ad.zone }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-700 dark:text-gray-300">{{ t(String(ad.show_to).replace('_', ' ')) }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex justify-center gap-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                                <span><b class="text-gray-900 dark:text-white">{{ formatNumber(Number(ad.impressions || 0)) }}</b><br>{{ t('Impressions') }}</span>
+                                <span><b class="text-gray-900 dark:text-white">{{ formatNumber(Number(ad.clicks || 0)) }}</b><br>{{ t('Clicks') }}</span>
+                                <span><b class="text-gray-900 dark:text-white">{{ ad.ctr }}%</b><br>{{ t('CTR') }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <button type="button" :class="ad.is_active ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'bg-gray-100 text-gray-500 dark:bg-surface-800 dark:text-gray-300'" class="rounded-full px-3 py-1 text-xs font-bold" @click="toggleAd(ad.id)">
+                                {{ ad.is_active ? t('Active') : t('Paused') }}
+                            </button>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <div class="flex items-center justify-end gap-2">
+                                <Tooltip :content="t('Edit ad')" placement="top">
+                                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" @click="openEditModal(ad)">
+                                        <i class="ti ti-pencil text-base"></i>
+                                    </button>
+                                </Tooltip>
+                                <Tooltip :content="t('Delete ad')" placement="top">
+                                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300" @click="deleteTarget = ad">
+                                        <i class="ti ti-trash text-base"></i>
+                                    </button>
+                                </Tooltip>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr v-if="ads.length === 0">
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">{{ t('No advertisements found.') }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <ActionConfirmModal
+        :open="Boolean(deleteTarget)"
+        :title="t('Delete advertisement?')"
+        :message="t('Delete this advertisement permanently? This action cannot be undone.')"
+        :confirm-label="t('Delete Ad')"
+        :cancel-label="t('Cancel')"
+        variant="danger"
+        @cancel="deleteTarget = null"
+        @confirm="deleteAd"
+    />
+
+    <div v-if="adModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeAdModal">
+        <form class="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900" @submit.prevent="submitAdForm">
+            <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-5 dark:border-surface-800">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ adModalTitle }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure zone, audience, creative, schedule, and tracking behavior.') }}</p>
+                </div>
+                <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200" :aria-label="t('Close ad editor modal')" @click="closeAdModal">
+                    <i class="ti ti-x text-lg"></i>
                 </button>
             </div>
 
-            <div class="grid gap-4 lg:grid-cols-4">
-                <label class="block lg:col-span-2">
-                    <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('AdSense Publisher ID') }}</span>
-                    <input v-model="settingsForm.adsense_publisher_id" type="text" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="ca-pub-xxxxxxxx" />
+            <div class="overflow-y-auto px-6 py-6">
+                <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+                    <section class="space-y-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Admin title') }}</span>
+                                <input v-model="adForm.title" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Enter internal ad title')" />
+                                <p v-if="adForm.errors.title" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.title }}</p>
+                            </label>
+                            <div class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Ad type') }}</span>
+                                <AppSelect v-model="adForm.type" :options="adTypeOptions" :placeholder="t('Select ad type')" :error="adForm.errors.type" />
+                            </div>
+                        </div>
+
+                        <div class="block">
+                            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Zone') }}</span>
+                            <AppSelect v-model="adForm.zone" :options="zoneOptions" :placeholder="t('Select ad zone')" :error="adForm.errors.zone" />
+                        </div>
+
+                        <div v-if="adForm.type === 'image_link'" class="space-y-4">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Banner image') }}</span>
+                                <input type="file" accept="image/*" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-100 file:px-3 file:py-1.5 file:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:file:bg-primary-900/20 dark:file:text-primary-300" @change="handleImageUpload" />
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Upload JPG, PNG, WEBP, or GIF up to 5 MB.') }}</p>
+                                <div v-if="imagePreviewUrl" class="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-gray-50 dark:border-surface-700 dark:bg-surface-800">
+                                    <img :src="imagePreviewUrl" :alt="t('Ad preview')" class="h-40 w-full object-cover" />
+                                </div>
+                                <p v-if="adForm.errors.image_file" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.image_file }}</p>
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Link URL') }}</span>
+                                <input v-model="adForm.link_url" type="url" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('https://example.com/landing-page')" />
+                                <p v-if="adForm.errors.link_url" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.link_url }}</p>
+                            </label>
+                        </div>
+
+                        <div v-else-if="adForm.type === 'custom_html'">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Custom HTML or script') }}</span>
+                                <textarea v-model="adForm.custom_html" rows="10" class="w-full rounded-lg border border-gray-200 bg-gray-950 px-3 py-2 font-mono text-sm text-white dark:border-surface-700" />
+                                <p v-if="adForm.errors.custom_html" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.custom_html }}</p>
+                            </label>
+                        </div>
+
+                        <div v-else class="grid gap-4 md:grid-cols-3">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Publisher ID') }}</span>
+                                <input v-model="adForm.adsense_client" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('ca-pub-1234567890123456')" />
+                                <p v-if="adForm.errors.adsense_client" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.adsense_client }}</p>
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slot ID') }}</span>
+                                <input v-model="adForm.adsense_slot" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Enter AdSense slot ID')" />
+                                <p v-if="adForm.errors.adsense_slot" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.adsense_slot }}</p>
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Format') }}</span>
+                                <input v-model="adForm.adsense_format" type="text" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('auto')" />
+                                <p v-if="adForm.errors.adsense_format" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.adsense_format }}</p>
+                            </label>
+                        </div>
+                    </section>
+
+                    <aside class="space-y-6">
+                        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                            <div class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show to') }}</span>
+                                <AppSelect v-model="adForm.show_to" :options="audienceOptions" :placeholder="t('Select audience')" :error="adForm.errors.show_to" />
+                            </div>
+                            <div class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Link target') }}</span>
+                                <AppSelect v-model="adForm.link_target" :options="linkTargetOptions" :placeholder="t('Select link target')" :error="adForm.errors.link_target" />
+                            </div>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Sort order') }}</span>
+                                <input v-model="adForm.sort_order" type="number" min="0" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('0')" />
+                                <p v-if="adForm.errors.sort_order" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.sort_order }}</p>
+                            </label>
+                            <div class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 dark:border-surface-700">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Active') }}</div>
+                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ adForm.is_active ? t('Ad is available for delivery') : t('Ad is paused') }}</div>
+                                </div>
+                                <button type="button" :aria-pressed="adForm.is_active" :class="adForm.is_active ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200" @click="adForm.is_active = !adForm.is_active">
+                                    <span :class="adForm.is_active ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Start at') }}</span>
+                                <input v-model="adForm.start_at" type="datetime-local" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                <p v-if="adForm.errors.start_at" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.start_at }}</p>
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('End at') }}</span>
+                                <input v-model="adForm.end_at" type="datetime-local" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                <p v-if="adForm.errors.end_at" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ adForm.errors.end_at }}</p>
+                            </label>
+                        </section>
+                    </aside>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
+                <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="closeAdModal">
+                    {{ t('Cancel') }}
+                </button>
+                <button type="submit" :disabled="adForm.processing" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:opacity-60">
+                    <i class="ti ti-device-floppy text-base"></i>
+                    <span>{{ adSubmitLabel }}</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div v-if="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="settingsModalOpen = false">
+        <form class="w-full max-w-3xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900" @submit.prevent="saveSettings">
+            <div class="border-b border-gray-200 px-6 py-5 dark:border-surface-800">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Global Ad Settings') }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set publisher ID, auto ads, and subscriber visibility rules.') }}</p>
+                    </div>
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200" :aria-label="t('Close settings modal')" @click="settingsModalOpen = false">
+                        <i class="ti ti-x text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="space-y-6 px-6 py-6">
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('AdSense Publisher ID') }}</span>
+                    <input
+                        v-model="settingsForm.adsense_publisher_id"
+                        type="text"
+                        :class="settingsForm.errors.adsense_publisher_id ? 'border-red-300 focus:border-red-400 dark:border-red-800' : 'border-gray-200 dark:border-surface-700'"
+                        class="w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 dark:bg-surface-800 dark:text-white"
+                        :placeholder="t('ca-pub-1234567890123456')"
+                    />
+                    <p v-if="settingsForm.errors.adsense_publisher_id" class="mt-2 text-sm text-red-600 dark:text-red-400">
+                        {{ settingsForm.errors.adsense_publisher_id }}
+                    </p>
                 </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium">
-                    {{ t('Enable ads') }}
-                    <input v-model="settingsForm.ads_enabled" type="checkbox" />
-                </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium">
-                    {{ t('Auto ads') }}
-                    <input v-model="settingsForm.ads_auto_ads_enabled" type="checkbox" />
-                </label>
-                <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium lg:col-span-2">
-                    {{ t('Disable ads for subscribed users') }}
-                    <input v-model="settingsForm.ads_disable_for_subscribed_users" type="checkbox" />
-                </label>
-                <div class="lg:col-span-2">
-                    <span class="mb-2 block text-sm font-medium text-gray-700">{{ t('Disable ads for plans') }}</span>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                        <div>
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable ads') }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ settingsForm.ads_enabled ? t('Global ad delivery is enabled') : t('Global ad delivery is disabled') }}</div>
+                        </div>
+                        <button type="button" :aria-pressed="settingsForm.ads_enabled" :class="settingsForm.ads_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200" @click="settingsForm.ads_enabled = !settingsForm.ads_enabled">
+                            <span :class="settingsForm.ads_enabled ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                        <div>
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Auto ads') }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ settingsForm.ads_auto_ads_enabled ? t('Automatic AdSense placement is enabled') : t('Automatic AdSense placement is disabled') }}</div>
+                        </div>
+                        <button type="button" :aria-pressed="settingsForm.ads_auto_ads_enabled" :class="settingsForm.ads_auto_ads_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200" @click="settingsForm.ads_auto_ads_enabled = !settingsForm.ads_auto_ads_enabled">
+                            <span :class="settingsForm.ads_auto_ads_enabled ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800 md:col-span-2">
+                        <div>
+                            <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Disable ads for subscribed users') }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ settingsForm.ads_disable_for_subscribed_users ? t('Subscribed users will not see ads') : t('Subscribed users can still see ads') }}</div>
+                        </div>
+                        <button type="button" :aria-pressed="settingsForm.ads_disable_for_subscribed_users" :class="settingsForm.ads_disable_for_subscribed_users ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200" @click="settingsForm.ads_disable_for_subscribed_users = !settingsForm.ads_disable_for_subscribed_users">
+                            <span :class="settingsForm.ads_disable_for_subscribed_users ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Disable ads for plans') }}</span>
                     <div class="flex flex-wrap gap-2">
-                        <button v-for="plan in plans" :key="plan.id" type="button" :class="settingsForm.ads_disabled_plan_ids.includes(plan.id) ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'" class="rounded-full px-3 py-1 text-xs font-bold" @click="togglePlan(plan.id)">
+                        <button v-for="plan in plans" :key="plan.id" type="button" :class="settingsForm.ads_disabled_plan_ids.includes(plan.id) ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'" class="rounded-full px-3 py-1 text-xs font-bold" @click="togglePlan(plan.id)">
                             {{ plan.name }}
                         </button>
                     </div>
                 </div>
             </div>
-        </form>
 
-        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-            <table class="w-full text-left text-sm">
-                <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                    <tr>
-                        <th class="px-4 py-3">{{ t('Ad') }}</th>
-                        <th class="px-4 py-3">{{ t('Zone') }}</th>
-                        <th class="px-4 py-3">{{ t('Audience') }}</th>
-                        <th class="px-4 py-3 text-center">{{ t('Stats') }}</th>
-                        <th class="px-4 py-3 text-center">{{ t('Status') }}</th>
-                        <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="ad in ads" :key="ad.id" class="border-t border-gray-100 hover:bg-primary-50/30">
-                        <td class="px-4 py-3">
-                            <div class="font-semibold text-gray-900">{{ ad.title }}</div>
-                            <div class="text-xs text-gray-500">{{ ad.type.replace('_', ' ') }}</div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-600">{{ zones[ad.zone] || ad.zone }}</span>
-                        </td>
-                        <td class="px-4 py-3">{{ t(String(ad.show_to).replace('_', ' ')) }}</td>
-                        <td class="px-4 py-3">
-                            <div class="flex justify-center gap-4 text-center text-xs">
-                                <span><b>{{ formatNumber(Number(ad.impressions || 0)) }}</b><br>{{ t('Impressions') }}</span>
-                                <span><b>{{ formatNumber(Number(ad.clicks || 0)) }}</b><br>{{ t('Clicks') }}</span>
-                                <span><b>{{ ad.ctr }}%</b><br>{{ t('CTR') }}</span>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <button type="button" :class="ad.is_active ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'" class="rounded-full px-3 py-1 text-xs font-bold" @click="toggleAd(ad.id)">
-                                {{ ad.is_active ? t('Active') : t('Paused') }}
-                            </button>
-                        </td>
-                        <td class="px-4 py-3 text-right">
-                            <Link :href="route('admin.ads.edit', ad.id)" class="mr-2 rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 hover:border-primary-300">{{ t('Edit') }}</Link>
-                            <button type="button" class="rounded-lg bg-red-500 px-3 py-1 text-xs font-semibold text-white" @click="deleteAd(ad.id)">{{ t('Delete') }}</button>
-                        </td>
-                    </tr>
-                    <tr v-if="ads.length === 0">
-                        <td colspan="6" class="px-4 py-12 text-center text-gray-400">{{ t('No advertisements found.') }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+            <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
+                <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="settingsModalOpen = false">
+                    {{ t('Cancel') }}
+                </button>
+                <button type="submit" :disabled="settingsForm.processing" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:opacity-60">
+                    <i class="ti ti-device-floppy text-base"></i>
+                    <span>{{ settingsForm.processing ? t('Saving...') : t('Save Settings') }}</span>
+                </button>
+            </div>
+        </form>
     </div>
 </template>

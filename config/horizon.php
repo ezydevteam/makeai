@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'name' => env('HORIZON_NAME'),
+    'name' => env('HORIZON_NAME', settings('app_name', config('app.name'))),
 
     /*
     |--------------------------------------------------------------------------

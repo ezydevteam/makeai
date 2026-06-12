@@ -23,7 +23,7 @@ class FaqGenerateRequest extends FormRequest
         return [
             'topic' => ['required', 'string', 'max:160'],
             'prompt' => ['nullable', 'string', 'max:1000'],
-            'count' => ['required', 'integer', 'min:5', 'max:20'],
+            'count' => ['required', 'integer', 'min:1', 'max:20'],
             'category_id' => ['nullable', 'integer', 'exists:faq_categories,id'],
         ];
     }

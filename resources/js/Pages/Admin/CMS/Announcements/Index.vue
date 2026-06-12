@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppColorPicker from '@/Components/AppColorPicker.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -69,18 +71,30 @@ const blank = (): Omit<Announcement, 'id'> => ({
 
 const form = useForm(blank())
 const searchQuery = ref(props.filters.search || '')
+const audienceFilter = ref('all')
+const statusFilter = ref('all')
+const filteredAnnouncements = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
 
-const applySearch = () => {
-    router.get(route('admin.announcements.index'), {
-        search: searchQuery.value || undefined,
-    }, { preserveScroll: true, preserveState: true, replace: true })
-}
+    return props.announcements.data.filter((announcement) => {
+        const matchesAudience = audienceFilter.value === 'all' || announcement.target_audience === audienceFilter.value
+        const matchesStatus = statusFilter.value === 'all'
+            || (statusFilter.value === 'active' && announcement.is_active)
+            || (statusFilter.value === 'inactive' && !announcement.is_active)
 
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-const onSearchInput = () => {
-    if (searchTimer) clearTimeout(searchTimer)
-    searchTimer = setTimeout(applySearch, 400)
-}
+        const haystacks = [
+            announcement.title ?? '',
+            announcement.content ?? '',
+            announcement.type ?? '',
+            announcement.target_audience ?? '',
+            announcement.show_frequency ?? '',
+        ]
+
+        const matchesSearch = !query || haystacks.some((value) => value.toLowerCase().includes(query))
+
+        return matchesAudience && matchesStatus && matchesSearch
+    })
+})
 
 const openCreate = () => {
     form.reset()
@@ -154,248 +168,253 @@ const typeColor: Record<string, string> = {
     popup: 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400',
     notification: 'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400',
 }
+
+const typeOptions = computed(() => [
+    { value: 'topbar', label: t('Top Bar (Banner)') },
+    { value: 'popup', label: t('Popup Modal') },
+    { value: 'notification', label: t('In-App Notification') },
+])
+
+const audienceOptions = computed(() => [
+    { value: 'all', label: t('Everyone') },
+    { value: 'guests', label: t('Guests Only') },
+    { value: 'auth', label: t('Logged In Users') },
+    { value: 'free', label: t('Free Users') },
+    { value: 'pro', label: t('Pro Users') },
+])
+
+const triggerTypeOptions = computed(() => [
+    { value: '', label: t('On Load') },
+    { value: 'delay', label: t('Delay') },
+    { value: 'scroll', label: t('Scroll %') },
+    { value: 'exit', label: t('Exit Intent') },
+])
+
+const frequencyOptions = computed(() => [
+    { value: 'always', label: t('Always Show') },
+    { value: 'session', label: t('Once per session') },
+    { value: 'once', label: t('Once per user') },
+])
+
+const audienceFilterOptions = computed(() => [
+    { value: 'all', label: t('All audiences') },
+    ...audienceOptions.value.filter((option) => option.value !== 'all'),
+])
+
+const statusFilterOptions = computed(() => [
+    { value: 'all', label: t('All statuses') },
+    { value: 'active', label: t('Active') },
+    { value: 'inactive', label: t('Inactive') },
+])
 </script>
 
 <template>
     <Head :title="t('Announcements - Admin')" />
     <AdminLayout>
-        <div class="max-w-7xl mx-auto px-6 py-8">
-
-            <!-- Header -->
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-8">
+        <div class="mx-auto max-w-7xl px-6 py-8">
+            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Announcements') }}</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Manage sitewide banners, popups, and in-app notifications.') }}</p>
+                    <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Announcements') }}</h1>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage sitewide banners, popups, and in-app notifications.') }}</p>
                 </div>
                 <div class="flex items-center gap-3">
-                    <button @click="openCreate" type="button" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-600/20">
-                        {{ t('+ Add Announcement') }}
+                    <button @click="openCreate" type="button" class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm">
+                        <i class="ti ti-plus text-base"></i>
+                        <span>{{ t('Add Announcement') }}</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Stats bar -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-gray-900 dark:text-white">{{ props.totalCount }}</div>
-                    <div class="text-xs text-gray-500 mt-1">{{ t('Total') }}</div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-success-600">{{ props.activeCount }}</div>
-                    <div class="text-xs text-gray-500 mt-1">{{ t('Active') }}</div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-blue-600">{{ props.topbarCount }}</div>
-                    <div class="text-xs text-gray-500 mt-1">{{ t('Top Bars') }}</div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5">
-                    <div class="text-2xl font-black text-purple-600">{{ props.popupCount }}</div>
-                    <div class="text-xs text-gray-500 mt-1">{{ t('Popups') }}</div>
-                </div>
-            </div>
-
-            <!-- Search -->
-            <div class="mb-6">
-                <div class="relative max-w-md">
-                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                        </svg>
-                    </span>
-                    <input
-                        v-model="searchQuery"
-                        type="text"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                        :placeholder="t('Search announcements...')"
-                        @input="onSearchInput"
-                    />
-                    <button
-                        v-if="searchQuery"
-                        type="button"
-                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
-                        @click="searchQuery = ''; applySearch()"
-                    >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Empty state -->
-            <div v-if="announcements.data.length === 0" class="bg-white dark:bg-surface-900 rounded-2xl border-2 border-dashed border-gray-200 dark:border-surface-700 p-16 text-center">
-                <div class="text-5xl mb-4">📢</div>
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">{{ t('No announcements yet') }}</h3>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ t('Create promotional banners or important notices for your users.') }}</p>
-                <button @click="openCreate" type="button" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all">{{ t('Add first announcement') }}</button>
-            </div>
-
-            <!-- Announcements list -->
-            <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                <div
-                    v-for="a in announcements.data"
-                    :key="a.id"
-                    class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-100 dark:border-surface-800 p-5 flex flex-col gap-4 hover:shadow-md transition-shadow"
-                    :class="!a.is_active ? 'opacity-60' : ''"
-                >
-                    <!-- Header -->
-                    <div class="flex items-center justify-between">
-                        <span :class="typeColor[a.type]" class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md shrink-0">{{ typeLabel[a.type] }}</span>
-                        <button @click="toggleActive(a.id)" type="button" :class="a.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'" class="relative inline-flex h-5 w-9 rounded-full transition-colors ml-1">
-                            <span :class="a.is_active ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
+            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+                <div class="flex flex-col gap-4 border-b border-gray-100 p-5 dark:border-gray-800 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="relative w-full lg:max-w-sm">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                            </svg>
+                        </span>
+                        <input
+                            v-model="searchQuery"
+                            type="text"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            :placeholder="t('Search announcements...')"
+                        />
+                        <button
+                            v-if="searchQuery"
+                            type="button"
+                            class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                            @click="searchQuery = ''"
+                        >
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 6 6 18M6 6l12 12" />
+                            </svg>
                         </button>
                     </div>
 
-                    <!-- Content -->
-                    <div class="flex-1">
-                        <h3 class="text-base font-bold text-gray-900 dark:text-white mb-1 line-clamp-1">{{ a.title || t('Untitled') }}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2" v-html="a.content"></p>
-                    </div>
-
-                    <!-- Details -->
-                    <div class="text-xs text-gray-400 flex flex-col gap-1 bg-gray-50 dark:bg-surface-800 p-3 rounded-xl">
-                        <div class="flex justify-between"><span>{{ t('Audience:') }}</span> <span class="text-gray-700 dark:text-gray-300 capitalize">{{ t(a.target_audience) }}</span></div>
-                        <div class="flex justify-between"><span>{{ t('Frequency:') }}</span> <span class="text-gray-700 dark:text-gray-300 capitalize">{{ t(a.show_frequency) }}</span></div>
-                        <div v-if="a.starts_at" class="flex justify-between"><span>{{ t('Starts:') }}</span> <span class="text-gray-700 dark:text-gray-300">{{ formatDate(a.starts_at) }}</span></div>
-                        <div v-if="a.ends_at" class="flex justify-between"><span>{{ t('Ends:') }}</span> <span class="text-gray-700 dark:text-gray-300">{{ formatDate(a.ends_at) }}</span></div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-surface-800">
-                        <div class="flex-1"></div>
-                        <button @click="openEdit(a)" type="button" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-surface-700 text-gray-500 hover:text-primary-600 hover:border-primary-300 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                        </button>
-                        <button @click="remove(a.id)" type="button" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 dark:border-surface-700 text-danger-500 hover:bg-danger-50 transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </button>
+                    <div class="grid gap-3 md:grid-cols-2 lg:flex lg:w-auto lg:items-center">
+                        <div class="min-w-[220px]">
+                            <AppSelect v-model="audienceFilter" :options="audienceFilterOptions" />
+                        </div>
+                        <div class="min-w-[180px]">
+                            <AppSelect v-model="statusFilter" :options="statusFilterOptions" />
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Pagination -->
-            <Pagination :links="announcements.links" class="mt-8" />
+                <div v-if="filteredAnnouncements.length === 0" class="p-16 text-center">
+                    <h3 class="mb-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('No announcements yet') }}</h3>
+                    <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">{{ t('Create promotional banners or important notices for your users.') }}</p>
+                    <button @click="openCreate" type="button" class="rounded-lg btn-primary px-6 py-2.5 text-sm">{{ t('Add first announcement') }}</button>
+                </div>
+
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
+                            <tr>
+                                <th class="px-4 py-3">{{ t('Announcement') }}</th>
+                                <th class="px-4 py-3">{{ t('Type') }}</th>
+                                <th class="px-4 py-3">{{ t('Audience') }}</th>
+                                <th class="px-4 py-3">{{ t('Schedule') }}</th>
+                                <th class="px-4 py-3">{{ t('Status') }}</th>
+                                <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="a in filteredAnnouncements" :key="a.id" class="border-t border-gray-100 transition-colors hover:bg-primary-50/40 dark:border-gray-800 dark:hover:bg-gray-800/40">
+                                <td class="px-4 py-4">
+                                    <div class="min-w-[240px]">
+                                        <div class="font-medium text-gray-900 dark:text-white">{{ a.title || t('Untitled') }}</div>
+                                        <div class="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400" v-html="a.content"></div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span :class="typeColor[a.type]" class="inline-flex rounded-md px-2.5 py-1 text-[10px] font-bold uppercase">{{ typeLabel[a.type] }}</span>
+                                </td>
+                                <td class="px-4 py-4 text-gray-600 dark:text-gray-300">{{ t(a.target_audience) }}</td>
+                                <td class="px-4 py-4 text-xs text-gray-500 dark:text-gray-400">
+                                    <div>{{ t(a.show_frequency) }}</div>
+                                    <div v-if="a.starts_at" class="mt-1">{{ t('Starts') }}: {{ formatDate(a.starts_at) }}</div>
+                                    <div v-if="a.ends_at">{{ t('Ends') }}: {{ formatDate(a.ends_at) }}</div>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <button
+                                        @click="toggleActive(a.id)"
+                                        type="button"
+                                        :class="a.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'"
+                                        class="relative inline-flex h-5 w-9 rounded-full transition-colors"
+                                    >
+                                        <span :class="a.is_active ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none mt-0.5 ml-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition"></span>
+                                    </button>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button @click="openEdit(a)" type="button" class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:border-primary-300 hover:text-primary-600 dark:border-surface-700">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        </button>
+                                        <button @click="remove(a.id)" type="button" class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-danger-500 transition-colors hover:bg-danger-50 dark:border-surface-700">
+                                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <Pagination :links="announcements.links" class="border-t border-gray-100 p-5 dark:border-gray-800" />
+                </div>
+            </div>
         </div>
 
-        <!-- Create / Edit Modal -->
-        <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-6 border-b border-gray-100 dark:border-surface-800 flex items-center justify-between">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ editingId ? t('Edit Announcement') : t('Add Announcement') }}</h3>
-                    <button @click="showForm = false" type="button" class="text-gray-400 hover:text-gray-700 dark:hover:text-white text-sm">{{ t('Close') }}</button>
-                </div>
-                <div class="p-6 overflow-y-auto space-y-5">
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Type') }} *</label>
-                            <select v-model="form.type" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                                <option value="topbar">{{ t('Top Bar (Banner)') }}</option>
-                                <option value="popup">{{ t('Popup Modal') }}</option>
-                                <option value="notification">{{ t('In-App Notification') }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Target Audience') }}</label>
-                            <select v-model="form.target_audience" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                                <option value="all">{{ t('Everyone') }}</option>
-                                <option value="guests">{{ t('Guests Only') }}</option>
-                                <option value="auth">{{ t('Logged In Users') }}</option>
-                                <option value="free">{{ t('Free Users') }}</option>
-                                <option value="pro">{{ t('Pro Users') }}</option>
-                            </select>
-                        </div>
-                    </div>
-
+        <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showForm = false">
+            <div class="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-100 p-6 dark:border-surface-800">
                     <div>
-                        <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Title') }}</label>
-                        <input v-model="form.title" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ editingId ? t('Edit Announcement') : t('Add Announcement') }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the display, audience, and timing for this announcement.') }}</p>
                     </div>
-
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Content (Supports HTML)') }}</label>
-                        <textarea v-model="form.content" rows="3" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Background Color') }}</label>
-                            <div class="flex items-center gap-2">
-                                <input v-model="form.bg_color" type="color" class="w-8 h-8 rounded cursor-pointer border-0 p-0">
-                                <input v-model="form.bg_color" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-2 py-1.5 text-xs text-gray-900 dark:text-white uppercase font-mono">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Text Color') }}</label>
-                            <div class="flex items-center gap-2">
-                                <input v-model="form.text_color" type="color" class="w-8 h-8 rounded cursor-pointer border-0 p-0">
-                                <input v-model="form.text_color" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-2 py-1.5 text-xs text-gray-900 dark:text-white uppercase font-mono">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('CTA Text') }}</label>
-                            <input v-model="form.cta_text" type="text" :placeholder="t('e.g. Learn More')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('CTA URL') }}</label>
-                            <input v-model="form.cta_url" type="text" :placeholder="t('https://')" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                    </div>
-
-                    <div v-if="form.type === 'popup'" class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-purple-50 dark:bg-purple-900/10 p-4 rounded-xl border border-purple-100 dark:border-purple-900/30">
-                        <div class="md:col-span-2">
-                            <h4 class="text-sm font-bold text-purple-800 dark:text-purple-300 mb-3">{{ t('Popup Specific Settings') }}</h4>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Trigger Type') }}</label>
-                            <select v-model="form.trigger_type" class="w-full bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                                <option value="">{{ t('On Load') }}</option>
-                                <option value="delay">{{ t('Delay') }}</option>
-                                <option value="scroll">{{ t('Scroll %') }}</option>
-                                <option value="exit">{{ t('Exit Intent') }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Trigger Value') }}</label>
-                            <input v-model="form.trigger_value" type="text" :placeholder="t('e.g. 5 (seconds) or 50 (%)')" class="w-full bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Image URL (Optional banner)') }}</label>
-                            <input v-model="form.image" type="text" :placeholder="t('https://')" class="w-full bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Show Frequency') }}</label>
-                            <select v-model="form.show_frequency" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                                <option value="always">{{ t('Always Show') }}</option>
-                                <option value="session">{{ t('Once per session') }}</option>
-                                <option value="once">{{ t('Once per user') }}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Start Date (Optional)') }}</label>
-                            <input v-model="form.starts_at" type="datetime-local" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('End Date (Optional)') }}</label>
-                            <input v-model="form.ends_at" type="datetime-local" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2.5 text-sm text-gray-900 dark:text-white">
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2 cursor-pointer mt-2">
-                        <input v-model="form.is_active" type="checkbox" id="isActive" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500">
-                        <label for="isActive" class="text-sm font-bold text-gray-700 dark:text-gray-300 cursor-pointer">{{ t('Active') }}</label>
-                    </div>
+                    <button @click="showForm = false" type="button" class="rounded-lg border border-gray-200 p-2 text-gray-500 hover:bg-gray-50 dark:border-surface-700 dark:hover:bg-surface-800" :aria-label="t('Close')">
+                        <i class="ti ti-x text-base"></i>
+                    </button>
                 </div>
-                
-                <div class="p-6 bg-gray-50 dark:bg-surface-800 border-t border-gray-100 dark:border-surface-700 flex justify-end gap-3">
-                    <button @click="showForm = false" type="button" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 rounded-xl transition-colors">{{ t('Cancel') }}</button>
-                    <button @click="submit" :disabled="form.processing" type="button" class="px-6 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50">
+                <div class="space-y-6 overflow-y-auto p-6">
+                    <div class="grid gap-6 md:grid-cols-2">
+                        <section class="rounded-xl border border-gray-200 p-5 shadow-sm dark:border-surface-800">
+                            <div class="grid gap-4">
+                                <AppSelect v-model="form.type" :options="typeOptions" :label="t('Type')" />
+                                <AppSelect v-model="form.target_audience" :options="audienceOptions" :label="t('Target audience')" />
+                                <label class="block">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</span>
+                                    <input v-model="form.title" type="text" :placeholder="t('Announcement title')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                </label>
+                                <label class="block">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Content (Supports HTML)') }}</span>
+                                    <textarea v-model="form.content" rows="5" :placeholder="t('Write the announcement content')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                                </label>
+                            </div>
+                        </section>
+
+                        <section class="rounded-xl border border-gray-200 p-5 shadow-sm dark:border-surface-800">
+                            <div class="grid gap-4">
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <AppColorPicker v-model="form.bg_color" :label="t('Background color')" />
+                                    <AppColorPicker v-model="form.text_color" :label="t('Text color')" />
+                                </div>
+                                <label class="block">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('CTA text') }}</span>
+                                    <input v-model="form.cta_text" type="text" :placeholder="t('e.g. Learn More')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                </label>
+                                <label class="block">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('CTA URL') }}</span>
+                                    <input v-model="form.cta_url" type="text" :placeholder="t('https://example.com')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                </label>
+                                <AppSelect v-model="form.show_frequency" :options="frequencyOptions" :label="t('Show frequency')" />
+                                <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium dark:border-surface-700">
+                                    <span class="text-gray-700 dark:text-gray-300">{{ t('Active') }}</span>
+                                    <button
+                                        type="button"
+                                        :class="form.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'"
+                                        class="relative inline-flex h-5 w-9 rounded-full transition-colors"
+                                        @click="form.is_active = !form.is_active"
+                                    >
+                                        <span :class="form.is_active ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none mt-0.5 ml-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition"></span>
+                                    </button>
+                                </label>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div v-if="form.type === 'popup'" class="rounded-xl border border-purple-100 bg-purple-50 p-5 dark:border-purple-900/30 dark:bg-purple-900/10">
+                        <h4 class="mb-4 text-sm font-bold text-purple-800 dark:text-purple-300">{{ t('Popup Specific Settings') }}</h4>
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <AppSelect v-model="form.trigger_type" :options="triggerTypeOptions" :label="t('Trigger type')" />
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Trigger value') }}</span>
+                                <input v-model="form.trigger_value" type="text" :placeholder="t('e.g. 5 or 50')" class="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                            </label>
+                            <label class="block md:col-span-2">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image URL (Optional banner)') }}</span>
+                                <input v-model="form.image" type="text" :placeholder="t('https://example.com/image.jpg')" class="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                            </label>
+                        </div>
+                    </div>
+
+                    <section class="rounded-xl border border-gray-200 p-5 shadow-sm dark:border-surface-800">
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Start date (Optional)') }}</span>
+                                <input v-model="form.starts_at" type="datetime-local" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('End date (Optional)') }}</span>
+                                <input v-model="form.ends_at" type="datetime-local" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                            </label>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 p-6 dark:border-surface-700 dark:bg-surface-800">
+                    <button @click="showForm = false" type="button" class="rounded-lg px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-surface-700">{{ t('Cancel') }}</button>
+                    <button @click="submit" :disabled="form.processing" type="button" class="rounded-lg btn-primary px-6 py-2.5 text-sm disabled:opacity-50">
                         {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Add Announcement') }}
                     </button>
                 </div>

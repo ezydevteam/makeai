@@ -25,11 +25,12 @@ class ExportService
     {
         return response()->stream(function () use ($headers, $rows, $mapper) {
             $handle = fopen('php://output', 'w');
+            fprintf($handle, "\xEF\xBB\xBF");
             fputcsv($handle, $headers);
             $rows->each(fn ($row) => fputcsv($handle, $mapper($row)));
             fclose($handle);
         }, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
             'X-Accel-Buffering' => 'no',
         ]);

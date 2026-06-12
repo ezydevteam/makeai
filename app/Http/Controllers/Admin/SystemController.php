@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CronTaskRunRequest;
 use App\Http\Requests\Admin\MaintenanceSettingsRequest;
+use App\Services\BroadcastingService;
 use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -54,12 +55,13 @@ class SystemController extends Controller
             'health' => $this->healthChecks(),
             'healthSummary' => $this->healthCheckSummary(),
             'stats' => [
-                'app_name' => 'MakeAI',
+                'app_name' => settings('app_name', translate('Application')),
                 'app_version' => settings('app_version', '1.0.0'),
                 'php_version' => PHP_VERSION,
                 'laravel_version' => app()->version(),
                 'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? translate('N/A'),
                 'database_version' => $this->getDatabaseVersion(),
+                'uptime' => $this->getInstallationUptime(),
                 'disk_free' => $this->getDiskSpace(),
                 'memory_usage' => $this->getMemoryUsage(),
             ],
@@ -79,7 +81,7 @@ class SystemController extends Controller
     {
         $this->authorizeSystem();
 
-        return Inertia::render('Admin/System/Tools', [
+        return Inertia::render('Admin/System/CronJobs', [
             'cron' => $this->cronStatus(),
             'logs' => $this->getLastLogs(),
         ]);
@@ -549,6 +551,21 @@ class SystemController extends Controller
         ];
     }
 
+    private function getInstallationUptime(): string
+    {
+        $installedAt = DB::table('settings')->orderBy('created_at')->value('created_at');
+
+        if (blank($installedAt)) {
+            return translate('N/A');
+        }
+
+        return Carbon::parse($installedAt)->diffForHumans(now(), [
+            'parts' => 3,
+            'short' => true,
+            'syntax' => Carbon::DIFF_ABSOLUTE,
+        ]);
+    }
+
     private function healthChecks(): array
     {
         return [
@@ -690,6 +707,7 @@ class SystemController extends Controller
     private function licenseChecks(): array
     {
         $verified = license_verified();
+        $domainMatches = $verified ? $this->domainCheck() : null;
 
         return [
             [
@@ -699,10 +717,10 @@ class SystemController extends Controller
                 'suggestion' => $verified ? null : translate('Activate your license in Settings → License.'),
             ],
             [
-                'status' => $verified ? $this->domainCheck() : 'warn',
+                'status' => ! $verified ? 'warn' : ($domainMatches ? 'pass' : 'fail'),
                 'label' => translate('Domain match'),
-                'detail' => $this->domainCheck() ? translate('Matches') : ($verified ? translate('Mismatch') : translate('N/A')),
-                'suggestion' => $verified && ! $this->domainCheck() ? translate('Deactivate and re-activate license on this domain.') : null,
+                'detail' => ! $verified ? translate('N/A') : ($domainMatches ? translate('Matches') : translate('Mismatch')),
+                'suggestion' => $verified && ! $domainMatches ? translate('Deactivate and re-activate license on this domain.') : null,
             ],
         ];
     }
@@ -790,24 +808,23 @@ class SystemController extends Controller
 
     private function broadcastingCheck(): string
     {
-        $driver = config('broadcasting.default');
+        $health = app(BroadcastingService::class)->healthStatus();
 
-        if (in_array($driver, ['reverb', 'pusher'], true)) {
-            return $this->pingRedis() ? 'pass' : 'warn';
-        }
-
-        if ($driver === 'null' || blank($driver)) {
+        if ($health['degraded']) {
             return 'warn';
         }
 
-        return 'warn';
+        $effective = $health['effective'] ?? 'polling';
+
+        return $effective === 'polling' ? 'warn' : 'pass';
     }
 
     private function getBroadcastingDetail(): string
     {
-        $driver = config('broadcasting.default');
+        $health = app(BroadcastingService::class)->healthStatus();
+        $effective = $health['effective'] ?? 'polling';
 
-        return match ($driver) {
+        return match ($effective) {
             'reverb' => translate('Laravel Reverb (WebSocket)'),
             'pusher' => translate('Pusher (WebSocket)'),
             'polling' => translate('HTTP Polling'),
@@ -817,19 +834,14 @@ class SystemController extends Controller
 
     private function getBroadcastingSuggestion(): ?string
     {
-        $driver = config('broadcasting.default');
-        $status = $this->broadcastingCheck();
+        $health = app(BroadcastingService::class)->healthStatus();
 
-        if ($status === 'warn') {
-            if ($driver === 'reverb' && ! $this->pingRedis()) {
-                return translate('Reverb requires Redis. Configure Redis or switch to Pusher.');
-            }
+        if ($health['degraded']) {
+            return $health['reason'];
+        }
 
-            if ($driver === 'null' || blank($driver)) {
-                return translate('Configure broadcasting driver in Settings → Broadcasting.');
-            }
-
-            return translate('Check broadcasting configuration.');
+        if (($health['effective'] ?? '') === 'polling') {
+            return translate('Configure Reverb or Pusher in Settings → Broadcasting for real-time notifications.');
         }
 
         return null;

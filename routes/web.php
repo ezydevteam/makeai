@@ -45,6 +45,7 @@ use App\Models\AiTool;
 use App\Models\Page;
 use App\Models\SiteTemplate;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -60,6 +61,9 @@ use Inertia\Inertia;
 
 // ─── Installation Wizard ────────────────────
 require __DIR__.'/install.php';
+
+// ─── Broadcasting Auth ──────────────────────
+Broadcast::routes(['middleware' => ['web']]);
 
 // ─── Admin Routes ───────────────────────────
 Route::middleware('web')->prefix('admin')->group(base_path('routes/admin.php'));

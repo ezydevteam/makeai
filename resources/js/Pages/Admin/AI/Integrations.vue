@@ -49,11 +49,11 @@ const aiIndexUrl = route('admin.ai.index')
 const DEFAULT_AI_SENTINEL = '__default_ai__'
 
 const tabs = [
-    { key: 'image_media', label: 'Image & Media', icon: '🎨', description: 'Image generation, stock photos, editing tools' },
-    { key: 'voice_audio', label: 'Voice & Audio', icon: '🎙️', description: 'TTS, STT, music generation, voice cloning' },
-    { key: 'video', label: 'Video', icon: '🎬', description: 'Video generation and avatar creation' },
-    { key: 'productivity', label: 'Productivity', icon: '⚡', description: 'Notion, Drive, WordPress, Slack, Zapier' },
-    { key: 'utilities', label: 'Utilities', icon: '🔧', description: 'Search, translation, captcha, SMS, crypto' },
+    { key: 'image_media', label: 'Image & Media', icon: 'ti ti-photo', description: 'Image generation, stock photos, and editing tools' },
+    { key: 'voice_audio', label: 'Voice & Audio', icon: 'ti ti-wave-sine', description: 'Text-to-speech, speech-to-text, and audio tools' },
+    { key: 'video', label: 'Video', icon: 'ti ti-video', description: 'Video generation and avatar creation services' },
+    { key: 'productivity', label: 'Productivity', icon: 'ti ti-bolt', description: 'Workspace, publishing, and workflow integrations' },
+    { key: 'utilities', label: 'Utilities', icon: 'ti ti-tool', description: 'Search, translation, captcha, SMS, and support services' },
 ]
 
 const activeTab = ref('image_media')
@@ -61,7 +61,7 @@ const searchQuery = ref('')
 
 const defaultAiName = computed(() => {
     const cfg = props.configuredAiProviders[props.defaultAiProvider]
-    return cfg ? `${cfg.name} (System Default)` : 'System Default AI Model'
+    return cfg ? `${cfg.name} (${t('System Default')})` : t('System Default AI Model')
 })
 
 const tabIntegrations = computed(() => {
@@ -101,7 +101,7 @@ const form = useForm({
                             secrets: Object.fromEntries(
                                 Object.entries(provider.secrets).map(([secretKey, secret]) => [
                                     secretKey,
-                                    secret.configured ? '••••••••' : ''
+                                    secret.masked ?? ''
                                 ])
                             ),
                         },
@@ -157,12 +157,52 @@ const isSecretConfigured = (slug: string, secretKey: string) => {
     return sp.secrets[secretKey]?.configured ?? false
 }
 
+const maskedSecretValue = (slug: string, secretKey: string) => {
+    const sp = selectedProviderFromProps(slug)
+    if (!sp) return ''
+    return sp.secrets[secretKey]?.masked ?? ''
+}
+
+const clearMaskedSecretOnFocus = (slug: string, providerSlug: string, secretKey: string) => {
+    const maskedValue = maskedSecretValue(slug, secretKey)
+    if (!maskedValue) return
+
+    const currentValue = form.integrations[slug]?.providers[providerSlug]?.secrets[secretKey]
+    if (currentValue === maskedValue) {
+        form.integrations[slug].providers[providerSlug].secrets[secretKey] = ''
+    }
+}
+
 const hasProviderSwitcher = (integration: IntegrationState, slug: string) => {
     return Object.keys(integration.providers).length > 0
 }
 
 const submit = () => {
-    form.post(route('admin.ai.integrations.update'), {
+    form.transform((data) => ({
+        ...data,
+        integrations: Object.fromEntries(
+            Object.entries(data.integrations).map(([slug, integration]) => [
+                slug,
+                {
+                    ...integration,
+                    providers: Object.fromEntries(
+                        Object.entries(integration.providers).map(([providerSlug, provider]) => [
+                            providerSlug,
+                            {
+                                ...provider,
+                                secrets: Object.fromEntries(
+                                    Object.entries(provider.secrets).map(([secretKey, value]) => [
+                                        secretKey,
+                                        value === maskedSecretValue(slug, secretKey) ? '' : value,
+                                    ])
+                                ),
+                            },
+                        ])
+                    ),
+                },
+            ])
+        ),
+    })).post(route('admin.ai.integrations.update'), {
         preserveScroll: true,
     })
 }
@@ -182,7 +222,7 @@ const testConnection = async (slug: string) => {
         const data = await res.json()
         testResults.value[slug] = data
     } catch {
-        testResults.value[slug] = { success: false, error: 'Network error' }
+        testResults.value[slug] = { success: false, error: t('Network error') }
     } finally {
         testing.value[slug] = false
     }
@@ -196,64 +236,46 @@ const enabledCount = computed(() =>
 <template>
     <Head :title="t('Integrations — AI Management')" />
 
-    <div class="max-w-7xl mx-auto px-6 py-8">
-        <!-- Header -->
-        <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div class="mx-auto max-w-7xl px-6 py-8">
+        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <div class="mb-3 flex items-center gap-2">
-                    <Link
-                        :href="aiIndexUrl"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:border-[#1F75FE]/30 hover:bg-[#EFF6FF] hover:text-[#1F75FE]"
-                    >
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                        </svg>
-                    </Link>
-                    <span class="rounded-full bg-[#EDE9FE] px-3 py-1 text-xs font-medium text-[#5B21B6]">
-                        Integrations
-                    </span>
-                </div>
-                <h1 class="text-2xl font-bold text-[#111827]">{{ t('Integrations') }}</h1>
-                <p class="mt-1 text-sm text-gray-500">
-                    {{ t('Configure third-party service providers for image, voice, video, productivity, and utility tools.') }}
-                    <span class="ml-2 rounded-full bg-[#DBEAFE] px-2 py-0.5 text-xs font-medium text-[#1F75FE]">
-                        {{ enabledCount }} / {{ Object.keys(props.integrations).length }} enabled
-                    </span>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Integrations') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Configure third-party service providers for image, voice, video, productivity, and utility tools from one unified admin workspace.') }}
                 </p>
             </div>
 
-            <button
-                type="button"
-                :disabled="form.processing"
-                class="inline-flex items-center justify-center rounded-lg bg-[#1F75FE] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-[#1A65E0] hover:shadow-[0_0_20px_rgb(31_117_254_/_0.25)] hover:-translate-y-px active:translate-y-0 disabled:opacity-60"
-                @click="submit"
-            >
-                <svg
-                    v-if="form.processing"
-                    class="me-2 h-4 w-4 animate-spin"
-                    fill="none"
-                    viewBox="0 0 24 24"
+            <div class="flex flex-wrap items-center gap-3">
+                <button
+                    type="button"
+                    :disabled="form.processing"
+                    class="rounded-lg btn-primary disabled:opacity-60"
+                    @click="submit"
                 >
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                </svg>
-                {{ form.processing ? t('Saving...') : t('Save All Changes') }}
-            </button>
+                    <svg
+                        v-if="form.processing"
+                        class="me-2 h-4 w-4 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                    >
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    {{ form.processing ? t('Saving...') : t('Save Changes') }}
+                </button>
+            </div>
         </div>
 
-        <!-- Info Banner -->
-        <div class="mb-6 rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-5 py-4 text-sm text-[#1A65E0] shadow-sm">
+        <div class="mb-6 rounded-2xl border border-sky-100 bg-sky-50/80 px-5 py-4 text-sm text-sky-700 shadow-sm dark:border-sky-900/30 dark:bg-sky-900/10 dark:text-sky-200">
             <div class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                 </svg>
-                <span>{{ t('Each integration can use a dedicated provider or fall back to the system default AI model. Secret fields show •••••••• when already configured — only re-enter them to change the value.') }}</span>
+                <span>{{ t('Each integration can use a dedicated provider or fall back to the system default AI model.') }}</span>
             </div>
         </div>
 
-        <!-- Search + Tab Bar -->
-        <div class="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm">
-            <!-- Search -->
+        <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-gray-900">
             <div class="border-b border-gray-200 px-5 py-3">
                 <div class="relative">
                     <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -263,7 +285,7 @@ const enabledCount = computed(() =>
                         v-model="searchQuery"
                         type="text"
                         :placeholder="t('Search integrations...')"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-4 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/10"
+                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-4 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                     />
                     <button
                         v-if="searchQuery"
@@ -277,7 +299,6 @@ const enabledCount = computed(() =>
                 </div>
             </div>
 
-            <!-- Tabs -->
             <nav class="flex gap-0 overflow-x-auto px-2" aria-label="Tabs">
                 <button
                     v-for="tab in tabs"
@@ -290,8 +311,8 @@ const enabledCount = computed(() =>
                             : 'text-gray-500 hover:text-gray-700'
                     ]"
                 >
-                    <span class="text-base">{{ tab.icon }}</span>
-                    {{ t(tab.label) }}
+                    <i :class="[tab.icon, 'text-base']"></i>
+                    <span>{{ t(tab.label) }}</span>
                     <span
                         v-if="activeTab === tab.key"
                         class="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-primary-500"
@@ -300,22 +321,20 @@ const enabledCount = computed(() =>
             </nav>
         </div>
 
-        <!-- Integration Cards Grid -->
         <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
             <section
                 v-for="[slug, integration] in filteredIntegrations"
                 :key="slug"
-                class="group rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-primary-500/40 hover:shadow-md hover:shadow-primary-500/5"
+                class="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:border-primary-300 hover:shadow-md dark:border-surface-800 dark:bg-gray-900"
             >
-                <!-- Header Row -->
                 <div class="mb-5 flex items-start justify-between gap-4">
                     <div class="flex items-start gap-3">
-                        <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-500/8 text-lg">
-                            🔌
+                        <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
+                            <i class="ti ti-plug text-lg"></i>
                         </div>
                         <div>
-                            <h2 class="text-[15px] font-semibold text-[#111827]">{{ integration.name }}</h2>
-                            <p class="mt-0.5 font-mono text-xs text-gray-400">{{ integration.service }}</p>
+                            <h2 class="text-[15px] font-semibold text-gray-900 dark:text-white">{{ integration.name }}</h2>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(tabs.find((tab) => tab.key === integration.tab)?.description ?? 'Utility integration') }}</p>
                         </div>
                     </div>
 
@@ -326,7 +345,7 @@ const enabledCount = computed(() =>
                             target="_blank"
                             rel="noopener noreferrer"
                             :title="t('View API documentation')"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:border-gray-300 hover:text-gray-600"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 shadow-sm transition-colors hover:border-gray-300 hover:text-gray-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
                         >
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -335,7 +354,8 @@ const enabledCount = computed(() =>
 
                         <button
                             type="button"
-                            :class="form.integrations[slug].enabled ? 'bg-[#1F75FE]' : 'bg-gray-200'"
+                            :title="t('Toggle active')"
+                            :class="form.integrations[slug].enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'"
                             class="relative h-6 w-11 shrink-0 rounded-full transition-colors"
                             @click="form.integrations[slug].enabled = !form.integrations[slug].enabled"
                         >
@@ -347,7 +367,6 @@ const enabledCount = computed(() =>
                     </div>
                 </div>
 
-                <!-- Config Row (Provider + Timeout + Credits) -->
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div v-if="hasProviderSwitcher(integration, slug)" class="md:col-span-2">
                         <AppSelect
@@ -357,52 +376,53 @@ const enabledCount = computed(() =>
                         />
                     </div>
                     <div v-else class="md:col-span-2">
-                        <label class="mb-1.5 block text-sm font-medium text-[#374151]">{{ t('Provider') }}</label>
-                        <p class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500">—</p>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Provider') }}</label>
+                        <p class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400">—</p>
                     </div>
 
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-[#374151]">{{ t('Timeout (s)') }}</label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Timeout (s)') }}</label>
                         <input
                             v-model="form.integrations[slug].timeout"
                             type="number"
                             min="5"
                             max="180"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10"
+                            :placeholder="t('30')"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                         />
                     </div>
 
                     <div class="md:col-span-3">
-                        <label class="mb-1.5 block text-sm font-medium text-[#374151]">{{ t('Fixed Credit Cost') }}</label>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Fixed Credit Cost') }}</label>
                         <input
                             v-model="form.integrations[slug].fixed_credit_cost"
                             type="number"
                             min="0"
                             step="0.01"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10"
+                            :placeholder="t('0.00')"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                         />
                     </div>
                 </div>
 
-                <!-- Default AI Model Fallback Info -->
                 <div
                     v-if="isDefaultAi(slug)"
-                    class="mt-5 rounded-lg border border-[#EDE9FE] bg-[#F5F3FF] px-4 py-4"
+                    class="mt-5 rounded-xl border border-violet-100 bg-violet-50/80 px-4 py-4 dark:border-violet-900/30 dark:bg-violet-900/10"
                 >
                     <div class="flex items-start gap-3">
-                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#8B5CF6]/12 text-sm">
-                            ✨
+                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-sm text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                            <i class="ti ti-sparkles"></i>
                         </div>
                         <div>
-                            <p class="text-sm font-medium text-[#5B21B6]">
+                            <p class="text-sm font-medium text-violet-700 dark:text-violet-300">
                                 {{ t('Using System Default AI Model') }}
                             </p>
-                            <p class="mt-0.5 text-xs text-[#7C3AED]/70">
+                            <p class="mt-0.5 text-xs text-violet-600/80 dark:text-violet-200/80">
                                 {{ t('This integration will use :provider as the fallback LLM. No dedicated API credentials are needed.', { provider: defaultAiName }) }}
                             </p>
-                            <p class="mt-1.5 text-xs text-[#7C3AED]/60">
+                            <p class="mt-1.5 text-xs text-violet-600/70 dark:text-violet-200/70">
                                 {{ t('Manage API keys in') }}
-                                <Link :href="aiIndexUrl" class="underline hover:text-[#5B21B6]">
+                                <Link :href="aiIndexUrl" class="underline hover:text-violet-700 dark:hover:text-violet-200">
                                     {{ t('Providers & Keys') }}
                                 </Link>
                             </p>
@@ -410,11 +430,10 @@ const enabledCount = computed(() =>
                     </div>
                 </div>
 
-                <!-- Provider Credentials -->
-                <div v-else class="mt-5 rounded-lg border border-gray-100 bg-gray-50/70 p-4">
+                <div v-else class="mt-5 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                     <div class="mb-4 flex items-center justify-between gap-3">
                         <div>
-                            <h3 v-if="selectedProvider(slug)" class="text-sm font-semibold text-[#111827]">
+                            <h3 v-if="selectedProvider(slug)" class="text-sm font-semibold text-gray-900 dark:text-white">
                                 {{ selectedProvider(slug)!.name }}
                                 <span v-if="Object.keys(selectedProvider(slug)!.secrets).length + Object.keys(selectedProvider(slug)!.options).length === 0" class="font-normal text-gray-500"> — {{ t('No credentials required') }}</span>
                                 <span v-else class="font-normal text-gray-500"> — {{ t('Credentials') }}</span>
@@ -424,7 +443,7 @@ const enabledCount = computed(() =>
                         <button
                             type="button"
                             :disabled="testing[slug]"
-                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:opacity-60"
+                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200"
                             @click="testConnection(slug)"
                         >
                             <svg
@@ -446,7 +465,7 @@ const enabledCount = computed(() =>
                     <!-- Test Result -->
                     <div
                         v-if="testResults[slug]"
-                        :class="testResults[slug].success ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'"
+                        :class="testResults[slug].success ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900/30 dark:bg-green-900/10 dark:text-green-200' : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-200'"
                         class="mb-4 rounded-lg border px-4 py-3 text-sm"
                     >
                         <div class="flex items-center gap-2">
@@ -456,22 +475,22 @@ const enabledCount = computed(() =>
                         </div>
                     </div>
 
-                    <!-- Credential fields -->
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <template v-if="selectedProvider(slug)">
                             <div
                                 v-for="(_, secretKey) in selectedProvider(slug)!.secrets"
                                 :key="secretKey"
                             >
-                                <label class="mb-1.5 block text-sm font-medium capitalize text-[#374151]">
+                                <label class="mb-1.5 block text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
                                     {{ String(secretKey).replaceAll('_', ' ') }}
                                 </label>
                                 <input
                                     v-model="form.integrations[slug].providers[form.integrations[slug].provider].secrets[secretKey]"
-                                    type="password"
+                                    type="text"
                                     autocomplete="new-password"
-                                    :placeholder="isSecretConfigured(slug, secretKey) ? t('•••••••• (already saved)') : t('Enter key...')"
-                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10"
+                                    :placeholder="t('Enter key...')"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                                    @focus="clearMaskedSecretOnFocus(slug, form.integrations[slug].provider, secretKey)"
                                 />
                                 <p class="mt-1 text-xs text-gray-400">
                                     {{ isSecretConfigured(slug, secretKey) ? t('Encrypted value saved. Leave blank to keep it.') : t('Not configured yet.') }}
@@ -482,13 +501,14 @@ const enabledCount = computed(() =>
                                 v-for="(_, optionKey) in selectedProvider(slug)!.options"
                                 :key="optionKey"
                             >
-                                <label class="mb-1.5 block text-sm font-medium capitalize text-[#374151]">
+                                <label class="mb-1.5 block text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
                                     {{ String(optionKey).replaceAll('_', ' ') }}
                                 </label>
                                 <input
                                     v-model="form.integrations[slug].providers[form.integrations[slug].provider].options[optionKey]"
                                     type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10"
+                                    :placeholder="t('Enter value...')"
+                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
                                 />
                             </div>
                         </template>
@@ -496,10 +516,9 @@ const enabledCount = computed(() =>
                 </div>
             </section>
 
-            <!-- Empty state -->
             <div
                 v-if="filteredIntegrations.length === 0"
-                class="col-span-full rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm"
+                class="col-span-full rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm dark:border-surface-800 dark:bg-gray-900"
             >
                 <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
                     <svg class="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

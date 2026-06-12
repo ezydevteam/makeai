@@ -1,19 +1,59 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { VueDraggable } from 'vue-draggable-plus'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
+
+type SidebarBlockType =
+    | 'search_box'
+    | 'categories_list'
+    | 'recent_posts'
+    | 'popular_tools'
+    | 'recently_added'
+    | 'tag_cloud'
+    | 'newsletter'
+    | 'ad_zone'
+    | 'social_follow'
+    | 'custom_html'
+
+type SidebarBlockConfig = {
+    title?: string
+    placeholder?: string
+    show_count?: boolean
+    count?: number
+    description?: string
+    zone_id?: string
+    content?: string
+}
+
+type SidebarBlock = {
+    id: string
+    type: SidebarBlockType
+    config: SidebarBlockConfig
+}
 
 const props = defineProps<{
-    config: any;
+    config: {
+        blocks?: SidebarBlock[];
+        position?: 'left' | 'right';
+        sticky?: boolean;
+        show_on_pages?: string[];
+    } | null;
+    availablePages: { key: string; label: string }[];
 }>();
 
 const { t } = useTranslate()
+const toast = useToastr()
 const form = useForm({
     blocks: props.config?.blocks || [],
     position: props.config?.position || 'right',
     sticky: props.config?.sticky ?? true,
+    show_on_pages: props.config?.show_on_pages || [],
 });
 
 const submit = () => {
@@ -24,8 +64,10 @@ const submit = () => {
 
 const blockTypes = [
     { type: 'search_box', label: 'Search Box', desc: 'A search input field' },
-    { type: 'categories_list', label: 'Categories List', desc: 'List of categories' },
-    { type: 'recent_posts', label: 'Recent Posts', desc: 'List of recent articles' },
+    { type: 'categories_list', label: 'Categories List', desc: 'List of AI tool categories' },
+    { type: 'recent_posts', label: 'Recent Blog Posts', desc: 'List of recent articles' },
+    { type: 'popular_tools', label: 'Popular Tools', desc: 'Most-used AI tools' },
+    { type: 'recently_added', label: 'Recently Added', desc: 'Recently published tools' },
     { type: 'tag_cloud', label: 'Tag Cloud', desc: 'Cloud of popular tags' },
     { type: 'newsletter', label: 'Newsletter Subscribe', desc: 'Email subscription form' },
     { type: 'ad_zone', label: 'Ad Zone', desc: 'Select from defined ad zones' },
@@ -33,32 +75,42 @@ const blockTypes = [
     { type: 'custom_html', label: 'Custom HTML', desc: 'Embed custom code' },
 ];
 
+const positionOptions = [
+    { value: 'left', label: 'Left' },
+    { value: 'right', label: 'Right' },
+];
+
+const recentPostCountOptions = [1, 2, 3, 4, 5, 6, 8, 10].map((count) => ({ value: count, label: String(count) }));
+const toolCountOptions = [1, 3, 5, 6, 8, 10, 12, 15, 20].map((count) => ({ value: count, label: String(count) }));
+
 const getBlockLabel = (type: string) => {
-    return blockTypes.find(b => b.type === type)?.label || type;
+    return blockTypes.find((b) => b.type === type)?.label || type;
 };
 
 const addBlockModalOpen = ref(false);
 const blockModalOpen = ref(false);
-const editingBlock = ref<any>(null);
+const editingBlock = ref<{ index: number; data: SidebarBlock } | null>(null);
 const confirmRemoveOpen = ref(false);
 const removeIndex = ref<number | null>(null);
+const resetProcessing = ref(false);
 
 const openAddBlockModal = () => {
     addBlockModalOpen.value = true;
 };
 
-const addBlock = (type: string) => {
-    const newBlock = {
-        id: 'b_' + Math.random().toString(36).substr(2, 9),
+const addBlock = (type: SidebarBlockType) => {
+    const newBlock: SidebarBlock = {
+        id: 'b_' + Math.random().toString(36).substring(2, 9),
         type,
-        config: { title: getBlockLabel(type) } as Record<string, any>
+        config: { title: getBlockLabel(type) }
     };
-    
-    // Set default config based on type
-    if (type === 'search_box') newBlock.config['placeholder'] = 'Search...';
+
+    if (type === 'search_box') newBlock.config['placeholder'] = t('Search...');
     if (type === 'categories_list') newBlock.config['show_count'] = true;
     if (type === 'recent_posts') newBlock.config['count'] = 3;
-    if (type === 'newsletter') newBlock.config['description'] = 'Subscribe to our newsletter.';
+    if (type === 'popular_tools') newBlock.config['count'] = 5;
+    if (type === 'recently_added') newBlock.config['count'] = 3;
+    if (type === 'newsletter') newBlock.config['description'] = t('Subscribe to our newsletter.');
     if (type === 'ad_zone') newBlock.config['zone_id'] = '';
     if (type === 'social_follow') newBlock.config['title'] = 'Follow Us';
     if (type === 'custom_html') newBlock.config['content'] = '';
@@ -94,19 +146,69 @@ const executeRemoveBlock = () => {
     removeIndex.value = null
 }
 
-const moveBlockUp = (index: number) => {
-    if (index > 0) {
-        const temp = form.blocks[index - 1];
-        form.blocks[index - 1] = form.blocks[index];
-        form.blocks[index] = temp;
+const buildDefaultBlocks = (): SidebarBlock[] => [
+    { id: 'b1', type: 'search_box', config: { title: t('Search'), placeholder: t('Search articles...') } },
+    { id: 'b2', type: 'categories_list', config: { title: t('Categories'), show_count: true } },
+    { id: 'b3', type: 'recent_posts', config: { title: t('Recent Posts'), count: 3 } },
+];
+
+const applyDefaults = () => {
+    form.blocks = JSON.parse(JSON.stringify(buildDefaultBlocks()));
+    form.position = 'right';
+    form.sticky = true;
+    form.show_on_pages = [];
+};
+
+const resetToDefaults = () => {
+    resetProcessing.value = true;
+
+    applyDefaults();
+
+    form.post(route('admin.sidebar.update'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast.success(t('Sidebar settings reset to defaults.'));
+        },
+        onFinish: () => {
+            resetProcessing.value = false;
+        },
+    });
+};
+
+const togglePage = (page: string) => {
+    const idx = form.show_on_pages.indexOf(page);
+    if (idx >= 0) {
+        form.show_on_pages.splice(idx, 1);
+    } else {
+        form.show_on_pages.push(page);
     }
 };
 
-const moveBlockDown = (index: number) => {
-    if (index < form.blocks.length - 1) {
-        const temp = form.blocks[index + 1];
-        form.blocks[index + 1] = form.blocks[index];
-        form.blocks[index] = temp;
+const importJsonText = ref('');
+const importModalOpen = ref(false);
+
+const exportConfig = () => {
+    const data = JSON.stringify({ blocks: form.blocks, position: form.position, sticky: form.sticky, show_on_pages: form.show_on_pages }, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sidebar-config.json';
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+const importConfig = () => {
+    try {
+        const data = JSON.parse(importJsonText.value);
+        if (Array.isArray(data.blocks)) form.blocks = data.blocks;
+        if (data.position) form.position = data.position;
+        if (typeof data.sticky === 'boolean') form.sticky = data.sticky;
+        if (Array.isArray(data.show_on_pages)) form.show_on_pages = data.show_on_pages;
+        importJsonText.value = '';
+        importModalOpen.value = false;
+    } catch (e) {
+        toast.error(t('Invalid JSON format.'));
     }
 };
 </script>
@@ -114,197 +216,249 @@ const moveBlockDown = (index: number) => {
 <template>
     <AdminLayout>
         <Head :title="t('Sidebar Builder — Admin')" />
-        
-        <div class="max-w-6xl mx-auto px-6 py-8">
-            <div class="flex items-center justify-between mb-8">
+
+        <div class="mx-auto max-w-7xl px-6 py-8">
+            <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Sidebar Builder') }}</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Configure widgets and layout for the application sidebar.') }}</p>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure widgets, visibility, and layout behavior for the application sidebar.') }}</p>
                 </div>
-                <button @click="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-600/20 disabled:opacity-50 flex items-center gap-2">
-                    <svg v-if="form.processing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    <span>{{ t('Save Sidebar') }}</span>
-                </button>
-            </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <Tooltip :content="t('Export JSON')" placement="top">
+                        <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Export JSON')" @click="exportConfig">
+                            <i class="ti ti-file-export text-base"></i>
+                        </button>
+                    </Tooltip>
+                    <Tooltip :content="t('Import JSON')" placement="top">
+                        <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Import JSON')" @click="importModalOpen = true">
+                            <i class="ti ti-file-import text-base"></i>
+                        </button>
+                    </Tooltip>
+                    <button type="button" @click="resetToDefaults" :disabled="form.processing || resetProcessing" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700">
+                        <svg v-if="resetProcessing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <i v-else class="ti ti-restore text-sm"></i>
+                        <span>{{ resetProcessing ? t('Resetting...') : t('Reset') }}</span>
+                    </button>
+                    <button type="button" @click="submit" :disabled="form.processing" class="inline-flex items-center gap-2 rounded-lg btn-primary px-5 py-2.5 text-sm font-semibold disabled:opacity-50">
+                        <svg v-if="form.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>{{ form.processing ? t('Saving...') : t('Save Sidebar') }}</span>
+                    </button>
+                </div>
+            </section>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Sidebar Layout Settings -->
-                <div class="lg:col-span-1 space-y-6">
-                    <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-gray-100 dark:border-surface-800 p-6">
-                        <h2 class="text-base font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                            <svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>
-                            {{ t('Layout Configuration') }}
-                        </h2>
-                        
-                        <div class="space-y-5">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 uppercase mb-3">{{ t('Position') }}</label>
-                                <div class="grid grid-cols-2 gap-3">
-                                    <button type="button" @click="form.position = 'left'" :class="form.position === 'left' ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20 ring-1 ring-primary-500' : 'border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 hover:border-gray-300'" class="p-3 rounded-xl border text-center transition-all">
-                                        <div class="w-full h-12 bg-white dark:bg-surface-900 rounded border border-gray-200 dark:border-surface-700 flex mb-2">
-                                            <div class="w-1/3 h-full bg-primary-100 dark:bg-primary-900/40 rounded-l border-r border-gray-200 dark:border-surface-700"></div>
-                                        </div>
-                                        <span class="text-sm font-bold text-gray-900 dark:text-white">{{ t('Left') }}</span>
-                                    </button>
-                                    <button type="button" @click="form.position = 'right'" :class="form.position === 'right' ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-900/20 ring-1 ring-primary-500' : 'border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 hover:border-gray-300'" class="p-3 rounded-xl border text-center transition-all">
-                                        <div class="w-full h-12 bg-white dark:bg-surface-900 rounded border border-gray-200 dark:border-surface-700 flex mb-2">
-                                            <div class="w-2/3 h-full"></div>
-                                            <div class="w-1/3 h-full bg-primary-100 dark:bg-primary-900/40 rounded-r border-l border-gray-200 dark:border-surface-700"></div>
-                                        </div>
-                                        <span class="text-sm font-bold text-gray-900 dark:text-white">{{ t('Right') }}</span>
-                                    </button>
+            <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <aside class="space-y-6">
+                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                        <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout') }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose where the sidebar appears and when it stays visible.') }}</p>
+
+                        <div class="mt-5 space-y-5">
+                            <AppSelect
+                                v-model="form.position"
+                                :label="t('Position')"
+                                :options="positionOptions.map((option) => ({ value: option.value, label: t(option.label) }))"
+                            />
+
+                            <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Sticky Sidebar') }}</div>
+                                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Keep the sidebar visible while the page scrolls.') }}</div>
                                 </div>
+                                <button type="button" role="switch" :aria-checked="form.sticky" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form.sticky ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.sticky = !form.sticky">
+                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.sticky ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                </button>
                             </div>
-                            
-                            <label class="flex items-center justify-between cursor-pointer group">
-                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{{ t('Sticky Sidebar') }}</span>
-                                <div class="relative">
-                                    <input type="checkbox" v-model="form.sticky" class="sr-only peer">
-                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-surface-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
-                                </div>
-                            </label>
                         </div>
                     </div>
-                </div>
 
-                <!-- Widgets Builder Area -->
-                <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-sm border border-gray-100 dark:border-surface-800 p-6">
-                        <div class="flex items-center justify-between mb-6">
-                            <h2 class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                <svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25z" /></svg>
-                                {{ t('Active Widgets') }}
-                            </h2>
-                            <button @click="openAddBlockModal" class="px-4 py-2 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-lg text-sm font-bold hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors">
-                                {{ t('+ Add Widget') }}
+                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Show On Pages') }}</h2>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Leave all pages unselected to show the sidebar everywhere.') }}</p>
+                            </div>
+                            <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ form.show_on_pages.length }}</span>
+                        </div>
+
+                        <div class="mt-4 flex max-h-72 flex-wrap gap-2 overflow-y-auto">
+                            <button
+                                v-for="page in availablePages"
+                                :key="page.key"
+                                type="button"
+                                class="inline-flex items-center rounded-full border px-3 py-2 text-xs font-semibold transition"
+                                :class="form.show_on_pages.includes(page.key)
+                                    ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300'
+                                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:border-primary-900/40'"
+                                @click="togglePage(page.key)"
+                            >
+                                {{ page.label }}
                             </button>
                         </div>
-
-                        <div class="space-y-3">
-                            <div v-if="form.blocks.length === 0" class="border-2 border-dashed border-gray-200 dark:border-surface-700 rounded-2xl p-8 text-center bg-gray-50/50 dark:bg-surface-800/50">
-                                <div class="w-12 h-12 bg-white dark:bg-surface-900 rounded-xl shadow-sm flex items-center justify-center mx-auto mb-3">
-                                    <svg class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" /></svg>
-                                </div>
-                                <h3 class="text-sm font-bold text-gray-900 dark:text-white mb-1">{{ t('No widgets added') }}</h3>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Add widgets to build your sidebar.') }}</p>
-                            </div>
-
-                            <div v-for="(block, index) in form.blocks" :key="block.id" class="group flex items-center gap-3 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 p-3 rounded-xl hover:border-primary-500 dark:hover:border-primary-500 transition-all shadow-sm">
-                                <div class="flex flex-col gap-1 text-gray-400 cursor-move pl-1">
-                                    <button @click.prevent="moveBlockUp(Number(index))" :disabled="index === 0" class="hover:text-primary-500 disabled:opacity-30 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7" /></svg></button>
-                                    <button @click.prevent="moveBlockDown(Number(index))" :disabled="index === form.blocks.length - 1" class="hover:text-primary-500 disabled:opacity-30 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" /></svg></button>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-bold text-sm text-gray-900 dark:text-white truncate flex items-center gap-2">
-                                        {{ t(getBlockLabel(block.type)) }}
-                                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-gray-100 dark:bg-surface-800 text-gray-500">{{ block.type }}</span>
-                                    </div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{{ block.config.title || t('No Title') }}</div>
-                                </div>
-                                <div class="flex items-center gap-2 pr-2">
-                                    <button @click="editBlock(Number(index))" class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 dark:bg-surface-800 text-gray-600 dark:text-gray-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg></button>
-                                    <button @click="removeBlock(Number(index))" class="w-8 h-8 flex items-center justify-center rounded-lg bg-gray-50 dark:bg-surface-800 text-danger-500 hover:bg-danger-50 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                </aside>
 
-        <!-- Add Widget Modal -->
-        <div v-if="addBlockModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-6 overflow-y-auto">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">{{ t('Add Widget to Sidebar') }}</h3>
-                    <div class="space-y-2">
-                        <button v-for="bt in blockTypes" :key="bt.type" @click="addBlock(bt.type)" class="w-full flex items-start gap-3 p-3 rounded-xl border border-gray-100 dark:border-surface-700 hover:border-primary-500 dark:hover:border-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/10 transition-all text-left group">
-                            <div class="w-10 h-10 rounded-lg bg-gray-50 dark:bg-surface-800 group-hover:bg-white dark:group-hover:bg-surface-900 flex items-center justify-center shrink-0 border border-gray-100 dark:border-surface-700 shadow-sm">
-                                <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm text-gray-900 dark:text-white">{{ t(bt.label) }}</div>
-                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ t(bt.desc) }}</div>
-                            </div>
+                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                            <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Active Widgets') }}</h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Drag to reorder widgets and open each item to configure its content.') }}</p>
+                        </div>
+                        <button type="button" @click="openAddBlockModal" class="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 dark:bg-gray-800">
+                            <i class="ti ti-plus text-base"></i>
+                            {{ t('Add Widget') }}
                         </button>
                     </div>
-                    <div class="mt-6 flex justify-end">
-                        <button @click="addBlockModalOpen = false" class="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">{{ t('Cancel') }}</button>
+
+                    <div class="mt-6">
+                        <div v-if="form.blocks.length === 0" class="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50/70 p-10 text-center dark:border-surface-700 dark:bg-surface-800/50">
+                            <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-surface-900">
+                                <i class="ti ti-layout-sidebar text-2xl text-gray-400"></i>
+                            </div>
+                            <h3 class="mt-4 text-sm font-bold text-gray-900 dark:text-white">{{ t('No widgets added') }}</h3>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Start by adding a widget to build the sidebar experience.') }}</p>
+                        </div>
+
+                        <VueDraggable v-else v-model="form.blocks" handle=".drag-handle" ghostClass="opacity-50" :animation="150" class="space-y-3">
+                            <article v-for="(block, index) in form.blocks" :key="block.id" class="group flex items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 transition hover:border-primary-300 hover:bg-primary-50/40 dark:border-surface-700 dark:bg-surface-800/60 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10">
+                                <button type="button" class="drag-handle inline-flex h-10 w-10 shrink-0 cursor-grab items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 transition hover:text-primary-600 active:cursor-grabbing dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300">
+                                    <i class="ti ti-grip-vertical text-lg"></i>
+                                </button>
+
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ t(getBlockLabel(block.type)) }}</h3>
+                                    </div>
+                                    <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{{ block.config.title || t('No title set') }}</p>
+                                </div>
+
+                                <div class="flex shrink-0 items-center gap-2">
+                                    <Tooltip :content="t('Settings')" placement="top">
+                                        <button type="button" @click="editBlock(Number(index))" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
+                                            <i class="ti ti-settings text-base"></i>
+                                        </button>
+                                    </Tooltip>
+                                    <Tooltip :content="t('Remove')" placement="top">
+                                        <button type="button" @click="removeBlock(Number(index))" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+                                            <i class="ti ti-trash text-base"></i>
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                            </article>
+                        </VueDraggable>
                     </div>
+                </section>
+            </div>
+        </div>
+
+        <div v-if="addBlockModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+            <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Add Widget') }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose a widget to add to the sidebar layout.') }}</p>
+                    </div>
+                    <button type="button" class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="addBlockModalOpen = false">
+                        <i class="ti ti-x text-xl"></i>
+                    </button>
+                </div>
+                <div class="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
+                    <button v-for="bt in blockTypes" :key="bt.type" type="button" @click="addBlock(bt.type)" class="flex items-start gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-left transition hover:border-primary-300 hover:bg-primary-50 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
+                            <i class="ti ti-plus text-base"></i>
+                        </span>
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t(bt.label) }}</span>
+                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t(bt.desc) }}</span>
+                        </span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Edit Widget Modal -->
-        <div v-if="blockModalOpen && editingBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div class="bg-white dark:bg-surface-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-                <div class="p-6 overflow-y-auto">
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        {{ t(getBlockLabel(editingBlock.data.type)) }} {{ t('Settings') }}
-                    </h3>
+        <div v-if="blockModalOpen && editingBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+            <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t(getBlockLabel(editingBlock.data.type)) }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Adjust the widget content and behavior for this sidebar block.') }}</p>
+                    </div>
+                    <button type="button" class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="blockModalOpen = false">
+                        <i class="ti ti-x text-xl"></i>
+                    </button>
+                </div>
 
-                    <div class="space-y-4">
-                        <!-- Widget Title (Shared) -->
+                <div class="space-y-4 overflow-y-auto p-6">
+                    <div>
+                        <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Widget Title') }}</label>
+                        <input v-model="editingBlock.data.config.title" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </div>
+
+                    <template v-if="editingBlock.data.type === 'search_box'">
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Widget Title') }}</label>
-                            <input v-model="editingBlock.data.config.title" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Placeholder Text') }}</label>
+                            <input v-model="editingBlock.data.config.placeholder" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                         </div>
+                    </template>
 
-                        <!-- Search Box Settings -->
-                        <template v-if="editingBlock.data.type === 'search_box'">
+                    <template v-if="editingBlock.data.type === 'categories_list'">
+                        <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
                             <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Placeholder Text') }}</label>
-                                <input v-model="editingBlock.data.config.placeholder" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
+                                <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Tool Count') }}</div>
+                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Display category totals beside each item.') }}</div>
                             </div>
-                        </template>
+                            <button type="button" role="switch" :aria-checked="editingBlock.data.config.show_count" class="relative inline-flex h-6 w-11 rounded-full transition" :class="editingBlock.data.config.show_count ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="editingBlock.data.config.show_count = !editingBlock.data.config.show_count">
+                                <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="editingBlock.data.config.show_count ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                            </button>
+                        </div>
+                    </template>
 
-                        <!-- Categories List Settings -->
-                        <template v-if="editingBlock.data.type === 'categories_list'">
-                            <label class="flex items-center gap-2 cursor-pointer group">
-                                <input type="checkbox" v-model="editingBlock.data.config.show_count" class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500" />
-                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">{{ t('Show Post Count') }}</span>
-                            </label>
-                        </template>
+                    <template v-if="editingBlock.data.type === 'recent_posts'">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Number of Posts to Show') }}</label>
+                            <AppSelect v-model="editingBlock.data.config.count" :options="recentPostCountOptions" :placeholder="t('Select count')" />
+                        </div>
+                    </template>
 
-                        <!-- Recent Posts Settings -->
-                        <template v-if="editingBlock.data.type === 'recent_posts'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Number of Posts to Show') }}</label>
-                                <input v-model.number="editingBlock.data.config.count" type="number" min="1" max="10" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            </div>
-                        </template>
-                        
-                        <!-- Newsletter Settings -->
-                        <template v-if="editingBlock.data.type === 'newsletter'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Description') }}</label>
-                                <input v-model="editingBlock.data.config.description" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                            </div>
-                        </template>
+                    <template v-if="editingBlock.data.type === 'popular_tools'">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Number of Tools to Show') }}</label>
+                            <AppSelect v-model="editingBlock.data.config.count" :options="toolCountOptions" :placeholder="t('Select count')" />
+                        </div>
+                    </template>
 
-                        <!-- Ad Zone Settings -->
-                        <template v-if="editingBlock.data.type === 'ad_zone'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Ad Zone ID') }}</label>
-                                <input v-model="editingBlock.data.config.zone_id" type="text" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all">
-                                <p class="text-[10px] text-gray-500 mt-1">{{ t('Enter the ID of the ad zone configured in Ads System.') }}</p>
-                            </div>
-                        </template>
+                    <template v-if="editingBlock.data.type === 'recently_added'">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Number of Tools to Show') }}</label>
+                            <AppSelect v-model="editingBlock.data.config.count" :options="recentPostCountOptions" :placeholder="t('Select count')" />
+                        </div>
+                    </template>
 
-                        <!-- Custom HTML Settings -->
-                        <template v-if="editingBlock.data.type === 'custom_html'">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wider">{{ t('Custom HTML Content') }}</label>
-                                <textarea v-model="editingBlock.data.config.content" rows="4" class="w-full bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:text-white transition-all font-mono"></textarea>
-                            </div>
-                        </template>
-                    </div>
+                    <template v-if="editingBlock.data.type === 'newsletter'">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Description') }}</label>
+                            <input v-model="editingBlock.data.config.description" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        </div>
+                    </template>
 
-                    <div class="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-surface-800">
-                        <button @click="blockModalOpen = false" class="px-5 py-2.5 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-800 rounded-xl transition-colors">{{ t('Cancel') }}</button>
-                        <button @click="saveBlockSettings" class="px-5 py-2.5 btn-primary text-sm font-bold rounded-xl transition-all shadow-lg shadow-primary-600/20">{{ t('Apply Configuration') }}</button>
-                    </div>
+                    <template v-if="editingBlock.data.type === 'ad_zone'">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Ad Zone ID') }}</label>
+                            <input v-model="editingBlock.data.config.zone_id" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <p class="mt-1 text-[11px] text-gray-500">{{ t('Enter the ID of the ad zone configured in Ads System.') }}</p>
+                        </div>
+                    </template>
+
+                    <template v-if="editingBlock.data.type === 'custom_html'">
+                        <div>
+                            <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Custom HTML Content') }}</label>
+                            <textarea v-model="editingBlock.data.config.content" rows="5" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-mono text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
+                    <button type="button" @click="blockModalOpen = false" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button>
+                    <button type="button" @click="saveBlockSettings" class="rounded-lg btn-primary px-4 py-2 text-sm font-semibold">{{ t('Done') }}</button>
                 </div>
             </div>
         </div>
@@ -319,5 +473,26 @@ const moveBlockDown = (index: number) => {
             @cancel="confirmRemoveOpen = false; removeIndex = null"
             @confirm="executeRemoveBlock"
         />
+
+        <div v-if="importModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+            <div class="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Import Sidebar Configuration') }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Paste a previously exported JSON file to replace the current sidebar setup.') }}</p>
+                    </div>
+                    <button type="button" class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="importModalOpen = false">
+                        <i class="ti ti-x text-xl"></i>
+                    </button>
+                </div>
+                <div class="p-6">
+                    <textarea v-model="importJsonText" rows="10" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Paste JSON here...')"></textarea>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
+                    <button type="button" @click="importModalOpen = false" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button>
+                    <button type="button" @click="importConfig" class="rounded-lg btn-primary px-4 py-2 text-sm font-semibold">{{ t('Import') }}</button>
+                </div>
+            </div>
+        </div>
     </AdminLayout>
 </template>

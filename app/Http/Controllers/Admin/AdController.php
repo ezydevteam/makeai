@@ -8,6 +8,7 @@ use App\Models\Ad;
 use App\Models\Plan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -15,32 +16,12 @@ class AdController extends Controller
 {
     public function index(): Response
     {
-        $ads = Ad::orderBy('zone')->orderBy('sort_order')->latest()->get()->map(function ($ad) {
-            return array_merge($ad->toArray(), [
-                'ctr' => $ad->ctr,
-            ]);
-        });
-
-        return Inertia::render('Admin/Ads/Index', [
-            'ads' => $ads,
-            'zones' => config('ads.zones'),
-            'settings' => [
-                'ads_enabled' => (bool) settings('ads_enabled', true),
-                'adsense_publisher_id' => (string) settings('adsense_publisher_id', ''),
-                'ads_auto_ads_enabled' => (bool) settings('ads_auto_ads_enabled', false),
-                'ads_disable_for_subscribed_users' => (bool) settings('ads_disable_for_subscribed_users', false),
-                'ads_disabled_plan_ids' => settings('ads_disabled_plan_ids', []),
-            ],
-            'plans' => Plan::query()->orderBy('sort_order')->get(['id', 'name']),
-        ]);
+        return $this->renderIndex();
     }
 
     public function create(): Response
     {
-        return Inertia::render('Admin/Ads/Editor', [
-            'ad' => null,
-            'zones' => config('ads.zones'),
-        ]);
+        return $this->renderIndex(editorMode: 'create');
     }
 
     public function store(AdRequest $request): RedirectResponse
@@ -54,10 +35,7 @@ class AdController extends Controller
 
     public function edit(Ad $ad): Response
     {
-        return Inertia::render('Admin/Ads/Editor', [
-            'ad' => $ad,
-            'zones' => config('ads.zones'),
-        ]);
+        return $this->renderIndex($ad, 'edit');
     }
 
     public function update(AdRequest $request, Ad $ad): RedirectResponse
@@ -94,6 +72,14 @@ class AdController extends Controller
             'ads_disabled_plan_ids.*' => ['integer', 'exists:plans,id'],
         ]);
 
+        if (($data['ads_enabled'] ?? false) && blank($data['adsense_publisher_id'] ?? null)) {
+            return back()
+                ->withErrors([
+                    'adsense_publisher_id' => translate('AdSense Publisher ID is required before ads can be enabled.'),
+                ])
+                ->withInput();
+        }
+
         settings_set('ads_enabled', (bool) ($data['ads_enabled'] ?? false), 'boolean', 'ads');
         settings_set('adsense_publisher_id', $data['adsense_publisher_id'] ?? '', 'string', 'ads');
         settings_set('ads_auto_ads_enabled', (bool) ($data['ads_auto_ads_enabled'] ?? false), 'boolean', 'ads');
@@ -106,9 +92,61 @@ class AdController extends Controller
     private function payload(AdRequest $request): array
     {
         $validated = $request->validated();
+        $currentAd = $request->route('ad');
+
+        if ($request->hasFile('image_file')) {
+            if ($currentAd?->image_url) {
+                $this->deleteUploadedAdImage($currentAd->image_url);
+            }
+
+            $validated['image_url'] = Storage::url($request->file('image_file')->store('ads', 'public'));
+        } elseif (($validated['type'] ?? null) === 'image_link') {
+            $validated['image_url'] = $currentAd?->image_url;
+        } else {
+            $validated['image_url'] = null;
+        }
+
+        unset($validated['image_file']);
         $validated['adsense_client'] = $validated['adsense_client'] ?: settings('adsense_publisher_id');
         $validated['is_active'] = (bool) ($validated['is_active'] ?? false);
 
         return $validated;
+    }
+
+    private function deleteUploadedAdImage(?string $imageUrl): void
+    {
+        if (blank($imageUrl)) {
+            return;
+        }
+
+        $storagePrefix = Storage::url('');
+
+        if (str_starts_with($imageUrl, $storagePrefix)) {
+            Storage::disk('public')->delete(str_replace($storagePrefix, '', $imageUrl));
+        }
+    }
+
+    private function renderIndex(?Ad $editorAd = null, ?string $editorMode = null): Response
+    {
+        $ads = Ad::orderBy('zone')->orderBy('sort_order')->latest()->get()->map(function ($ad) {
+            return array_merge($ad->toArray(), [
+                'ctr' => $ad->ctr,
+            ]);
+        });
+
+        return Inertia::render('Admin/Ads/Index', [
+            'ads' => $ads,
+            'zones' => config('ads.zones'),
+            'settings' => [
+                'ads_enabled' => (bool) settings('ads_enabled', true),
+                'adsense_publisher_id' => (string) settings('adsense_publisher_id', ''),
+                'ads_auto_ads_enabled' => (bool) settings('ads_auto_ads_enabled', false),
+                'ads_disable_for_subscribed_users' => (bool) settings('ads_disable_for_subscribed_users', false),
+                'ads_disabled_plan_ids' => settings('ads_disabled_plan_ids', []),
+            ],
+            'plans' => Plan::query()->orderBy('sort_order')->get(['id', 'name']),
+            'editorAd' => $editorAd,
+            'editorMode' => $editorMode,
+        ]);
     }
 }

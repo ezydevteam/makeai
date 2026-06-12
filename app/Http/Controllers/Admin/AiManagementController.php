@@ -201,7 +201,7 @@ class AiManagementController extends Controller
                 ['role' => 'user', 'content' => 'Respond with exactly: OK'],
             ], $testModel, ['timeout' => 15]);
 
-            $success = ! empty($result['content']);
+            $success = ! empty($result->content);
 
             return response()->json([
                 'success' => $success,
@@ -424,8 +424,22 @@ class AiManagementController extends Controller
 
     private function maskSecret(string $secret): string
     {
-        $tail = substr($secret, -4);
+        $length = mb_strlen($secret);
 
-        return $tail ? "•••• {$tail}" : '••••';
+        if ($length <= 4) {
+            return '••••';
+        }
+
+        if ($length <= 8) {
+            $prefix = mb_substr($secret, 0, 1);
+            $suffix = mb_substr($secret, -1);
+
+            return "{$prefix}•••{$suffix}";
+        }
+
+        $prefix = mb_substr($secret, 0, 3);
+        $suffix = mb_substr($secret, -4);
+
+        return "{$prefix}•••{$suffix}";
     }
 }

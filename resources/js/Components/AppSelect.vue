@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick as vueNextTick } from 'vue'
 
 export interface SelectOption {
     value: string | number
@@ -24,6 +24,8 @@ const props = withDefaults(defineProps<{
     required?: boolean
     id?: string
     name?: string
+    /** Auto-enable virtual scrolling when options exceed this threshold. Default 100. */
+    virtualThreshold?: number
 }>(), {
     modelValue: undefined,
     placeholder: '',
@@ -38,11 +40,14 @@ const props = withDefaults(defineProps<{
     required: false,
     id: undefined,
     name: undefined,
+    virtualThreshold: 100,
 })
 
 const emit = defineEmits<{
     'update:modelValue': [value: string | number | null | (string | number)[]]
 }>()
+
+const ITEM_HEIGHT = 38
 
 const isOpen = ref(false)
 const searchQuery = ref('')
@@ -52,8 +57,9 @@ const inputRef = ref<HTMLInputElement | null>(null)
 const triggerRef = ref<HTMLButtonElement | null>(null)
 const wrapperRef = ref<HTMLElement | null>(null)
 const placement = ref<'bottom' | 'top'>('bottom')
+const listScrollTop = ref(0)
 
-const selectedValues = computed<string[] | number[]>(() => {
+const selectedValues = computed<(string | number)[]>(() => {
     if (props.multiple) {
         return (Array.isArray(props.modelValue) ? props.modelValue : []) as (string | number)[]
     }
@@ -70,6 +76,10 @@ const filtered = computed(() => {
     )
 })
 
+const useVirtual = computed(() => {
+    return (props.liveSearch || props.multiple) && filtered.value.length > props.virtualThreshold
+})
+
 const showSearch = computed(() => props.liveSearch && (props.options.length > props.size || props.multiple))
 
 const selectedOptions = computed(() =>
@@ -80,7 +90,6 @@ const displayText = computed(() => {
     if (props.multiple && props.compactMultiple && selectedOptions.value.length > 0) {
         return selectedOptions.value.map((option) => option.label).join(', ')
     }
-
     if (props.multiple && selectedOptions.value.length > 0) {
         return ''
     }
@@ -90,10 +99,38 @@ const displayText = computed(() => {
     return props.placeholder
 })
 
+// --- Virtual scroll ---
+const visibleCount = computed(() => Math.min(filtered.value.length, props.size))
+const totalVirtualHeight = computed(() => filtered.value.length * ITEM_HEIGHT)
+
+const startIndex = computed(() => {
+    if (!useVirtual.value) return 0
+    return Math.floor(listScrollTop.value / ITEM_HEIGHT)
+})
+const endIndex = computed(() => {
+    if (!useVirtual.value) return filtered.value.length
+    return Math.min(filtered.value.length, startIndex.value + visibleCount.value + 3)
+})
+
+const visibleItems = computed(() => {
+    if (!useVirtual.value) return filtered.value
+    return filtered.value.slice(startIndex.value, endIndex.value)
+})
+
+const virtualOffsetY = computed(() => {
+    if (!useVirtual.value) return 0
+    return startIndex.value * ITEM_HEIGHT
+})
+
+function onListScroll(e: Event) {
+    listScrollTop.value = (e.target as HTMLElement).scrollTop
+}
+// --- End virtual scroll ---
+
 const detectPlacement = () => {
     if (!triggerRef.value) return
     const rect = triggerRef.value.getBoundingClientRect()
-    const menuHeight = props.size * 38 + (showSearch.value ? 50 : 0) + 8
+    const menuHeight = props.size * ITEM_HEIGHT + (showSearch.value ? 50 : 0) + 8
     const spaceBelow = window.innerHeight - rect.bottom
     placement.value = spaceBelow < menuHeight ? 'top' : 'bottom'
 }
@@ -104,8 +141,9 @@ function toggle() {
     isOpen.value = !isOpen.value
     if (isOpen.value) {
         searchQuery.value = ''
-        highlightedIndex.value = 0
-        nextTick(() => {
+        highlightedIndex.value = -1
+        listScrollTop.value = 0
+        vueNextTick(() => {
             if (showSearch.value) inputRef.value?.focus()
         })
     }
@@ -123,7 +161,7 @@ function select(option: SelectOption) {
             current.splice(idx, 1)
         }
         emit('update:modelValue', current)
-        nextTick(() => { if (showSearch.value) inputRef.value?.focus() })
+        vueNextTick(() => { if (showSearch.value) inputRef.value?.focus() })
         return
     }
 
@@ -167,15 +205,25 @@ function handleKeydown(e: KeyboardEvent) {
         scrollToHighlighted()
         return
     }
-    if (e.key === 'Enter' && isOpen.value && highlightedIndex.value >= 0) {
+    if (e.key === 'Enter' && isOpen.value) {
         e.preventDefault()
-        select(filtered.value[highlightedIndex.value])
+        if (highlightedIndex.value >= 0 && highlightedIndex.value < filtered.value.length) {
+            select(filtered.value[highlightedIndex.value])
+        }
         return
     }
 }
 
 function scrollToHighlighted() {
-    nextTick(() => {
+    if (!dropdownRef.value || highlightedIndex.value < 0) return
+
+    if (useVirtual.value) {
+        const targetScroll = highlightedIndex.value * ITEM_HEIGHT
+        listScrollTop.value = targetScroll
+        return
+    }
+
+    vueNextTick(() => {
         const el = dropdownRef.value?.querySelector('[data-highlighted]')
         el?.scrollIntoView({ block: 'nearest' })
     })
@@ -183,25 +231,30 @@ function scrollToHighlighted() {
 
 function clickOutside(e: MouseEvent) {
     const target = e.target as HTMLElement
-    if (!dropdownRef.value?.contains(target) && !triggerRef.value?.contains(target)) {
+    if (!wrapperRef.value?.contains(target)) {
         isOpen.value = false
     }
-}
-
-function nextTick(fn: () => void) {
-    requestAnimationFrame(() => requestAnimationFrame(fn))
 }
 
 onMounted(() => document.addEventListener('click', clickOutside))
 onBeforeUnmount(() => document.removeEventListener('click', clickOutside))
 
 watch(isOpen, (val) => {
-    if (!val) searchQuery.value = ''
+    if (!val) {
+        searchQuery.value = ''
+        listScrollTop.value = 0
+    }
+})
+
+// Reset scroll when search filter changes
+watch(searchQuery, () => {
+    listScrollTop.value = 0
+    highlightedIndex.value = -1
 })
 </script>
 
 <template>
-    <div class="relative" :class="{ 'opacity-60 pointer-events-none': disabled }">
+    <div ref="wrapperRef" class="relative" :class="{ 'opacity-60 pointer-events-none': disabled }">
         <label v-if="label" :for="id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             {{ label }}
             <span v-if="required" class="text-danger-500">*</span>
@@ -209,132 +262,182 @@ watch(isOpen, (val) => {
 
         <div class="relative">
             <button
-            ref="triggerRef"
-            type="button"
-            :id="id"
-            :name="name"
-            :disabled="disabled"
-            class="w-full min-h-[2.5rem] flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white text-left transition-colors focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
-            @click="toggle"
-            @keydown="handleKeydown"
-        >
-            <span class="flex items-center gap-1.5 flex-wrap truncate">
-                <i v-if="!multiple && displayText && selectedOptions[0]?.icon" :class="selectedOptions[0].icon" class="text-base shrink-0" aria-hidden="true" />
-                <template v-if="multiple && selectedOptions.length > 0 && !compactMultiple">
-                    <span
-                        v-for="opt in selectedOptions"
-                        :key="String(opt.value)"
-                        class="inline-flex items-center gap-1 rounded-md bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
-                    >
-                        <span
-                            v-if="opt.color"
-                            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
-                            :style="{ backgroundColor: opt.color }"
-                        ></span>
-                        <i v-if="opt.icon" :class="opt.icon" class="text-xs" />
-                        {{ opt.label }}
-                        <button type="button" class="ml-0.5 rounded-full p-0.5 hover:bg-primary-200 dark:hover:bg-primary-800" @click="removeTag(opt.value, $event as any)">
-                            <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </span>
-                </template>
-                <span v-if="displayText" :class="{ 'text-gray-400 dark:text-gray-500': !selectedOptions.length }">{{ displayText }}</span>
-            </span>
-            <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-        </button>
-
-        <Transition
-            enter-active-class="transition ease-out duration-150"
-            :enter-from-class="placement === 'top' ? 'opacity-0 translate-y-1 scale-95' : 'opacity-0 -translate-y-1 scale-95'"
-            :enter-to-class="placement === 'top' ? 'opacity-100 -translate-y-0 scale-100' : 'opacity-100 translate-y-0 scale-100'"
-            leave-active-class="transition ease-in duration-100"
-            leave-from-class="opacity-100 scale-100"
-            leave-to-class="opacity-0 scale-95"
-        >
-            <div
-                v-if="isOpen"
-                ref="dropdownRef"
-                class="absolute z-50 w-full rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900 overflow-hidden"
-                :class="placement === 'top' ? 'bottom-full' : 'top-full mt-1'"
+                ref="triggerRef"
+                type="button"
+                :id="id"
+                :name="name"
+                :disabled="disabled"
+                class="w-full min-h-[2.5rem] flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white text-left transition-colors focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                @click.stop="toggle"
+                @keydown="handleKeydown"
             >
-                <div v-if="showSearch && placement === 'bottom'" class="border-b border-gray-100 dark:border-surface-700 p-2">
-                    <input
-                        ref="inputRef"
-                        v-model="searchQuery"
-                        type="text"
-                        :placeholder="searchPlaceholder || 'Search...'"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white focus:ring-0"
-                        @keydown.stop="handleKeydown"
-                    />
-                </div>
-
-                <div v-if="multiple && filtered.length > 1" class="flex gap-2 border-b border-gray-100 dark:border-surface-700 px-3 py-1.5">
-                    <button type="button" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400" @click="selectAll">Select all</button>
-                    <button type="button" class="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" @click="deselectAll">Clear</button>
-                </div>
-
-                <div
-                    class="overflow-y-auto"
-                    :style="{ maxHeight: `${size * 38}px` }"
-                >
-                    <div
-                        v-for="(option, index) in filtered"
-                        :key="String(option.value)"
-                        :data-highlighted="highlightedIndex === index ? '' : undefined"
-                        class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors"
-                        :class="[
-                            option.disabled
-                                ? 'opacity-40 cursor-not-allowed'
-                                : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
-                            isSelected(option.value)
-                                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
-                                : 'text-gray-700 dark:text-gray-200',
-                            highlightedIndex === index && !option.disabled && !isSelected(option.value)
-                                ? 'bg-gray-100 dark:bg-surface-700'
-                                : '',
-                        ]"
-                        @click="select(option)"
-                        @mouseenter="highlightedIndex = index"
-                        @mouseleave="highlightedIndex = -1"
-                    >
+                <span class="flex items-center gap-1.5 flex-wrap truncate">
+                    <i v-if="!multiple && displayText && selectedOptions[0]?.icon" :class="selectedOptions[0].icon" class="text-base shrink-0" aria-hidden="true" />
+                    <template v-if="multiple && selectedOptions.length > 0 && !compactMultiple">
                         <span
-                            v-if="option.color"
-                            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
-                            :style="{ backgroundColor: option.color }"
-                        ></span>
-                        <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
-                        <span class="truncate">{{ option.label }}</span>
-                        <i
-                            v-if="isSelected(option.value)"
-                            class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
-                            aria-hidden="true"
-                        ></i>
+                            v-for="opt in selectedOptions"
+                            :key="String(opt.value)"
+                            class="inline-flex items-center gap-1 rounded-md bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                        >
+                            <span
+                                v-if="opt.color"
+                                class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                                :style="{ backgroundColor: opt.color }"
+                            ></span>
+                            <i v-if="opt.icon" :class="opt.icon" class="text-xs" />
+                            {{ opt.label }}
+                            <button type="button" class="ml-0.5 rounded-full p-0.5 hover:bg-primary-200 dark:hover:bg-primary-800" @click.stop="removeTag(opt.value, $event as any)">
+                                <svg class="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </span>
+                    </template>
+                    <span v-if="displayText" :class="{ 'text-gray-400 dark:text-gray-500': !selectedOptions.length }">{{ displayText }}</span>
+                </span>
+                <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+            </button>
+
+            <Transition
+                enter-active-class="transition ease-out duration-150"
+                :enter-from-class="placement === 'top' ? 'opacity-0 translate-y-1 scale-95' : 'opacity-0 -translate-y-1 scale-95'"
+                :enter-to-class="placement === 'top' ? 'opacity-100 -translate-y-0 scale-100' : 'opacity-100 translate-y-0 scale-100'"
+                leave-active-class="transition ease-in duration-100"
+                leave-from-class="opacity-100 scale-100"
+                leave-to-class="opacity-0 scale-95"
+            >
+                <div
+                    v-if="isOpen"
+                    ref="dropdownRef"
+                    class="absolute z-50 w-full rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900 overflow-hidden"
+                    :class="placement === 'top' ? 'bottom-full' : 'top-full mt-1'"
+                    @click.stop
+                >
+                    <div v-if="showSearch && placement === 'bottom'" class="border-b border-gray-100 dark:border-surface-700 p-2">
+                        <input
+                            ref="inputRef"
+                            v-model="searchQuery"
+                            type="text"
+                            :placeholder="searchPlaceholder || 'Search...'"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white focus:ring-0"
+                            @keydown.stop="handleKeydown"
+                        />
                     </div>
 
+                    <div v-if="multiple && filtered.length > 1" class="flex gap-2 border-b border-gray-100 dark:border-surface-700 px-3 py-1.5">
+                        <button type="button" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400" @click.stop="selectAll">Select all</button>
+                        <button type="button" class="text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" @click.stop="deselectAll">Clear</button>
+                    </div>
+
+                    <!-- Virtual scroll list -->
                     <div
-                        v-if="filtered.length === 0"
-                        class="px-3 py-4 text-center text-sm text-gray-400 dark:text-gray-500"
+                        v-if="useVirtual"
+                        class="overflow-y-auto"
+                        :style="{ maxHeight: `${size * ITEM_HEIGHT}px` }"
+                        @scroll="onListScroll"
                     >
-                        No results found
+                        <div :style="{ height: `${totalVirtualHeight}px`, position: 'relative' }">
+                            <div :style="{ transform: `translateY(${virtualOffsetY}px)` }">
+                                <div
+                                    v-for="(option, index) in visibleItems"
+                                    :key="String(option.value)"
+                                    :data-highlighted="(startIndex + index) === highlightedIndex ? '' : undefined"
+                                    class="flex items-center gap-2 px-3 text-sm cursor-pointer transition-colors"
+                                    :style="{ height: `${ITEM_HEIGHT}px` }"
+                                    :class="[
+                                        option.disabled
+                                            ? 'opacity-40 cursor-not-allowed'
+                                            : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                                        isSelected(option.value)
+                                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                                            : 'text-gray-700 dark:text-gray-200',
+                                        (startIndex + index) === highlightedIndex && !option.disabled && !isSelected(option.value)
+                                            ? 'bg-gray-100 dark:bg-surface-700'
+                                            : '',
+                                    ]"
+                                    @click.stop="select(option)"
+                                    @mouseenter="highlightedIndex = startIndex + index"
+                                    @mouseleave="highlightedIndex = -1"
+                                >
+                                    <span
+                                        v-if="option.color"
+                                        class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                                        :style="{ backgroundColor: option.color }"
+                                    ></span>
+                                    <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
+                                    <span class="truncate">{{ option.label }}</span>
+                                    <i
+                                        v-if="isSelected(option.value)"
+                                        class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
+                                        aria-hidden="true"
+                                    ></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Normal (non-virtual) list -->
+                    <div
+                        v-else
+                        class="overflow-y-auto"
+                        :style="{ maxHeight: `${size * ITEM_HEIGHT}px` }"
+                    >
+                        <div
+                            v-for="(option, index) in filtered"
+                            :key="String(option.value)"
+                            :data-highlighted="highlightedIndex === index ? '' : undefined"
+                            class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors"
+                            :class="[
+                                option.disabled
+                                    ? 'opacity-40 cursor-not-allowed'
+                                    : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                                isSelected(option.value)
+                                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                                    : 'text-gray-700 dark:text-gray-200',
+                                highlightedIndex === index && !option.disabled && !isSelected(option.value)
+                                    ? 'bg-gray-100 dark:bg-surface-700'
+                                    : '',
+                            ]"
+                            @click.stop="select(option)"
+                            @mouseenter="highlightedIndex = index"
+                            @mouseleave="highlightedIndex = -1"
+                        >
+                            <span
+                                v-if="option.color"
+                                class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                                :style="{ backgroundColor: option.color }"
+                            ></span>
+                            <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
+                            <span class="truncate">{{ option.label }}</span>
+                            <i
+                                v-if="isSelected(option.value)"
+                                class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
+                                aria-hidden="true"
+                            ></i>
+                        </div>
+
+                        <div
+                            v-if="filtered.length === 0"
+                            class="px-3 py-4 text-center text-sm text-gray-400 dark:text-gray-500"
+                        >
+                            No results found
+                        </div>
+                    </div>
+
+                    <div v-if="showSearch && placement === 'top'" class="border-t border-gray-100 dark:border-surface-700 p-2">
+                        <input
+                            ref="inputRef"
+                            v-model="searchQuery"
+                            type="text"
+                            :placeholder="searchPlaceholder || 'Search...'"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white focus:ring-0"
+                            @keydown.stop="handleKeydown"
+                        />
                     </div>
                 </div>
+            </Transition>
 
-                <div v-if="showSearch && placement === 'top'" class="border-t border-gray-100 dark:border-surface-700 p-2">
-                    <input
-                        ref="inputRef"
-                        v-model="searchQuery"
-                        type="text"
-                        :placeholder="searchPlaceholder || 'Search...'"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white focus:ring-0"
-                        @keydown.stop="handleKeydown"
-                    />
-                </div>
-            </div>
-        </Transition>
-
-        <span v-if="error" class="mt-1 block text-xs text-danger-600">{{ error }}</span>
+            <span v-if="error" class="mt-1 block text-xs text-danger-600">{{ error }}</span>
         </div>
     </div>
 </template>

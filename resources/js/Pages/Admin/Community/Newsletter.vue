@@ -1,42 +1,114 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
-import AdminLayout from '@/Layouts/AdminLayout.vue';
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue';
-import Pagination from '@/Components/Pagination.vue';
-import RichEditor from '@/Components/RichEditor.vue';
-import { useTranslate } from '@/Composables/useTranslate';
-import { useDateFormat } from '@/Composables/useDateFormat';
+import { computed, defineAsyncComponent, ref } from 'vue'
+import { Head, router, useForm } from '@inertiajs/vue3'
+import AdminLayout from '@/Layouts/AdminLayout.vue'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppColorPicker from '@/Components/AppColorPicker.vue'
+import AppSelect from '@/Components/AppSelect.vue'
+import Pagination from '@/Components/Pagination.vue'
+import { useTranslate } from '@/Composables/useTranslate'
+import { useDateFormat } from '@/Composables/useDateFormat'
 
-defineOptions({ layout: AdminLayout });
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+
+defineOptions({ layout: AdminLayout })
+
+type NewsletterTab = 'subscribers' | 'campaigns' | 'settings' | 'popup'
+type AudienceValue = 'subscribers' | 'users_all' | 'users_active' | 'users_inactive' | 'users_pro' | 'users_free'
+type CampaignStatus = 'draft' | 'sending' | 'sent' | string
+
+interface SubscriberItem {
+    id: number
+    email: string
+    name: string | null
+    status: string
+    created_at: string
+}
+
+interface CampaignItem {
+    id: number
+    subject: string
+    audience: AudienceValue
+    content: string
+    status: CampaignStatus
+    created_at: string
+    sent_at: string | null
+    recipient_count: number
+    sent_count: number | null
+    failed_count: number | null
+    opened_count: number | null
+}
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
+interface PaginatedCollection<T> {
+    data: T[]
+    links: PaginationLink[]
+    search?: string
+}
+
+interface NewsletterStats {
+    total: number
+    active: number
+    unsubscribed: number
+    users_all?: number
+    users_active?: number
+    users_inactive?: number
+    users_pro?: number
+    users_free?: number
+}
+
+interface NewsletterSettings {
+    newsletter_driver?: string | null
+    mailchimp_server_prefix?: string | null
+    mailchimp_list_id?: string | null
+    mailchimp_double_optin?: boolean | null
+    mailchimp_tags?: string | null
+    newsletter_double_optin?: boolean | null
+    newsletter_enable_popup?: boolean | null
+    newsletter_popup_trigger?: string | null
+    newsletter_popup_trigger_value?: string | number | null
+    newsletter_popup_title?: string | null
+    newsletter_popup_description?: string | null
+    newsletter_popup_placeholder?: string | null
+    newsletter_popup_submit_text?: string | null
+    newsletter_popup_success_message?: string | null
+    newsletter_popup_bg_color?: string | null
+    newsletter_popup_show_mobile?: boolean | null
+    newsletter_popup_cookie_duration?: string | number | null
+    newsletter_popup_hide_for_logged_in?: boolean | null
+}
 
 const props = defineProps<{
-    subscribers: any,
-    campaigns: any,
-    stats: any,
-    settings: any,
+    subscribers: PaginatedCollection<SubscriberItem>
+    campaigns: PaginatedCollection<CampaignItem>
+    stats: NewsletterStats
+    settings: NewsletterSettings
     configuredSecrets: Record<string, boolean>
-}>();
+}>()
 
-const activeTab = ref('subscribers');
-const { t } = useTranslate();
-const { formatDate } = useDateFormat();
+const { t } = useTranslate()
+const { formatDate } = useDateFormat()
 
-const showCampaignModal = ref(false);
-const editingCampaignId = ref<number | null>(null);
-const sendTargetId = ref<number | null>(null);
-const deleteTargetId = ref<number | null>(null);
-const testTargetId = ref<number | null>(null);
-const deleteSubscriberId = ref<number | null>(null);
-const subscriberSearch = ref(props.subscribers?.search ?? '')
-const filterSubscribers = () => {
-    window.location.href = route('admin.newsletter.index') + '?search=' + encodeURIComponent(subscriberSearch.value)
-}
-const campaignForm = useForm({
-    subject: '',
-    audience: 'subscribers',
-    content: ''
-});
+const activeTab = ref<NewsletterTab>('subscribers')
+const showCampaignModal = ref(false)
+const editingCampaignId = ref<number | null>(null)
+const sendTargetId = ref<number | null>(null)
+const deleteTargetId = ref<number | null>(null)
+const deleteSubscriberId = ref<number | null>(null)
+const subscriberSearch = ref(props.subscribers.search ?? '')
+const subscriberStatus = ref(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('status') ?? 'all' : 'all')
+
+const tabOptions = [
+    { value: 'subscribers', label: t('Subscribers') },
+    { value: 'campaigns', label: t('Campaigns') },
+    { value: 'settings', label: t('Integrations') },
+    { value: 'popup', label: t('Popup') },
+] as const
 
 const audienceOptions = [
     { value: 'subscribers', label: t('Newsletter subscribers'), countKey: 'active' },
@@ -45,89 +117,35 @@ const audienceOptions = [
     { value: 'users_inactive', label: t('Inactive users'), countKey: 'users_inactive' },
     { value: 'users_pro', label: t('Pro users'), countKey: 'users_pro' },
     { value: 'users_free', label: t('Free users'), countKey: 'users_free' },
-];
+] as const
 
-const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || t('Newsletter subscribers');
+const driverOptions = [
+    { value: 'internal', label: t('Internal only') },
+    { value: 'mailchimp', label: t('Mailchimp only') },
+    { value: 'both', label: t('Internal + Mailchimp') },
+]
 
-const submitCampaign = () => {
-    campaignForm.post(route('admin.newsletter.campaign.store'), {
-        onSuccess: () => {
-            showCampaignModal.value = false;
-            editingCampaignId.value = null;
-            campaignForm.reset();
-        }
-    });
-};
+const popupTriggerOptions = [
+    { value: 'time_delay', label: t('Time delay') },
+    { value: 'scroll_depth', label: t('Scroll depth') },
+    { value: 'exit_intent', label: t('Exit intent') },
+    { value: 'page_views', label: t('Page views') },
+    { value: 'first_visit', label: t('First visit only') },
+]
 
-const editCampaign = (camp: any) => {
-    editingCampaignId.value = camp.id;
-    campaignForm.subject = camp.subject;
-    campaignForm.audience = camp.audience;
-    campaignForm.content = camp.content;
-    showCampaignModal.value = true;
-};
+const subscriberStatusOptions = [
+    { value: 'all', label: t('All status') },
+    { value: 'subscribed', label: t('Subscribed') },
+    { value: 'unsubscribed', label: t('Unsubscribed') },
+]
 
-const updateCampaign = () => {
-    if (editingCampaignId.value === null) return;
-    campaignForm.post(route('admin.newsletter.campaign.update', editingCampaignId.value), {
-        onSuccess: () => {
-            showCampaignModal.value = false;
-            editingCampaignId.value = null;
-            campaignForm.reset();
-        }
-    });
-};
+const campaignForm = useForm({
+    subject: '',
+    audience: 'subscribers' as AudienceValue,
+    content: '',
+})
 
-const sendCampaign = (id: number) => {
-    sendTargetId.value = id;
-};
-
-const confirmSendCampaign = () => {
-    if (sendTargetId.value === null) {
-        return;
-    }
-
-    useForm({}).post(route('admin.newsletter.campaign.send', sendTargetId.value), {
-        onFinish: () => {
-            sendTargetId.value = null;
-        },
-    });
-};
-
-const deleteSubscriber = (id: number) => {
-    deleteSubscriberId.value = id;
-};
-
-const confirmDeleteSubscriber = () => {
-    if (deleteSubscriberId.value === null) {
-        return;
-    }
-
-    useForm({}).delete(route('admin.newsletter.subscriber.delete', deleteSubscriberId.value), {
-        onFinish: () => {
-            deleteSubscriberId.value = null;
-        },
-    });
-};
-
-const deleteCampaign = (id: number) => {
-    deleteTargetId.value = id;
-};
-
-const confirmDeleteCampaign = () => {
-    if (deleteTargetId.value === null) return;
-    useForm({}).delete(route('admin.newsletter.campaign.delete', deleteTargetId.value), {
-        onFinish: () => { deleteTargetId.value = null; },
-    });
-};
-
-const testCampaign = (id: number) => {
-    useForm({}).post(route('admin.newsletter.campaign.test', id));
-};
-
-const retryCampaign = (id: number) => {
-    useForm({}).post(route('admin.newsletter.campaign.retry', id));
-};
+const sendCampaignForm = useForm({})
 
 const settingsForm = useForm({
     newsletter_driver: props.settings.newsletter_driver || 'internal',
@@ -137,10 +155,9 @@ const settingsForm = useForm({
     mailchimp_double_optin: props.settings.mailchimp_double_optin ?? false,
     mailchimp_tags: props.settings.mailchimp_tags || '',
     newsletter_double_optin: props.settings.newsletter_double_optin ?? false,
-    
     newsletter_enable_popup: props.settings.newsletter_enable_popup ?? false,
     newsletter_popup_trigger: props.settings.newsletter_popup_trigger || 'time_delay',
-    newsletter_popup_trigger_value: props.settings.newsletter_popup_trigger_value || '5',
+    newsletter_popup_trigger_value: String(props.settings.newsletter_popup_trigger_value || '5'),
     newsletter_popup_title: props.settings.newsletter_popup_title || t('Subscribe to our Newsletter'),
     newsletter_popup_description: props.settings.newsletter_popup_description || t('Get the latest updates delivered directly to your inbox.'),
     newsletter_popup_placeholder: props.settings.newsletter_popup_placeholder || t('Enter your email address'),
@@ -148,329 +165,584 @@ const settingsForm = useForm({
     newsletter_popup_success_message: props.settings.newsletter_popup_success_message || t('Thanks for subscribing!'),
     newsletter_popup_bg_color: props.settings.newsletter_popup_bg_color || '#ffffff',
     newsletter_popup_show_mobile: props.settings.newsletter_popup_show_mobile ?? true,
-    newsletter_popup_cookie_duration: props.settings.newsletter_popup_cookie_duration || 30,
+    newsletter_popup_cookie_duration: Number(props.settings.newsletter_popup_cookie_duration || 30),
     newsletter_popup_hide_for_logged_in: props.settings.newsletter_popup_hide_for_logged_in ?? true,
-});
+})
+
+const selectedTabLabel = computed(() => tabOptions.find((tab) => tab.value === activeTab.value)?.label ?? t('Subscribers'))
+const primaryActionLabel = computed(() => {
+    if (activeTab.value === 'campaigns') return t('Create Campaign')
+    if (activeTab.value === 'settings' || activeTab.value === 'popup') return t('Save Settings')
+    return ''
+})
+const canShowPrimaryAction = computed(() => activeTab.value !== 'subscribers')
+const usesExternalDriver = computed(() => settingsForm.newsletter_driver !== 'internal')
+const modalTitle = computed(() => editingCampaignId.value ? t('Edit Campaign') : t('Create Campaign'))
+
+const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || t('Newsletter subscribers')
+
+const formatNumber = (value: number | undefined) => new Intl.NumberFormat().format(value ?? 0)
+
+const filterSubscribers = () => {
+    router.get(route('admin.newsletter.index'), {
+        search: subscriberSearch.value,
+        status: subscriberStatus.value === 'all' ? '' : subscriberStatus.value,
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+    })
+}
+
+const filterSubscribersOnStatusChange = () => {
+    filterSubscribers()
+}
+
+const clearSubscriberSearch = () => {
+    if (!subscriberSearch.value) {
+        return
+    }
+
+    subscriberSearch.value = ''
+    filterSubscribers()
+}
+
+const openCreateCampaign = () => {
+    editingCampaignId.value = null
+    campaignForm.reset()
+    campaignForm.audience = 'subscribers'
+    showCampaignModal.value = true
+}
+
+const closeCampaignModal = () => {
+    showCampaignModal.value = false
+    editingCampaignId.value = null
+    campaignForm.reset()
+}
+
+const submitCampaign = () => {
+    campaignForm.post(route('admin.newsletter.campaign.store'), {
+        onSuccess: closeCampaignModal,
+    })
+}
+
+const editCampaign = (campaign: CampaignItem) => {
+    editingCampaignId.value = campaign.id
+    campaignForm.subject = campaign.subject
+    campaignForm.audience = campaign.audience
+    campaignForm.content = campaign.content
+    showCampaignModal.value = true
+}
+
+const updateCampaign = () => {
+    if (editingCampaignId.value === null) return
+
+    campaignForm.post(route('admin.newsletter.campaign.update', editingCampaignId.value), {
+        onSuccess: closeCampaignModal,
+    })
+}
+
+const queueCampaign = (id: number) => {
+    sendTargetId.value = id
+}
+
+const confirmSendCampaign = () => {
+    if (sendTargetId.value === null) return
+
+    sendCampaignForm.post(route('admin.newsletter.campaign.send', sendTargetId.value), {
+        onFinish: () => {
+            sendTargetId.value = null
+        },
+    })
+}
+
+const deleteSubscriber = (id: number) => {
+    deleteSubscriberId.value = id
+}
+
+const confirmDeleteSubscriber = () => {
+    if (deleteSubscriberId.value === null) return
+
+    useForm({}).delete(route('admin.newsletter.subscriber.delete', deleteSubscriberId.value), {
+        onFinish: () => {
+            deleteSubscriberId.value = null
+        },
+    })
+}
+
+const deleteCampaign = (id: number) => {
+    deleteTargetId.value = id
+}
+
+const confirmDeleteCampaign = () => {
+    if (deleteTargetId.value === null) return
+
+    useForm({}).delete(route('admin.newsletter.campaign.delete', deleteTargetId.value), {
+        onFinish: () => {
+            deleteTargetId.value = null
+        },
+    })
+}
+
+const testCampaign = (id: number) => {
+    useForm({}).post(route('admin.newsletter.campaign.test', id))
+}
+
+const retryCampaign = (id: number) => {
+    useForm({}).post(route('admin.newsletter.campaign.retry', id))
+}
 
 const saveSettings = () => {
-    settingsForm.post(route('admin.newsletter.settings.save'));
-};
+    settingsForm.post(route('admin.newsletter.settings.save'))
+}
+
+const handlePrimaryAction = () => {
+    if (activeTab.value === 'campaigns') {
+        openCreateCampaign()
+        return
+    }
+
+    if (activeTab.value === 'settings' || activeTab.value === 'popup') {
+        saveSettings()
+    }
+}
 </script>
 
 <template>
-    <Head :title="t('Newsletter - Admin')" />
-    <div class="max-w-6xl mx-auto px-6 py-8">
-        <div class="flex items-center justify-between mb-8">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ t('Newsletter System') }}</h1>
-                <p class="text-sm text-gray-500 mt-1">{{ t('Manage subscribers, campaigns, and Mailchimp integration.') }}</p>
-            </div>
-            <button v-if="activeTab === 'campaigns'" @click="showCampaignModal = true" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-500/20">
-                {{ t('CREATE CAMPAIGN') }}
-            </button>
-            <button v-if="activeTab === 'settings' || activeTab === 'popup'" @click="saveSettings" :disabled="settingsForm.processing" class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary-500/20 disabled:opacity-50">
-                {{ t('SAVE SETTINGS') }}
-            </button>
-        </div>
+    <Head :title="t('Newsletter')" />
 
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <p class="text-xs font-bold text-gray-400 uppercase mb-2">{{ t('Total Subscribers') }}</p>
-                <p class="text-3xl font-black text-gray-900">{{ stats.total }}</p>
+    <div class="space-y-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div class="space-y-1">
+                <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Newsletter') }}</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Manage subscribers, campaigns, integrations, and popup capture from one place.') }}
+                </p>
             </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <p class="text-xs font-bold text-gray-400 uppercase mb-2">{{ t('Active') }}</p>
-                <p class="text-3xl font-black text-success-600">{{ stats.active }}</p>
-            </div>
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <p class="text-xs font-bold text-gray-400 uppercase mb-2">{{ t('Unsubscribed') }}</p>
-                <p class="text-3xl font-black text-danger-600">{{ stats.unsubscribed }}</p>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button
+                    v-if="canShowPrimaryAction"
+                    type="button"
+                    class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                    :disabled="settingsForm.processing"
+                    @click="handlePrimaryAction"
+                >
+                    <i :class="activeTab === 'campaigns' ? 'ti ti-plus text-base' : 'ti ti-device-floppy text-base'"></i>
+                    <span>{{ primaryActionLabel }}</span>
+                </button>
             </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="flex space-x-6 border-b border-gray-200 mb-6">
-            <button @click="activeTab = 'subscribers'" :class="[activeTab === 'subscribers' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300', 'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm']">
-                {{ t('Subscribers') }}
-            </button>
-            <button @click="activeTab = 'campaigns'" :class="[activeTab === 'campaigns' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300', 'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm']">
-                {{ t('Campaigns') }}
-            </button>
-            <button @click="activeTab = 'settings'" :class="[activeTab === 'settings' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300', 'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm']">
-                {{ t('Integrations (Mailchimp)') }}
-            </button>
-            <button @click="activeTab = 'popup'" :class="[activeTab === 'popup' ? 'border-primary-500 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300', 'whitespace-nowrap pb-4 px-1 border-b-2 font-medium text-sm']">
-                {{ t('Popup Settings') }}
-            </button>
+        <div class="grid gap-4 md:grid-cols-3">
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <p class="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{{ t('Total Subscribers') }}</p>
+                <p class="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{{ formatNumber(stats.total) }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <p class="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{{ t('Active') }}</p>
+                <p class="mt-3 text-3xl font-semibold text-success-600">{{ formatNumber(stats.active) }}</p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <p class="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{{ t('Unsubscribed') }}</p>
+                <p class="mt-3 text-3xl font-semibold text-danger-600">{{ formatNumber(stats.unsubscribed) }}</p>
+            </div>
         </div>
 
-        <div v-if="activeTab === 'subscribers'">
-            <div class="mb-4">
-                <input v-model="subscriberSearch" @keyup.enter="filterSubscribers" type="text" :placeholder="t('Search subscribers...')" class="w-full max-w-sm bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
+        <div class="rounded-xl border border-gray-200 bg-white p-2 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-wrap gap-2">
+                <button
+                    v-for="tab in tabOptions"
+                    :key="tab.value"
+                    type="button"
+                    class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                    :class="activeTab === tab.value ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800'"
+                    @click="activeTab = tab.value"
+                >
+                    {{ tab.label }}
+                </button>
             </div>
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        </div>
+
+        <div v-if="activeTab === 'subscribers'" class="space-y-4">
+            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 dark:border-surface-700 lg:flex-row lg:items-end lg:justify-between">
+                    <div class="w-full max-w-md">
+                        <label class="sr-only">{{ t('Search subscribers') }}</label>
+                        <div class="relative">
+                            <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
+                            <input
+                                v-model="subscriberSearch"
+                                type="text"
+                                :placeholder="t('Search subscribers...')"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                @input="filterSubscribers"
+                            >
+                            <button
+                                v-if="subscriberSearch"
+                                type="button"
+                                class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                                :aria-label="t('Clear search')"
+                                @click="clearSubscriberSearch"
+                            >
+                                <i class="ti ti-x text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="w-full lg:w-auto">
+                        <div class="min-w-[190px]">
+                            <AppSelect v-model="subscriberStatus" :options="subscriberStatusOptions" @update:modelValue="filterSubscribersOnStatusChange" />
+                        </div>
+                    </div>
+                </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50/50">
-                                <th class="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('Email') }}</th>
-                                <th class="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('Status') }}</th>
-                                <th class="px-6 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ t('Date') }}</th>
-                                <th class="px-6 py-3"></th>
+                    <table class="min-w-full divide-y divide-gray-200 dark:divide-surface-700">
+                        <thead class="bg-gray-50 dark:bg-surface-800">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Email') }}</th>
+                                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Date') }}</th>
+                                <th class="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-50">
-                            <tr v-for="sub in subscribers.data" :key="sub.id" class="hover:bg-gray-50/50 transition-colors">
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr v-for="subscriber in subscribers.data" :key="subscriber.id" class="transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-500/5">
                                 <td class="px-6 py-4">
-                                    <div class="text-sm font-bold text-gray-900">{{ sub.email }}</div>
-                                    <div class="text-[10px] text-gray-400">{{ sub.name || t('Anonymous') }}</div>
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ subscriber.email }}</div>
+                                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ subscriber.name || t('Anonymous') }}</div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span :class="{
-                                        'bg-success-50 text-success-600 border-success-100': sub.status === 'subscribed',
-                                        'bg-warning-50 text-warning-600 border-warning-100': sub.status === 'pending',
-                                        'bg-danger-50 text-danger-600 border-danger-100': sub.status === 'unsubscribed' || sub.status === 'bounced'
-                                    }" class="px-2 py-0.5 text-[10px] font-bold rounded-full border">
-                                        {{ t(sub.status).toUpperCase() }}
+                                    <span
+                                        class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                                        :class="subscriber.status === 'subscribed'
+                                            ? 'bg-success-100 text-success-700'
+                                            : 'bg-danger-100 text-danger-700'"
+                                    >
+                                        {{ t(subscriber.status) }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-xs text-gray-500">
-                                    {{ formatDate(sub.created_at) }}
+                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                    {{ formatDate(subscriber.created_at) }}
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button @click="deleteSubscriber(sub.id)" class="text-gray-400 hover:text-danger-600 transition-colors">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-500/10"
+                                        :title="t('Remove subscriber')"
+                                        @click="deleteSubscriber(subscriber.id)"
+                                    >
+                                        <i class="ti ti-trash text-base"></i>
                                     </button>
+                                </td>
+                            </tr>
+                            <tr v-if="subscribers.data.length === 0">
+                                <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-400">
+                                    {{ t('No subscribers found.') }}
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <Pagination class="mt-6" :links="subscribers.links" />
+
+            <Pagination class="mt-2" :links="subscribers.links" />
         </div>
 
-        <div v-if="activeTab === 'campaigns'">
-            <div class="space-y-4">
-                <div v-for="camp in campaigns.data" :key="camp.id" class="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm group">
-                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div v-if="activeTab === 'campaigns'" class="space-y-4">
+            <div class="grid gap-4 xl:grid-cols-2">
+                <article
+                    v-for="campaign in campaigns.data"
+                    :key="campaign.id"
+                    class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900"
+                >
+                    <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
-                            <div class="flex items-center gap-3 mb-2">
-                                <h4 class="text-base font-bold text-gray-900">{{ camp.subject }}</h4>
-                                <span :class="{
-                                    'bg-success-50 text-success-600': camp.status === 'sent',
-                                    'bg-blue-50 text-blue-600': camp.status === 'sending',
-                                    'bg-warning-50 text-warning-600': camp.status === 'draft'
-                                }" class="px-2 py-0.5 text-[10px] font-bold rounded-md">
-                                    {{ t(camp.status).toUpperCase() }}
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h2 class="truncate text-lg font-semibold text-gray-900 dark:text-white">{{ campaign.subject }}</h2>
+                                <span
+                                    class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                                    :class="campaign.status === 'sent'
+                                        ? 'bg-success-100 text-success-700'
+                                        : campaign.status === 'sending'
+                                            ? 'bg-secondary-100 text-secondary-700'
+                                            : 'bg-amber-100 text-amber-700'"
+                                >
+                                    {{ t(campaign.status) }}
                                 </span>
                             </div>
-                            <p class="text-xs text-gray-500">
-                                {{ t('Created: :date', { date: formatDate(camp.created_at) }) }}
-                                <span v-if="camp.sent_at">{{ t(' • Sent: :date', { date: formatDate(camp.sent_at) }) }}</span>
-                                {{ t(' • :audience • :recipients recipients • :sent sent • :failed failed • :opened opened', { audience: audienceLabel(camp.audience), recipients: camp.recipient_count, sent: camp.sent_count || 0, failed: camp.failed_count || 0, opened: camp.opened_count || 0 }) }}
+
+                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('Created: :date', { date: formatDate(campaign.created_at) }) }}
+                                <span v-if="campaign.sent_at">{{ t(' • Sent: :date', { date: formatDate(campaign.sent_at) }) }}</span>
+                            </p>
+                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                                {{ audienceLabel(campaign.audience) }}
                             </p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button v-if="camp.status === 'draft'" @click="editCampaign(camp)" class="p-2 text-gray-400 hover:text-gray-600 transition-colors" :title="t('Edit campaign')">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <button
+                                v-if="campaign.status === 'draft'"
+                                type="button"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-white"
+                                :title="t('Edit campaign')"
+                                @click="editCampaign(campaign)"
+                            >
+                                <i class="ti ti-pencil text-base"></i>
                             </button>
-                            <button v-if="camp.status !== 'sending'" @click="testCampaign(camp.id)" class="p-2 text-gray-400 hover:text-blue-600 transition-colors" :title="t('Send test')">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                            <button
+                                v-if="campaign.status === 'draft'"
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-lg bg-primary-100 px-3 py-2 text-xs font-medium text-primary-700 transition hover:bg-primary-200"
+                                @click="queueCampaign(campaign.id)"
+                            >
+                                <i class="ti ti-send text-sm"></i>
+                                <span>{{ t('Queue Send') }}</span>
                             </button>
-                            <button v-if="camp.status === 'draft'" @click="sendCampaign(camp.id)" class="px-4 py-2 btn-primary rounded-lg text-xs font-bold transition-all">
-                                {{ t('QUEUE SEND') }}
+                            <button
+                                v-if="campaign.status === 'sent'"
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-200 dark:hover:bg-surface-800"
+                                @click="testCampaign(campaign.id)"
+                            >
+                                <i class="ti ti-send-2 text-sm"></i>
+                                <span>{{ t('Send Test') }}</span>
                             </button>
-                            <span v-else-if="camp.status === 'sending'" class="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">
-                                {{ t('SENDING IN QUEUE') }}
-                            </span>
-                            <button v-if="camp.status !== 'sending'" @click="deleteCampaign(camp.id)" class="p-2 text-gray-400 hover:text-danger-600 transition-colors" :title="t('Delete campaign')">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            <button
+                                v-if="campaign.status === 'sent' && (campaign.failed_count || 0) > 0"
+                                type="button"
+                                class="inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700 transition hover:bg-amber-200"
+                                @click="retryCampaign(campaign.id)"
+                            >
+                                <i class="ti ti-rotate-clockwise-2 text-sm"></i>
+                                <span>{{ t('Retry Failed') }}</span>
                             </button>
-                            <button v-if="camp.status === 'sent' && (camp.failed_count || 0) > 0" @click="retryCampaign(camp.id)" class="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold hover:bg-amber-100 transition-colors" :title="t('Retry failed recipients')">
-                                {{ t('RETRY FAILED') }}
+                            <button
+                                v-if="campaign.status !== 'sending'"
+                                type="button"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-500/10"
+                                :title="t('Delete campaign')"
+                                @click="deleteCampaign(campaign.id)"
+                            >
+                                <i class="ti ti-trash text-base"></i>
                             </button>
                         </div>
                     </div>
-                </div>
-                <div v-if="campaigns.data.length === 0" class="p-10 bg-white rounded-2xl border border-gray-100 shadow-sm text-center text-sm text-gray-400">
+
+                    <div class="mt-5 grid gap-3 sm:grid-cols-4">
+                        <div class="rounded-lg bg-gray-50 px-4 py-3 dark:bg-surface-800">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Recipients') }}</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{{ formatNumber(campaign.recipient_count) }}</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 px-4 py-3 dark:bg-surface-800">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Sent') }}</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{{ formatNumber(campaign.sent_count || 0) }}</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 px-4 py-3 dark:bg-surface-800">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Failed') }}</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{{ formatNumber(campaign.failed_count || 0) }}</p>
+                        </div>
+                        <div class="rounded-lg bg-gray-50 px-4 py-3 dark:bg-surface-800">
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Opened') }}</p>
+                            <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{{ formatNumber(campaign.opened_count || 0) }}</p>
+                        </div>
+                    </div>
+                </article>
+
+                <div v-if="campaigns.data.length === 0" class="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center text-sm text-gray-400 shadow-card dark:border-surface-700 dark:bg-surface-900">
                     {{ t('No campaigns found.') }}
                 </div>
             </div>
-            <Pagination class="mt-6" :links="campaigns.links" />
+
+            <Pagination class="mt-2" :links="campaigns.links" />
         </div>
 
-        <div v-if="activeTab === 'settings'">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 max-w-3xl">
-                <form @submit.prevent="saveSettings" class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Newsletter Driver') }}</label>
-                        <p class="text-xs text-gray-500 mb-3">{{ t('Choose how to handle new newsletter subscribers.') }}</p>
-                        <select v-model="settingsForm.newsletter_driver" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                            <option value="internal">{{ t('Internal Only (Local DB)') }}</option>
-                            <option value="mailchimp">{{ t('Mailchimp Only') }}</option>
-                            <option value="both">{{ t('Both (Local DB + Mailchimp)') }}</option>
-                        </select>
+        <div v-if="activeTab === 'settings'" class="space-y-6">
+            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="grid gap-6 md:grid-cols-2">
+                    <div class="md:col-span-2">
+                        <AppSelect v-model="settingsForm.newsletter_driver" :options="driverOptions" :label="t('Newsletter driver')" />
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Choose how new subscribers are stored and synced.') }}</p>
                     </div>
 
-                    <div v-if="settingsForm.newsletter_driver !== 'internal'" class="space-y-6 p-5 bg-gray-50 rounded-xl border border-gray-100">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Mailchimp API Key') }}</label>
-                            <input v-model="settingsForm.mailchimp_api_key" type="password" :placeholder="configuredSecrets.mailchimp_api_key ? t('Stored securely - leave blank to keep') : t('e.g. 1234567890abcdef-us21')" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Server Prefix') }}</label>
-                                <input v-model="settingsForm.mailchimp_server_prefix" type="text" :placeholder="t('e.g. us21')" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Audience / List ID') }}</label>
-                                <input v-model="settingsForm.mailchimp_list_id" type="text" :placeholder="t('e.g. 1a2b3c4d5e')" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Default Tags') }}</label>
-                            <p class="text-xs text-gray-500 mb-2">{{ t('Comma-separated tags to apply to new subscribers.') }}</p>
-                            <input v-model="settingsForm.mailchimp_tags" type="text" :placeholder="t('website_signup, ai_user')" class="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                        </div>
-
-                        <label class="flex items-center gap-3 cursor-pointer">
-                            <input v-model="settingsForm.newsletter_double_optin" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                            <div>
-                                <span class="block text-sm font-bold text-gray-900">{{ t('Double Opt-In') }}</span>
-                                <span class="block text-xs text-gray-500">{{ t('Require email confirmation before adding subscribers.') }}</span>
-                            </div>
-                        </label>
-
-                        <label v-if="settingsForm.newsletter_driver !== 'internal'" class="flex items-center gap-3 cursor-pointer">
-                            <input v-model="settingsForm.mailchimp_double_optin" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                            <div>
-                                <span class="block text-sm font-bold text-gray-900">{{ t('Require Double Opt-in') }}</span>
-                                <span class="block text-xs text-gray-500">{{ t('Send a confirmation email to new subscribers.') }}</span>
-                            </div>
-                        </label>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <div v-if="activeTab === 'popup'">
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 max-w-3xl">
-                <form @submit.prevent="saveSettings" class="space-y-6">
-                    <label class="flex items-center gap-3 cursor-pointer pb-6 border-b border-gray-100">
-                        <input v-model="settingsForm.newsletter_enable_popup" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                        <div>
-                            <span class="block text-sm font-bold text-gray-900">{{ t('Enable Newsletter Popup') }}</span>
-                            <span class="block text-xs text-gray-500">{{ t('Show a popup to encourage visitors to subscribe.') }}</span>
-                        </div>
+                    <label v-if="usesExternalDriver" class="block md:col-span-2">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Mailchimp API key') }}</span>
+                        <input
+                            v-model="settingsForm.mailchimp_api_key"
+                            type="password"
+                            autocomplete="new-password"
+                            :placeholder="configuredSecrets.mailchimp_api_key ? t('Stored securely - leave blank to keep') : t('e.g. 1234567890abcdef-us21')"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                        >
                     </label>
 
-                    <template v-if="settingsForm.newsletter_enable_popup">
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Trigger Type') }}</label>
-                                <select v-model="settingsForm.newsletter_popup_trigger" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                                    <option value="time_delay">{{ t('Time Delay (Seconds)') }}</option>
-                                    <option value="scroll_depth">{{ t('Scroll Depth (%)') }}</option>
-                                    <option value="exit_intent">{{ t('Exit Intent') }}</option>
-                                    <option value="page_views">{{ t('After N Page Views') }}</option>
-                                    <option value="first_visit">{{ t('First Visit Only') }}</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Trigger Value') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_trigger_value" type="text" :placeholder="t('e.g. 5')" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                        </div>
+                    <label v-if="usesExternalDriver" class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Server prefix') }}</span>
+                        <input v-model="settingsForm.mailchimp_server_prefix" type="text" :placeholder="t('e.g. us21')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Title') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_title" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Success Message') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_success_message" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                        </div>
+                    <label v-if="usesExternalDriver" class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Audience / List ID') }}</span>
+                        <input v-model="settingsForm.mailchimp_list_id" type="text" :placeholder="t('e.g. 1a2b3c4d5e')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
 
+                    <label v-if="usesExternalDriver" class="block md:col-span-2">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Default tags') }}</span>
+                        <input v-model="settingsForm.mailchimp_tags" type="text" :placeholder="t('website_signup, ai_user')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Comma-separated tags to apply to new subscribers.') }}</p>
+                    </label>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
                         <div>
-                            <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Description') }}</label>
-                            <textarea v-model="settingsForm.newsletter_popup_description" rows="2" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"></textarea>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Double opt-in') }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Require email confirmation before adding subscribers.') }}</p>
                         </div>
+                        <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="settingsForm.newsletter_double_optin ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" :aria-pressed="settingsForm.newsletter_double_optin" @click="settingsForm.newsletter_double_optin = !settingsForm.newsletter_double_optin">
+                            <span class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="settingsForm.newsletter_double_optin ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                        </button>
+                    </div>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Input Placeholder') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_placeholder" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Submit Button Text') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_submit_text" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
+                    <div v-if="usesExternalDriver" class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Mailchimp double opt-in') }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Send a confirmation email to new subscribers.') }}</p>
                         </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Cookie Duration (Days)') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_cookie_duration" type="number" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-900 mb-1">{{ t('Background Color') }}</label>
-                                <input v-model="settingsForm.newsletter_popup_bg_color" type="color" class="w-full h-10 bg-gray-50 border border-gray-200 rounded-lg px-1 py-1 focus:border-primary-500 focus:outline-none" />
-                            </div>
-                        </div>
-
-                        <div class="space-y-3 pt-2">
-                            <label class="flex items-center gap-3 cursor-pointer">
-                                <input v-model="settingsForm.newsletter_popup_show_mobile" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                                <span class="text-sm font-bold text-gray-900">{{ t('Show on Mobile Devices') }}</span>
-                            </label>
-                            
-                            <label class="flex items-center gap-3 cursor-pointer">
-                                <input v-model="settingsForm.newsletter_popup_hide_for_logged_in" type="checkbox" class="w-5 h-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-                                <span class="text-sm font-bold text-gray-900">{{ t('Hide for logged-in users') }}</span>
-                            </label>
-                        </div>
-                    </template>
-                </form>
-            </div>
+                        <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="settingsForm.mailchimp_double_optin ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" :aria-pressed="settingsForm.mailchimp_double_optin" @click="settingsForm.mailchimp_double_optin = !settingsForm.mailchimp_double_optin">
+                            <span class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="settingsForm.mailchimp_double_optin ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
         </div>
 
-        <!-- Campaign Modal -->
-        <div v-if="showCampaignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 backdrop-blur-sm p-4">
-            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h3 class="font-bold text-gray-900">{{ editingCampaignId ? t('Edit Campaign') : t('Create Campaign') }}</h3>
-                    <button @click="showCampaignModal = false; editingCampaignId = null; campaignForm.reset()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        <div v-if="activeTab === 'popup'" class="space-y-6">
+            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Enable newsletter popup') }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Show a popup to encourage visitors to subscribe.') }}</p>
+                    </div>
+                    <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="settingsForm.newsletter_enable_popup ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" :aria-pressed="settingsForm.newsletter_enable_popup" @click="settingsForm.newsletter_enable_popup = !settingsForm.newsletter_enable_popup">
+                        <span class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="settingsForm.newsletter_enable_popup ? 'translate-x-5' : 'translate-x-0.5'"></span>
                     </button>
                 </div>
-                <form @submit.prevent="editingCampaignId ? updateCampaign() : submitCampaign()" class="p-6 space-y-4">
+            </section>
+
+            <section v-if="settingsForm.newsletter_enable_popup" class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="grid gap-6 md:grid-cols-2">
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('Subject') }}</label>
-                        <input v-model="campaignForm.subject" type="text" :placeholder="t('Weekly AI Updates')" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none" required />
+                        <AppSelect v-model="settingsForm.newsletter_popup_trigger" :options="popupTriggerOptions" :label="t('Trigger type')" />
                     </div>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Trigger value') }}</span>
+                        <input v-model="settingsForm.newsletter_popup_trigger_value" type="text" :placeholder="t('e.g. 5')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</span>
+                        <input v-model="settingsForm.newsletter_popup_title" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Success message') }}</span>
+                        <input v-model="settingsForm.newsletter_popup_success_message" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block md:col-span-2">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</span>
+                        <textarea v-model="settingsForm.newsletter_popup_description" rows="3" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Input placeholder') }}</span>
+                        <input v-model="settingsForm.newsletter_popup_placeholder" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Submit button text') }}</span>
+                        <input v-model="settingsForm.newsletter_popup_submit_text" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cookie duration (days)') }}</span>
+                        <input v-model="settingsForm.newsletter_popup_cookie_duration" type="number" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <div class="block">
+                        <AppColorPicker v-model="settingsForm.newsletter_popup_bg_color" :label="t('Background color')" />
+                    </div>
+                </div>
+            </section>
+
+            <section v-if="settingsForm.newsletter_enable_popup" class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Show on mobile devices') }}</p>
+                        </div>
+                        <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="settingsForm.newsletter_popup_show_mobile ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" :aria-pressed="settingsForm.newsletter_popup_show_mobile" @click="settingsForm.newsletter_popup_show_mobile = !settingsForm.newsletter_popup_show_mobile">
+                            <span class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="settingsForm.newsletter_popup_show_mobile ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Hide for logged-in users') }}</p>
+                        </div>
+                        <button type="button" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="settingsForm.newsletter_popup_hide_for_logged_in ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" :aria-pressed="settingsForm.newsletter_popup_hide_for_logged_in" @click="settingsForm.newsletter_popup_hide_for_logged_in = !settingsForm.newsletter_popup_hide_for_logged_in">
+                            <span class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="settingsForm.newsletter_popup_hide_for_logged_in ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div v-if="showCampaignModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+            <div class="w-full max-w-4xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-surface-700">
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('Audience') }}</label>
-                        <select v-model="campaignForm.audience" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:border-primary-500 focus:outline-none">
-                            <option v-for="option in audienceOptions" :key="option.value" :value="option.value" :disabled="option.value === 'users_pro' && !$page.props.isProAvailable">
-                                {{ option.label }} ({{ stats[option.countKey] ?? 0 }})
-                            </option>
-                        </select>
-                        <p class="text-[10px] text-gray-400 mt-2">{{ t('User audiences only include active, non-banned users with email marketing enabled.') }}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ modalTitle }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Prepare the subject, audience, and message body before sending.') }}</p>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">{{ t('Content') }}</label>
-                        <RichEditor v-model="campaignForm.content" variant="minimal" />
-                        <p class="text-[10px] text-gray-400 mt-2">{{ t('Available variables: {user_name}, {user_email}, {unsubscribe_url}, {site_name}, {site_url}') }}</p>
+                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-white" @click="closeCampaignModal">
+                        <i class="ti ti-x text-lg"></i>
+                    </button>
+                </div>
+
+                <form class="space-y-6 p-6" @submit.prevent="editingCampaignId ? updateCampaign() : submitCampaign()">
+                    <div class="grid gap-6 md:grid-cols-2">
+                        <label class="block md:col-span-2">
+                            <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Subject') }}</span>
+                            <input v-model="campaignForm.subject" type="text" :placeholder="t('Weekly AI Updates')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" required>
+                        </label>
+
+                        <div>
+                            <AppSelect v-model="campaignForm.audience" :options="audienceOptions.map((option) => ({ value: option.value, label: `${option.label} (${stats[option.countKey as keyof NewsletterStats] ?? 0})` }))" :label="t('Audience')" />
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('User audiences only include active, non-banned users with email marketing enabled.') }}</p>
+                        </div>
+
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                            <p class="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Available Variables') }}</p>
+                            <p class="mt-3 text-sm text-gray-600 dark:text-gray-300">{user_name}, {user_email}, {unsubscribe_url}, {site_name}, {site_url}</p>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Content') }}</label>
+                            <RichEditor v-model="campaignForm.content" variant="minimal" />
+                        </div>
                     </div>
-                    <div class="pt-4">
-                        <button type="submit" :disabled="campaignForm.processing" class="w-full py-3 btn-primary rounded-xl font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
-                            {{ editingCampaignId ? t('UPDATE CAMPAIGN') : t('SAVE AS DRAFT') }}
+
+                    <div class="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-surface-700">
+                        <button type="button" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-200 dark:hover:bg-surface-800" @click="closeCampaignModal">
+                            {{ t('Cancel') }}
+                        </button>
+                        <button type="submit" :disabled="campaignForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60">
+                            {{ editingCampaignId ? t('Update Campaign') : t('Save Draft') }}
                         </button>
                     </div>
                 </form>
@@ -482,6 +754,8 @@ const saveSettings = () => {
             :title="t('Send campaign?')"
             :message="t('This campaign will be queued for delivery to the selected audience.')"
             :confirm-label="t('Queue Send')"
+            :processing-label="t('Queueing...')"
+            :processing="sendCampaignForm.processing"
             variant="primary"
             @cancel="sendTargetId = null"
             @confirm="confirmSendCampaign"

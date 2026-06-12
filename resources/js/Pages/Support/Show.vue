@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
-import RichEditor from '@/Components/RichEditor.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { sanitizeHtml } from '@/Composables/useSanitize'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 defineOptions({ layout: UserDashboardLayout })
 

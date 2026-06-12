@@ -63,30 +63,12 @@ const list = computed({
     set: (value: MenuItemNode[]) => emit('update:modelValue', value),
 })
 
-const badgeColors: Record<BadgeColor, string> = {
-    green: 'bg-primary-100 text-primary-700',
-    blue: 'bg-secondary-100 text-secondary-700',
-    violet: 'bg-violet-100 text-violet-700',
-    amber: 'bg-amber-100 text-amber-700',
-    red: 'bg-danger-100 text-danger-700',
-    gray: 'bg-gray-100 text-gray-600',
-}
-
-const visibilityLabels: Record<VisibilityRule, string> = {
-    none: 'Everyone',
-    guest: 'Guests only',
-    auth: 'Logged-in users',
-    pro: 'Pro users',
-}
-
 const itemDestination = (item: MenuItemNode) => {
     if (item.type === 'page') return item.page ? `/${item.page.slug}` : t('Selected page')
     if (item.type === 'route') return item.route_name || t('Route')
 
     return item.url || '#'
 }
-
-const badgeClass = (color: BadgeColor | null) => color ? badgeColors[color] : badgeColors.gray
 
 const dragOptions = computed(() => ({
     group: 'menu-builder-items',
@@ -126,19 +108,9 @@ const dragOptions = computed(() => ({
                         <path stroke-linecap="round" d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" />
                     </svg>
                 </button>
-                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 dark:border-surface-700 dark:bg-surface-900">
-                    <i v-if="item.icon" :class="item.icon" aria-hidden="true" />
-                    <i v-else class="ti ti-menu-2" aria-hidden="true" />
-                </div>
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.label }}</span>
-                        <span v-if="!item.is_active" class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-500 dark:bg-surface-900">{{ t('Inactive') }}</span>
-                        <span v-if="item.badge_text" class="rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="badgeClass(item.badge_color)">{{ item.badge_text }}</span>
-                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold uppercase text-gray-500 dark:bg-surface-900">{{ item.type }}</span>
-                        <span v-if="item.target === '_blank'" class="rounded-full bg-secondary-100 px-2 py-0.5 text-[11px] font-semibold text-secondary-700">{{ t('New Tab') }}</span>
-                        <span v-if="item.requires_auth !== 'none'" class="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">{{ t(visibilityLabels[item.requires_auth]) }}</span>
-                        <span v-if="item.mega_menu" class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">{{ t('Mega') }}</span>
                     </div>
                     <div class="mt-1 truncate font-mono text-xs text-gray-500">{{ itemDestination(item) }}</div>
                 </div>

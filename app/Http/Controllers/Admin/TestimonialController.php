@@ -145,12 +145,10 @@ class TestimonialController extends Controller
             $user,
             $prompt,
             'You generate safe demo testimonials for a SaaS admin panel. Return JSON only.',
-            settings('default_ai_provider', 'openai'),
-            settings('default_ai_model', 'gpt-4o-mini'),
-            ['max_tokens' => 1200, 'temperature' => 0.55]
+            options: ['max_tokens' => 1200, 'temperature' => 0.55]
         );
 
-        $items = collect($this->decodeAiJsonArray((string) ($result['content'] ?? '')))
+        $items = collect($this->decodeAiJsonArray((string) ($result->content ?? '')))
             ->filter(fn ($item) => is_array($item))
             ->take((int) $validated['count'])
             ->map(function (array $item, int $index) {

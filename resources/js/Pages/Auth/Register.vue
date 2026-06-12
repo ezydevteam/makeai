@@ -7,6 +7,7 @@ interface SocialLoginProvider {
     provider: string
     label: string
     url: string
+    display_mode?: 'icon' | 'icon-label'
 }
 
 interface PageProps {
@@ -33,6 +34,13 @@ const socialProviders = computed(() => {
 
     return props.socialLoginProviders ?? []
 })
+const socialProviderIcons: Record<string, string> = {
+    google: 'ti ti-brand-google',
+    github: 'ti ti-brand-github',
+    facebook: 'ti ti-brand-facebook',
+    reddit: 'ti ti-brand-reddit',
+    twitter: 'ti ti-brand-x',
+}
 
 const submit = () => {
     form.post(route('register.attempt'), {
@@ -70,9 +78,10 @@ const submit = () => {
                         v-for="provider in socialProviders"
                         :key="provider.provider"
                         :href="provider.url"
-                        class="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary-300 hover:bg-primary-50"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary-300 hover:bg-primary-50"
                     >
-                        {{ t('Continue with :provider', { provider: provider.label }) }}
+                        <i :class="socialProviderIcons[provider.provider] || 'ti ti-login-2'" class="text-base"></i>
+                        <span v-if="provider.display_mode !== 'icon'">{{ t('Continue with :provider', { provider: provider.label }) }}</span>
                     </a>
                     <div class="flex items-center gap-3">
                         <span class="h-px flex-1 bg-gray-100"></span>
