@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { watch } from 'vue'
+import { sanitizeErrorMessage } from '@/Composables/useErrorSanitizer'
 
 export interface ToastItem {
     id: number
@@ -21,7 +22,7 @@ export const toastStore = reactive<{ toasts: ToastItem[] }>({
 function addToast(message: string, type: ToastItem['type'], title?: string, duration = 4500) {
     const toast: ToastItem = {
         id: nextId++,
-        message,
+        message: sanitizeErrorMessage(message),
         type,
         title,
         duration,

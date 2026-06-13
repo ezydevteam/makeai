@@ -249,6 +249,8 @@ class ToolCatalogCacheService
             'og_image' => $tool->og_image,
             'show_reviews' => (bool) $tool->show_reviews,
             'show_related_tools' => (bool) $tool->show_related_tools,
+            'show_header' => (bool) ($tool->show_header ?? true),
+            'show_footer' => (bool) ($tool->show_footer ?? true),
         ];
 
         if ($includeContent) {
@@ -318,6 +320,8 @@ class ToolCatalogCacheService
             'og_image',
             'show_reviews',
             'show_related_tools',
+            'show_header',
+            'show_footer',
         ];
     }
 

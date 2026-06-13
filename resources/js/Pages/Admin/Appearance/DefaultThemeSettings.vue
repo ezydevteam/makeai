@@ -143,9 +143,18 @@ const previewStyle = computed(() => ({
                 </div>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage the public-facing default theme colors, typography, layout scale, and background treatment without duplicate controls.') }}</p>
             </div>
-            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="submit">
-                {{ form.processing ? t('Saving...') : t('Save Changes') }}
-            </button>
+            <div class="flex items-center gap-3 self-start">
+                <Link
+                    :href="route('admin.themes')"
+                    class="inline-flex items-center justify-center rounded-lg bg-white border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-900"
+                >
+                    <i class="ti ti-arrow-left mr-1"></i>
+                    {{ t('Back') }}
+                </Link>
+                <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="submit">
+                    {{ form.processing ? t('Saving...') : t('Save Changes') }}
+                </button>
+            </div>
         </div>
 
         <div class="grid gap-6">

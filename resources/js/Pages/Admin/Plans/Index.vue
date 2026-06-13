@@ -14,13 +14,14 @@
                         </p>
                     </div>
 
-                    <Link
-                        :href="route('admin.plans.pricing')"
+                    <button
+                        type="button"
+                        @click="pricingSettingsModalOpen = true"
                         class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                     >
                         <i class="ti ti-settings text-base"></i>
                         {{ t('Pricing Settings') }}
-                    </Link>
+                    </button>
                 </div>
 
                 <div v-if="plans.length === 0" class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
@@ -499,6 +500,126 @@
             </Transition>
         </Teleport>
 
+        <Teleport to="body">
+            <Transition
+                enter-active-class="transform transition duration-200 ease-out"
+                enter-from-class="translate-y-2 scale-95 opacity-0"
+                enter-to-class="translate-y-0 scale-100 opacity-100"
+                leave-active-class="transform transition duration-150 ease-in"
+                leave-from-class="translate-y-0 scale-100 opacity-100"
+                leave-to-class="translate-y-2 scale-95 opacity-0"
+            >
+                <div v-if="pricingSettingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="pricingSettingsModalOpen = false">
+                    <div class="w-full max-w-3xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900">
+                        <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+                            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Pricing Settings') }}</h2>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control global pricing display, billing cycles, and frontend pricing copy.') }}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    :aria-label="t('Close pricing settings')"
+                                    @click="pricingSettingsModalOpen = false"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="max-h-[calc(90vh-140px)] overflow-y-auto p-5">
+                            <form class="space-y-6" @submit.prevent="submitPricingSettings">
+                                <div class="grid gap-4 md:grid-cols-3">
+                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                        {{ t('Show Monthly') }}
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            :aria-checked="pricingSettingsForm.pricing_show_monthly"
+                                            class="relative inline-flex h-6 w-11 rounded-full transition"
+                                            :class="pricingSettingsForm.pricing_show_monthly ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                                            @click="pricingSettingsForm.pricing_show_monthly = !pricingSettingsForm.pricing_show_monthly"
+                                        >
+                                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="pricingSettingsForm.pricing_show_monthly ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                        </button>
+                                    </label>
+                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                        {{ t('Show Yearly') }}
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            :aria-checked="pricingSettingsForm.pricing_show_yearly"
+                                            class="relative inline-flex h-6 w-11 rounded-full transition"
+                                            :class="pricingSettingsForm.pricing_show_yearly ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                                            @click="pricingSettingsForm.pricing_show_yearly = !pricingSettingsForm.pricing_show_yearly"
+                                        >
+                                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="pricingSettingsForm.pricing_show_yearly ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                        </button>
+                                    </label>
+                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                        {{ t('Show Lifetime') }}
+                                        <button
+                                            type="button"
+                                            role="switch"
+                                            :aria-checked="pricingSettingsForm.pricing_show_lifetime"
+                                            class="relative inline-flex h-6 w-11 rounded-full transition"
+                                            :class="pricingSettingsForm.pricing_show_lifetime ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                                            @click="pricingSettingsForm.pricing_show_lifetime = !pricingSettingsForm.pricing_show_lifetime"
+                                        >
+                                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="pricingSettingsForm.pricing_show_lifetime ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                        </button>
+                                    </label>
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Default Currency') }}</span>
+                                        <AppSelect
+                                            v-model="pricingSettingsForm.pricing_currency_code"
+                                            :options="currencyOptions"
+                                            :placeholder="t('Select currency')"
+                                            live-search
+                                        />
+                                        <p v-if="pricingSettingsForm.errors.pricing_currency_code" class="mt-1 text-xs text-danger-600">{{ pricingSettingsForm.errors.pricing_currency_code }}</p>
+                                    </label>
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-3">
+                                    <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Trial Button Text') }}</span>
+                                        <input v-model="pricingSettingsForm.pricing_trial_button_text" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+                                        <p v-if="pricingSettingsForm.errors.pricing_trial_button_text" class="mt-1 text-xs text-danger-600">{{ pricingSettingsForm.errors.pricing_trial_button_text }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Featured Label Text') }}</span>
+                                        <input v-model="pricingSettingsForm.pricing_featured_label_text" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+                                        <p v-if="pricingSettingsForm.errors.pricing_featured_label_text" class="mt-1 text-xs text-danger-600">{{ pricingSettingsForm.errors.pricing_featured_label_text }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Checkout Button Text') }}</span>
+                                        <input v-model="pricingSettingsForm.pricing_checkout_button_text" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+                                        <p v-if="pricingSettingsForm.errors.pricing_checkout_button_text" class="mt-1 text-xs text-danger-600">{{ pricingSettingsForm.errors.pricing_checkout_button_text }}</p>
+                                    </label>
+                                </div>
+
+                                <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-surface-800">
+                                    <button type="button" class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white" @click="pricingSettingsModalOpen = false">
+                                        {{ t('Cancel') }}
+                                    </button>
+                                    <button type="submit" :disabled="pricingSettingsForm.processing" class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60">
+                                        {{ pricingSettingsForm.processing ? t('Saving...') : t('Save Settings') }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </Transition>
+        </Teleport>
+
         <ActionConfirmModal
             :open="pendingCountryRemovalIndex !== null"
             :title="t('Remove country pricing?')"
@@ -602,6 +723,7 @@ const { t } = useTranslate()
 const { topOffset } = useHeaderHeight()
 const sidebarMaxHeight = computed(() => `calc(100vh - ${topOffset.value} - 24px)`)
 const countryPricingModalOpen = ref(false)
+const pricingSettingsModalOpen = ref(false)
 const collapsedCountryPrices = ref<Record<string, boolean>>({})
 const pendingCountryRemovalIndex = ref<number | null>(null)
 const pendingFeatureRemovalIndex = ref<number | null>(null)
@@ -611,6 +733,16 @@ const currencyOptions = computed(() => props.currencies.map((currency) => ({
     value: currency,
     label: currency,
 })))
+
+const pricingSettingsForm = useForm({
+    pricing_show_monthly: props.settings.pricing_show_monthly,
+    pricing_show_yearly: props.settings.pricing_show_yearly,
+    pricing_show_lifetime: props.settings.pricing_show_lifetime,
+    pricing_currency_code: props.settings.pricing_currency_code,
+    pricing_trial_button_text: props.settings.pricing_trial_button_text,
+    pricing_featured_label_text: props.settings.pricing_featured_label_text,
+    pricing_checkout_button_text: props.settings.pricing_checkout_button_text,
+})
 const countryOptions = computed(() => props.countries.map((country) => ({
     value: country.code,
     label: country.name,
@@ -729,7 +861,11 @@ const resetForm = () => {
 watch(selectedPlanId, resetForm, { immediate: true })
 watch(countryPricingModalOpen, (isOpen) => {
     if (typeof document === 'undefined') return
-    document.body.classList.toggle('overflow-hidden', isOpen)
+    document.body.classList.toggle('overflow-hidden', isOpen || pricingSettingsModalOpen.value)
+})
+watch(pricingSettingsModalOpen, (isOpen) => {
+    if (typeof document === 'undefined') return
+    document.body.classList.toggle('overflow-hidden', isOpen || countryPricingModalOpen.value)
 })
 
 const addFeature = () => form.features.push('')
@@ -824,6 +960,7 @@ const toggleCountryPriceCollapsed = (row: CountryPrice, index: number) => {
 const closeCountryPricingOnEscape = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
         countryPricingModalOpen.value = false
+        pricingSettingsModalOpen.value = false
     }
 }
 
@@ -846,6 +983,15 @@ const formatMoney = (value: string | number | null | undefined, currencyCode?: s
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(amount)
+}
+
+const submitPricingSettings = () => {
+    pricingSettingsForm.post(route('admin.plans.settings'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            pricingSettingsModalOpen.value = false
+        },
+    })
 }
 
 const submit = () => {

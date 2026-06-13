@@ -2,14 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\Addon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
-/**
- * AddonService — scans addons/ directory, registers enabled addons, auto-loads ServiceProviders.
- * Ref: AI_SaaS_Master_Prompt Part 2.2.
- */
 class AddonService
 {
     private string $addonsPath;
@@ -19,50 +16,107 @@ class AddonService
         $this->addonsPath = config('addons.path', base_path('addons'));
     }
 
-    /**
-     * Get all available addons by scanning the addons directory.
-     */
-    public function getAvailableAddons(): array
-    {
-        $addons = [];
+    // ─── filesystem sync ────────────────────────────────────
 
+    /**
+     * Scan the addons/ directory and upsert addon.json (primary) or settings.json (fallback)
+     * into the addons table. Called once on boot.
+     */
+    public function syncFromFilesystem(): void
+    {
         if (! File::isDirectory($this->addonsPath)) {
-            return $addons;
+            return;
         }
+
+        $scannedSlugs = [];
 
         foreach (File::directories($this->addonsPath) as $dir) {
-            $settingsFile = $dir.'/settings.json';
-            if (File::exists($settingsFile)) {
-                $config = json_decode(File::get($settingsFile), true);
-                if ($config && isset($config['slug'])) {
-                    $config['path'] = $dir;
-                    $config['is_active'] = $this->isActive($config['slug']);
-                    $config['license_ok'] = $this->checkLicenseRequirement($config);
-                    $addons[] = $config;
-                }
+            $slug = basename($dir);
+            $scannedSlugs[] = $slug;
+
+            $manifest = $this->readManifest($slug);
+            if (! $manifest) {
+                continue;
             }
+
+            $addon = Addon::where('slug', $slug)->first();
+
+            Addon::query()->updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $manifest['name'] ?? $slug,
+                    'version' => $manifest['version'] ?? '0.0.0',
+                    'manifest' => $manifest,
+                    'installed_at' => $addon?->installed_at ?? ($addon ? null : now()),
+                ]
+            );
         }
 
-        return $addons;
+        // Mark addons no longer on disk as inactive
+        if ($scannedSlugs) {
+            Addon::whereNotIn('slug', $scannedSlugs)->update(['is_active' => false]);
+        }
     }
 
     /**
-     * Get a specific addon's configuration.
+     * Read an addon's manifest. addon.json takes priority, settings.json as fallback.
      */
-    public function getAddonConfig(string $slug): ?array
+    public function readManifest(string $slug): ?array
     {
-        $settingsFile = $this->addonsPath.'/'.$slug.'/settings.json';
+        $addonJson = $this->addonsPath . '/' . $slug . '/addon.json';
+        $settingsJson = $this->addonsPath . '/' . $slug . '/settings.json';
 
-        if (! File::exists($settingsFile)) {
+        $file = File::exists($addonJson) ? $addonJson : (File::exists($settingsJson) ? $settingsJson : null);
+        if (! $file) {
             return null;
         }
 
-        $config = json_decode(File::get($settingsFile), true);
-        $config['path'] = $this->addonsPath.'/'.$slug;
-        $config['is_active'] = $this->isActive($slug);
-        $config['license_ok'] = $this->checkLicenseRequirement($config);
+        $manifest = json_decode(File::get($file), true);
+        if (! $manifest || ! isset($manifest['slug'])) {
+            $manifest['slug'] = $slug;
+        }
 
-        return $config;
+        return $manifest;
+    }
+
+    // ─── available / active ──────────────────────────────────
+
+    /**
+     * Get all available addons (from DB, synced from filesystem).
+     */
+    public function getAvailableAddons(): array
+    {
+        return Addon::all()->map(function (Addon $addon) {
+            $manifest = $addon->manifest ?? [];
+            $manifest['slug'] = $addon->slug;
+            $manifest['name'] = $addon->name;
+            $manifest['version'] = $addon->version;
+            $manifest['is_active'] = $addon->is_active;
+            $manifest['license_ok'] = $this->checkLicenseRequirement($manifest);
+            $manifest['envato_item_id'] = $manifest['envato_item_id'] ?? null;
+            return $manifest;
+        })->toArray();
+    }
+
+    /**
+     * Get a specific addon's config from DB.
+     */
+    public function getAddonConfig(string $slug): ?array
+    {
+        $addon = Addon::where('slug', $slug)->first();
+        if (! $addon) {
+            return null;
+        }
+
+        $manifest = $addon->manifest ?? [];
+        $manifest['slug'] = $addon->slug;
+        $manifest['name'] = $addon->name;
+        $manifest['version'] = $addon->version;
+        $manifest['is_active'] = $addon->is_active;
+        $manifest['license_ok'] = $this->checkLicenseRequirement($manifest);
+        $manifest['envato_item_id'] = $manifest['envato_item_id'] ?? null;
+
+        return $manifest;
     }
 
     /**
@@ -70,65 +124,94 @@ class AddonService
      */
     public function isActive(string $slug): bool
     {
-        $active = $this->getActiveAddons();
-
-        return in_array($slug, $active);
+        return Addon::where('slug', $slug)->where('is_active', true)->exists();
     }
 
     /**
-     * Get list of active addon slugs.
+     * Get active addon slugs.
      */
     public function getActiveAddons(): array
     {
-        $addons = settings('active_addons', '[]');
-        if (is_string($addons)) {
-            $addons = json_decode($addons, true) ?? [];
-        }
+        // Migrate legacy data on first call if needed
+        $this->migrateLegacyActiveAddons();
 
-        return is_array($addons) ? $addons : [];
+        return Addon::where('is_active', true)->pluck('slug')->toArray();
     }
 
     /**
-     * Activate an addon.
+     * One-time migration: if addons table exists but has no active entries,
+     * read from legacy settings('active_addons') and mark those as active.
      */
+    private function migrateLegacyActiveAddons(): void
+    {
+        static $migrated = false;
+        if ($migrated) return;
+        $migrated = true;
+
+        if (Addon::where('is_active', true)->exists()) return;
+
+        $legacy = settings('active_addons', '[]');
+        if (is_string($legacy)) $legacy = json_decode($legacy, true) ?? [];
+        if (empty($legacy)) return;
+
+        foreach ($legacy as $slug) {
+            Addon::updateOrCreate(
+                ['slug' => $slug],
+                [
+                    'name' => $slug,
+                    'version' => '0.0.0',
+                    'is_active' => true,
+                    'installed_at' => now(),
+                    'activated_at' => now(),
+                ]
+            );
+        }
+    }
+
+    // ─── activation / deactivation ───────────────────────────
+
     public function activate(string $slug): bool
     {
-        $config = $this->getAddonConfig($slug);
-        if (! $config) {
+        $manifest = $this->getAddonConfig($slug);
+        if (! $manifest) {
             return false;
         }
 
-        if (! $this->checkLicenseRequirement($config)) {
+        if (! $this->checkLicenseRequirement($manifest)) {
             return false;
         }
 
-        $active = $this->getActiveAddons();
-        if (! in_array($slug, $active)) {
-            $active[] = $slug;
-            settings_set('active_addons', json_encode($active), 'json', 'addons');
+        // GATE: addons with envato_item_id must have a verified addon license
+        if (! $this->checkAddonLicense($slug, $manifest)) {
+            return false;
         }
+
+        $addon = Addon::where('slug', $slug)->first();
+        if (! $addon) return false;
+
+        $addon->update([
+            'is_active' => true,
+            'activated_at' => $addon->activated_at ?? now(),
+        ]);
 
         Cache::forget('active_addons_list');
 
         return true;
     }
 
-    /**
-     * Deactivate an addon.
-     */
     public function deactivate(string $slug): bool
     {
-        $active = $this->getActiveAddons();
-        $active = array_values(array_filter($active, fn ($s) => $s !== $slug));
-        settings_set('active_addons', json_encode($active), 'json', 'addons');
+        Addon::where('slug', $slug)->update([
+            'is_active' => false,
+        ]);
+
         Cache::forget('active_addons_list');
 
         return true;
     }
 
-    /**
-     * Get all settings for an addon with current values.
-     */
+    // ─── settings ────────────────────────────────────────────
+
     public function getAddonSettings(string $slug): array
     {
         $config = $this->getAddonConfig($slug);
@@ -143,15 +226,51 @@ class AddonService
         }, $config['settings']);
     }
 
-    /**
-     * Save addon settings (bulk).
-     */
     public function saveAddonSettings(string $slug, array $values): void
     {
+        $config = $this->getAddonConfig($slug);
+        $settingsMap = collect($config['settings'] ?? [])->keyBy('key');
+
         foreach ($values as $key => $value) {
-            settings_set("addon_{$slug}_{$key}", $value, 'string', 'addon');
+            $type = $settingsMap[$key]['type'] ?? 'string';
+            // Honor encrypted type from manifest
+            if ($settingsMap[$key]['type'] ?? null === 'encrypted') {
+                $type = 'encrypted';
+            }
+            settings_set("addon_{$slug}_{$key}", $value, $type, 'addon');
         }
     }
+
+    // ─── menu items ──────────────────────────────────────────
+
+    /**
+     * Collect admin_menu entries from all active addons for Inertia sharing.
+     */
+    public function getActiveAddonMenuItems(): array
+    {
+        $items = [];
+
+        foreach (Addon::where('is_active', true)->get() as $addon) {
+            $menuEntries = $addon->manifest['admin_menu'] ?? [];
+            if (! is_array($menuEntries)) continue;
+
+            foreach ($menuEntries as $entry) {
+                $items[] = [
+                    'slug' => $addon->slug,
+                    'label' => $entry['label'] ?? $addon->name,
+                    'route' => $entry['route'] ?? '',
+                    'route_params' => $entry['route_params'] ?? [],
+                    'route_pattern' => $entry['route_pattern'] ?? ($entry['route'] ?? ''),
+                    'icon' => $entry['icon'] ?? 'ti ti-puzzle',
+                    'permission' => $entry['permission'] ?? 'addons.view',
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    // ─── registration ────────────────────────────────────────
 
     /**
      * Register all active addons' ServiceProviders.
@@ -160,7 +279,7 @@ class AddonService
     public function registerActiveAddons(): void
     {
         foreach ($this->getActiveAddons() as $slug) {
-            $providerPath = $this->addonsPath.'/'.$slug.'/AddonServiceProvider.php';
+            $providerPath = $this->addonsPath . '/' . $slug . '/AddonServiceProvider.php';
             if (File::exists($providerPath)) {
                 try {
                     require_once $providerPath;
@@ -169,8 +288,7 @@ class AddonService
                         app()->register($namespace);
                     }
                 } catch (\Exception $e) {
-                    // Silently skip broken addons
-                    Log::warning("Failed to load addon '{$slug}': ".$e->getMessage());
+                    Log::warning("Failed to load addon '{$slug}': " . $e->getMessage());
                 }
             }
         }
@@ -181,15 +299,36 @@ class AddonService
      */
     private function resolveProviderClass(string $slug): string
     {
-        // Convention: addons/social-media/AddonServiceProvider.php → Addons\SocialMedia\AddonServiceProvider
         $namespace = str_replace('-', '', ucwords($slug, '-'));
 
         return "Addons\\{$namespace}\\AddonServiceProvider";
     }
 
+    // ─── migration ───────────────────────────────────────────
+
     /**
-     * Check if an addon's license requirement is met.
+     * Run migrations for a specific addon.
      */
+    public function migrateAddon(string $slug): void
+    {
+        $migrationsPath = $this->addonsPath . '/' . $slug . '/database/migrations';
+        if (! File::isDirectory($migrationsPath)) {
+            return;
+        }
+
+        try {
+            \Artisan::call('migrate', [
+                '--path' => 'addons/' . $slug . '/database/migrations',
+                '--force' => true,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Failed to migrate addon '{$slug}': " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    // ─── helpers ─────────────────────────────────────────────
+
     private function checkLicenseRequirement(array $config): bool
     {
         if (! license_verified()) {
@@ -199,5 +338,20 @@ class AddonService
         $required = $config['requires_license'] ?? 1;
 
         return get_license_type() >= $required;
+    }
+
+    /**
+     * GATE: addons with envato_item_id must have a verified addon license from AddonLicenseService.
+     */
+    private function checkAddonLicense(string $slug, array $manifest): bool
+    {
+        $envatoItemId = $manifest['envato_item_id'] ?? null;
+        if (! $envatoItemId) {
+            return true; // no separate license needed
+        }
+
+        $licenseService = app(\App\Services\AddonLicenseService::class);
+
+        return $licenseService->isLicensed($slug);
     }
 }

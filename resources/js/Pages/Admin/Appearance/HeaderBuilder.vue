@@ -458,7 +458,7 @@ const handleLogoUpload = async (event: Event) => {
     formData.append('file', input.files[0])
     formData.append('directory', 'logos')
     try {
-        const response = await fetch('/admin/appearance/header/upload-logo', {
+        const response = await fetch('/admin/builder/header/upload-logo', {
             method: 'POST',
             body: formData,
             headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '' },
@@ -484,7 +484,7 @@ const handleBackgroundUpload = async (event: Event, section: HeaderSectionKey = 
     formData.append('directory', 'header-backgrounds')
 
     try {
-        const response = await fetch('/admin/appearance/header/upload-logo', {
+        const response = await fetch('/admin/builder/header/upload-logo', {
             method: 'POST',
             body: formData,
             headers: {
@@ -528,7 +528,7 @@ const handleMobileLogoUpload = async (event: Event) => {
     formData.append('file', input.files[0])
     formData.append('directory', 'logos')
     try {
-        const response = await fetch('/admin/appearance/header/upload-logo', {
+        const response = await fetch('/admin/builder/header/upload-logo', {
             method: 'POST',
             body: formData,
             headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '' },

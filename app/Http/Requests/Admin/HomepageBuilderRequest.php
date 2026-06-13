@@ -21,6 +21,8 @@ class HomepageBuilderRequest extends FormRequest
         'newsletter',
         'integrations',
         'custom_html',
+        'template_grid',
+        'all_tools',
     ];
 
     public function authorize(): bool
@@ -59,6 +61,9 @@ class HomepageBuilderRequest extends FormRequest
             'sections.*.config.stats' => ['nullable', 'array'],
             'sections.*.config.stats.*.number' => ['nullable', 'string', 'max:20'],
             'sections.*.config.stats.*.label' => ['nullable', 'string', 'max:100'],
+            'sections.*.config.template_slug' => ['nullable', 'string', 'max:100'],
+            'sections.*.config.max_items' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'sections.*.config.show_filter' => ['nullable', 'boolean'],
             'settings' => ['required', 'array'],
             'settings.seo' => ['required', 'array'],
             'settings.seo.meta_title' => ['nullable', 'string', 'max:160'],

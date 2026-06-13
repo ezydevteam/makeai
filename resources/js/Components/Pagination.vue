@@ -1,62 +1,194 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
+import { useTranslate } from '@/Composables/useTranslate'
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
 
 const props = defineProps<{
-    links: Array<{
-        url: string | null
-        label: string
-        active: boolean
-    }>
+    links: PaginationLink[]
+    from?: number | null
+    to?: number | null
+    total?: number | null
+    currentPage?: number | null
+    lastPage?: number | null
 }>()
+
+const { t } = useTranslate()
 
 const isPrev = (label: string) => label.includes('Previous') || label.includes('&laquo;')
 const isNext = (label: string) => label.includes('Next') || label.includes('&raquo;')
+const isNumeric = (label: string) => /^\d+$/.test(label.replace(/<[^>]+>/g, '').trim())
 
 const processedLinks = computed(() =>
-    props.links.map((link) => ({
-        ...link,
-        isPrev: isPrev(link.label),
-        isNext: isNext(link.label),
-    })),
+    props.links.map((link) => {
+        const cleanLabel = link.label.replace(/<[^>]+>/g, '').trim()
+
+        return {
+            ...link,
+            cleanLabel,
+            isPrev: isPrev(link.label),
+            isNext: isNext(link.label),
+            isNumeric: isNumeric(link.label),
+            pageNumber: isNumeric(link.label) ? Number(cleanLabel) : null,
+        }
+    }),
 )
+
+const prevLink = computed(() => processedLinks.value.find((link) => link.isPrev) ?? null)
+const nextLink = computed(() => processedLinks.value.find((link) => link.isNext) ?? null)
+const numericLinks = computed(() => processedLinks.value.filter((link) => link.isNumeric && link.pageNumber !== null))
+
+const activePage = computed(() => {
+    if (props.currentPage) {
+        return props.currentPage
+    }
+
+    return numericLinks.value.find((link) => link.active)?.pageNumber ?? 1
+})
+
+const finalPage = computed(() => {
+    if (props.lastPage) {
+        return props.lastPage
+    }
+
+    return numericLinks.value.at(-1)?.pageNumber ?? 1
+})
+
+const visibleLinks = computed(() => {
+    const visible: typeof numericLinks.value = []
+    const used = new Set<number>()
+
+    const addPage = (page: number) => {
+        const match = numericLinks.value.find((link) => link.pageNumber === page)
+        if (!match || used.has(page)) {
+            return
+        }
+
+        used.add(page)
+        visible.push(match)
+    }
+
+    if (finalPage.value <= 7) {
+        for (let page = 1; page <= finalPage.value; page += 1) {
+            addPage(page)
+        }
+
+        return visible.sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0))
+    }
+
+    addPage(1)
+
+    const middleWindowSize = Math.min(5, Math.max(finalPage.value - 2, 0))
+    const maxStartPage = Math.max(finalPage.value - middleWindowSize, 2)
+    const startPage = Math.min(Math.max(activePage.value - 2, 2), maxStartPage)
+    const endPage = Math.min(startPage + middleWindowSize - 1, finalPage.value - 1)
+
+    for (let page = startPage; page <= endPage; page += 1) {
+        addPage(page)
+    }
+
+    addPage(finalPage.value)
+
+    return visible.sort((a, b) => (a.pageNumber ?? 0) - (b.pageNumber ?? 0))
+})
+
+const paginationItems = computed(() => {
+    const items: Array<
+        | { type: 'page'; pageNumber: number; url: string | null; active: boolean }
+        | { type: 'ellipsis'; key: string }
+    > = []
+
+    visibleLinks.value.forEach((link, index) => {
+        const pageNumber = link.pageNumber ?? 0
+        const previous = visibleLinks.value[index - 1]?.pageNumber ?? null
+
+        if (previous !== null && pageNumber - previous > 1) {
+            items.push({ type: 'ellipsis', key: `ellipsis-${previous}-${pageNumber}` })
+        }
+
+        items.push({
+            type: 'page',
+            pageNumber,
+            url: link.url,
+            active: link.active,
+        })
+    })
+
+    return items
+})
+
+const summaryText = computed(() => {
+    if (!props.total || !props.from || !props.to) {
+        return ''
+    }
+
+    return t('Showing :start to :end of :count', {
+        start: String(props.from),
+        end: String(props.to),
+        count: String(props.total),
+    }).replace(/(\d)([A-Za-z])/g, '$1 $2')
+})
 </script>
 
 <template>
-    <div v-if="links.length > 3" class="flex flex-wrap items-center justify-center gap-2">
-        <template v-for="(link, key) in processedLinks" :key="key">
-            <div
-                v-if="link.url === null"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gray-50 text-gray-300"
-            >
-                <svg v-if="link.isPrev" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                </svg>
-                <svg v-else-if="link.isNext" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                </svg>
-                <span v-else v-html="link.label" />
-            </div>
+    <div
+        v-if="links.length > 3"
+        class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+    >
+        <p v-if="summaryText" class="text-sm text-gray-500 dark:text-gray-400">
+            {{ summaryText }}
+        </p>
+        <div v-else class="hidden md:block"></div>
 
-            <Link
-                v-else
-                :href="link.url"
-                class="inline-flex h-9 items-center justify-center rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                :class="{
-                    'bg-primary-400 text-white shadow-lg shadow-primary-400/20 pointer-events-none cursor-default': link.active,
-                    'bg-white text-gray-500 hover:bg-gray-50 border border-gray-100': !link.active,
-                    'w-9 px-0': link.isPrev || link.isNext,
-                    'px-4 min-w-[36px]': !link.isPrev && !link.isNext,
-                }"
+        <div class="flex flex-wrap items-center justify-start gap-2 md:justify-end">
+            <component
+                :is="prevLink?.url ? Link : 'div'"
+                v-if="prevLink"
+                :href="prevLink.url ?? undefined"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm transition-all"
+                :class="prevLink.url
+                    ? 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800'
+                    : 'border-gray-100 bg-gray-50 text-gray-300 dark:border-surface-800 dark:bg-surface-900/60 dark:text-gray-600'"
             >
-                <svg v-if="link.isPrev" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                </svg>
-                <svg v-else-if="link.isNext" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                </svg>
-                <span v-else v-html="link.label" />
-            </Link>
-        </template>
+                <i class="ti ti-chevron-left text-base"></i>
+            </component>
+
+            <template v-for="item in paginationItems" :key="item.type === 'page' ? item.pageNumber : item.key">
+                <div
+                    v-if="item.type === 'ellipsis'"
+                    class="inline-flex h-9 min-w-[36px] items-center justify-center px-2 text-sm font-semibold text-gray-400 dark:text-gray-500"
+                >
+                    ...
+                </div>
+                <component
+                    v-else
+                    :is="item.url && !item.active ? Link : 'div'"
+                    :href="item.url ?? undefined"
+                    class="inline-flex h-9 min-w-[36px] items-center justify-center rounded-xl px-3 text-sm font-semibold transition-all"
+                    :class="item.active
+                        ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20'
+                        : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800'"
+                >
+                    {{ item.pageNumber }}
+                </component>
+            </template>
+
+            <component
+                :is="nextLink?.url ? Link : 'div'"
+                v-if="nextLink"
+                :href="nextLink.url ?? undefined"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm transition-all"
+                :class="nextLink.url
+                    ? 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800'
+                    : 'border-gray-100 bg-gray-50 text-gray-300 dark:border-surface-800 dark:bg-surface-900/60 dark:text-gray-600'"
+            >
+                <i class="ti ti-chevron-right text-base"></i>
+            </component>
+        </div>
     </div>
 </template>

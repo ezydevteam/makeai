@@ -5,7 +5,7 @@ import { usePage, Link, router } from '@inertiajs/vue3'
 import { useTheme } from '@/Composables/useTheme'
 import { useTranslate } from '@/Composables/useTranslate'
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue'
-import LiveSearch from '@/Components/LiveSearch.vue'
+import CommandPalette from '@/Components/CommandPalette.vue'
 import NotificationBell from '@/Components/NotificationBell.vue'
 import SocialFollow from '@/Components/SocialFollow.vue'
 
@@ -59,10 +59,6 @@ const mobileDrawerTitle = computed(() => mobileHamburgerBlock.value?.config?.dra
 
 const profileOpen = ref(false)
 const mobileMenuOpen = ref(false)
-const mobileSearchOpen = ref(false)
-const desktopSearchBlockId = ref<string | null>(null)
-const mobileSearchOrigin = ref<'top' | 'bottom'>('top')
-const mobileSearchConfig = ref<Record<string, unknown> | null>(null)
 const lastScrollY = ref(0)
 const scrollY = ref(0)
 const scrollDirection = ref<'up' | 'down'>('down')
@@ -163,7 +159,6 @@ const sectionStyle = (config: any, section: 'top' | 'main' | 'mobile' | 'mobile_
 const mobileIconButtonClass = 'flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
 const mobileBottomItemClass = 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
 const configString = (config: Record<string, unknown> | undefined, key: string, fallback = '') => typeof config?.[key] === 'string' ? (config[key] as string) : fallback
-const configBoolean = (config: Record<string, unknown> | undefined, key: string, fallback = true) => typeof config?.[key] === 'boolean' ? config[key] as boolean : fallback
 const mobileCtaClass = (block: any, bottom = false) => [
     bottom ? 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold transition-colors' : (block.config?.icon_only ? 'inline-flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition-colors' : 'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors'),
     block.config?.style === 'outline' ? 'border border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
@@ -227,28 +222,8 @@ const iconSurfaceClass = (block: any, baseClass: string) => [
     block.config?.bg_style === 'custom' ? 'hover:opacity-90' : '',
 ]
 
-const searchLiveEnabled = (config?: Record<string, unknown>) => configBoolean(config, 'enable_live_search', true)
-const searchSuggestionsEnabled = (config?: Record<string, unknown>) => configBoolean(config, 'show_suggestions', true)
-const searchStyle = (block: any) => String(block.config?.search_style || 'box')
-const toggleDesktopSearch = (block: any) => {
-    desktopSearchBlockId.value = desktopSearchBlockId.value === String(block.id) ? null : String(block.id)
-}
-const toggleMobileSearch = (block: any, origin: 'top' | 'bottom') => {
-    mobileSearchConfig.value = block.config ?? null
-    mobileSearchOrigin.value = origin
-    mobileSearchOpen.value = !mobileSearchOpen.value
-    mobileMenuOpen.value = false
-}
-
 const openCommandPalette = () => {
-    const searchBlock = activeBlocks.value.find((b: any) => b.type === 'search') || activeMobileBlocks.value.find((b: any) => b.type === 'search_icon')
-    if (searchBlock) {
-        if (window.innerWidth >= 768) {
-            toggleDesktopSearch(searchBlock)
-        } else {
-            toggleMobileSearch(searchBlock, 'top')
-        }
-    }
+    window.dispatchEvent(new CustomEvent('palette:open'))
 }
 
 const userIconHref = computed(() => user.value ? route('user.dashboard') : '/login')
@@ -274,7 +249,6 @@ const close = () => { profileOpen.value = false }
 const closeOnEscape = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
         closeMobileMenu()
-        mobileSearchOpen.value = false
     }
 }
 const handleKeydown = (event: KeyboardEvent) => {
@@ -306,6 +280,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+    <CommandPalette />
     <!-- Custom CSS injection -->
     <component
         v-for="(_, sectionKey) in { top: topHeaderConfig, main: headerConfig, mobile: mobileHeaderConfig, mobile_bottom: mobileBottomHeaderConfig }"
@@ -421,23 +396,19 @@ onUnmounted(() => {
                     </nav>
 
                     <!-- SEARCH BAR -->
-                    <div v-else-if="block.type === 'search'" class="hidden md:block relative">
-                        <LiveSearch
-                            v-if="searchStyle(block) === 'box'"
-                            context="public"
-                            :compact="Boolean(block.config.compact)"
-                            :enable-live-search="searchLiveEnabled(block.config)"
-                            :show-suggestions="searchSuggestionsEnabled(block.config)"
-                        />
-                        <div v-else class="relative">
-                            <button type="button" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="toggleDesktopSearch(block)">
-                                <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
-                                <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" /></svg>
-                            </button>
-                            <div v-if="desktopSearchBlockId === String(block.id)" class="absolute inset-inline-end-0 top-full z-50 mt-3 w-80 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                                <LiveSearch context="public" compact :enable-live-search="searchLiveEnabled(block.config)" :show-suggestions="searchSuggestionsEnabled(block.config)" />
-                            </div>
-                        </div>
+                    <div v-else-if="block.type === 'search'" class="hidden md:flex items-center">
+                        <button
+                            type="button"
+                            class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400 shadow-sm transition-all hover:border-gray-300 hover:text-gray-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-500 dark:hover:border-surface-600 dark:hover:text-gray-300"
+                            :aria-label="t('Search tools, documents, settings...')"
+                            @click="openCommandPalette"
+                        >
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span class="hidden lg:inline">{{ t('Search...') }}</span>
+                            <kbd class="hidden lg:inline-flex items-center gap-0.5 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 dark:border-surface-600 dark:bg-surface-700">Ctrl K</kbd>
+                        </button>
                     </div>
                 </template>
             </div>
@@ -535,7 +506,7 @@ onUnmounted(() => {
         <div class="flex h-full items-center justify-between gap-3" :class="containerClass({ ...mobileHeaderConfig, container_width: 'default' }, true)">
             <div class="flex items-center gap-2" :class="mobileColFlexClass('left')">
                 <template v-for="block in mobileLeftBlocks" :key="block.id">
-                    <button v-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen; mobileSearchOpen = false">
+                    <button v-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
                     </button>
@@ -551,7 +522,7 @@ onUnmounted(() => {
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v9A2.25 2.25 0 0 0 6.75 21h10.5a2.25 2.25 0 0 0 2.25-2.25v-9" /></svg>
                     </Link>
-                    <button v-else-if="block.type === 'search_icon'" type="button" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="toggleMobileSearch(block, 'top')">
+                    <button v-else-if="block.type === 'search_icon'" type="button" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="openCommandPalette">
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" /></svg>
                     </button>
@@ -630,19 +601,6 @@ onUnmounted(() => {
         </Transition>
     </Teleport>
 
-    <!-- Mobile Search Overlay -->
-    <div
-        v-if="mobileSearchOpen"
-        class="fixed inset-x-0 z-50 border-b border-gray-200 bg-white p-4 shadow-lg dark:border-white/5 dark:bg-surface-900 md:hidden"
-        :style="{ top: mobileHeaderConfig?.enabled ? `${Number(mobileHeaderConfig?.height ?? 64)}px` : '0px' }"
-    >
-        <LiveSearch
-            context="public"
-            :enable-live-search="searchLiveEnabled(mobileSearchConfig ?? undefined)"
-            :show-suggestions="searchSuggestionsEnabled(mobileSearchConfig ?? undefined)"
-        />
-    </div>
-
     <!-- Mobile Bottom Header -->
     <nav
         v-if="mobileBottomHeaderConfig?.enabled && activeMobileBottomBlocks.length > 0"
@@ -657,12 +615,12 @@ onUnmounted(() => {
                     <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v9A2.25 2.25 0 0 0 6.75 21h10.5a2.25 2.25 0 0 0 2.25-2.25v-9" /></svg>
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Home')) }}</span>
                 </Link>
-                <button v-else-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen; mobileSearchOpen = false">
+                <button v-else-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
                     <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
                     <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Menu')) }}</span>
                 </button>
-                <button v-else-if="block.type === 'search_icon'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="toggleMobileSearch(block, 'bottom')">
+                <button v-else-if="block.type === 'search_icon'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="openCommandPalette">
                     <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
                     <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" /></svg>
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Search')) }}</span>

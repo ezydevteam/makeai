@@ -218,11 +218,6 @@ export function useCommandPalette() {
     }
 
     function handleKeydown(e: KeyboardEvent) {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-            e.preventDefault()
-            open()
-            return
-        }
         if (!isOpen.value) return
         if (e.key === 'Escape') { e.preventDefault(); close(); return }
         if (e.key === 'ArrowDown') { e.preventDefault(); selectNext(); return }

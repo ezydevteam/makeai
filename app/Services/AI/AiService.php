@@ -488,7 +488,10 @@ class AiService
         ?string $provider = null,
         ?string $model = null,
     ): EmbeddingResult {
-        $providerName = $provider ?? settings('ai_embedding_provider', config('ai.default_for_embeddings', 'openai'));
+        $providerName = $provider
+            ?? (settings('ai_embedding_provider')
+            ?: settings('default_ai_provider')
+            ?: config('ai.default_for_embeddings', 'openai'));
 
         $adapter = ProviderRegistry::resolve($providerName);
 
@@ -512,7 +515,10 @@ class AiService
         array $texts,
         ?string $provider = null,
     ): array {
-        $providerName = $provider ?? settings('ai_embedding_provider', config('ai.default_for_embeddings', 'openai'));
+        $providerName = $provider
+            ?? (settings('ai_embedding_provider')
+            ?: settings('default_ai_provider')
+            ?: config('ai.default_for_embeddings', 'openai'));
 
         $adapter = ProviderRegistry::resolve($providerName);
 

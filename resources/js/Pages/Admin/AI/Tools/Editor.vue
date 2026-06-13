@@ -22,15 +22,41 @@ const props = defineProps<{
 const isEditing = computed(() => !!props.tool)
 const activeTab = ref('basic')
 
-const tabs = [
-    { key: 'basic', label: t('Basic'), icon: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z' },
-    { key: 'prompts', label: t('Prompts'), icon: 'M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z' },
-    { key: 'fields', label: t('Fields'), icon: 'M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z' },
-    { key: 'content', label: t('Content'), icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z' },
-    { key: 'seo', label: t('SEO'), icon: 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z' },
-]
+const tabs = computed(() => {
+    const list = [
+        { key: 'basic', label: t('Basic'), icon: 'ti ti-info-circle' },
+    ]
+    if (props.tool?.type !== 'rag') {
+        list.push(
+            { key: 'prompts', label: t('Prompts'), icon: 'ti ti-message-2-code' },
+            { key: 'fields', label: t('Fields'), icon: 'ti ti-forms' }
+        )
+    }
+    list.push(
+        { key: 'content', label: t('Content'), icon: 'ti ti-file-text' },
+        { key: 'seo', label: t('SEO'), icon: 'ti ti-search' }
+    )
+    return list
+})
 
 const textLength = (value: unknown) => String(value || '').length
+
+const ensureArray = (val: any) => {
+    if (!val) return []
+    if (Array.isArray(val)) return val
+    if (typeof val === 'string') {
+        try {
+            const parsed = JSON.parse(val)
+            return Array.isArray(parsed) ? parsed : Object.values(parsed)
+        } catch {
+            return []
+        }
+    }
+    if (typeof val === 'object') {
+        return Object.values(val)
+    }
+    return []
+}
 
 const form = useForm({
     // Basic
@@ -44,6 +70,8 @@ const form = useForm({
     is_active: props.tool?.is_active ?? true,
     is_featured: props.tool?.is_featured ?? false,
     requires_pro: props.tool?.requires_pro ?? false,
+    show_header: props.tool?.show_header ?? true,
+    show_footer: props.tool?.show_footer ?? true,
     access_level: props.tool?.access_level || 'inherit',
 
     // Prompts
@@ -61,13 +89,13 @@ const form = useForm({
     avg_output_tokens: props.tool?.avg_output_tokens || '',
 
     // Fields
-    fields: props.tool?.fields ? (typeof props.tool?.fields === 'string' ? JSON.parse(props.tool?.fields) : props.tool?.fields) : [],
+    fields: props.tool?.type === 'rag' ? props.tool.fields : ensureArray(props.tool?.fields),
 
     // Content
     about_content: props.tool?.about_content || '',
-    how_it_works: props.tool?.how_it_works ? (typeof props.tool?.how_it_works === 'string' ? JSON.parse(props.tool?.how_it_works) : props.tool?.how_it_works) : [],
-    usage_examples: props.tool?.usage_examples ? (typeof props.tool?.usage_examples === 'string' ? JSON.parse(props.tool?.usage_examples) : props.tool?.usage_examples) : [],
-    faq_items: props.tool?.faq_items ? (typeof props.tool?.faq_items === 'string' ? JSON.parse(props.tool?.faq_items) : props.tool?.faq_items) : [],
+    how_it_works: ensureArray(props.tool?.how_it_works),
+    usage_examples: ensureArray(props.tool?.usage_examples),
+    faq_items: ensureArray(props.tool?.faq_items),
     show_about: props.tool?.show_about ?? true,
     show_how_it_works: props.tool?.show_how_it_works ?? true,
     show_usage_examples: props.tool?.show_usage_examples ?? true,
@@ -243,31 +271,48 @@ const submit = () => {
 <template>
     <Head :title="(isEditing ? t('Edit Tool') : t('Create Tool')) + ' - ' + t('Admin')" />
 
-    <div class="max-w-5xl mx-auto space-y-6">
+    <div class="mx-auto w-full sm:max-w-5xl space-y-6 px-4 sm:px-6">
         <!-- Header -->
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-                <div class="flex items-center gap-3">
-                    <Link :href="route('admin.ai.tools.index')" class="px-2 py-1 rounded-lg bg-surface-200 hover:bg-gray-300 dark:bg-surface-800 dark:hover:bg-surface-700 text-gray-400 transition-colors">
-                       <i class="ti ti-chevron-left"></i>
-                    </Link>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditing ? t('Edit Tool') : t('Create Tool') }}</h1>
-                </div>
-                <p v-if="isEditing" class="text-sm text-gray-500 dark:text-gray-400 ml-11">{{ tool.slug }}</p>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditing ? t('Edit Tool') : t('Create Tool') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ isEditing
+                        ? t('Update tool settings, prompts, fields, content, and search metadata.')
+                        : t('Create a new AI tool with access rules, prompts, dynamic fields, and SEO content.') }}
+                </p>
+                <p v-if="isEditing" class="mt-2 text-xs font-medium text-gray-400 dark:text-gray-500">{{ props.tool?.slug }}</p>
             </div>
-            <button @click="submit" :disabled="form.processing" :class="form.processing ? 'opacity-50 cursor-wait' : ''" class="inline-flex items-center gap-2 btn-primary">
-                <svg v-if="form.processing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                {{ isEditing ? t('Save Changes') : t('Create Tool') }}
-            </button>
+            <div class="flex flex-wrap items-center gap-3">
+                <Link
+                    :href="route('admin.ai.tools.index')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                >
+                    <i class="ti ti-arrow-left text-base"></i>
+                    {{ t('Back') }}
+                </Link>
+                <button
+                    type="button"
+                    @click="submit"
+                    :disabled="form.processing"
+                    :class="form.processing ? 'cursor-wait opacity-50' : ''"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm"
+                >
+                    <i v-if="form.processing" class="ti ti-loader-2 animate-spin text-base"></i>
+                    <i v-else-if="!isEditing" class="ti ti-plus text-base"></i>
+                    <i v-else class="ti ti-device-floppy text-base"></i>
+                    {{ isEditing ? t('Save Changes') : t('Create Tool') }}
+                </button>
+            </div>
         </div>
 
         <!-- Tabs -->
         <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-200 dark:border-surface-800 overflow-hidden">
             <div class="flex border-b border-gray-100 dark:border-surface-800 overflow-x-auto">
-                <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key" :class="[activeTab === tab.key ? 'text-primary-600 dark:text-primary-400 border-primary-500' : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300']" class="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" :d="tab.icon" /></svg>
-                    {{ tab.label }}
-                </button>
+                    <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key" :class="[activeTab === tab.key ? 'text-primary-600 dark:text-primary-400 border-primary-500' : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300']" class="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap">
+                        <i :class="[tab.icon, 'text-base']"></i>
+                        {{ tab.label }}
+                    </button>
             </div>
 
             <div class="p-6 space-y-5">
@@ -350,11 +395,33 @@ const submit = () => {
                             </button>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Requires Pro') }}</span>
                         </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.show_header ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.show_header = !form.show_header"
+                            >
+                                <span :class="form.show_header ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Site Header') }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.show_footer ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.show_footer = !form.show_footer"
+                            >
+                                <span :class="form.show_footer ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Site Footer') }}</span>
+                        </div>
                     </div>
                 </div>
 
                 <!-- ═══ TAB: Prompts ═══ -->
-                <div v-show="activeTab === 'prompts'" class="space-y-5">
+                <div v-if="props.tool?.type !== 'rag'" v-show="activeTab === 'prompts'" class="space-y-5">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('System Prompt') }}</label>
                         <textarea v-model="form.prompt_system" rows="5" @input="autoExpand" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono resize-none overflow-hidden" :placeholder="t('You are a professional writer...')" />
@@ -439,12 +506,12 @@ const submit = () => {
                 </div>
 
                 <!-- ═══ TAB: Fields ═══ -->
-                <div v-show="activeTab === 'fields'" class="space-y-4">
+                <div v-if="props.tool?.type !== 'rag'" v-show="activeTab === 'fields'" class="space-y-4">
                     <div v-for="(field, i) in form.fields" :key="i" class="p-4 bg-gray-50 dark:bg-surface-800 rounded-xl border border-gray-200 dark:border-surface-700">
                         <div class="flex items-center justify-between mb-3">
                             <span class="text-xs font-bold text-gray-400 uppercase">{{ t('Field :number', { number: Number(i) + 1 }) }}</span>
-                            <button @click="confirmRemoveField(Number(i))" class="p-1 text-gray-400 hover:text-red-500 transition-colors" :title="t('Delete field')">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            <button type="button" @click="confirmRemoveField(Number(i))" class="p-1 text-gray-400 hover:text-red-500 transition-colors" :title="t('Delete field')">
+                                <i class="ti ti-x text-base"></i>
                             </button>
                         </div>
                         <div class="grid grid-cols-4 gap-3">
@@ -560,7 +627,7 @@ const submit = () => {
                                 </div>
                             </div>
                             <button @click="confirmRemoveFaq(Number(i))" class="p-1 text-gray-400 hover:text-red-500 self-start mt-2">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <i class="ti ti-x text-base"></i>
                             </button>
                         </div>
                         <button @click="addFaq" class="text-sm font-semibold text-primary-600 hover:text-primary-700">{{ t('+ Add FAQ') }}</button>

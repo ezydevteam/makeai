@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppearanceSetting;
+use App\Services\AddonLicenseService;
 use App\Services\AddonService;
 use App\Services\ThemeService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use ZipArchive;
 
 /**
  * Admin Theme & Addon Management Controller.
@@ -19,6 +21,7 @@ class ThemeAddonController extends Controller
     public function __construct(
         private ThemeService $themeService,
         private AddonService $addonService,
+        private AddonLicenseService $addonLicenseService,
     ) {}
 
     // ─── Themes ──────────────────────────────────────────
@@ -182,8 +185,17 @@ class ThemeAddonController extends Controller
      */
     public function addons()
     {
+        $addons = $this->addonService->getAvailableAddons();
+
+        // Enrich with license info for the Vue page
+        $addons = array_map(function ($addon) {
+            $addon['license'] = $this->addonLicenseService->getLicenseInfo($addon['slug']);
+            $addon['envato_item_id'] = $addon['envato_item_id'] ?? null;
+            return $addon;
+        }, $addons);
+
         return Inertia::render('Admin/Addons', [
-            'addons' => $this->addonService->getAvailableAddons(),
+            'addons' => $addons,
         ]);
     }
 
@@ -219,9 +231,29 @@ class ThemeAddonController extends Controller
             return back()->with('error', translate('Addon not found.'));
         }
 
-        return Inertia::render('Admin/AddonSettings', [
+        $settings = $this->addonService->getAddonSettings($slug);
+
+        // Fetch available chat models for the AI Assistant model select.
+        // Only show models from providers with at least one active, non-disabled API key.
+        $configuredProviders = \App\Models\AiKey::available()->pluck('provider');
+
+        $aiModels = \App\Models\AiModel::active()
+            ->whereIn('type', ['chat'])
+            ->whereIn('provider', $configuredProviders)
+            ->orderBy('provider')
+            ->orderBy('name')
+            ->get(['slug', 'name', 'provider'])
+            ->map(fn ($m) => [
+                'value' => $m->slug,
+                'label' => $m->name,
+                'provider' => $m->provider,
+            ]);
+
+        // Resolve from either the generic page or the addon-specific page
+        return Inertia::render('Addons/' . $slug . '/Admin/Settings', [
             'addon' => $config,
-            'settings' => $this->addonService->getAddonSettings($slug),
+            'settings' => $settings,
+            'aiModels' => $aiModels,
         ]);
     }
 
@@ -238,5 +270,118 @@ class ThemeAddonController extends Controller
         $this->addonService->saveAddonSettings($slug, $request->except('_token'));
 
         return back()->with('success', translate('Addon settings saved.'));
+    }
+
+    /**
+     * Install addon from uploaded zip.
+     */
+    public function installAddon(Request $request)
+    {
+        $request->validate([
+            'addon_zip' => ['required', 'file', 'mimes:zip', 'max:20480'],
+        ]);
+
+        $file = $request->file('addon_zip');
+        $zip = new ZipArchive;
+        $openResult = $zip->open($file->getRealPath());
+
+        if ($openResult !== true) {
+            return back()->with('error', translate('Failed to open the uploaded zip file.'));
+        }
+
+        $addonsPath = config('addons.path', base_path('addons'));
+
+        // Find the root slug directory inside the zip
+        $slug = null;
+        $rootDirs = [];
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            $parts = explode('/', trim($name, '/'));
+            if (count($parts) > 0 && $parts[0] !== '' && $parts[0] !== '__MACOSX') {
+                $rootDirs[$parts[0]] = true;
+            }
+        }
+
+        $slug = count($rootDirs) === 1 ? array_key_first($rootDirs) : null;
+
+        if (! $slug) {
+            $zip->close();
+            return back()->with('error', translate('Invalid addon zip structure. Expected a single root directory.'));
+        }
+
+        // Check if the slug has addon.json or settings.json
+        $hasManifest = false;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            if (str_starts_with($name, $slug . '/') && basename($name) === 'addon.json') {
+                $hasManifest = true;
+                break;
+            }
+            if (str_starts_with($name, $slug . '/') && basename($name) === 'settings.json') {
+                $hasManifest = true;
+                break;
+            }
+        }
+
+        if (! $hasManifest) {
+            $zip->close();
+            return back()->with('error', translate('Invalid addon zip — no addon.json or settings.json found inside.'));
+        }
+
+        $destPath = $addonsPath . '/' . $slug;
+
+        // Extract: strip the root folder
+        $zip->extractTo($addonsPath);
+        $zip->close();
+
+        // Run sync to register the new addon
+        $this->addonService->syncFromFilesystem();
+
+        // Run addon migrations
+        $this->addonService->migrateAddon($slug);
+
+        return back()->with('success', translate('Addon installed successfully. You can now activate it below.'));
+    }
+
+    /**
+     * Verify addon license — Envato purchase code validation.
+     * Called BEFORE activateAddon for first-time addons.
+     */
+    public function verifyAddonLicense(Request $request, string $slug)
+    {
+        $config = $this->addonService->getAddonConfig($slug);
+        if (! $config) {
+            return response()->json(['error' => translate('Addon not found.')], 404);
+        }
+
+        $envatoItemId = $config['envato_item_id'] ?? null;
+        if (! $envatoItemId) {
+            return response()->json(['error' => translate('This addon does not require a separate license.')], 422);
+        }
+
+        $request->validate([
+            'purchase_code' => ['required', 'string', 'max:64'],
+        ]);
+
+        $result = $this->addonLicenseService->verify(
+            $slug,
+            $request->input('purchase_code'),
+            (int) $envatoItemId
+        );
+
+        if (! $result->valid) {
+            return response()->json([
+                'error' => $result->error,
+                'error_code' => $result->errorCode,
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'buyer' => $result->buyer,
+            'type' => $result->type,
+            'message' => translate('License verified for :buyer', ['buyer' => $result->buyer]),
+        ]);
     }
 }

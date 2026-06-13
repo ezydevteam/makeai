@@ -28,7 +28,15 @@
     @if(settings('ads_auto_ads_enabled', false) && settings('adsense_publisher_id'))
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ settings('adsense_publisher_id') }}" crossorigin="anonymous"></script>
     @endif
-    @vite(['resources/js/app.ts', "resources/js/Pages/{$page['component']}.vue"])
+    @php
+        $component = $page['component'] ?? '';
+        if ($component && str_starts_with($component, 'Addons/')) {
+            $viteEntries = ['resources/js/app.ts'];
+        } else {
+            $viteEntries = ['resources/js/app.ts', "resources/js/Pages/{$component}.vue"];
+        }
+    @endphp
+    @vite($viteEntries)
     @inertiaHead
 </head>
 <body class="font-sans antialiased">

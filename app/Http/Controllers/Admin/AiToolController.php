@@ -62,7 +62,9 @@ class AiToolController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateTool($request);
-        $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
+        if (($request->type ?? 'template') !== 'rag') {
+            $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
+        }
 
         if ($request->hasFile('og_image_file')) {
             $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
@@ -102,7 +104,9 @@ class AiToolController extends Controller
     public function update(Request $request, AiTool $tool)
     {
         $data = $this->validateTool($request, $tool->id);
-        $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
+        if ($tool->type !== 'rag') {
+            $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
+        }
 
         if ($request->hasFile('og_image_file')) {
             $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
@@ -168,7 +172,12 @@ class AiToolController extends Controller
     {
         $slugUnique = $ignoreId ? "unique:ai_tools,slug,{$ignoreId}" : 'unique:ai_tools,slug';
 
-        return $request->validate([
+        $type = $request->input('type');
+        if (! $type && $ignoreId) {
+            $type = \DB::table('ai_tools')->where('id', $ignoreId)->value('type');
+        }
+
+        $rules = [
             // Tab 1: Basic
             'name' => 'required|string|max:255',
             'slug' => "required|string|max:100|{$slugUnique}",
@@ -180,6 +189,8 @@ class AiToolController extends Controller
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
             'requires_pro' => 'boolean',
+            'show_header' => 'boolean',
+            'show_footer' => 'boolean',
             'access_level' => 'nullable|in:inherit,public,login_required,free_plan,pro_plan',
 
             // Tab 2: Prompts
@@ -195,21 +206,28 @@ class AiToolController extends Controller
 
             // Tab 3: Fields
             'fields' => 'nullable|array',
-            'fields.*.id' => 'nullable|string|max:100',
-            'fields.*.key' => 'nullable|string|max:100',
-            'fields.*.name' => 'nullable|string|max:100',
-            'fields.*.label' => 'required_with:fields|string|max:255',
-            'fields.*.type' => 'required_with:fields|string|in:text,textarea,select,number,toggle,slider,color,tags_input,tone_select,language_select,length_select,model_select,image_upload,file_upload,code_input,url,date,datetime_local,radio,multi_select,hidden',
-            'fields.*.required' => 'boolean',
-            'fields.*.options' => 'nullable|array',
-            'fields.*.placeholder' => 'nullable|string|max:255',
-            'fields.*.default' => 'nullable',
-            'fields.*.min' => 'nullable|numeric',
-            'fields.*.max' => 'nullable|numeric',
-            'fields.*.step' => 'nullable|numeric|min:0',
-            'fields.*.rows' => 'nullable|integer|min:1|max:50',
-            'fields.*.max_length' => 'nullable|integer|min:1',
+        ];
 
+        if ($type !== 'rag') {
+            $rules += [
+                'fields.*.id' => 'nullable|string|max:100',
+                'fields.*.key' => 'nullable|string|max:100',
+                'fields.*.name' => 'nullable|string|max:100',
+                'fields.*.label' => 'required_with:fields|string|max:255',
+                'fields.*.type' => 'required_with:fields|string|in:text,textarea,select,number,toggle,slider,color,tags_input,tone_select,language_select,length_select,model_select,image_upload,file_upload,code_input,url,date,datetime_local,radio,multi_select,hidden',
+                'fields.*.required' => 'boolean',
+                'fields.*.options' => 'nullable|array',
+                'fields.*.placeholder' => 'nullable|string|max:255',
+                'fields.*.default' => 'nullable',
+                'fields.*.min' => 'nullable|numeric',
+                'fields.*.max' => 'nullable|numeric',
+                'fields.*.step' => 'nullable|numeric|min:0',
+                'fields.*.rows' => 'nullable|integer|min:1|max:50',
+                'fields.*.max_length' => 'nullable|integer|min:1',
+            ];
+        }
+
+        $rules += [
             // Tab 4: Content
             'about_content' => 'nullable|string|max:10000',
             'how_it_works' => 'nullable|array',
@@ -230,7 +248,9 @@ class AiToolController extends Controller
             'meta_description' => 'nullable|string|max:500',
             'og_image' => 'nullable|string|max:500',
             'og_image_file' => 'nullable|image|mimes:png,jpg,jpeg,webp|max:4096',
-        ]);
+        ];
+
+        return $request->validate($rules);
     }
 
     private function normalizeFields(array $fields): array

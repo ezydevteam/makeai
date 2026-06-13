@@ -36,9 +36,14 @@ export function useKeyboardShortcuts(
         }
 
         const mod = e.ctrlKey || e.metaKey
+        const eventKey = typeof e.key === 'string' ? e.key.toLowerCase() : ''
 
         for (const h of handlers) {
-            const keyMatch = e.key.toLowerCase() === h.key.toLowerCase()
+            if (typeof h.key !== 'string' || h.key.length === 0) {
+                continue
+            }
+
+            const keyMatch = eventKey === h.key.toLowerCase()
             const ctrlMatch = h.ctrl ? mod : !mod
             const shiftMatch = h.shift ? e.shiftKey : !e.shiftKey
             const altMatch = h.alt ? e.altKey : !e.altKey
@@ -80,7 +85,6 @@ export function useGlobalShortcuts(extra: ShortcutHandler[] = []) {
 
     const handlers: ShortcutHandler[] = [
         { key: '?', description: 'Open shortcuts reference', action: () => window.dispatchEvent(new CustomEvent('shortcuts:show')) },
-        { key: 'k', ctrl: true, description: 'Open command palette', action: () => window.dispatchEvent(new CustomEvent('palette:open')) },
         { key: '/', ctrl: true, description: 'Focus global search', action: () => {
             const searchInput = document.querySelector<HTMLInputElement>('[data-global-search]')
             searchInput?.focus()
@@ -107,9 +111,14 @@ export function useGlobalShortcuts(extra: ShortcutHandler[] = []) {
         }
 
         const mod = e.ctrlKey || e.metaKey
+        const eventKey = typeof e.key === 'string' ? e.key.toLowerCase() : ''
 
         for (const h of handlers) {
-            const keyMatch = e.key.toLowerCase() === h.key.toLowerCase()
+            if (typeof h.key !== 'string' || h.key.length === 0) {
+                continue
+            }
+
+            const keyMatch = eventKey === h.key.toLowerCase()
             const ctrlMatch = h.ctrl ? mod : !mod
             const shiftMatch = h.shift ? e.shiftKey : !e.shiftKey
             const altMatch = h.alt ? e.altKey : !e.altKey

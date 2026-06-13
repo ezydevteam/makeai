@@ -2,9 +2,9 @@
     <Head :title="t('User Management')" />
 
     <AdminLayout>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div class="py-6">
+            <div class="mx-auto w-full sm:max-w-7xl sm:px-6 lg:px-8">
+                <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                             {{ t('User Management') }}
@@ -15,14 +15,14 @@
                     </div>
 
                     <div class="flex flex-col gap-3 sm:flex-row">
-                        <button
-                            type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary"
-                            @click="openCreateModal"
-                        >
-                            <i class="ti ti-plus text-base"></i>
-                            {{ t('Create User') }}
-                        </button>
+                        <Tooltip :content="t('Export')">
+                            <a
+                                :href="route('admin.users.export')"
+                                class="inline-flex items-center justify-center w-10 h-10 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                            >
+                                <i class="ti ti-file-export text-base"></i>
+                            </a>
+                        </Tooltip>
 
                         <Link
                             v-if="hasTrashedUsers"
@@ -33,103 +33,102 @@
                             {{ t('Trash') }}
                         </Link>
 
-                        <a
-                            :href="route('admin.users.export')"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                         <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary"
+                            @click="openCreateModal"
                         >
-                            <i class="ti ti-download text-base"></i>
-                            {{ t('Export CSV') }}
-                        </a>
+                            <i class="ti ti-plus text-base"></i>
+                            {{ t('Create User') }}
+                        </button>
                     </div>
                 </div>
 
-                <div class="mb-4 flex flex-col gap-4">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                                    </svg>
-                                </span>
-                                <input
-                                    v-model="searchQuery"
-                                    type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Filter this table by name, email, or ULID...')"
-                                />
-                                <button
-                                    v-if="searchQuery"
-                                    type="button"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                    :aria-label="t('Clear search')"
-                                    :title="t('Clear search')"
-                                    @click="searchQuery = ''"
-                                >
-                                    <i class="ti ti-x text-base"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
-                            <div class="w-full md:w-52">
-                                <AppSelect
-                                    v-model="form.status"
-                                    :options="statusOptions"
-                                    :placeholder="t('All Status')"
-                                    @update:model-value="applyFilters"
-                                />
+                <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                    <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div class="w-full xl:max-w-md">
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                        <i class="ti ti-search text-base"></i>
+                                    </span>
+                                    <input
+                                        v-model="searchQuery"
+                                        type="text"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        :placeholder="t('Filter this table by name, email, or ULID...')"
+                                    />
+                                    <button
+                                        v-if="searchQuery"
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                        :aria-label="t('Clear search')"
+                                        :title="t('Clear search')"
+                                        @click="searchQuery = ''"
+                                    >
+                                        <i class="ti ti-x text-base"></i>
+                                    </button>
+                                </div>
                             </div>
 
-                            <div class="w-full md:w-56">
-                                <AppSelect
-                                    v-model="form.plan"
-                                    :options="planOptions"
-                                    :placeholder="t('All Plans')"
-                                    live-search
-                                    @update:model-value="applyFilters"
-                                />
-                            </div>
-
-                            <template v-if="selectedIds.length > 0">
-                                <span class="text-sm text-gray-500 dark:text-gray-400 xl:whitespace-nowrap">
-                                    {{ t(':count selected', { count: selectedIds.length }) }}
-                                </span>
-
-                                <div class="w-full md:w-56">
+                            <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
+                                <div class="w-full md:w-52">
                                     <AppSelect
-                                        v-model="bulkAction"
-                                        :options="bulkActionOptions"
-                                        :placeholder="t('Bulk Actions')"
+                                        v-model="form.status"
+                                        :options="statusOptions"
+                                        :placeholder="t('All Status')"
+                                        @update:model-value="applyFilters"
                                     />
                                 </div>
 
-                                <input
-                                    v-if="bulkAction === 'add_credits'"
-                                    v-model="bulkCredits"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white md:w-40"
-                                    :placeholder="t('Credits')"
-                                />
-
-                                <div :title="applyDisabledReason">
-                                    <button
-                                        type="button"
-                                        class="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                        :disabled="isApplyDisabled"
-                                        @click="applyBulkAction"
-                                    >
-                                        {{ t('Apply') }}
-                                    </button>
+                                <div class="w-full md:w-56">
+                                    <AppSelect
+                                        v-model="form.plan"
+                                        :options="planOptions"
+                                        :placeholder="t('All Plans')"
+                                        live-search
+                                        @update:model-value="applyFilters"
+                                    />
                                 </div>
-                            </template>
+
+                                <template v-if="selectedIds.length > 0">
+                                    <span class="text-sm text-gray-500 dark:text-gray-400 xl:whitespace-nowrap">
+                                        {{ t(':count selected', { count: selectedIds.length }) }}
+                                    </span>
+
+                                    <div class="w-full md:w-56">
+                                        <AppSelect
+                                            v-model="bulkAction"
+                                            :options="bulkActionOptions"
+                                            :placeholder="t('Bulk Actions')"
+                                        />
+                                    </div>
+
+                                    <input
+                                        v-if="bulkAction === 'add_credits'"
+                                        v-model="bulkCredits"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white md:w-40"
+                                        :placeholder="t('Credits')"
+                                    />
+
+                                    <div :title="applyDisabledReason">
+                                        <button
+                                            type="button"
+                                            class="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                            :disabled="isApplyDisabled"
+                                            @click="applyBulkAction"
+                                        >
+                                            {{ t('Apply') }}
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="overflow-hidden border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
                             <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
@@ -238,10 +237,15 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
 
-                <div v-if="users.links.length > 3" class="mt-4">
-                    <Pagination :links="users.links" />
+                    <div v-if="users.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                        <Pagination
+                            :links="users.links"
+                            :from="users.from"
+                            :to="users.to"
+                            :total="users.total"
+                        />
+                    </div>
                 </div>
             </div>
         </div>
@@ -259,7 +263,7 @@
         />
 
         <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm">
-            <div class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
+            <div class="flex max-h-[90vh] w-full sm:max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-700">
                     <div>
                         <h3 class="text-lg font-bold text-gray-900 dark:text-white">
@@ -272,8 +276,9 @@
 
                     <button
                         type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                         :aria-label="t('Close modal')"
+                        :disabled="createForm.processing"
                         @click="() => closeCreateModal()"
                     >
                         <i class="ti ti-x text-base"></i>
@@ -412,7 +417,8 @@
                 <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900/40">
                     <button
                         type="button"
-                        class="px-5 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        :disabled="createForm.processing"
                         @click="() => closeCreateModal()"
                     >
                         {{ t('Cancel') }}

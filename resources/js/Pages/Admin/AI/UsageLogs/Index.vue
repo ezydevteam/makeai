@@ -1,8 +1,8 @@
 <template>
     <Head :title="t('AI Usage Logs')" />
 
-    <div class="py-12">
-        <div class="mx-auto max-w-7xl space-y-6 sm:px-6 lg:px-8">
+    <div class="px-4 py-8 sm:px-6">
+        <div class="mx-auto w-full space-y-6 sm:max-w-7xl">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t('AI Usage Logs') }}
@@ -12,83 +12,51 @@
                 </p>
             </div>
 
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <div class="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-                        {{ t('Visible Logs') }}
-                    </div>
-                    <div class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                        {{ filteredLogs.length }}
-                    </div>
-                </div>
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <div class="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-                        {{ t('Visible Tokens') }}
-                    </div>
-                    <div class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                        {{ visibleTokenTotal }}
-                    </div>
-                </div>
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <div class="text-xs font-semibold uppercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-                        {{ t('Providers') }}
-                    </div>
-                    <div class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                        {{ providerOptions.length - 1 }}
-                    </div>
-                </div>
-            </div>
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                        <div class="relative w-full sm:max-w-xs">
+                            <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
+                            <input
+                                v-model="searchQuery"
+                                type="text"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                :placeholder="t('Search tool, user, model...')"
+                            />
+                            <button
+                                v-if="searchQuery"
+                                type="button"
+                                class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                                :aria-label="t('Clear search')"
+                                @click="searchQuery = ''"
+                            >
+                                <i class="ti ti-x text-sm"></i>
+                            </button>
+                        </div>
 
-            <div class="mb-4 flex items-center justify-between gap-4">
-                <div class="relative w-64">
-                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                        </svg>
-                    </span>
-                    <input
-                        v-model="searchQuery"
-                        type="text"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-9 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                        :placeholder="t('Search tool, user, model...')"
-                    />
-                    <button
-                        v-if="searchQuery"
-                        type="button"
-                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                        :aria-label="t('Clear search')"
-                        :title="t('Clear search')"
-                        @click="searchQuery = ''"
-                    >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
-
-                <div class="flex items-center gap-3">
-                    <div class="w-56">
                         <AppSelect
                             v-model="selectedProvider"
                             :options="providerOptions"
                             :placeholder="t('All Providers')"
+                            class="w-full sm:w-56"
                         />
                     </div>
 
-                    <div v-if="searchQuery || selectedProvider" class="flex items-center justify-end">
-                        <button
-                            type="button"
-                            class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700"
-                            @click="resetFilters"
-                        >
-                            {{ t('Reset Filters') }}
-                        </button>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:bg-surface-800 dark:text-gray-300">
+                            <i class="ti ti-list-details text-sm"></i>
+                            {{ t(':count log(s)', { count: filteredLogs.length }) }}
+                        </div>
+                        <div class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:bg-surface-800 dark:text-gray-300">
+                            <i class="ti ti-binary-tree-2 text-sm"></i>
+                            {{ t(':count token(s)', { count: visibleTokenTotal }) }}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[860px] text-left text-sm text-gray-500 dark:text-gray-400">
-                        <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-surface-800 dark:bg-surface-800 dark:text-gray-400">
                             <tr>
                                 <th scope="col" class="px-6 py-3">{{ t('User') }}</th>
                                 <th scope="col" class="px-6 py-3">{{ t('Provider') }}</th>
@@ -101,7 +69,7 @@
                             <tr
                                 v-for="log in filteredLogs"
                                 :key="log.id"
-                                class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                                class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50/70 dark:border-surface-800 dark:bg-surface-900 dark:hover:bg-surface-800/50"
                             >
                                 <td class="px-6 py-4">
                                     <div class="font-medium text-gray-900 dark:text-white">
@@ -132,17 +100,27 @@
                                 </td>
                             </tr>
                             <tr v-if="filteredLogs.length === 0">
-                                <td colspan="5" class="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
-                                    {{ t('No usage logs found.') }}
+                                <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <div class="flex flex-col items-center justify-center">
+                                        <i class="ti ti-database-off mb-3 text-4xl opacity-40"></i>
+                                        <p>{{ t('No usage logs found.') }}</p>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
 
-            <div v-if="logs.links && logs.links.length > 3">
-                <Pagination :links="logs.links" />
+                <div v-if="logs.links && logs.links.length > 3 && !searchQuery && !selectedProvider" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
+                    <Pagination
+                        :links="logs.links"
+                        :from="logs.from"
+                        :to="logs.to"
+                        :total="logs.total"
+                        :current-page="logs.current_page"
+                        :last-page="logs.last_page"
+                    />
+                </div>
             </div>
         </div>
     </div>
@@ -182,6 +160,11 @@ interface PaginationLink {
 interface LogsResponse {
     data: UsageLog[]
     links?: PaginationLink[]
+    from?: number | null
+    to?: number | null
+    total?: number | null
+    current_page?: number | null
+    last_page?: number | null
 }
 
 defineOptions({ layout: AdminLayout })
@@ -277,8 +260,4 @@ const providerBadgeClass = (provider: string | null) => {
     }
 }
 
-const resetFilters = () => {
-    searchQuery.value = ''
-    selectedProvider.value = ''
-}
 </script>

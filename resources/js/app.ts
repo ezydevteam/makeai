@@ -7,13 +7,24 @@ import { ZiggyVue } from 'ziggy-js'
 import AppSelect from './Components/AppSelect.vue'
 import AppColorPicker from './Components/AppColorPicker.vue'
 import ToastContainer from './Components/ToastContainer.vue'
-import CommandPalette from './Components/CommandPalette.vue'
 import ShortcutsReferenceModal from './Components/ShortcutsReferenceModal.vue'
 import { useGlobalShortcuts } from './Composables/useKeyboardShortcuts'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
 const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
 const templates = import.meta.glob<{ default: DefineComponent }>('./Templates/**/*.vue')
+const addonPages = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Pages/**/*.vue')
+const addonComponents = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Components/**/*.vue')
+
+// Build lookup: { 'ai-assistant/Admin/Settings': importFn }
+const addonPageMap: Record<string, () => Promise<{ default: DefineComponent }>> = {}
+
+for (const [path, importFn] of Object.entries(addonPages)) {
+    const match = path.match(/addons\/([^/]+)\/resources\/js\/Pages\/(.+)\.vue$/)
+    if (match) {
+        addonPageMap[`${match[1]}/${match[2]}`] = importFn as () => Promise<{ default: DefineComponent }>
+    }
+}
 
 function syncDocumentLocale(locale: unknown) {
     const localeInfo = (locale ?? {}) as { code?: string; is_rtl?: boolean | number | string }
@@ -30,10 +41,14 @@ createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: async (name) => {
         const page = pages[`./Pages/${name}.vue`]
-
             ?? (
                 name.startsWith('Templates/')
                 ? templates[`./Templates/${name.slice('Templates/'.length)}.vue`]
+                : null
+            )
+            ?? (
+                name.startsWith('Addons/')
+                ? addonPageMap[name.replace('Addons/', '')]
                 : null
             )
 
@@ -51,7 +66,7 @@ createInertiaApp({
 
         const pinia = createPinia()
         const vueApp = createApp({
-            render: () => [h(App, props), h(ToastContainer), h(CommandPalette), h(ShortcutsReferenceModal)],
+            render: () => [h(App, props), h(ToastContainer), h(ShortcutsReferenceModal)],
         })
 
         vueApp

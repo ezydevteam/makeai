@@ -42,7 +42,8 @@ class AiKey extends Model
         try {
             return Crypt::decryptString($value);
         } catch (\Exception $e) {
-            return $value; // Fallback if not encrypted or key changed
+            \Log::warning("AI Key decryption failed for provider [{$this->provider}]: " . $e->getMessage());
+            return null;
         }
     }
 

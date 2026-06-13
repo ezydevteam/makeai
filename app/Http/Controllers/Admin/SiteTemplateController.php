@@ -59,6 +59,16 @@ class SiteTemplateController extends Controller
             $chatbotSettings = Setting::getByGroup('chatbot');
         }
 
+        $platformSettings = null;
+        if ($template->slug === 'social-media-manager') {
+            $platformSettings = settings('template_social_platforms', []);
+        }
+
+        $stageSettings = null;
+        if ($template->slug === 'marketing-suite') {
+            $stageSettings = settings('template_marketing_stages', []);
+        }
+
         $chatModels = [];
         $providerRegistry = app(\App\Services\AI\ProviderRegistry::class);
         foreach ($providerRegistry->getEnabledProviders() as $name => $models) {
@@ -76,6 +86,8 @@ class SiteTemplateController extends Controller
             'missing_tool_slugs' => array_values($missingSlugs),
             'chatbotSettings' => $chatbotSettings,
             'chatModels' => $chatModels,
+            'platformSettings' => $platformSettings,
+            'stageSettings' => $stageSettings,
         ]);
     }
 
@@ -167,6 +179,45 @@ class SiteTemplateController extends Controller
         }
 
         return back()->with('success', translate('Chatbot settings saved.'));
+    }
+
+    public function savePlatformSettings(Request $request, SiteTemplate $template)
+    {
+        if ($template->slug !== 'social-media-manager') {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'platforms' => 'required|array',
+            'platforms.*.slug' => 'required|string',
+            'platforms.*.enabled' => 'required|boolean',
+            'default_platform' => 'nullable|string|max:50',
+        ]);
+
+        settings_set('template_social_platforms', $validated['platforms'], 'json', 'template_social');
+        settings_set('template_social_default_platform', $validated['default_platform'] ?? '', 'string', 'template_social');
+
+        return back()->with('success', translate('Platform settings saved.'));
+    }
+
+    public function saveStageSettings(Request $request, SiteTemplate $template)
+    {
+        if ($template->slug !== 'marketing-suite') {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'stages' => 'required|array',
+            'stages.*.slug' => 'required|string',
+            'stages.*.label' => 'required|string|max:100',
+            'stages.*.icon' => 'required|string|max:100',
+            'default_stage' => 'nullable|string|max:50',
+        ]);
+
+        settings_set('template_marketing_stages', $validated['stages'], 'json', 'template_marketing');
+        settings_set('template_marketing_default_stage', $validated['default_stage'] ?? 'awareness', 'string', 'template_marketing');
+
+        return back()->with('success', translate('Stage settings saved.'));
     }
 
     private function resolveBundledSlugs(SiteTemplate $template): array

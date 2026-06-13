@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
@@ -41,6 +41,11 @@ const props = defineProps<{
     categories: {
         data: Category[]
         links: { url: string | null; label: string; active: boolean }[]
+        from?: number | null
+        to?: number | null
+        total?: number | null
+        current_page?: number | null
+        last_page?: number | null
     }
     parents: ParentOption[]
     filters: { search: string; status: string }
@@ -49,6 +54,7 @@ const props = defineProps<{
 const { t } = useTranslate()
 
 const editingId = ref<number | null>(null)
+const formModalOpen = ref(false)
 const slugTouched = ref(false)
 const deleteTarget = ref<Category | null>(null)
 const deleteProcessing = ref(false)
@@ -73,8 +79,10 @@ const form = useForm({
 
 const resetForm = () => {
     editingId.value = null
+    formModalOpen.value = false
     slugTouched.value = false
     form.reset()
+    form.clearErrors()
     form.color = '#10b981'
     form.is_active = true
     form.requires_pro = false
@@ -85,8 +93,14 @@ const resetForm = () => {
     form.meta_description = ''
 }
 
+const openCreateModal = () => {
+    resetForm()
+    formModalOpen.value = true
+}
+
 const editCategory = (category: Category) => {
     editingId.value = category.id
+    formModalOpen.value = true
     slugTouched.value = true
     actionMenuOpen.value = null
     form.name = category.name
@@ -101,10 +115,6 @@ const editCategory = (category: Category) => {
     form.parent_id = category.parent_id != null ? String(category.parent_id) : null
     form.meta_title = category.meta_title || ''
     form.meta_description = category.meta_description || ''
-
-    nextTick(() => {
-        document.getElementById('category-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
 }
 
 const makeSlug = (value: string) => value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
@@ -163,21 +173,6 @@ const toggleLogin = (category: Category) => {
     router.post(route('admin.ai.categories.toggle-login', category.id), {}, { preserveScroll: true })
 }
 
-const applyFilters = () => {
-    router.get(route('admin.ai.categories.index'), {
-        search: searchQuery.value || undefined,
-        status: statusFilter.value || undefined,
-    }, { preserveScroll: true, preserveState: true, replace: true })
-}
-
-let filterTimer: ReturnType<typeof setTimeout> | null = null
-const searchInput = () => {
-    if (filterTimer) clearTimeout(filterTimer)
-    filterTimer = setTimeout(applyFilters, 400)
-}
-
-watch(statusFilter, applyFilters)
-
 const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
         month: 'short',
@@ -199,7 +194,35 @@ const statusFilterOptions: SelectOption[] = [
     { value: 'inactive', label: t('Inactive') },
 ]
 
-const hasActiveFilters = computed(() => searchQuery.value || statusFilter.value)
+const filteredCategories = computed(() => {
+    const search = searchQuery.value.trim().toLowerCase()
+
+    return props.categories.data.filter((category) => {
+        const matchesSearch = !search
+            || category.name.toLowerCase().includes(search)
+            || category.slug.toLowerCase().includes(search)
+        const matchesStatus = !statusFilter.value
+            || (statusFilter.value === 'active' && category.is_active)
+            || (statusFilter.value === 'inactive' && !category.is_active)
+
+        return matchesSearch && matchesStatus
+    })
+})
+
+const hasActiveFilters = computed(() => Boolean(searchQuery.value || statusFilter.value))
+
+const resetTableFilters = () => {
+    searchQuery.value = ''
+    statusFilter.value = ''
+}
+
+const clearSearchQuery = () => {
+    if (!searchQuery.value) {
+        return
+    }
+
+    searchQuery.value = ''
+}
 
 const closeAllMenus = () => {
     actionMenuOpen.value = null
@@ -209,9 +232,215 @@ const closeAllMenus = () => {
 <template>
     <Head :title="t('AI Tool Categories — Admin')" />
 
+    <Teleport to="body">
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="formModalOpen"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+                @click.self="resetForm"
+            >
+                <Transition
+                    appear
+                    enter-active-class="transition duration-200 ease-out"
+                    enter-from-class="translate-y-2 scale-95 opacity-0"
+                    enter-to-class="translate-y-0 scale-100 opacity-100"
+                    leave-active-class="transition duration-150 ease-in"
+                    leave-from-class="translate-y-0 scale-100 opacity-100"
+                    leave-to-class="translate-y-2 scale-95 opacity-0"
+                >
+                    <section
+                        v-if="formModalOpen"
+                        class="flex max-h-[90vh] w-full sm:max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900"
+                    >
+                        <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-3 dark:border-surface-800">
+                            <div>
+                                <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+                                    {{ editingId ? t('Edit Category') : t('Create Category') }}
+                                </h2>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                    {{ editingId
+                                        ? t('Update category details, hierarchy, and access requirements.')
+                                        : t('Create a new AI category with icon, color, and access settings.') }}
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800"
+                                @click="resetForm"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+
+                        <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
+                            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Name') }}</label>
+                                        <input
+                                            v-model="form.name"
+                                            @input="syncSlug"
+                                            :placeholder="t('Enter category name')"
+                                            type="text"
+                                            required
+                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        />
+                                        <p v-if="form.errors.name" class="mt-1 text-xs text-danger-500">{{ form.errors.name }}</p>
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
+                                        <input
+                                            v-model="form.slug"
+                                            @input="markSlugTouched"
+                                            :placeholder="t('Enter category slug')"
+                                            type="text"
+                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        />
+                                        <p class="mt-1 text-xs text-gray-400">{{ t('Generated from name. Edit if needed.') }}</p>
+                                        <p v-if="form.errors.slug" class="mt-1 text-xs text-danger-500">{{ form.errors.slug }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <AppSelect
+                                        v-model="form.parent_id"
+                                        :options="parentOptions"
+                                        :label="t('Parent')"
+                                        :placeholder="t('No parent')"
+                                    />
+                                    <div>
+                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Sort order') }}</label>
+                                        <input
+                                            v-model.number="form.sort_order"
+                                            type="number"
+                                            min="0"
+                                            :placeholder="t('Enter sort order')"
+                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</label>
+                                    <textarea
+                                        v-model="form.description"
+                                        :placeholder="t('Enter category description')"
+                                        rows="3"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                    ></textarea>
+                                </div>
+
+                                <div class="grid gap-4 md:grid-cols-2">
+                                    <IconClassSelect v-model="form.icon" :label="t('Icon')" />
+                                    <AppColorPicker v-model="form.color" :label="t('Color')" />
+                                </div>
+
+                                <div>
+                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta title (SEO)') }}</label>
+                                    <input
+                                        v-model="form.meta_title"
+                                        :placeholder="t('Enter meta title')"
+                                        type="text"
+                                        maxlength="160"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta description (SEO)') }}</label>
+                                    <textarea
+                                        v-model="form.meta_description"
+                                        :placeholder="t('Enter meta description')"
+                                        rows="3"
+                                        maxlength="500"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                    ></textarea>
+                                </div>
+
+                                <div class="grid gap-3 md:grid-cols-3">
+                                    <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800/60">
+                                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Active') }}</span>
+                                        <button
+                                            type="button"
+                                            :class="form.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
+                                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                            @click="form.is_active = !form.is_active"
+                                        >
+                                            <span
+                                                :class="form.is_active ? 'translate-x-4' : 'translate-x-0'"
+                                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                                            />
+                                        </button>
+                                    </div>
+
+                                    <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800/60">
+                                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Requires Pro') }}</span>
+                                        <button
+                                            type="button"
+                                            :class="form.requires_pro ? 'bg-accent-500' : 'bg-gray-200 dark:bg-surface-600'"
+                                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                            @click="form.requires_pro = !form.requires_pro"
+                                        >
+                                            <span
+                                                :class="form.requires_pro ? 'translate-x-4' : 'translate-x-0'"
+                                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                                            />
+                                        </button>
+                                    </div>
+
+                                    <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800/60">
+                                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Requires Login') }}</span>
+                                        <button
+                                            type="button"
+                                            :class="form.requires_login ? 'bg-blue-500' : 'bg-gray-200 dark:bg-surface-600'"
+                                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                            @click="form.requires_login = !form.requires_login"
+                                        >
+                                            <span
+                                                :class="form.requires_login ? 'translate-x-4' : 'translate-x-0'"
+                                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="shrink-0 border-t border-gray-100 bg-gray-50/80 px-5 py-2 dark:border-surface-800 dark:bg-surface-950">
+                                <div class="flex items-center justify-end gap-3">
+                            <button
+                                type="button"
+                                class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                @click="resetForm"
+                            >
+                                {{ t('Cancel') }}
+                            </button>
+                            <button
+                                :disabled="form.processing"
+                                type="submit"
+                                class="rounded-lg btn-primary px-5 disabled:opacity-50"
+                            >
+                                {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Create Category') }}
+                            </button>
+                        </div>
+                    </div>
+                        </form>
+                    </section>
+                </Transition>
+            </div>
+        </Transition>
+    </Teleport>
+
     <ActionConfirmModal
         :open="Boolean(deleteTarget)"
-        :title="t('Delete ' + (deleteTarget?.name ?? ''))"
+        :title="t('Delete Category')"
         :message="t('This category will be permanently removed. Tools in this category will be detached, not deleted.')"
         :confirm-label="t('Delete')"
         :processing-label="t('Deleting...')"
@@ -221,223 +450,64 @@ const closeAllMenus = () => {
         @confirm="executeDelete"
     />
 
-    <div class="mx-auto w-full max-w-7xl px-6 py-8" @click="closeAllMenus">
+    <div class="mx-auto w-full sm:max-w-7xl px-6 py-8" @click="closeAllMenus">
         <div class="mb-6 flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tool Categories') }}</h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 w-full sm:max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Manage the dynamic groups used by public tool pages and admin templates. Categories control tool visibility and access requirements.') }}
                 </p>
             </div>
-            <Link
-                :href="route('admin.ai.tools.index')"
-                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:border-primary-300 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300"
-            >
-                <i class="ti ti-apps"></i>{{ t('All Tools') }}
-            </Link>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('admin.ai.tools.index')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:border-primary-300 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300"
+                >
+                    <i class="ti ti-apps"></i>{{ t('All Tools') }}
+                </Link>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm"
+                    @click="openCreateModal"
+                >
+                    <i class="ti ti-plus"></i>{{ t('Create Category') }}
+                </button>
+            </div>
         </div>
 
-        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <!-- Form Sidebar -->
-            <div class="w-full shrink-0 lg:w-[380px]">
-            <section id="category-form" class="flex  flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="shrink-0 border-b border-gray-100 px-5 py-4 dark:border-surface-800">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">
-                <i :class="editingId ? 'ti ti-edit' : 'ti ti-circle-plus'" class="mr-1"></i>
-                {{ editingId ? t('Edit Category') : t('Create Category') }}
-                    </h2>
-                </div>
-
-                <form class="flex flex-1 flex-col" @submit.prevent="submit">
-                    <div class="flex-1 space-y-4 p-5">
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Name') }}</label>
-                        <input
-                            v-model="form.name"
-                            @input="syncSlug"
-                            :placeholder="t('Enter category name')"
-                            type="text"
-                            required
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        />
-                        <p v-if="form.errors.name" class="mt-1 text-xs text-danger-500">{{ form.errors.name }}</p>
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
-                        <input
-                            v-model="form.slug"
-                            @input="markSlugTouched"
-                            :placeholder="t('Enter category slug')"
-                            type="text"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        />
-                        <p class="mt-1 text-xs text-gray-400">{{ t('Generated from name. Edit if needed.') }}</p>
-                        <p v-if="form.errors.slug" class="mt-1 text-xs text-danger-500">{{ form.errors.slug }}</p>
-                    </div>
-
-                    <AppSelect
-                        v-model="form.parent_id"
-                        :options="parentOptions"
-                        :label="t('Parent')"
-                        :placeholder="t('No parent')"
-                    />
-
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</label>
-                        <textarea
-                            v-model="form.description"
-                            :placeholder="t('Enter category description')"
-                            rows="3"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        ></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <IconClassSelect v-model="form.icon" :label="t('Icon')" />
-                        <AppColorPicker v-model="form.color" :label="t('Color')" />
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta title (SEO)') }}</label>
-                        <input
-                            v-model="form.meta_title"
-                            :placeholder="t('Enter meta title')"
-                            type="text"
-                            maxlength="160"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta description (SEO)') }}</label>
-                        <textarea
-                            v-model="form.meta_description"
-                            :placeholder="t('Enter meta description')"
-                            rows="2"
-                            maxlength="500"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        ></textarea>
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Sort order') }}</label>
-                        <input
-                            v-model.number="form.sort_order"
-                            type="number"
-                            min="0"
-                            :placeholder="t('Enter sort order')"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        />
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Active') }}</span>
-                        <button
-                            type="button"
-                            :class="form.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                            @click="form.is_active = !form.is_active"
-                        >
-                            <span
-                                :class="form.is_active ? 'translate-x-4' : 'translate-x-0'"
-                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                            />
-                        </button>
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Requires Pro') }}</span>
-                        <button
-                            type="button"
-                            :class="form.requires_pro ? 'bg-accent-500' : 'bg-gray-200 dark:bg-surface-600'"
-                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                            @click="form.requires_pro = !form.requires_pro"
-                        >
-                            <span
-                                :class="form.requires_pro ? 'translate-x-4' : 'translate-x-0'"
-                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                            />
-                        </button>
-                    </div>
-
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Requires Login') }}</span>
-                        <button
-                            type="button"
-                            :class="form.requires_login ? 'bg-blue-500' : 'bg-gray-200 dark:bg-surface-600'"
-                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                            @click="form.requires_login = !form.requires_login"
-                        >
-                            <span
-                                :class="form.requires_login ? 'translate-x-4' : 'translate-x-0'"
-                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                            />
-                        </button>
-                    </div>
-
-                    </div>
-
-                    <div class="shrink-0 border-t border-gray-100 bg-gray-50/50 p-4 dark:border-surface-800 dark:bg-surface-800/30">
-                        <div class="flex items-center gap-2">
-                            <button
-                                :disabled="form.processing"
-                                type="submit"
-                                class="flex-1 rounded-lg btn-primary disabled:opacity-50"
-                            >
-                                {{ form.processing ? t('Saving...') : t('Save') }}
-                            </button>
-                            <button
-                                v-if="editingId"
-                                type="button"
-                                class="rounded-lg bg-surface-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-surface-200 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                                @click="resetForm"
-                            >
-                                {{ t('Cancel') }}
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </section>
-            </div>
-
-            <!-- Table Section -->
-            <section class="min-w-0 flex-1">
-                <!-- Filters Bar -->
-                <div class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="relative flex-1">
-                        <svg class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                        </svg>
+        <div class="min-w-0">
+            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
+                    <div class="relative min-w-[240px] flex-1">
+                        <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
                         <input
                             v-model="searchQuery"
-                            @input="searchInput"
-                            :placeholder="t('Search by name or slug...')"
+                            :placeholder="t('Search tool category...')"
                             type="text"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-3 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                         />
+                        <button
+                            v-if="searchQuery"
+                            type="button"
+                            class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                            :aria-label="t('Clear filter')"
+                            @click="clearSearchQuery"
+                        >
+                            <i class="ti ti-x text-sm"></i>
+                        </button>
                     </div>
                     <AppSelect
                         v-model="statusFilter"
                         :options="statusFilterOptions"
                         :placeholder="t('All status')"
-                        class="w-36"
+                        class="w-full sm:w-40"
                     />
-                    <button
-                        v-if="hasActiveFilters"
-                        type="button"
-                        class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-400 dark:hover:bg-surface-800"
-                        @click="searchQuery = ''; statusFilter = ''; applyFilters()"
-                    >
-                        {{ t('Clear') }}
-                    </button>
                 </div>
 
-                <!-- Categories Table -->
-                <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="overflow-x-auto">
                     <!-- Empty State -->
                     <div
-                        v-if="categories.data.length === 0"
+                        v-if="filteredCategories.length === 0"
                         class="flex flex-col items-center justify-center px-6 py-16 text-center"
                     >
                         <div class="mb-4 text-5xl">
@@ -455,7 +525,7 @@ const closeAllMenus = () => {
                             v-if="hasActiveFilters"
                             type="button"
                             class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                            @click="searchQuery = ''; statusFilter = ''; applyFilters()"
+                            @click="resetTableFilters"
                         >
                             {{ t('Clear filters') }}
                         </button>
@@ -477,7 +547,7 @@ const closeAllMenus = () => {
                         </thead>
                         <tbody>
                             <tr
-                                v-for="category in categories.data"
+                                v-for="category in filteredCategories"
                                 :key="category.id"
                                 class="border-t border-gray-100 transition-colors hover:bg-gray-50/50 dark:border-surface-800 dark:hover:bg-surface-800/50"
                             >
@@ -587,8 +657,18 @@ const closeAllMenus = () => {
                     </table>
                 </div>
 
-                <div v-if="categories.links && categories.links.length > 3" class="mt-4">
-                    <Pagination :links="categories.links" />
+                <div
+                    v-if="!hasActiveFilters && categories.links && categories.links.length > 3"
+                    class="border-t border-gray-100 px-4 py-4 dark:border-surface-800"
+                >
+                    <Pagination
+                        :links="categories.links"
+                        :from="categories.from"
+                        :to="categories.to"
+                        :total="categories.total"
+                        :current-page="categories.current_page"
+                        :last-page="categories.last_page"
+                    />
                 </div>
             </section>
         </div>

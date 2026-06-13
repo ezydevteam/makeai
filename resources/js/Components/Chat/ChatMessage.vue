@@ -227,7 +227,7 @@ const showCreditsRemaining = computed(() => {
             </div>
             <div class="min-w-0 flex-1">
                 <!-- Reasoning verb indicator during streaming -->
-                <div v-if="isStreaming && showReasoning" class="flex items-center gap-2 mb-2">
+                <div v-if="isStreaming && showReasoning && !message.content" class="flex items-center gap-2 mb-2">
                     <div class="flex gap-1">
                         <span class="w-1.5 h-1.5 rounded-full bg-[#d9cec7] dark:bg-white/30 animate-bounce" style="animation-delay: 0ms"></span>
                         <span class="w-1.5 h-1.5 rounded-full bg-[#d9cec7] dark:bg-white/30 animate-bounce" style="animation-delay: 150ms"></span>

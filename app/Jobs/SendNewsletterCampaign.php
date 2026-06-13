@@ -19,7 +19,7 @@ class SendNewsletterCampaign implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 1;
+    public int $timeout = 1800;
 
     public function __construct(
         protected int $campaignId,
@@ -32,16 +32,21 @@ class SendNewsletterCampaign implements ShouldQueue
     {
         $campaign = NewsletterCampaign::find($this->campaignId);
 
-        if (! $campaign) {
+        if (! $campaign || $campaign->status === 'sent') {
+            return;
+        }
+
+        // Optimistic lock: only one job per campaign can transition to 'sending'
+        $updated = NewsletterCampaign::where('id', $this->campaignId)
+            ->whereNotIn('status', ['sending', 'sent'])
+            ->update(['status' => 'sending', 'started_at' => now()]);
+
+        if (! $updated && $this->retryOnly === false) {
             return;
         }
 
         if ($this->retryOnly) {
             $this->handleRetry($campaign);
-            return;
-        }
-
-        if ($campaign->status === 'sent') {
             return;
         }
 
@@ -52,7 +57,6 @@ class SendNewsletterCampaign implements ShouldQueue
             'recipient_count' => $recipientCount,
             'sent_count' => 0,
             'failed_count' => 0,
-            'started_at' => now(),
             'finished_at' => null,
         ]);
 
@@ -114,7 +118,8 @@ class SendNewsletterCampaign implements ShouldQueue
 
     private function handleRetry(NewsletterCampaign $campaign): void
     {
-        NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
+        NewsletterCampaignRecipient::with('subscriber')
+            ->where('campaign_id', $campaign->id)
             ->where('status', 'failed')
             ->orderBy('id')
             ->chunkById(100, function ($recipients) use ($campaign) {
@@ -244,8 +249,8 @@ class SendNewsletterCampaign implements ShouldQueue
         $subjectTemplate = $template?->subject ?: $campaign->subject;
         $bodyTemplate = $template?->content ?: $content;
 
-        $subject = $this->replaceVariables($subjectTemplate, $variables);
-        $body = $this->replaceVariables($bodyTemplate, array_merge($variables, [
+        $subject = self::replaceVariables($subjectTemplate, $variables);
+        $body = self::replaceVariables($bodyTemplate, array_merge($variables, [
             'campaign_content' => $content,
         ]));
         $layout = settings('mail_layout', '{content}');
@@ -261,7 +266,7 @@ class SendNewsletterCampaign implements ShouldQueue
         ];
     }
 
-    private function replaceVariables(string $value, array $variables): string
+    private static function replaceVariables(string $value, array $variables): string
     {
         foreach ($variables as $key => $replacement) {
             $value = str_replace('{'.$key.'}', (string) $replacement, $value);

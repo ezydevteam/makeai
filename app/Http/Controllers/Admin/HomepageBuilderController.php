@@ -26,6 +26,8 @@ class HomepageBuilderController extends Controller
         'newsletter',
         'integrations',
         'custom_html',
+        'template_grid',
+        'all_tools',
     ];
 
     public function index(): Response
@@ -36,6 +38,7 @@ class HomepageBuilderController extends Controller
         $activeHomepageTemplate = settings('homepage_template', 'default');
 
         $availableTemplates = SiteTemplate::active()
+            ->where('slug', 'ai-chatbot')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get(['slug', 'name', 'requires_pro'])
@@ -51,6 +54,12 @@ class HomepageBuilderController extends Controller
             'sectionTypes' => self::SECTION_TYPES,
             'activeHomepageTemplate' => $activeHomepageTemplate,
             'availableTemplates' => $availableTemplates,
+            'gridTemplates' => SiteTemplate::active()
+                ->where('slug', '!=', 'ai-chatbot')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'requires_pro'])
+                ->values(),
         ]);
     }
 

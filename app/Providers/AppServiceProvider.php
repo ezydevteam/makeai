@@ -27,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureInfrastructureFallbacks();
         $this->configureBroadcasting();
+        $this->syncAddonsFromFilesystem();
         $this->registerAddons();
 
         Gate::policy(BlogPost::class, BlogPostPolicy::class);
@@ -83,6 +84,15 @@ class AppServiceProvider extends ServiceProvider
             app(AddonService::class)->registerActiveAddons();
         } catch (\Throwable) {
             // Silently skip if addons directory or settings are unavailable
+        }
+    }
+
+    private function syncAddonsFromFilesystem(): void
+    {
+        try {
+            app(AddonService::class)->syncFromFilesystem();
+        } catch (\Throwable) {
+            // Silently skip if addons directory doesn't exist
         }
     }
 

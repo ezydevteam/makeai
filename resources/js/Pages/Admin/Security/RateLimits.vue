@@ -122,13 +122,13 @@ const categoryDescriptions = computed<Record<string, string>>(() => ({
 }))
 
 function saveTiers() {
-    tierForm.post(route('admin.security.rate-limits.tiers.update'), {
+    tierForm.post(route('admin.system.rate-limits.tiers.update'), {
         preserveScroll: true,
     })
 }
 
 function submitBan() {
-    banForm.post(route('admin.security.rate-limits.ban'), {
+    banForm.post(route('admin.system.rate-limits.ban'), {
         preserveScroll: true,
         onSuccess: () => {
             banForm.reset()
@@ -138,7 +138,7 @@ function submitBan() {
 }
 
 function submitOverride() {
-    overrideForm.post(route('admin.security.rate-limits.overrides.store'), {
+    overrideForm.post(route('admin.system.rate-limits.overrides.store'), {
         preserveScroll: true,
         onSuccess: () => {
             overrideForm.reset()
@@ -162,7 +162,7 @@ function removeBan() {
         return
     }
 
-    router.delete(route('admin.security.rate-limits.unban', { bannedIp: confirmBanTarget.value.id }), {
+    router.delete(route('admin.system.rate-limits.unban', { bannedIp: confirmBanTarget.value.id }), {
         preserveScroll: true,
         onFinish: () => {
             confirmBanTarget.value = null
@@ -175,7 +175,7 @@ function removeOverride() {
         return
     }
 
-    router.delete(route('admin.security.rate-limits.overrides.delete', { override: confirmOverrideTarget.value.id }), {
+    router.delete(route('admin.system.rate-limits.overrides.delete', { override: confirmOverrideTarget.value.id }), {
         preserveScroll: true,
         onFinish: () => {
             confirmOverrideTarget.value = null
@@ -210,11 +210,23 @@ function formatWindow(seconds: number): string {
     <Head :title="t('Rate Limits')" />
 
     <div class="space-y-6">
-        <section class="space-y-1">
-            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Rate Limits') }}</h1>
-            <p class="max-w-3xl text-sm text-gray-600 dark:text-gray-300">
-                {{ t('Configure request throttling for each endpoint group, manually block abusive IPs, and assign custom per-user limits where needed.') }}
-            </p>
+        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="space-y-1">
+                <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Rate Limits') }}</h1>
+                <p class="max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+                    {{ t('Configure request throttling for each endpoint group, manually block abusive IPs, and assign custom per-user limits where needed.') }}
+                </p>
+            </div>
+
+            <button
+                v-if="activeTab === 'tiers'"
+                type="button"
+                :disabled="tierForm.processing"
+                class="btn-primary inline-flex items-center justify-center self-start rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-60"
+                @click="saveTiers"
+            >
+                {{ tierForm.processing ? t('Saving...') : t('Save Tier Limits') }}
+            </button>
         </section>
 
         <section class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
@@ -300,14 +312,8 @@ function formatWindow(seconds: number): string {
                             </tbody>
                         </table>
                     </div>
-
-                    <div class="flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-surface-800 md:flex-row md:items-center md:justify-between">
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Use max for allowed requests and window for the rolling time span in seconds. Example: 60 requests within 60 seconds.') }}</p>
-                        <button type="submit" :disabled="tierForm.processing" class="btn-primary rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-60">
-                            {{ tierForm.processing ? t('Saving...') : t('Save Tier Limits') }}
-                        </button>
-                    </div>
                 </form>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Use max for allowed requests and window for the rolling time span in seconds. Example: 60 requests within 60 seconds.') }}</p>
             </div>
 
             <div v-else-if="activeTab === 'bans'" class="space-y-5 p-5">

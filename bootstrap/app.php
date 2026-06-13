@@ -55,5 +55,29 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->renderable(function (\App\Exceptions\AI\CreditLimitException $e) {
+            return response()->json([
+                'error' => 'Credit limit exceeded',
+                'message' => $e->getMessage(),
+                'limit_type' => $e->limitType,
+                'remaining' => $e->remaining,
+            ], 402);
+        });
+
+        $exceptions->renderable(function (\App\Exceptions\AI\InsufficientCreditsException $e) {
+            return response()->json([
+                'error' => 'Insufficient credits',
+                'message' => $e->getMessage(),
+                'balance' => $e->balance,
+                'estimated_cost' => $e->estimatedCost,
+            ], 402);
+        });
+
+        $exceptions->renderable(function (\App\Exceptions\AI\IntegrationNotConfiguredException $e) {
+            return response()->json([
+                'error' => 'Integration not available',
+                'message' => $e->getMessage(),
+                'integration' => $e->integration,
+            ], 503);
+        });
     })->create();

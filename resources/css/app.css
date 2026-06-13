@@ -387,8 +387,8 @@ input[type="radio"]:disabled,
     background: var(--color-surface-800);
 }
 
-:where(input:not(.ai-tools-search):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus,
-:where(input:not(.ai-tools-search):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select):focus-visible {
+:where(input:not(.ai-tools-search):not(.chat-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus,
+:where(input:not(.ai-tools-search):not(.chat-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus-visible {
     border-color: var(--color-primary-500) !important;
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 12%, transparent) !important;
     outline: none !important;
@@ -614,7 +614,10 @@ input[type="radio"]:disabled,
   box-shadow: 0 0 0 3px rgb(255 255 255 / 0.12), var(--shadow-sm);
 }
 
-/* Chat composer textarea should stay flat inside the pill */
+/* Chat composer input/textarea should stay flat inside the pill */
+.chat-input,
+.chat-input:focus,
+.chat-input:focus-visible,
 .chat-textarea,
 .chat-textarea:focus,
 .chat-textarea:focus-visible {

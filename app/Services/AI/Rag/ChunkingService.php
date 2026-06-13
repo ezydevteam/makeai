@@ -68,7 +68,16 @@ class ChunkingService
                 $index++;
             }
 
-            $start = $end - $this->chunkOverlap;
+            if ($end >= $totalLength) {
+                break;
+            }
+
+            $nextStart = $end - $this->chunkOverlap;
+            if ($nextStart <= $start) {
+                $start = $end;
+            } else {
+                $start = $nextStart;
+            }
         }
 
         return $chunks;

@@ -8,6 +8,7 @@ import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import LiveSearch from '@/Components/LiveSearch.vue'
 import NotificationBell from '@/Components/NotificationBell.vue'
 import AdminSidebar from '@/Components/AdminSidebar.vue'
+import AiAssistantLoader from '@/Components/Addons/AiAssistantLoader.vue'
 
 const { isDark, toggleDark } = useTheme()
 const { t } = useTranslate()
@@ -314,5 +315,6 @@ onUnmounted(() => {
             @cancel="confirmClearCacheOpen = false"
             @confirm="clearCache"
         />
+        <AiAssistantLoader />
     </div>
 </template>

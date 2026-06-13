@@ -459,4 +459,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(ChatProject::class);
     }
+
+    public function ragSessions()
+    {
+        return $this->hasMany(RagSession::class);
+    }
 }

@@ -53,8 +53,6 @@ const currencyOptions = computed(() => props.currencies.map((currency) => ({
     value: currency,
 })))
 
-const enabledGatewayCount = computed(() => localGateways.value.filter((gateway) => gateway.is_enabled).length)
-const testModeGatewayCount = computed(() => localGateways.value.filter((gateway) => gateway.is_test_mode).length)
 const configuredFieldCount = computed(() => {
     if (!selectedGateway.value) return 0
 
@@ -248,30 +246,23 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
     <AdminLayout>
         <div class="mx-auto max-w-7xl px-6 py-8">
             <div class="space-y-6">
-                <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                    <div class="flex flex-col gap-6 px-6 py-5 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                            <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Payment Gateways') }}</h1>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                {{ t('Enable gateways, manage credentials, and define checkout priority from one place.') }}
-                            </p>
-                        </div>
-
-                        <div class="grid gap-3 sm:grid-cols-3">
-                            <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Total gateways') }}</p>
-                                <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ localGateways.length }}</p>
-                            </div>
-                            <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Enabled') }}</p>
-                                <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ enabledGatewayCount }}</p>
-                            </div>
-                            <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Test mode') }}</p>
-                                <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ testModeGatewayCount }}</p>
-                            </div>
-                        </div>
+                <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Payment Gateways') }}</h1>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('Enable gateways, manage credentials, and define checkout priority from one place.') }}
+                        </p>
                     </div>
+                    <button
+                        v-if="selectedGateway"
+                        type="button"
+                        :disabled="form.processing"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="submit"
+                    >
+                        <i :class="form.processing ? 'ti ti-loader-2 animate-spin' : 'ti ti-device-floppy'" class="text-base"></i>
+                        {{ form.processing ? t('Saving...') : t('Save Gateway') }}
+                    </button>
                 </section>
 
                 <div class="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -365,14 +356,6 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
                                         </div>
                                     </div>
 
-                                    <button
-                                        type="submit"
-                                        :disabled="form.processing"
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <i class="ti ti-device-floppy text-base"></i>
-                                        {{ form.processing ? t('Saving...') : t('Save Gateway') }}
-                                    </button>
                                 </div>
                             </div>
 

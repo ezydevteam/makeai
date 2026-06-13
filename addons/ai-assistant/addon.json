@@ -1,0 +1,37 @@
+{
+    "slug": "ai-assistant",
+    "name": "AI Assistant",
+    "version": "1.0.0",
+    "description": "Floating AI assistant widget for frontend and admin panel with streaming chat, admin slash commands, and feedback.",
+    "author": "MakeAI",
+    "requires_license": 1,
+    "envato_item_id": 0,
+    "admin_menu": [
+        {
+            "label": "AI Assistant",
+            "route": "admin.addons.settings",
+            "route_params": { "slug": "ai-assistant" },
+            "route_pattern": "admin.addons.*",
+            "icon": "ti ti-robot",
+            "permission": "settings.manage"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",              "type": "boolean",  "label": "Enable on Frontend",                            "default": false,    "group": "general" },
+        { "key": "admin_enabled",        "type": "boolean",  "label": "Enable in Admin Panel",                        "default": true,     "group": "general" },
+        { "key": "position",             "type": "select",   "label": "Widget Position",  "options": ["bottom-right","bottom-left"],             "default": "bottom-right", "group": "general" },
+        { "key": "accent_color",         "type": "color",    "label": "Accent Color",                                 "default": "#1F75FE","group": "general" },
+        { "key": "model",                "type": "string",   "label": "AI Model",                                     "default": "gpt-4o-mini","group": "ai" },
+        { "key": "max_tokens",           "type": "integer",  "label": "Max Tokens",                                   "default": 1024,     "group": "ai" },
+        { "key": "temperature",          "type": "string",   "label": "Temperature",                                  "default": "0.7",    "group": "ai" },
+        { "key": "assistant_name",       "type": "string",   "label": "Assistant Name",                               "default": "AI Assistant","group": "persona" },
+        { "key": "avatar_url",           "type": "url",      "label": "Avatar URL",                                   "default": null,     "group": "persona" },
+        { "key": "designation",          "type": "string",   "label": "Designation",                                  "default": "Your AI Helper","group": "persona" },
+        { "key": "greeting_message",     "type": "textarea", "label": "Greeting Message",                             "default": null,     "group": "persona" },
+        { "key": "show_to",              "type": "select",   "label": "Show To",          "options": ["all","logged_in","pro_only"],            "default": "all",    "group": "access" },
+        { "key": "daily_message_limit",  "type": "integer",  "label": "Daily Limit (0 = unlimited)",                 "default": 20,       "group": "access" },
+        { "key": "system_prompt_frontend","type": "textarea","label": "Frontend System Prompt",                       "default": null,     "group": "prompts", "secret": true },
+        { "key": "system_prompt_admin",  "type": "textarea", "label": "Admin System Prompt",                          "default": null,     "group": "prompts", "secret": true },
+        { "key": "custom_api_key",       "type": "encrypted","label": "Custom API Key (optional)",                   "default": null,     "group": "ai", "secret": true }
+    ]
+}

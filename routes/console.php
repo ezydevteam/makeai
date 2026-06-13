@@ -51,7 +51,7 @@ Schedule::command('subscriptions:expire-past-due')
     ->withoutOverlapping();
 
 Schedule::command('notes:prune-expired')
-    ->hourly()
+    ->daily()
     ->withoutOverlapping();
 
 Schedule::command('tools:flush-views')
@@ -63,15 +63,19 @@ Schedule::command('exports:cleanup')
     ->withoutOverlapping();
 
 Schedule::command('license:reverify')
-    ->daily()
+    ->weekly()
+    ->withoutOverlapping();
+
+Schedule::command('addon:reverify-licenses')
+    ->dailyAt('03:00')
     ->withoutOverlapping();
 
 Schedule::command('blog:publish-scheduled')
-    ->everyMinute()
+    ->everyFiveMinutes()
     ->withoutOverlapping();
 
 Schedule::command('support:auto-close')
-    ->dailyAt('01:00')
+    ->dailyAt('06:00')
     ->withoutOverlapping();
 
 Schedule::command('social:refresh')
@@ -79,13 +83,37 @@ Schedule::command('social:refresh')
     ->withoutOverlapping();
 
 Schedule::command('updates:check')
-    ->daily()
+    ->dailyAt('03:00')
     ->withoutOverlapping();
 
 Schedule::command('demo:reset --force')
-    ->hourly()
+    ->everySixHours()
     ->withoutOverlapping()
     ->when(fn () => config('demo.enabled'));
+
+Schedule::command('rag:cleanup-ephemeral')
+    ->daily()
+    ->withoutOverlapping();
+
+Schedule::command('accounts:purge-deleted')
+    ->dailyAt('03:00')
+    ->withoutOverlapping();
+
+Schedule::command('accounts:cleanup-expired-otps')
+    ->hourly()
+    ->withoutOverlapping();
+
+Schedule::command('analytics:aggregate')
+    ->hourly()
+    ->withoutOverlapping();
+
+Schedule::command('currency:sync-rates')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();
+
+Schedule::command('system:cleanup-temp-files')
+    ->dailyAt('05:00')
+    ->withoutOverlapping();
 
 Schedule::call(function (): void {
     $timestamp = now()->toDateTimeString();

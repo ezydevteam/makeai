@@ -72,6 +72,11 @@ class TemplateController extends Controller
             return redirect()->back()->with('error', translate('This tool requires a Pro plan. Please upgrade to continue.'));
         }
 
+        // RAG tools use their own controller + page
+        if ($tool->type === 'rag') {
+            return app(\App\Http\Controllers\RagToolController::class)->show($slug);
+        }
+
         // Track view (only for real visits, not admin preview)
         if (! $isAdminPreview) {
             $this->viewTracker->record($tool->slug);

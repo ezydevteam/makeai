@@ -350,3 +350,45 @@ if (! function_exists('is_maintenance')) {
         return (bool) settings('maintenance_mode', false);
     }
 }
+
+if (! function_exists('addon_setting')) {
+    /**
+     * Read an addon setting.
+     */
+    function addon_setting(string $addonSlug, string $key, mixed $default = null): mixed
+    {
+        return settings("addon_{$addonSlug}_{$key}", $default);
+    }
+}
+
+if (! function_exists('addon_setting_set')) {
+    /**
+     * Set an addon setting.
+     */
+    function addon_setting_set(string $addonSlug, string $key, mixed $value, string $type = 'string'): void
+    {
+        settings_set("addon_{$addonSlug}_{$key}", $value, $type, 'addon');
+    }
+}
+
+if (! function_exists('addon_manifest')) {
+    /**
+     * Get an addon's manifest array.
+     */
+    function addon_manifest(string $slug): array
+    {
+        $addon = \App\Models\Addon::where('slug', $slug)->first();
+        return $addon ? $addon->manifest ?? [] : [];
+    }
+}
+
+if (! function_exists('addon_version')) {
+    /**
+     * Get an addon's version string.
+     */
+    function addon_version(string $slug): string
+    {
+        $addon = \App\Models\Addon::where('slug', $slug)->first();
+        return $addon ? $addon->version ?? '0.0.0' : '0.0.0';
+    }
+}

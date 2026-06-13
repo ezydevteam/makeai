@@ -192,7 +192,7 @@ const dragOptions = computed(() => ({
 .menu-dropzone:empty::before {
     content: '';
     display: block;
-    min-height: 46px;
+    min-height: 30px;
     border: 1px dashed var(--color-primary-200);
     border-radius: 0.5rem;
     background: rgb(99 102 241 / 0.06);

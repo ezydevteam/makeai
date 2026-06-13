@@ -9,6 +9,7 @@ import AnnouncementManager from '@/Components/AnnouncementManager.vue'
 import NewsletterPopup from '@/Components/NewsletterPopup.vue'
 import AdSection from '@/Components/AdSection.vue'
 import CookieConsentBanner from '@/Components/CookieConsentBanner.vue'
+import AiAssistantLoader from '@/Components/Addons/AiAssistantLoader.vue'
 
 const page = usePage()
 const { t } = useTranslate()
@@ -111,5 +112,6 @@ useFlashToasts()
 
         <!-- GDPR Cookie Consent Banner -->
         <CookieConsentBanner v-if="gdprEnabled && showCookieBanner" :config="gdprConfig" @accept="onCookieAccept" @accept-all="showCookieBanner = false" @accept-necessary="showCookieBanner = false" />
+        <AiAssistantLoader />
     </div>
 </template>

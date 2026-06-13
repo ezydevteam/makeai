@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Ad;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class TrackAdClick implements ShouldQueue
 {
@@ -14,6 +15,10 @@ class TrackAdClick implements ShouldQueue
 
     public function handle(): void
     {
-        Ad::whereKey($this->adId)->increment('clicks');
+        $updated = Ad::whereKey($this->adId)->increment('clicks');
+
+        if ($updated === 0) {
+            Log::warning('TrackAdClick: ad not found', ['ad_id' => $this->adId]);
+        }
     }
 }

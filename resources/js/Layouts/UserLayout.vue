@@ -14,6 +14,16 @@ const page = usePage()
 const profileOpen = ref(false)
 const user = computed(() => page.props.auth?.user as any)
 
+const showHeader = computed(() => {
+    const tool = page.props.tool as any
+    return tool?.show_header !== false
+})
+
+const showFooter = computed(() => {
+    const tool = page.props.tool as any
+    return tool?.show_footer !== false
+})
+
 const close = () => { profileOpen.value = false }
 onMounted(() => document.addEventListener('click', close))
 onUnmounted(() => document.removeEventListener('click', close))
@@ -41,8 +51,8 @@ useFlashToasts()
         <NewsletterPopup />
 
         <!-- Global Header Component -->
-        <AppHeader />
-        <AdSection zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
+        <AppHeader v-if="showHeader" />
+        <AdSection v-if="showHeader" zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
 
         <!-- Content -->
         <main class="flex-1 flex flex-col">
@@ -52,7 +62,7 @@ useFlashToasts()
         </main>
 
         <!-- Global Footer Component -->
-        <AdSection zone="footer_banner" class="mx-auto mb-4 w-full max-w-7xl px-6" />
-        <AppFooter />
+        <AdSection v-if="showFooter" zone="footer_banner" class="mx-auto mb-4 w-full max-w-7xl px-6" />
+        <AppFooter v-if="showFooter" />
     </div>
 </template>

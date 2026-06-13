@@ -455,6 +455,8 @@ class HandleInertiaRequests extends Middleware
 
             'affiliateEnabled' => fn () => isProAvailable() && (bool) AffiliateProgram::current()->is_active,
 
+            'addonMenuItems' => fn () => app(\App\Services\AddonService::class)->getActiveAddonMenuItems(),
+
             'appearanceAdminSettings' => fn () => auth('admin')->check()
                 ? AppearanceSetting::getForScope('admin')
                 : null,

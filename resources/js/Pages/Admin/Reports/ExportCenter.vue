@@ -38,6 +38,7 @@ const dateTo = ref('')
 const customDateFrom = ref('')
 const customDateTo = ref('')
 const exporting = ref(false)
+const builderOpen = ref(false)
 const exportMessage = ref('')
 const deletingPath = ref<string | null>(null)
 const deleteTarget = ref<ExportFile | null>(null)
@@ -156,6 +157,7 @@ async function doExport() {
             a.download = buildExportFilename()
             a.click()
             URL.revokeObjectURL(url)
+            builderOpen.value = false
             // Refresh via Inertia instead of full page reload
             router.reload({ only: ['recentExports'] })
         }
@@ -282,13 +284,40 @@ const toolOptions = computed(() => props.toolSlugs)
     <Head :title="t('Export Center')" />
 
     <div class="mx-auto max-w-7xl space-y-6 px-6 py-8">
-        <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Export Center') }}</h1>
-        <p class="max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Build downloadable reports for users, subscriptions, support, and operational data from one admin workspace.') }}</p>
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900 xl:col-span-2">
-                <div class="mb-6">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Export Builder') }}</h2>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the dataset, time range, and file format before generating a downloadable report.') }}</p>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Export Center') }}</h1>
+                <p class="max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Build downloadable reports for users, subscriptions, support, and operational data from one admin workspace.') }}</p>
+            </div>
+            <button
+                type="button"
+                class="btn-primary inline-flex items-center justify-center gap-2 self-start rounded-xl px-4 py-2.5 text-sm font-medium shadow-lg shadow-primary-500/20 transition-all"
+                @click="builderOpen = true"
+            >
+                <i class="ti ti-file-export text-base"></i>
+                {{ t('Start Export') }}
+            </button>
+        </div>
+
+        <div
+            v-if="builderOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6 backdrop-blur-sm"
+            @click.self="builderOpen = false"
+        >
+            <section class="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-surface-800 dark:bg-surface-900">
+                <div class="mb-6 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Export Builder') }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the dataset, time range, and file format before generating a downloadable report.') }}</p>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                        :aria-label="t('Close export builder')"
+                        @click="builderOpen = false"
+                    >
+                        <i class="ti ti-x text-lg"></i>
+                    </button>
                 </div>
 
                 <div class="space-y-6">
@@ -453,21 +482,6 @@ const toolOptions = computed(() => props.toolSlugs)
                     </div>
                 </div>
             </section>
-
-            <aside class="space-y-6">
-                <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Export Notes') }}</h2>
-                    <div class="mt-4 space-y-4 text-sm text-gray-500 dark:text-gray-400">
-                        <p>{{ t('Use XLSX or CSV for the largest exports and PDF for summary-ready files.') }}</p>
-                        <p>{{ t('Custom date filters help keep support and transactional exports more focused.') }}</p>
-                        <p>{{ t('Recent exports stay available below until they are manually deleted.') }}</p>
-                    </div>
-                </section>
-                <section class="rounded-xl border border-violet-200 bg-violet-50 p-6 shadow-sm dark:border-violet-900/40 dark:bg-violet-900/20">
-                    <h2 class="text-lg font-bold text-violet-900 dark:text-violet-100">{{ t('Pro Data') }}</h2>
-                    <p class="mt-2 text-sm text-violet-700 dark:text-violet-200">{{ props.isProAvailable ? t('Revenue exports are available for this installation.') : t('Revenue exports stay hidden unless Pro subscriptions are enabled.') }}</p>
-                </section>
-            </aside>
         </div>
 
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
@@ -530,7 +544,7 @@ const toolOptions = computed(() => props.toolSlugs)
                     <i class="ti ti-file-export text-2xl"></i>
                 </div>
                 <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('No recent exports') }}</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use the export builder above to generate your first report file.') }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Open the export builder to generate your first report file.') }}</p>
             </div>
         </section>
     </div>

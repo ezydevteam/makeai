@@ -2,7 +2,9 @@
 
 namespace App\Services\AI\Rag;
 
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Smalot\PdfParser\Parser as PdfParser;
 
 /**
  * TextExtractionService — extracts clean text from files.
@@ -57,10 +59,22 @@ class TextExtractionService
      */
     public function extractFromUrl(string $url): string
     {
-        $html = @file_get_contents($url);
+        try {
+            $response = Http::timeout(30)
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (compatible; MakeAI RAG Bot/1.0)',
+                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language' => 'en-US,en;q=0.5',
+                ])
+                ->get($url);
 
-        if ($html === false) {
-            throw new RuntimeException("Failed to fetch URL: {$url}");
+            if (! $response->successful()) {
+                throw new RuntimeException("Failed to fetch URL (HTTP {$response->status()}): {$url}");
+            }
+
+            $html = $response->body();
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            throw new RuntimeException("Could not connect to URL: {$url} — {$e->getMessage()}");
         }
 
         $text = $this->stripHtml($html);
@@ -121,23 +135,24 @@ class TextExtractionService
 
     private function extractPdf(string $filePath): string
     {
-        // Use pdftotext if available, otherwise use built-in parsing
+        // Use pdftotext if available (fastest)
         $pdftotext = trim(shell_exec('where pdftotext 2>nul') ?: '');
 
         if (! empty($pdftotext)) {
             $escapedPath = escapeshellarg($filePath);
             $output = shell_exec("pdftotext {$escapedPath} - 2>&1");
 
-            return $output ? trim($output) : '';
+            $text = $output ? trim($output) : '';
+            if (! empty($text)) {
+                return $text;
+            }
         }
 
-        // Fallback: basic PDF text extraction via regex
-        $content = file_get_contents($filePath);
-        if ($content === false) {
-            throw new RuntimeException("Failed to read PDF: {$filePath}");
-        }
+        // Use smalot/pdfparser (pure PHP, works everywhere)
+        $parser = new PdfParser;
+        $pdf = $parser->parseFile($filePath);
 
-        return $this->extractPdfTextFallback($content);
+        return trim($pdf->getText());
     }
 
     private function extractDocx(string $filePath): string
@@ -256,36 +271,5 @@ class TextExtractionService
         return trim($text);
     }
 
-    private function extractPdfTextFallback(string $content): string
-    {
-        // Decode stream objects
-        $text = '';
-        $content = preg_replace('/\s+/', ' ', $content);
-
-        // Try to extract text from BT/ET blocks
-        if (preg_match_all('/BT(.*?)ET/s', $content, $matches)) {
-            foreach ($matches[1] as $block) {
-                // Extract text between parentheses in Tj/TJ operators
-                if (preg_match_all('/\(([^)]*)\)\s*Tj/', $block, $tjMatches)) {
-                    foreach ($tjMatches[1] as $tjText) {
-                        $text .= $this->decodePdfString($tjText).' ';
-                    }
-                }
-            }
-        }
-
-        return trim($text);
-    }
-
-    private function decodePdfString(string $string): string
-    {
-        // Handle PDF escape sequences
-        $string = str_replace(
-            ['\\(', '\\)', '\\\\', '\n', '\r', '\t'],
-            ['(', ')', '\\', "\n", "\r", "\t"],
-            $string
-        );
-
-        return $string;
-    }
+    // ─── Private Extractors ──────────────────────────────────────
 }

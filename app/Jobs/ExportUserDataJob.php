@@ -132,64 +132,70 @@ class ExportUserDataJob implements ShouldQueue
     private function writeUsageHistory(string $dir): void
     {
         $fp = fopen($dir . '/usage-history.csv', 'w');
-        fputcsv($fp, ['Date', 'Provider', 'Model', 'Type', 'Input Tokens', 'Output Tokens', 'Credits Used', 'Status']);
+        try {
+            fputcsv($fp, ['Date', 'Provider', 'Model', 'Type', 'Input Tokens', 'Output Tokens', 'Credits Used', 'Status']);
 
-        AiUsageLog::where('user_id', $this->user->id)->chunk(500, function ($logs) use ($fp) {
-            foreach ($logs as $log) {
-                fputcsv($fp, [
-                    $log->created_at?->toIso8601String(),
-                    $log->provider,
-                    $log->model,
-                    $log->type,
-                    $log->input_tokens,
-                    $log->output_tokens,
-                    $log->credits_used,
-                    $log->status,
-                ]);
-            }
-        });
-
-        fclose($fp);
+            AiUsageLog::where('user_id', $this->user->id)->chunk(500, function ($logs) use ($fp) {
+                foreach ($logs as $log) {
+                    fputcsv($fp, [
+                        $log->created_at?->toIso8601String(),
+                        $log->provider,
+                        $log->model,
+                        $log->type,
+                        $log->input_tokens,
+                        $log->output_tokens,
+                        $log->credits_used,
+                        $log->status,
+                    ]);
+                }
+            });
+        } finally {
+            fclose($fp);
+        }
     }
 
     private function writeCreditTransactions(string $dir): void
     {
         $fp = fopen($dir . '/credit-transactions.csv', 'w');
-        fputcsv($fp, ['Date', 'Type', 'Amount', 'Description']);
+        try {
+            fputcsv($fp, ['Date', 'Type', 'Amount', 'Description']);
 
-        $this->user->creditTransactions()->chunk(500, function ($txns) use ($fp) {
-            foreach ($txns as $txn) {
-                fputcsv($fp, [
-                    $txn->created_at?->toIso8601String(),
-                    $txn->type ?? '',
-                    $txn->amount ?? 0,
-                    $txn->description ?? '',
-                ]);
-            }
-        });
-
-        fclose($fp);
+            $this->user->creditTransactions()->chunk(500, function ($txns) use ($fp) {
+                foreach ($txns as $txn) {
+                    fputcsv($fp, [
+                        $txn->created_at?->toIso8601String(),
+                        $txn->type ?? '',
+                        $txn->amount ?? 0,
+                        $txn->description ?? '',
+                    ]);
+                }
+            });
+        } finally {
+            fclose($fp);
+        }
     }
 
     private function writeLoginHistory(string $dir): void
     {
         $fp = fopen($dir . '/login-history.csv', 'w');
-        fputcsv($fp, ['Date', 'IP', 'Country', 'City', 'User Agent', 'Success']);
+        try {
+            fputcsv($fp, ['Date', 'IP', 'Country', 'City', 'User Agent', 'Success']);
 
-        $this->user->loginHistory()->chunk(500, function ($logins) use ($fp) {
-            foreach ($logins as $login) {
-                fputcsv($fp, [
-                    $login->created_at?->toIso8601String(),
-                    $login->ip,
-                    $login->country,
-                    $login->city,
-                    $login->user_agent,
-                    $login->success ? 'yes' : 'no',
-                ]);
-            }
-        });
-
-        fclose($fp);
+            $this->user->loginHistory()->chunk(500, function ($logins) use ($fp) {
+                foreach ($logins as $login) {
+                    fputcsv($fp, [
+                        $login->created_at?->toIso8601String(),
+                        $login->ip,
+                        $login->country,
+                        $login->city,
+                        $login->user_agent,
+                        $login->success ? 'yes' : 'no',
+                    ]);
+                }
+            });
+        } finally {
+            fclose($fp);
+        }
     }
 
     private function createZip(string $sourceDir, string $zipFile): void

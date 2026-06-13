@@ -21,6 +21,7 @@ use App\Http\Controllers\Admin\CMS\AnnouncementController;
 use App\Http\Controllers\Admin\CommentModerationController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use App\Http\Controllers\Admin\ContactSettingsController;
+use App\Http\Controllers\Admin\FeatureSettingsController;
 use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\ExportCenterController;
 use App\Http\Controllers\Admin\FaqController;
@@ -88,7 +89,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('logout', [AdminLoginController::class, 'logout'])->name('admin.logout');
 
     // Dashboard
-    Route::get('/', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+    Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
 
     // Admin Notes
     Route::get('notes', [AdminNoteController::class, 'index'])->name('admin.notes.index');
@@ -98,46 +99,48 @@ Route::middleware('admin.auth')->group(function () {
 
     // Themes
     Route::middleware('admin.permission:addons.view')->group(function () {
-        Route::get('themes', [ThemeAddonController::class, 'themes'])->name('admin.themes');
-        Route::post('themes/{slug}/activate', [ThemeAddonController::class, 'activateTheme'])->name('admin.themes.activate');
-        Route::get('themes/{slug}/settings', [ThemeAddonController::class, 'themeSettings'])->name('admin.themes.settings');
-        Route::post('themes/{slug}/settings', [ThemeAddonController::class, 'saveThemeSettings'])->name('admin.themes.settings.save');
+        Route::get('appearance/themes', [ThemeAddonController::class, 'themes'])->name('admin.themes');
+        Route::post('appearance/themes/{slug}/activate', [ThemeAddonController::class, 'activateTheme'])->name('admin.themes.activate');
+        Route::get('appearance/themes/{slug}/settings', [ThemeAddonController::class, 'themeSettings'])->name('admin.themes.settings');
+        Route::post('appearance/themes/{slug}/settings', [ThemeAddonController::class, 'saveThemeSettings'])->name('admin.themes.settings.save');
 
         // Addons
         Route::get('addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
+        Route::post('addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:5,1');
         Route::post('addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
         Route::post('addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
+        Route::post('addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
         Route::get('addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
         Route::post('addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
     });
 
     // Users Management
-    Route::get('users', [UserManagementController::class, 'index'])->name('admin.users.index');
-    Route::get('users/trash', [UserManagementController::class, 'trash'])->name('admin.users.trash');
-    Route::get('users/create', [UserManagementController::class, 'create'])->name('admin.users.create');
-    Route::post('users', [UserManagementController::class, 'store'])->name('admin.users.store');
-    Route::get('users/export', [UserManagementController::class, 'export'])->name('admin.users.export');
-    Route::post('users/bulk', [UserManagementController::class, 'bulkAction'])->name('admin.users.bulk');
-    Route::post('users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->name('admin.users.trash.bulk');
-    Route::post('users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
-    Route::post('users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->name('admin.users.restore');
-    Route::delete('users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->name('admin.users.force-delete');
-    Route::get('users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
-    Route::post('users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
-    Route::delete('users/{user}', [UserManagementController::class, 'destroy'])->name('admin.users.delete');
-    Route::post('users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
-    Route::post('users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->name('admin.users.2fa.disable');
-    Route::post('users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
+    Route::get('roles/users', [UserManagementController::class, 'index'])->name('admin.users.index');
+    Route::get('roles/users/trash', [UserManagementController::class, 'trash'])->name('admin.users.trash');
+    Route::get('roles/users/create', [UserManagementController::class, 'create'])->name('admin.users.create');
+    Route::post('roles/users', [UserManagementController::class, 'store'])->name('admin.users.store');
+    Route::get('roles/users/export', [UserManagementController::class, 'export'])->name('admin.users.export');
+    Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->name('admin.users.bulk');
+    Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->name('admin.users.trash.bulk');
+    Route::post('roles/users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
+    Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->name('admin.users.restore');
+    Route::delete('roles/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->name('admin.users.force-delete');
+    Route::get('roles/users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
+    Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
+    Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->name('admin.users.delete');
+    Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
+    Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->name('admin.users.2fa.disable');
+    Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
 
     // Administrators & Roles
-    Route::get('admins', [AdminController::class, 'index'])->name('admin.admins.index');
-    Route::get('admins/trash', [AdminController::class, 'trash'])->name('admin.admins.trash');
-    Route::post('admins', [AdminController::class, 'store'])->name('admin.admins.store');
-    Route::post('admins/trash/bulk', [AdminController::class, 'bulkTrashAction'])->name('admin.admins.trash.bulk');
-    Route::post('admins/{admin}', [AdminController::class, 'update'])->name('admin.admins.update');
-    Route::post('admins/{admin}/restore', [AdminController::class, 'restore'])->withTrashed()->name('admin.admins.restore');
-    Route::delete('admins/{admin}', [AdminController::class, 'destroy'])->name('admin.admins.delete');
-    Route::delete('admins/{admin}/force-delete', [AdminController::class, 'forceDelete'])->withTrashed()->name('admin.admins.force-delete');
+    Route::get('roles/admins', [AdminController::class, 'index'])->name('admin.admins.index');
+    Route::get('roles/admins/trash', [AdminController::class, 'trash'])->name('admin.admins.trash');
+    Route::post('roles/admins', [AdminController::class, 'store'])->name('admin.admins.store');
+    Route::post('roles/admins/trash/bulk', [AdminController::class, 'bulkTrashAction'])->name('admin.admins.trash.bulk');
+    Route::post('roles/admins/{admin}', [AdminController::class, 'update'])->name('admin.admins.update');
+    Route::post('roles/admins/{admin}/restore', [AdminController::class, 'restore'])->withTrashed()->name('admin.admins.restore');
+    Route::delete('roles/admins/{admin}', [AdminController::class, 'destroy'])->name('admin.admins.delete');
+    Route::delete('roles/admins/{admin}/force-delete', [AdminController::class, 'forceDelete'])->withTrashed()->name('admin.admins.force-delete');
 
     Route::get('security/two-factor', [AdminTwoFactorController::class, 'show'])->name('admin.security.2fa.show');
     Route::post('security/two-factor', [AdminTwoFactorController::class, 'enable'])->middleware('throttle:otp')->name('admin.security.2fa.enable');
@@ -145,7 +148,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::post('security/two-factor/recovery-codes', [AdminTwoFactorController::class, 'regenerateRecoveryCodes'])->middleware('throttle:otp')->name('admin.security.2fa.recovery-codes');
 
     // Rate Limits
-    Route::prefix('security/rate-limits')->name('admin.security.rate-limits.')->middleware('admin.permission:settings.manage')->group(function () {
+    Route::prefix('system/rate-limits')->name('admin.system.rate-limits.')->middleware('admin.permission:settings.manage')->group(function () {
         Route::get('/', [RateLimitController::class, 'index'])->name('index');
         Route::post('/tiers', [RateLimitController::class, 'updateTiers'])->name('tiers.update');
         Route::post('/ban', [RateLimitController::class, 'banIp'])->name('ban');
@@ -179,26 +182,26 @@ Route::middleware('admin.auth')->group(function () {
 
     // Plans (Pro only controller — uses isProAvailable() internally, guard with plans.view)
     Route::middleware('admin.permission:plans.view')->group(function () {
-        Route::get('plans', [PlanController::class, 'index'])->name('admin.plans.index');
-        Route::get('plans/pricing', [PlanController::class, 'pricing'])->name('admin.plans.pricing');
-        Route::post('plans/settings', [PlanController::class, 'updateSettings'])->name('admin.plans.settings');
-        Route::put('plans/{plan}', [PlanController::class, 'update'])->name('admin.plans.update');
+        Route::get('premium/plans', [PlanController::class, 'index'])->name('admin.plans.index');
+        Route::get('premium/plans/pricing', [PlanController::class, 'pricing'])->name('admin.plans.pricing');
+        Route::post('premium/plans/settings', [PlanController::class, 'updateSettings'])->name('admin.plans.settings');
+        Route::put('premium/plans/{plan}', [PlanController::class, 'update'])->name('admin.plans.update');
     });
 
-    Route::get('payment-gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
-    Route::post('payment-gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
-    Route::post('payment-gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
-    Route::get('coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
-    Route::post('coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
-    Route::post('coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
-    Route::post('coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
-    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
+    Route::get('premium/gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
+    Route::post('premium/gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
+    Route::post('premium/gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
+    Route::get('premium/coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
+    Route::post('premium/coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
+    Route::post('premium/coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
+    Route::post('premium/coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
+    Route::delete('premium/coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
 
-    Route::get('reports/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
-    Route::post('reports/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
-    Route::post('reports/affiliate/commissions/{commission}/approve', [AffiliateController::class, 'approveCommission'])->name('admin.affiliate.commissions.approve');
-    Route::post('reports/affiliate/commissions/{commission}/reject', [AffiliateController::class, 'rejectCommission'])->name('admin.affiliate.commissions.reject');
-    Route::post('reports/affiliate/payouts/{payout}', [AffiliateController::class, 'processPayout'])->name('admin.affiliate.payouts.process');
+    Route::get('marketing/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
+    Route::post('marketing/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
+    Route::post('marketing/affiliate/commissions/{commission}/approve', [AffiliateController::class, 'approveCommission'])->name('admin.affiliate.commissions.approve');
+    Route::post('marketing/affiliate/commissions/{commission}/reject', [AffiliateController::class, 'rejectCommission'])->name('admin.affiliate.commissions.reject');
+    Route::post('marketing/affiliate/payouts/{payout}', [AffiliateController::class, 'processPayout'])->name('admin.affiliate.payouts.process');
 
     // Export Center
     Route::middleware('admin.permission:reports.export')->group(function () {
@@ -211,53 +214,56 @@ Route::middleware('admin.auth')->group(function () {
 
     // Community (Newsletter)
     Route::middleware('admin.permission:users.manage')->group(function () {
-        Route::get('community/newsletter', [NewsletterController::class, 'index'])->name('admin.newsletter.index');
-        Route::post('community/newsletter/campaign', [NewsletterController::class, 'storeCampaign'])->name('admin.newsletter.campaign.store');
-        Route::post('community/newsletter/campaign/{campaign}', [NewsletterController::class, 'updateCampaign'])->name('admin.newsletter.campaign.update');
-        Route::delete('community/newsletter/campaign/{campaign}', [NewsletterController::class, 'destroyCampaign'])->name('admin.newsletter.campaign.delete');
-        Route::post('community/newsletter/campaign/{campaign}/send', [NewsletterController::class, 'sendCampaign'])->name('admin.newsletter.campaign.send');
-        Route::post('community/newsletter/campaign/{campaign}/test', [NewsletterController::class, 'testCampaign'])->name('admin.newsletter.campaign.test');
-        Route::post('community/newsletter/campaign/{campaign}/retry', [NewsletterController::class, 'retryFailed'])->name('admin.newsletter.campaign.retry');
-        Route::delete('community/newsletter/subscriber/{subscriber}', [NewsletterController::class, 'destroySubscriber'])->name('admin.newsletter.subscriber.delete');
-        Route::post('community/newsletter/settings', [NewsletterController::class, 'saveSettings'])->name('admin.newsletter.settings.save');
+        Route::get('marketing/newsletter', [NewsletterController::class, 'index'])->name('admin.newsletter.index');
+        Route::post('marketing/newsletter/campaign', [NewsletterController::class, 'storeCampaign'])->name('admin.newsletter.campaign.store');
+        Route::post('marketing/newsletter/campaign/{campaign}', [NewsletterController::class, 'updateCampaign'])->name('admin.newsletter.campaign.update');
+        Route::delete('marketing/newsletter/campaign/{campaign}', [NewsletterController::class, 'destroyCampaign'])->name('admin.newsletter.campaign.delete');
+        Route::post('marketing/newsletter/campaign/{campaign}/send', [NewsletterController::class, 'sendCampaign'])->name('admin.newsletter.campaign.send');
+        Route::post('marketing/newsletter/campaign/{campaign}/test', [NewsletterController::class, 'testCampaign'])->name('admin.newsletter.campaign.test');
+        Route::post('marketing/newsletter/campaign/{campaign}/retry', [NewsletterController::class, 'retryFailed'])->name('admin.newsletter.campaign.retry');
+        Route::delete('marketing/newsletter/subscriber/{subscriber}', [NewsletterController::class, 'destroySubscriber'])->name('admin.newsletter.subscriber.delete');
+        Route::post('marketing/newsletter/settings', [NewsletterController::class, 'saveSettings'])->name('admin.newsletter.settings.save');
     });
 
     // CMS: Pages
     Route::middleware('admin.permission:content.pages')->group(function () {
-        Route::get('cms/pages', [PageController::class, 'index'])->name('admin.pages.index');
-        Route::get('cms/pages/create', [PageController::class, 'create'])->name('admin.pages.create');
-        Route::post('cms/pages/ai-assist', [PageController::class, 'aiAssist'])->name('admin.pages.ai-assist');
-        Route::post('cms/pages', [PageController::class, 'store'])->name('admin.pages.store');
-        Route::get('cms/pages/{page}/edit', [PageController::class, 'edit'])->name('admin.pages.edit');
-        Route::post('cms/pages/{page}', [PageController::class, 'update'])->name('admin.pages.update');
-        Route::get('cms/pages/{page}/preview', [PageController::class, 'preview'])->name('admin.pages.preview');
-        Route::post('cms/pages/{page}/restore', [PageController::class, 'restore'])->withTrashed()->name('admin.pages.restore');
-        Route::delete('cms/pages/{page}/force-delete', [PageController::class, 'forceDelete'])->withTrashed()->name('admin.pages.force-delete');
-        Route::delete('cms/pages/{page}', [PageController::class, 'destroy'])->name('admin.pages.delete');
+        Route::get('content/pages', [PageController::class, 'index'])->name('admin.pages.index');
+        Route::get('content/pages/create', [PageController::class, 'create'])->name('admin.pages.create');
+        Route::post('content/pages/ai-assist', [PageController::class, 'aiAssist'])->name('admin.pages.ai-assist');
+        Route::post('content/pages', [PageController::class, 'store'])->name('admin.pages.store');
+        Route::get('content/pages/{page}/edit', [PageController::class, 'edit'])->name('admin.pages.edit');
+        Route::post('content/pages/{page}', [PageController::class, 'update'])->name('admin.pages.update');
+        Route::get('content/pages/{page}/preview', [PageController::class, 'preview'])->name('admin.pages.preview');
+        Route::post('content/pages/{page}/restore', [PageController::class, 'restore'])->withTrashed()->name('admin.pages.restore');
+        Route::delete('content/pages/{page}/force-delete', [PageController::class, 'forceDelete'])->withTrashed()->name('admin.pages.force-delete');
+        Route::delete('content/pages/{page}', [PageController::class, 'destroy'])->name('admin.pages.delete');
     });
 
     Route::middleware('admin.permission:content.pages')->group(function () {
-        Route::get('cms/contact/messages/export', [ContactMessageController::class, 'export'])->name('admin.contact.messages.export');
-        Route::get('cms/contact/messages', [ContactMessageController::class, 'index'])->name('admin.contact.messages.index');
-        Route::post('cms/contact/messages/{message}/read', [ContactMessageController::class, 'markRead'])->name('admin.contact.messages.read');
-        Route::post('cms/contact/messages/{message}/reply', [ContactMessageController::class, 'reply'])->name('admin.contact.messages.reply');
-        Route::delete('cms/contact/messages/{message}', [ContactMessageController::class, 'destroy'])->name('admin.contact.messages.delete');
+        Route::get('contact/messages/export', [ContactMessageController::class, 'export'])->name('admin.contact.messages.export');
+        Route::get('contact/messages', [ContactMessageController::class, 'index'])->name('admin.contact.messages.index');
+        Route::post('contact/messages/{message}/read', [ContactMessageController::class, 'markRead'])->name('admin.contact.messages.read');
+        Route::post('contact/messages/{message}/reply', [ContactMessageController::class, 'reply'])->name('admin.contact.messages.reply');
+        Route::delete('contact/messages/{message}', [ContactMessageController::class, 'destroy'])->name('admin.contact.messages.delete');
         Route::get('cms/contact/settings', [ContactSettingsController::class, 'edit'])->name('admin.contact.settings.edit');
         Route::post('cms/contact/settings', [ContactSettingsController::class, 'update'])->name('admin.contact.settings.update');
     });
 
     // Support Ticket System (PART 24)
+    Route::prefix('support/tickets')->name('admin.support.tickets.')->middleware('admin.permission:support.tickets')->group(function () {
+        Route::get('/', [SupportTicketController::class, 'index'])->name('index');
+        Route::get('/export', [SupportTicketController::class, 'export'])->name('export');
+        Route::post('/bulk', [SupportTicketController::class, 'bulkAction'])->name('bulk');
+        Route::get('/{ticket}', [SupportTicketController::class, 'show'])->name('show');
+        Route::post('/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('reply');
+        Route::post('/{ticket}/state', [SupportTicketController::class, 'updateState'])->name('state');
+        Route::post('/{ticket}/suggest-reply', [SupportTicketController::class, 'suggestReply'])->name('suggest-reply');
+        Route::post('/{ticket}/merge', [SupportTicketController::class, 'merge'])->name('merge');
+        Route::post('/{ticket}/toggle-user-ban', [SupportTicketController::class, 'toggleUserBan'])->name('toggle-user-ban');
+        Route::delete('/{ticket}', [SupportTicketController::class, 'destroy'])->name('delete');
+    });
+
     Route::prefix('support')->name('admin.support.')->middleware('admin.permission:support.tickets')->group(function () {
-        Route::get('tickets', [SupportTicketController::class, 'index'])->name('tickets.index');
-        Route::get('tickets/export', [SupportTicketController::class, 'export'])->name('tickets.export');
-        Route::post('tickets/bulk', [SupportTicketController::class, 'bulkAction'])->name('tickets.bulk');
-        Route::get('tickets/{ticket}', [SupportTicketController::class, 'show'])->name('tickets.show');
-        Route::post('tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('tickets.reply');
-        Route::post('tickets/{ticket}/state', [SupportTicketController::class, 'updateState'])->name('tickets.state');
-        Route::post('tickets/{ticket}/suggest-reply', [SupportTicketController::class, 'suggestReply'])->name('tickets.suggest-reply');
-        Route::post('tickets/{ticket}/merge', [SupportTicketController::class, 'merge'])->name('tickets.merge');
-        Route::post('tickets/{ticket}/toggle-user-ban', [SupportTicketController::class, 'toggleUserBan'])->name('tickets.toggle-user-ban');
-        Route::delete('tickets/{ticket}', [SupportTicketController::class, 'destroy'])->name('tickets.delete');
 
         Route::resource('departments', SupportDepartmentController::class)->except(['create', 'show', 'edit']);
         Route::resource('canned-responses', SupportCannedResponseController::class)->except(['create', 'show', 'edit'])->parameters([
@@ -283,24 +289,24 @@ Route::middleware('admin.auth')->group(function () {
 
     // Appearance: Settings
     Route::middleware('admin.permission:settings.manage')->group(function () {
-        Route::get('appearance/settings', [AppearanceController::class, 'index'])->name('admin.appearance.index');
-        Route::post('appearance/settings', [AppearanceController::class, 'update'])->name('admin.appearance.update');
+        Route::get('system/style', [AppearanceController::class, 'index'])->name('admin.appearance.index');
+        Route::post('system/style', [AppearanceController::class, 'update'])->name('admin.appearance.update');
 
         // Appearance: Homepage Builder
-        Route::get('appearance/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
-        Route::post('appearance/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
-        Route::post('appearance/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
+        Route::get('builder/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
+        Route::post('builder/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
+        Route::post('builder/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
 
         // Appearance: Header Builder
-        Route::get('appearance/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
-        Route::post('appearance/header', [HeaderBuilderController::class, 'update'])->name('admin.header.update');
-        Route::post('appearance/header/reset/{section}', [HeaderBuilderController::class, 'resetSection'])->name('admin.header.reset');
-        Route::get('appearance/header/export', [HeaderBuilderController::class, 'export'])->name('admin.header.export');
-        Route::post('appearance/header/upload-logo', [HeaderBuilderController::class, 'upload'])->name('admin.header.upload');
+        Route::get('builder/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
+        Route::post('builder/header', [HeaderBuilderController::class, 'update'])->name('admin.header.update');
+        Route::post('builder/header/reset/{section}', [HeaderBuilderController::class, 'resetSection'])->name('admin.header.reset');
+        Route::get('builder/header/export', [HeaderBuilderController::class, 'export'])->name('admin.header.export');
+        Route::post('builder/header/upload-logo', [HeaderBuilderController::class, 'upload'])->name('admin.header.upload');
 
         // Appearance: Footer Builder
-        Route::get('appearance/footer', [FooterBuilderController::class, 'index'])->name('admin.footer.index');
-        Route::post('appearance/footer', [FooterBuilderController::class, 'update'])->name('admin.footer.update');
+        Route::get('builder/footer', [FooterBuilderController::class, 'index'])->name('admin.footer.index');
+        Route::post('builder/footer', [FooterBuilderController::class, 'update'])->name('admin.footer.update');
 
         // Appearance: Sidebar Builder
         Route::get('appearance/sidebar', [SidebarBuilderController::class, 'index'])->name('admin.sidebar.index');
@@ -314,19 +320,21 @@ Route::middleware('admin.auth')->group(function () {
             Route::post('{template}/toggle', [SiteTemplateController::class, 'toggle'])->name('toggle');
             Route::post('{template}/reset', [SiteTemplateController::class, 'resetToDefaults'])->name('reset');
             Route::post('{template}/chatbot-settings', [SiteTemplateController::class, 'saveChatbotSettings'])->name('chatbot-settings');
+            Route::post('{template}/platform-settings', [SiteTemplateController::class, 'savePlatformSettings'])->name('platform-settings');
+            Route::post('{template}/stage-settings', [SiteTemplateController::class, 'saveStageSettings'])->name('stage-settings');
         });
     });
 
     // Ads System
     Route::middleware('admin.permission:settings.manage')->group(function () {
-        Route::get('ads', [AdController::class, 'index'])->name('admin.ads.index');
-        Route::get('ads/create', [AdController::class, 'create'])->name('admin.ads.create');
-        Route::post('ads', [AdController::class, 'store'])->name('admin.ads.store');
-        Route::post('ads/settings', [AdController::class, 'updateSettings'])->name('admin.ads.settings');
-        Route::get('ads/{ad}/edit', [AdController::class, 'edit'])->name('admin.ads.edit');
-        Route::post('ads/{ad}', [AdController::class, 'update'])->name('admin.ads.update');
-        Route::delete('ads/{ad}', [AdController::class, 'destroy'])->name('admin.ads.delete');
-        Route::post('ads/{ad}/toggle', [AdController::class, 'toggle'])->name('admin.ads.toggle');
+        Route::get('marketing/ads', [AdController::class, 'index'])->name('admin.ads.index');
+        Route::get('marketing/ads/create', [AdController::class, 'create'])->name('admin.ads.create');
+        Route::post('marketing/ads', [AdController::class, 'store'])->name('admin.ads.store');
+        Route::post('marketing/ads/settings', [AdController::class, 'updateSettings'])->name('admin.ads.settings');
+        Route::get('marketing/ads/{ad}/edit', [AdController::class, 'edit'])->name('admin.ads.edit');
+        Route::post('marketing/ads/{ad}', [AdController::class, 'update'])->name('admin.ads.update');
+        Route::delete('marketing/ads/{ad}', [AdController::class, 'destroy'])->name('admin.ads.delete');
+        Route::post('marketing/ads/{ad}/toggle', [AdController::class, 'toggle'])->name('admin.ads.toggle');
     });
 
     // Social Media
@@ -340,6 +348,8 @@ Route::middleware('admin.auth')->group(function () {
     // General Settings
     Route::get('settings', [GeneralSettingsController::class, 'edit'])->name('admin.settings.index');
     Route::post('settings', [GeneralSettingsController::class, 'update'])->name('admin.settings.update');
+    Route::get('settings/features', [FeatureSettingsController::class, 'edit'])->name('admin.features.settings');
+    Route::post('settings/features', [FeatureSettingsController::class, 'update'])->name('admin.features.settings.update');
 
     // GDPR Settings
     Route::get('settings/gdpr', [GdprSettingsController::class, 'edit'])->name('admin.gdpr.settings');
@@ -378,8 +388,8 @@ Route::middleware('admin.auth')->group(function () {
 
     // Mail System
     Route::middleware('admin.permission:settings.mail')->group(function () {
-        Route::get('mail', [MailController::class, 'index'])->name('admin.mail.index');
-        Route::post('mail', [MailController::class, 'update'])->name('admin.mail.update');
+        Route::get('mail/settings', [MailController::class, 'index'])->name('admin.mail.index');
+        Route::post('mail/settings', [MailController::class, 'update'])->name('admin.mail.update');
         Route::post('mail/test', [MailController::class, 'test'])->name('admin.mail.test');
 
         Route::get('mail/templates', [MailTemplateController::class, 'index'])->name('admin.mail.templates.index');
@@ -432,11 +442,11 @@ Route::middleware('admin.auth')->group(function () {
 
     // Content: Announcements (PART 29)
     Route::middleware('admin.permission:content.pages')->group(function () {
-        Route::get('content/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements.index');
-        Route::post('content/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
-        Route::post('content/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('admin.announcements.update');
-        Route::post('content/announcements/{announcement}/active', [AnnouncementController::class, 'toggleActive'])->name('admin.announcements.active');
-        Route::delete('content/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('admin.announcements.delete');
+        Route::get('marketing/announcements', [AnnouncementController::class, 'index'])->name('admin.announcements.index');
+        Route::post('marketing/announcements', [AnnouncementController::class, 'store'])->name('admin.announcements.store');
+        Route::post('marketing/announcements/{announcement}', [AnnouncementController::class, 'update'])->name('admin.announcements.update');
+        Route::post('marketing/announcements/{announcement}/active', [AnnouncementController::class, 'toggleActive'])->name('admin.announcements.active');
+        Route::delete('marketing/announcements/{announcement}', [AnnouncementController::class, 'destroy'])->name('admin.announcements.delete');
     });
 
     // Content: Blog (PART 16)
@@ -463,7 +473,7 @@ Route::middleware('admin.auth')->group(function () {
 
     // AI Tools Management
     Route::prefix('ai')->name('admin.ai.')->middleware('admin.permission:ai.tools')->group(function () {
-        Route::get('/', [AiManagementController::class, 'index'])->name('index');
+        Route::get('/providers', [AiManagementController::class, 'index'])->name('index');
         Route::get('/provider/{slug}', [AiManagementController::class, 'provider'])->name('provider');
         Route::get('/integrations', [AiManagementController::class, 'integrations'])->name('integrations.index');
         Route::post('/settings', [AiManagementController::class, 'updateSettings'])->name('settings.update');
@@ -479,6 +489,10 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('/access/bulk', [AiAccessController::class, 'bulkUpdate'])->name('access.bulk');
         Route::post('/access/category', [AiAccessController::class, 'categoryUpdate'])->name('access.category');
         Route::post('/access/preset', [AiAccessController::class, 'presetUpdate'])->name('access.preset');
+
+        // RAG Settings
+        Route::get('/rag', [AiManagementController::class, 'ragSettings'])->name('rag.index');
+        Route::post('/rag', [AiManagementController::class, 'updateRagSettings'])->name('rag.update');
 
         // Usage Logs
         Route::get('/logs', [AiUsageLogController::class, 'index'])->name('logs.index');

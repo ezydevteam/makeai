@@ -339,8 +339,8 @@ const addCategoryShortcut = (category: CategoryOption, source: 'blog' | 'ai') =>
     itemForm.label = category.name
     itemForm.type = 'url'
     itemForm.url = source === 'blog'
-        ? route('blog.category', category.slug)
-        : route('ai.tools.category', category.slug)
+        ? `/blog/category/${category.slug}`
+        : `/ai-tools/category/${category.slug}`
     itemForm.page_id = ''
     itemForm.route_name = ''
     itemForm.parent_id = ''
@@ -457,7 +457,7 @@ const importMenu = () => {
 </script>
 
 <template>
-    <Head :title="t('Menu Builder - Admin')" />
+    <Head :title="t('Menus - Admin')" />
 
     <div class="mx-auto max-w-7xl px-6 py-8">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -660,21 +660,22 @@ const importMenu = () => {
                         <AppSelect v-model="itemForm.type" :label="t('Link Type')" :options="linkTypeOptions" />
                         <label v-if="itemForm.type === 'url'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
                             {{ t('URL') }}
-                            <input v-model="itemForm.url" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="'https://example.com'">
+                            <input v-model="itemForm.url" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('https://example.com or /menu-name')">
+                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Use /menu-name for internal links and a full URL like https://example.com for external links.') }}</span>
                             <span v-if="itemForm.errors.url" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.url }}</span>
                         </label>
-                        <label v-if="itemForm.type === 'page'" class="block md:col-span-2">
+                        <div v-if="itemForm.type === 'page'" class="block md:col-span-2">
                             <AppSelect v-model="itemForm.page_id" :label="t('Select Page')" :options="pageOptions" :placeholder="t('Choose a page')" live-search />
                             <span v-if="itemForm.errors.page_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.page_id }}</span>
-                        </label>
-                        <label v-if="itemForm.type === 'route'" class="block md:col-span-2">
+                        </div>
+                        <div v-if="itemForm.type === 'route'" class="block md:col-span-2">
                             <AppSelect v-model="itemForm.route_name" :label="t('Named Route')" :options="routeSelectOptions" :placeholder="t('Choose a route')" live-search />
                             <span v-if="itemForm.errors.route_name" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.route_name }}</span>
-                        </label>
-                        <label class="block">
+                        </div>
+                        <div class="block">
                             <AppSelect v-model="itemForm.parent_id" :label="t('Parent Item')" :options="parentSelectOptions" :placeholder="t('Top level')" live-search />
                             <span v-if="itemForm.errors.parent_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.parent_id }}</span>
-                        </label>
+                        </div>
                         <AppSelect v-model="itemForm.target" :label="t('Target')" :options="targetOptions" />
                         <IconClassSelect
                             v-model="itemForm.icon"
@@ -687,10 +688,10 @@ const importMenu = () => {
                             <input v-model="itemForm.badge_text" type="text" maxlength="50" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('New')">
                             <span v-if="itemForm.errors.badge_text" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_text }}</span>
                         </label>
-                        <label class="block">
+                        <div class="block">
                             <AppSelect v-model="itemForm.badge_color" :label="t('Badge Color')" :options="badgeColorOptions" :placeholder="t('No badge color')" />
                             <span v-if="itemForm.errors.badge_color" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_color }}</span>
-                        </label>
+                        </div>
                         <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
                             <div class="flex items-center justify-between gap-4">
                                 <span>
@@ -703,10 +704,10 @@ const importMenu = () => {
                             </div>
                             <span v-if="itemForm.errors.is_active" class="mt-2 block text-xs text-danger-600">{{ itemForm.errors.is_active }}</span>
                         </div>
-                        <label class="block">
+                        <div class="block">
                             <AppSelect v-model="itemForm.requires_auth" :label="t('Visibility')" :options="visibilitySelectOptions" />
                             <span v-if="itemForm.errors.requires_auth" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.requires_auth }}</span>
-                        </label>
+                        </div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             {{ t('Sort Order') }}
                             <input v-model.number="itemForm.sort_order" type="number" min="0" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">

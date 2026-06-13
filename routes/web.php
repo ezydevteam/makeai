@@ -113,10 +113,67 @@ Route::get('/', function () {
 
     $resolvedTemplate = (new SiteTemplateResource($template))->resolve();
 
-    return Inertia::render("Templates/{$template->layout_component}", [
+    $props = [
         'template' => $resolvedTemplate,
         'tools' => $tools,
-    ]);
+    ];
+
+    if ($slug === 'social-media-manager') {
+        $props['platformSettings'] = settings('template_social_platforms', []);
+        $props['defaultPlatform'] = settings('template_social_default_platform', '');
+
+        if (auth()->check()) {
+            $today = now()->startOfDay();
+            $weekStart = now()->startOfWeek();
+
+            $props['userStats'] = [
+                'toolsUsedToday' => \App\Models\AiUsageLog::where('user_id', auth()->id())
+                    ->where('created_at', '>=', $today)
+                    ->distinct('tool_slug')
+                    ->count('tool_slug'),
+                'generationsThisWeek' => \App\Models\AiUsageLog::where('user_id', auth()->id())
+                    ->where('created_at', '>=', $weekStart)
+                    ->count(),
+            ];
+        }
+    }
+
+    if ($slug === 'marketing-suite') {
+        $props['stageSettings'] = settings('template_marketing_stages', []);
+        $props['defaultStage'] = settings('template_marketing_default_stage', 'awareness');
+    }
+
+    if ($slug === 'content-studio') {
+        $props['contentTypeSettings'] = settings('template_content_types', []);
+        $props['defaultType'] = settings('template_content_default_type', '');
+    }
+
+    if ($slug === 'ecommerce-toolkit') {
+        $props['ecomStageSettings'] = settings('template_ecom_stages', []);
+        $props['defaultStage'] = settings('template_ecom_default_stage', 'product-listing');
+        $props['showContextPanel'] = settings('template_ecom_show_context_panel', true);
+        $props['contextPanelLabel'] = settings('template_ecom_context_panel_label', '');
+    }
+
+    if ($slug === 'developer-assistant') {
+        $props['devCategorySettings'] = settings('template_dev_categories', []);
+        $props['defaultCategory'] = settings('template_dev_default_category', 'generate');
+        $props['devLanguageSettings'] = settings('template_dev_languages', []);
+    }
+
+    if ($slug === 'academic-writer') {
+        $props['academicStageSettings'] = settings('template_academic_stages', []);
+        $props['defaultStage'] = settings('template_academic_default_stage', 'research');
+        $props['showContextPanel'] = settings('template_academic_show_context_panel', true);
+        $props['contextPanelLabel'] = settings('template_academic_context_panel_label', '');
+        $props['contextSubjectPlaceholder'] = settings('template_academic_subject_placeholder', '');
+        $props['academicLevels'] = settings('template_academic_levels', []);
+        $props['defaultLevel'] = settings('template_academic_default_level', '');
+        $props['academicCitationStyles'] = settings('template_academic_citation_styles', []);
+        $props['defaultCitation'] = settings('template_academic_default_citation', '');
+    }
+
+    return Inertia::render("Templates/{$template->layout_component}", $props);
 })->name('home');
 Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
 Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->name('affiliate.capture');
@@ -311,6 +368,25 @@ Route::middleware('auth')->group(function () {
 Route::get('/ai-tools', [TemplateController::class, 'index'])->name('ai.tools.index');
 Route::get('/ai-tools/category/{slug}', [TemplateController::class, 'category'])->name('ai.tools.category');
 Route::get('/ai-tools/{slug}', [TemplateController::class, 'show'])->name('ai.tools.show');
+
+// ─── RAG Tools Suite ────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('tools/rag')->name('rag.')->group(function () {
+    Route::get('/{slug}', [App\Http\Controllers\RagToolController::class, 'show'])->name('show');
+    Route::post('/{slug}/sessions', [App\Http\Controllers\RagToolController::class, 'store'])->name('sessions.store');
+    Route::get('/sessions/{ulid}', [App\Http\Controllers\RagToolController::class, 'session'])->name('sessions.show');
+    Route::get('/sessions/{ulid}/status', [App\Http\Controllers\RagToolController::class, 'status'])->name('sessions.status');
+    Route::get('/sessions/{ulid}/file', [App\Http\Controllers\RagToolController::class, 'file'])->name('sessions.file');
+    Route::post('/sessions/{ulid}/chat', [App\Http\Controllers\RagToolController::class, 'chat'])->name('sessions.chat');
+    Route::post('/sessions/{ulid}/save-to-kb', [App\Http\Controllers\RagToolController::class, 'saveToKb'])->name('sessions.save');
+    Route::get('/sessions/{ulid}/share', [App\Http\Controllers\RagToolController::class, 'getShareStatus'])->name('sessions.share_status');
+    Route::post('/sessions/{ulid}/share', [App\Http\Controllers\RagToolController::class, 'share'])->name('sessions.share');
+    Route::delete('/sessions/{ulid}/share', [App\Http\Controllers\RagToolController::class, 'unshare'])->name('sessions.unshare');
+    Route::delete('/sessions/{ulid}', [App\Http\Controllers\RagToolController::class, 'destroy'])->name('sessions.destroy');
+    Route::put('/sessions/{ulid}', [App\Http\Controllers\RagToolController::class, 'update'])->name('sessions.update');
+    Route::get('/sessions/{ulid}/export', [App\Http\Controllers\RagToolController::class, 'exportChat'])->name('sessions.export');
+});
+
+Route::get('/shared/rag/{token}', [App\Http\Controllers\RagToolController::class, 'sharedView'])->name('rag.shared');
 
 // Public playground share
 Route::get('/playground/s/{uuid}', [PlaygroundController::class, 'showShare'])->name('playground.share.show');

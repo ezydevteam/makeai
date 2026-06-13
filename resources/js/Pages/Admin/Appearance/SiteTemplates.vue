@@ -2,16 +2,18 @@
   <AdminLayout>
     <Head :title="t('Templates')" />
 
-    <div class="p-6">
-      <div class="mx-auto flex max-w-7xl flex-col gap-6">
-        <section>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Templates') }}</h1>
-          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+    <div class="px-4 py-8 sm:px-6">
+      <div class="mx-auto flex w-full sm:max-w-7xl flex-col gap-6">
+        <section class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Templates') }}</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('Manage full-site AI template experiences, bundled tools, and landing content.') }}
-          </p>
+            </p>
+          </div>
         </section>
 
-        <section v-if="props.templates.length > 0" class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <section v-if="props.templates.length > 0" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2 2xl:grid-cols-3">
             <article
               v-for="template in props.templates"
@@ -73,30 +75,6 @@
               </div>
             </article>
           </div>
-
-          <aside class="h-fit rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
-            <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Notes') }}</h2>
-            <div class="mt-4 space-y-4">
-              <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
-                <div class="flex items-start gap-3">
-                  <span class="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">1</span>
-                  <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Review branding') }}</h3>
-                    <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('Check colors, typography, and CTA messaging before enabling a template.') }}</p>
-                  </div>
-                </div>
-              </div>
-              <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
-                <div class="flex items-start gap-3">
-                  <span class="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-300">2</span>
-                  <div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Check bundled tools') }}</h3>
-                    <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('Make sure assigned AI tools are enabled and aligned with the template purpose.') }}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </aside>
         </section>
 
         <section v-else class="rounded-2xl border border-dashed border-gray-300 bg-white px-6 py-16 text-center shadow-card dark:border-surface-700 dark:bg-surface-900">

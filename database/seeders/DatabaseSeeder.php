@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             AiToolCategorySeeder::class,
             AiTemplateSeeder::class,
             ChatbotProductSeeder::class,
+            RagToolSeeder::class,
             SiteTemplateSeeder::class,
             PlanSeeder::class,
             PaymentGatewaySeeder::class,

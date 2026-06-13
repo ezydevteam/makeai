@@ -30,6 +30,12 @@
   `P14` AI TOOLS & TEMPLATES (255 Templates)
   `P14B` SITE TEMPLATES (Full-Page Experiences)
   `P14B.10` CHATBOT SITE TEMPLATE (claude.ai / ChatGPT-style)
+  `P14B.11` SOCIAL MEDIA MANAGER SITE TEMPLATE
+  `P14B.12` MARKETING SUITE SITE TEMPLATE
+  `P14B.13` CONTENT STUDIO SITE TEMPLATE
+  `P14B.14` ECOMMERCE TOOLKIT SITE TEMPLATE
+  `P14B.15` DEVELOPER ASSISTANT SITE TEMPLATE
+  `P14B.16` ACADEMIC WRITER SITE TEMPLATE
   `P15` AI TOOLS DEVELOPMENT GUIDELINES
 
 **🔷 LAYER 4 — CONTENT & CMS**
@@ -69,7 +75,6 @@
 **🔷 LAYER 10 — API & INFRASTRUCTURE**
   `P38` MOBILE APP API ROUTES
   `P39` QUEUE & JOB ARCHITECTURE
-  `P66` BROADCASTING & INFRASTRUCTURE FALLBACKS (Redis-Optional)
 
 **🔷 LAYER 11 — DEPLOYMENT**
   `P40` SEEDER DATA (Complete)
@@ -3579,6 +3584,768 @@ resources/js/Components/Chat/
 
 ---
 
+## PART 14B.11 — SOCIAL MEDIA MANAGER SITE TEMPLATE ✅
+
+> Slug: `social-media-manager` | Vue Component: `SocialMediaManagerTemplate.vue`
+> Layout: Dashboard with left platform filter sidebar + main tool grid area.
+> Header: site default. Footer: visible.
+
+---
+
+### 14B.11.1 Layout Structure
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Site Default Header                                             │
+├──────────────────┬───────────────────────────────────────────────┤
+│  Platform Filter │  Tool Grid Area                               │
+│  200px · sticky  │  flex-1 · scrollable                          │
+│                  │                                               │
+│  [All Platforms] │  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
+│  [🟣 Instagram ] │  │  Tool   │ │  Tool   │ │  Tool   │        │
+│  [🐦 Twitter/X ] │  │  Card   │ │  Card   │ │  Card   │        │
+│  [🔵 LinkedIn  ] │  └─────────┘ └─────────┘ └─────────┘        │
+│  [🎵 TikTok    ] │  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
+│  [🔴 YouTube   ] │  │  Tool   │ │  Tool   │ │  Tool   │        │
+│  [📘 Facebook  ] │  │  Card   │ │  Card   │ │  Card   │        │
+│                  │  └─────────┘ └─────────┘ └─────────┘        │
+│  ─────────────── │                                               │
+│  Quick Stats     │  Hero banner (admin-editable headline)        │
+│  Tools used: 12  │                                               │
+└──────────────────┴───────────────────────────────────────────────┘
+```
+
+---
+
+### 14B.11.2 Unique Features
+
+**Platform Filter:**
+- Left sidebar lists platforms as clickable filter items
+- "All Platforms" selected by default (shows all bundled tools)
+- Clicking a platform filters tool grid to only that platform's tools
+- Active filter stored in URL query param: `?platform=instagram` (shareable, bookmarkable)
+- Each platform item shows: colored icon + name + tool count badge
+- Filter transition: smooth fade/slide of tool grid, no page reload (Vue reactive)
+
+**Tool Cards:**
+- Each card shows: platform icon badge (top-right corner), tool name, short description, "Generate →" CTA
+- Cards grouped visually by platform when "All Platforms" is selected (platform name as group header)
+- When filtered: group headers hidden, flat grid layout
+
+**Quick Stats (sidebar bottom):**
+- "Tools used today: X" — pulled from user's usage log
+- "Generations this week: X"
+- Shown only to logged-in users; hidden for guests
+
+---
+
+### 14B.11.3 Bundled Tools
+
+| Platform | Slug | Tool Name |
+|----------|------|-----------|
+| Instagram | `instagram-caption` | Instagram Caption Generator |
+| Instagram | `instagram-bio` | Instagram Bio Writer |
+| Twitter/X | `twitter-thread` | Twitter Thread Generator |
+| Twitter/X | `twitter-bio` | Twitter Bio Writer |
+| LinkedIn | `linkedin-post` | LinkedIn Post Generator |
+| LinkedIn | `linkedin-headline` | LinkedIn Headline Writer |
+| TikTok | `tiktok-script` | TikTok Script Generator |
+| TikTok | `tiktok-hook` | TikTok Hook Writer |
+| All | `hashtag-strategy` | Hashtag Strategy Generator |
+| All | `content-calendar` | Social Media Content Calendar |
+| Facebook | `facebook-ad` | Facebook Ad Copy |
+| YouTube | `youtube-description` | YouTube Description Generator |
+
+Each tool's `fields` JSON includes a platform pre-selector where applicable, so the tool form auto-knows the target platform.
+
+---
+
+### 14B.11.4 Admin Settings (Extra Tab: Platforms)
+
+**Admin → AI Management → Templates → Social Media Manager → Tab: Platforms**
+
+```
+Platform Visibility
+─────────────────────────────────────────────
+[✓] Instagram    Icon: [🟣]  Label: [Instagram __]
+[✓] Twitter/X   Icon: [🐦]  Label: [Twitter/X  __]
+[✓] LinkedIn    Icon: [🔵]  Label: [LinkedIn   __]
+[✓] TikTok      Icon: [🎵]  Label: [TikTok     __]
+[✓] Facebook    Icon: [📘]  Label: [Facebook   __]
+[✓] YouTube     Icon: [🔴]  Label: [YouTube    __]
+
+Admin can hide any platform — its tools are still accessible directly
+but won't appear in the filter sidebar.
+
+Default platform (pre-selected on load):
+  ( ) All Platforms   (●) Instagram   ( ) Twitter/X   ...
+```
+
+Platform config stored in `settings` table, group: `template_social`.
+
+---
+
+### 14B.11.5 Welcome State
+
+First load (no filter active, "All Platforms" selected):
+1. Hero banner: editable headline ("Create content for every platform") + subheadline + optional CTA
+2. Platform chips row (horizontal scroll on mobile): quick-tap filter shortcuts
+3. Tool grid below — all tools, grouped by platform with colored section headers
+
+---
+
+### 14B.11.6 Checklist
+
+- [ ] Platform filter updates URL query param (`?platform=slug`) on change
+- [ ] On page load, URL query param auto-applies the filter (deep link works)
+- [ ] "All Platforms" selected when no query param present
+- [ ] Tool count badge per platform reflects only `is_active = true` tools
+- [ ] Platform icons use Tabler Icons — no external image assets
+- [ ] Hidden platforms (admin toggle) removed from filter sidebar and tool grid
+- [ ] Quick stats panel hidden for guests — no API call made for guests
+- [ ] Tool cards show platform badge using the platform's `color_hex`
+- [ ] Mobile: platform filter sidebar becomes horizontal scrollable chip row at top
+
+---
+
+## PART 14B.12 — MARKETING SUITE SITE TEMPLATE ✅
+
+> Slug: `marketing-suite` | Vue Component: `MarketingSuiteTemplate.vue`
+> Layout: Funnel-stage navigation at top + tool grid below.
+> Header: site default. Footer: visible.
+
+---
+
+### 14B.12.1 Layout Structure
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Site Default Header                                             │
+├──────────────────────────────────────────────────────────────────┤
+│  Hero: editable headline + subheadline                           │
+├──────────────────────────────────────────────────────────────────┤
+│  Stage Nav (horizontal tabs):                                    │
+│  [Awareness]  [Consideration]  [Conversion]  [Retention]        │
+├──────────────────────────────────────────────────────────────────┤
+│  Tool Grid — filtered by active stage                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │  Tool    │  │  Tool    │  │  Tool    │  │  Tool    │        │
+│  │  Card    │  │  Card    │  │  Card    │  │  Card    │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+│  ┌──────────┐  ┌──────────┐                                     │
+│  │  Tool    │  │  Tool    │                                     │
+│  │  Card    │  │  Card    │                                     │
+│  └──────────┘  └──────────┘                                     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 14B.12.2 Unique Features
+
+**Stage Navigation:**
+- 4 horizontal tabs representing the marketing funnel stages
+- Each stage tab: label + tool count badge + optional emoji/icon
+- Active stage highlighted with primary color underline
+- Stage filter stored in URL query param: `?stage=awareness`
+- "All" is NOT an option — a stage is always selected (default: Awareness)
+
+**Tool Cards — Campaign Hint:**
+- Each tool card shows a small "→ pairs well with [Tool Name]" hint at the bottom
+- This hints at chaining (e.g. Value Proposition → Landing Page Copy → Facebook Ad)
+- Hint is static metadata stored in the tool's seeder data
+- Clicking the hint chip navigates to that paired tool
+
+**Stage Labels (admin-editable):**
+- Admin can rename "Awareness" → "Top of Funnel", "Conversion" → "Close", etc.
+- Labels stored in `settings` table, group: `template_marketing`
+
+---
+
+### 14B.12.3 Bundled Tools by Stage
+
+| Stage | Slug | Tool Name |
+|-------|------|-----------|
+| Awareness | `value-proposition` | Value Proposition Generator |
+| Awareness | `brand-story` | Brand Story Writer |
+| Awareness | `press-release` | Press Release Generator |
+| Consideration | `competitor-analysis` | Competitor Analysis |
+| Consideration | `landing-page-copy` | Landing Page Copy |
+| Consideration | `case-study` | Case Study Generator |
+| Conversion | `facebook-ad` | Facebook Ad Copy |
+| Conversion | `google-ads-headline` | Google Ads Headline |
+| Conversion | `cta-generator` | CTA Button Text Generator |
+| Retention | `email-generator` | Email Campaign Generator |
+| Retention | `abandoned-cart-email` | Abandoned Cart Email |
+| Retention | `winback-email` | Win-Back Email |
+
+Stage assignment stored in each tool's `tags` JSON field as `{"stage": "awareness"}` — used by template component to filter.
+
+---
+
+### 14B.12.4 Admin Settings (Extra Tab: Stages)
+
+**Admin → Appearance → Site Templates → Marketing Suite → Tab: Stages**
+
+```
+Stage Labels
+─────────────────────────────────────────────
+Stage 1 label:  [Awareness      __]  Icon: [ti-eye __]
+Stage 2 label:  [Consideration  __]  Icon: [ti-bulb __]
+Stage 3 label:  [Conversion     __]  Icon: [ti-currency-dollar __]
+Stage 4 label:  [Retention      __]  Icon: [ti-repeat __]
+
+Default stage on load:  (●) Stage 1  ( ) Stage 2  ( ) Stage 3  ( ) Stage 4
+```
+
+---
+
+### 14B.12.5 Checklist
+
+- [ ] Stage filter stored in URL query param — deep links work
+- [ ] Stage labels pulled from `settings` — never hardcoded "Awareness" in Vue
+- [ ] Tool `tags` JSON `stage` key used for filtering — not a separate DB column
+- [ ] Campaign pairing hints shown on tool cards — null-safe (no hint = no chip shown)
+- [ ] Active stage tab visually indicated with primary underline + bold label
+- [ ] Mobile: stage tabs become horizontal scrollable row, no wrapping
+
+---
+
+## PART 14B.13 — CONTENT STUDIO SITE TEMPLATE ✅
+
+> Slug: `content-studio` | Vue Component: `ContentStudioTemplate.vue`
+> Layout: Left content-type nav + main tool area + right recent-documents panel.
+> Header: site default. Footer: visible.
+
+---
+
+### 14B.13.1 Layout Structure
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│  Site Default Header                                                 │
+├─────────────────┬──────────────────────────────┬─────────────────────┤
+│  Content Types  │  Tool Area                   │  Recent Documents   │
+│  180px · sticky │  flex-1                      │  240px · sticky     │
+│                 │                              │                     │
+│  ✍️  Articles    │  Hero: headline + subhead    │  Recent             │
+│  🔍 SEO         │                              │  ──────────────     │
+│  ♻️  Rewriting   │  Tool cards for active type  │  📄 Blog post...    │
+│  📱 Social      │  (2-column grid)             │  📄 SEO article...  │
+│                 │                              │  📄 Rewritten...    │
+│  ─────────────  │                              │  📄 Meta tags...    │
+│  [Browse All]   │                              │  📄 Blog outline... │
+│                 │                              │                     │
+│                 │                              │  [View All Docs →]  │
+└─────────────────┴──────────────────────────────┴─────────────────────┘
+```
+
+---
+
+### 14B.13.2 Unique Features
+
+**Content Type Navigation (left sidebar):**
+- 4 content type sections: Articles, SEO, Rewriting, Social
+- Each type: emoji + label + tool count
+- Clicking a type filters tool cards in the center area
+- "Browse All" link at bottom shows all bundled tools
+- Active type stored in URL query param: `?type=articles`
+
+**Recent Documents Panel (right sidebar):**
+- Shows the last 5 documents the user generated using any tool in this template
+- Each item: document icon + truncated title (first 40 chars of content) + tool name badge + relative timestamp
+- Clicking an item: navigates to `/documents/{ulid}` (the document detail page)
+- "View All Docs →" link: navigates to `/documents?tool_slugs=blog-article,blog-outline,...` (pre-filtered)
+- Only shown to logged-in users; for guests shows an upsell: "Sign up to save your generations"
+- Panel pulled via API: `GET /api/v1/documents?tool_slugs=...&per_page=5` (uses existing documents endpoint)
+
+---
+
+### 14B.13.3 Bundled Tools by Content Type
+
+| Type | Slug | Tool Name |
+|------|------|-----------|
+| Articles | `blog-article` | Blog Article Generator |
+| Articles | `blog-outline` | Blog Post Outline |
+| Articles | `listicle-generator` | Listicle Generator |
+| SEO | `seo-blog` | SEO-Optimized Blog Post |
+| SEO | `meta-seo` | Meta Title & Description |
+| SEO | `faq-generator` | FAQ Generator |
+| Rewriting | `article-rewriter` | Article Rewriter |
+| Rewriting | `content-improver` | Content Improver |
+| Rewriting | `paraphrasing-tool` | Paraphrasing Tool |
+| Social | `linkedin-post` | LinkedIn Post |
+| Social | `twitter-thread` | Twitter Thread |
+| Social | `newsletter-intro` | Newsletter Intro |
+
+Content type assignment stored in each tool's `tags` JSON as `{"content_type": "articles"}`.
+
+---
+
+### 14B.13.4 Admin Settings (Extra Tab: Content Types)
+
+**Admin → Appearance → Site Templates → Content Studio → Tab: Content Types**
+
+```
+Content Type Visibility
+─────────────────────────────────────────────
+[✓] Articles    Icon: [✍️ ]  Label: [Articles  __]
+[✓] SEO         Icon: [🔍]  Label: [SEO        __]
+[✓] Rewriting   Icon: [♻️ ]  Label: [Rewriting  __]
+[✓] Social      Icon: [📱]  Label: [Social     __]
+
+Default content type on load:  (●) Articles  ( ) SEO  ( ) Rewriting  ( ) Social
+
+Recent Documents Panel
+  [✓] Show recent documents panel (right sidebar)
+  [✓] Show for guests (upsell CTA)  [ ] Hide for guests
+```
+
+---
+
+### 14B.13.5 Checklist
+
+- [ ] Content type filter in URL query param — deep links work
+- [ ] Tool `tags` JSON `content_type` key used for filtering
+- [ ] Recent documents panel calls `GET /api/v1/documents` filtered by template's tool slugs
+- [ ] Recent documents panel: null state "No documents yet — generate your first piece!"
+- [ ] Guest state: upsell panel replaces recent docs panel (no API call for guests)
+- [ ] "View All Docs" link passes tool slugs as query param to `/documents` page filter
+- [ ] Mobile: right panel hidden; recent docs accessible via floating "Recent" button
+- [ ] Left sidebar collapses to icon-only at tablet breakpoint (768px)
+
+---
+
+## PART 14B.14 — ECOMMERCE TOOLKIT SITE TEMPLATE ✅
+
+> Slug: `ecommerce-toolkit` | Vue Component: `EcommerceToolkitTemplate.vue`
+> Layout: Top funnel-stage tabs + Store Context panel (collapsible) + tool grid.
+> Header: site default. Footer: visible.
+
+---
+
+### 14B.14.1 Layout Structure
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Site Default Header                                             │
+├──────────────────────────────────────────────────────────────────┤
+│  Hero: headline ("Tools built for online stores") + subheadline  │
+├──────────────────────────────────────────────────────────────────┤
+│  Stage Tabs: [Product Listing]  [Email & Retention]  [Promotions]│
+├──────────────────────────────────────────────────────────────────┤
+│  ┌── Store Context (collapsible panel) ───────────────────────┐  │
+│  │  Store Name: [____________]  Product Category: [_________] │  │
+│  │  Brand Tone: [Professional ▾]   [Save Context]             │  │
+│  └──────────────────────────────────────────── [▲ Collapse] ──┘  │
+├──────────────────────────────────────────────────────────────────┤
+│  Tool Grid (filtered by active stage)                            │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │  Tool    │  │  Tool    │  │  Tool    │  │  Tool    │        │
+│  │  Card    │  │  Card    │  │  Card    │  │  Card    │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 14B.14.2 Unique Features
+
+**Store Context Panel:**
+- A collapsible panel above the tool grid (expanded by default on first visit)
+- Fields: Store Name, Product Category (text input), Brand Tone (select: Professional / Friendly / Playful / Luxury)
+- "Save Context" button: saves values to `localStorage` (persisted across sessions on same device)
+- When context is saved, all tool forms pre-fill `{store_name}`, `{product_category}`, `{brand_tone}` variables automatically
+- Pre-fill mechanism: template component injects context values into Inertia page props before navigating to the tool page, so `ToolPage.vue` receives pre-filled default values
+- Panel collapsed state persisted in `localStorage` key: `makeai_ecom_context_collapsed`
+
+**Stage Tabs:**
+- 3 stages: Product Listing | Email & Retention | Promotions
+- Active stage in URL query param: `?stage=product-listing`
+- Stage labels admin-editable via settings
+
+---
+
+### 14B.14.3 Bundled Tools by Stage
+
+| Stage | Slug | Tool Name |
+|-------|------|-----------|
+| Product Listing | `product-description` | Product Description Generator |
+| Product Listing | `amazon-listing` | Amazon Product Listing |
+| Product Listing | `product-title` | Product Title Optimizer |
+| Product Listing | `review-responder` | Review Response Generator |
+| Email & Retention | `abandoned-cart-email` | Abandoned Cart Email |
+| Email & Retention | `winback-email` | Win-Back Email |
+| Email & Retention | `order-confirmation-email` | Order Confirmation Email |
+| Email & Retention | `upsell-message` | Upsell Message Generator |
+| Promotions | `flash-sale-copy` | Flash Sale Copy |
+| Promotions | `promo-sms` | Promotional SMS |
+| Promotions | `discount-announcement` | Discount Announcement |
+| Promotions | `holiday-sale-copy` | Holiday Sale Copy |
+
+---
+
+### 14B.14.4 Store Context — Pre-fill Implementation
+
+```typescript
+// EcommerceToolkitTemplate.vue
+// When user clicks a tool card:
+
+const storeContext = reactive({
+  store_name: localStorage.getItem('makeai_ecom_store_name') ?? '',
+  product_category: localStorage.getItem('makeai_ecom_product_category') ?? '',
+  brand_tone: localStorage.getItem('makeai_ecom_brand_tone') ?? 'Professional',
+})
+
+function navigateToTool(toolSlug: string) {
+  // Pass context as query params → ToolPage.vue reads them as default field values
+  router.visit(route('tools.show', toolSlug), {
+    data: {
+      prefill_store_name: storeContext.store_name,
+      prefill_product_category: storeContext.product_category,
+      prefill_brand_tone: storeContext.brand_tone,
+    }
+  })
+}
+```
+
+```typescript
+// ToolPage.vue — reads prefill params
+const route = usePage()
+const prefills = {
+  store_name: route.props.ziggy?.query?.prefill_store_name ?? '',
+  // etc.
+}
+// DynamicForm.vue uses prefills as initial field values
+```
+
+---
+
+### 14B.14.5 Admin Settings (Extra Tab: Store Context)
+
+**Admin → Appearance → Site Templates → eCommerce Toolkit → Tab: Store Context**
+
+```
+Store Context Panel
+─────────────────────────────────────────────
+[✓] Enable Store Context panel
+Panel label: [Your Store Context  __________]
+Store name placeholder: [e.g. "My Shopify Store" __]
+Category placeholder:   [e.g. "Women's Clothing"  __]
+
+Stage Labels
+Stage 1: [Product Listing    __]
+Stage 2: [Email & Retention  __]
+Stage 3: [Promotions         __]
+```
+
+---
+
+### 14B.14.6 Checklist
+
+- [ ] Store context values saved to `localStorage` — persist across page reloads
+- [ ] Context pre-fill passed as query params to `ToolPage.vue` — not via Pinia (avoids SSR issues)
+- [ ] `ToolPage.vue` reads prefill params only on initial mount — never overwrites user edits
+- [ ] Store Context panel label pulled from admin settings — never hardcoded
+- [ ] Stage labels pulled from `settings` table — never hardcoded
+- [ ] Stage filter in URL query param — deep links work
+- [ ] Mobile: Store Context panel collapsed by default on mobile (saves vertical space)
+- [ ] "Save Context" shows a brief success toast: "Store context saved"
+
+---
+
+## PART 14B.15 — DEVELOPER ASSISTANT SITE TEMPLATE ✅
+
+> Slug: `developer-assistant` | Vue Component: `DeveloperAssistantTemplate.vue`
+> Layout: Dark-theme IDE style — top language selector + tool grid with code-focused cards.
+> Header: site default (dark variant). Footer: visible (dark).
+
+---
+
+### 14B.15.1 Layout Structure
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Site Default Header (forced dark variant)                       │
+├──────────────────────────────────────────────────────────────────┤
+│  Hero: monospace heading + subheadline (dark bg)                 │
+├──────────────────────────────────────────────────────────────────┤
+│  Language Selector (horizontal chips):                           │
+│  [All]  [Python]  [JavaScript]  [TypeScript]  [PHP]  [Go]  [+5] │
+├──────────────────────────────────────────────────────────────────┤
+│  Category Tabs: [Generate]  [Debug]  [Optimize]  [Document]      │
+├──────────────────────────────────────────────────────────────────┤
+│  Tool Grid (dark cards, monospace labels, syntax-highlight icon) │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │  Tool    │  │  Tool    │  │  Tool    │  │  Tool    │        │
+│  │  Card    │  │  Card    │  │  Card    │  │  Card    │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 14B.15.2 Unique Features
+
+**Forced Dark Mode (Scoped):**
+- This template ALWAYS renders in dark theme regardless of the user's global light/dark preference or global design system setting
+- Achieved via scoped CSS custom properties on the template wrapper:
+  ```vue
+  <div class="dev-template-wrapper" :style="devCssVars">
+  ```
+  ```typescript
+  const devCssVars = computed(() => ({
+    '--t-bg':      props.template.color_bg      ?? '#0d1117',  // GitHub dark
+    '--t-surface': props.template.color_surface ?? '#161b22',
+    '--t-text':    props.template.color_text    ?? '#e6edf3',
+    '--t-primary': props.template.color_primary ?? '#58a6ff',  // GitHub blue
+    '--t-border':  '#30363d',
+  }))
+  ```
+- Admin CAN override colors via Tab 1 → Appearance, but defaults are always dark
+- "Reset to defaults" resets to dark defaults — NOT global design system colors
+- Global light mode does NOT bleed into this template
+
+**Language Selector:**
+- Horizontal chip row above the category tabs
+- Default languages: All, Python, JavaScript, TypeScript, PHP, Go, Rust, SQL, Bash, C#
+- Admin can configure which languages appear (Tab: Languages in admin settings)
+- "All" chip = no language pre-fill
+- Selecting a language: stores in `localStorage` key `makeai_dev_language` AND passes as `prefill_language` query param when navigating to a tool (same mechanism as eCommerce Store Context)
+- `[+5]` overflow chip: click → expands full language list in a popover
+- Language chip selection stored in URL query param: `?lang=python`
+
+**Category Tabs:**
+- 4 tabs: Generate | Debug | Optimize | Document
+- Filter tools by their `tags.dev_category` JSON value
+- Active tab in URL query param: `?category=debug`
+
+**Code Output Enforcement:**
+- All tool cards in this template show a `</>` code badge
+- When navigating from this template to a tool, `prefill_output_format=code` is passed — `ToolPage.vue` renders output in a syntax-highlighted code block with copy button by default
+- This is a display preference only — the AI still generates based on the tool's `prompt_system`
+
+**Monospace UI:**
+- Template uses `font-family: 'JetBrains Mono', 'Fira Code', monospace` for all UI text
+- Tool card titles rendered in monospace
+- Hero heading in monospace with a blinking cursor animation
+
+---
+
+### 14B.15.3 Bundled Tools by Category
+
+| Category | Slug | Tool Name |
+|----------|------|-----------|
+| Generate | `code-generator` | Code Generator |
+| Generate | `api-endpoint-generator` | API Endpoint Generator |
+| Generate | `regex-generator` | Regex Generator |
+| Generate | `sql-query-generator` | SQL Query Generator |
+| Debug | `bug-fixer` | Bug Fixer |
+| Debug | `code-explainer` | Code Explainer |
+| Debug | `error-message-explainer` | Error Message Explainer |
+| Optimize | `code-optimizer` | Code Optimizer |
+| Optimize | `code-reviewer` | Code Reviewer |
+| Optimize | `complexity-analyzer` | Complexity Analyzer |
+| Document | `api-docs` | API Documentation Generator |
+| Document | `unit-test` | Unit Test Generator |
+| Document | `git-commit` | Git Commit Message Generator |
+| Document | `readme-generator` | README Generator |
+
+---
+
+### 14B.15.4 Admin Settings (Extra Tab: Languages)
+
+**Admin → Appearance → Site Templates → Developer Assistant → Tab: Languages**
+
+```
+Language Chips (shown in selector row)
+─────────────────────────────────────────────
+Drag to reorder. First 8 shown inline, rest behind [+N] chip.
+
+[≡] Python        [✓ visible]
+[≡] JavaScript    [✓ visible]
+[≡] TypeScript    [✓ visible]
+[≡] PHP           [✓ visible]
+[≡] Go            [✓ visible]
+[≡] Rust          [✓ visible]
+[≡] SQL           [✓ visible]
+[≡] Bash          [✓ visible]
+[≡] C#            [ visible]
+[≡] Swift         [ visible]
+[+ Add language]
+
+Dark Theme Defaults
+  Background:  [#0d1117 ██]  (admin can change, but default is always dark)
+  Surface:     [#161b22 ██]
+  Primary:     [#58a6ff ██]
+  Text:        [#e6edf3 ██]
+
+Category Tab Labels
+  Tab 1: [Generate  __]
+  Tab 2: [Debug     __]
+  Tab 3: [Optimize  __]
+  Tab 4: [Document  __]
+```
+
+Config stored in `settings` table, group: `template_developer`.
+
+---
+
+### 14B.15.5 Checklist
+
+- [ ] Template wrapper always forces dark CSS vars — global light mode cannot override
+- [ ] "Reset to defaults" in Tab 1 → Appearance resets to dark defaults (`#0d1117`), NOT global vars
+- [ ] Language selector stores selection in `localStorage` AND URL query param
+- [ ] Language pre-fill passed as query param to `ToolPage.vue` on tool card click
+- [ ] `prefill_output_format=code` passed on navigation → `ToolPage.vue` defaults output to code block
+- [ ] Language chips: max 8 visible inline, overflow behind `[+N]` popover
+- [ ] Category tab filter in URL query param — deep links work
+- [ ] Monospace font loaded (JetBrains Mono via Google Fonts) scoped to template wrapper
+- [ ] Hero cursor blink animation: pure CSS `@keyframes blink` — no JS
+- [ ] Mobile: language chips become 2-row horizontal scroll, category tabs remain full-width
+- [ ] Admin language list uses `vue-draggable-plus` for reorder
+- [ ] Tools with `is_active = false` hidden from grid — no dead card links
+
+---
+
+## PART 14B.16 — ACADEMIC WRITER SITE TEMPLATE ✅
+
+> Slug: `academic-writer` | Vue Component: `AcademicWriterTemplate.vue`
+> Layout: Clean editorial — top writing-stage flow + Academic Context panel + tool grid.
+> Header: site default. Footer: visible.
+
+---
+
+### 14B.16.1 Layout Structure
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Site Default Header                                             │
+├──────────────────────────────────────────────────────────────────┤
+│  Hero: clean headline ("Write smarter, not harder") + subhead   │
+├──────────────────────────────────────────────────────────────────┤
+│  Writing Stage Flow (horizontal steps — always visible):         │
+│  ① Research  ──→  ② Outline  ──→  ③ Write  ──→  ④ Polish        │
+│  (active stage highlighted; clicking a step filters tool grid)   │
+├──────────────────────────────────────────────────────────────────┤
+│  ┌── Academic Context (collapsible) ────────────────────────┐   │
+│  │  Subject: [__________]  Level: [Undergraduate ▾]         │   │
+│  │  Citation Style: [APA ▾]          [Save Context]         │   │
+│  └───────────────────────────────────── [▲ Collapse] ───────┘   │
+├──────────────────────────────────────────────────────────────────┤
+│  Tool Grid (filtered by active writing stage)                    │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐                       │
+│  │  Tool    │  │  Tool    │  │  Tool    │                       │
+│  │  Card    │  │  Card    │  │  Card    │                       │
+│  └──────────┘  └──────────┘  └──────────┘                       │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 14B.16.2 Unique Features
+
+**Writing Stage Flow:**
+- 4 stages shown as a horizontal step indicator with connecting arrows: Research → Outline → Write → Polish
+- Always visible (not in a tab bar) — the visual flow communicates the academic writing process
+- Clicking a step filters the tool grid to that stage's tools
+- Active step has a filled circle + bold label; completed previous steps shown with check or muted style
+- Active stage in URL query param: `?stage=research`
+
+**Academic Context Panel:**
+- Fields: Subject (text input), Academic Level (select), Citation Style (select)
+- Academic Level options (admin-configurable): High School | Undergraduate | Graduate | PhD | Professional
+- Citation Style options (admin-configurable): APA | MLA | Chicago | Harvard | IEEE | Vancouver
+- "Save Context" saves to `localStorage` keys: `makeai_academic_subject`, `makeai_academic_level`, `makeai_academic_citation`
+- Context pre-filled into tool forms via same query param mechanism as eCommerce template
+- Panel collapsed state persisted in `localStorage`
+
+**Clean/Editorial Aesthetic:**
+- Template `color_bg` defaults to `#fafafa` (off-white) — a library/word-processor feel
+- `color_surface` defaults to `#ffffff`
+- `font_heading` defaults to `Georgia, serif` — editorial feel
+- `font_body` defaults to system-ui (readable, clean)
+- Admin CAN override all via Tab 1 → Appearance
+- Tool cards: minimal style, white cards, subtle shadow, generous whitespace
+
+---
+
+### 14B.16.3 Bundled Tools by Writing Stage
+
+| Stage | Slug | Tool Name |
+|-------|------|-----------|
+| Research | `research-outline` | Research Outline Generator |
+| Research | `literature-review` | Literature Review Helper |
+| Research | `research-question` | Research Question Generator |
+| Outline | `essay-outline` | Essay Outline Generator |
+| Outline | `thesis-statement` | Thesis Statement Generator |
+| Outline | `argument-builder` | Argument Builder |
+| Write | `essay-writer` | Essay Writer |
+| Write | `paragraph-generator` | Paragraph Generator |
+| Write | `abstract-writer` | Abstract Writer |
+| Polish | `content-improver` | Content Improver |
+| Polish | `grammar-checker` | Grammar Checker |
+| Polish | `citation-generator` | Citation Generator |
+| Polish | `study-guide` | Study Guide Generator |
+
+Stage assignment stored in tool `tags` JSON as `{"writing_stage": "research"}`.
+
+---
+
+### 14B.16.4 Admin Settings (Extra Tab: Academic Context)
+
+**Admin → Appearance → Site Templates → Academic Writer → Tab: Academic Context**
+
+```
+Academic Context Panel
+─────────────────────────────────────────────
+[✓] Enable Academic Context panel
+Panel label: [Academic Context  _______________]
+Subject placeholder: [e.g. "Environmental Science" __]
+
+Academic Levels (shown in dropdown — drag to reorder, toggle to hide)
+[≡] High School      [✓]
+[≡] Undergraduate    [✓]
+[≡] Graduate         [✓]
+[≡] PhD              [✓]
+[≡] Professional     [✓]
+Default level: [Undergraduate ▾]
+
+Citation Styles (shown in dropdown — drag to reorder, toggle to hide)
+[≡] APA        [✓]
+[≡] MLA        [✓]
+[≡] Chicago    [✓]
+[≡] Harvard    [✓]
+[≡] IEEE       [✓]
+[≡] Vancouver  [ ]
+Default style: [APA ▾]
+
+Writing Stage Labels
+Stage 1: [Research  __]   Stage 2: [Outline  __]
+Stage 3: [Write     __]   Stage 4: [Polish   __]
+```
+
+Config stored in `settings` table, group: `template_academic`.
+
+---
+
+### 14B.16.5 Checklist
+
+- [ ] Writing stage flow shows as step indicator (not tabs) — arrows between steps always visible
+- [ ] Active stage stored in URL query param — deep links work
+- [ ] Academic context values saved to `localStorage` — persist across reloads
+- [ ] Context pre-fill passed as query params to `ToolPage.vue` on tool card click
+- [ ] Academic Level and Citation Style options loaded from settings — never hardcoded in Vue
+- [ ] Default color scheme is light/editorial (`#fafafa` bg, serif heading font) — overridable by admin
+- [ ] "Reset to defaults" in Appearance tab resets to editorial light defaults
+- [ ] Tool `tags` JSON `writing_stage` key used for stage filtering
+- [ ] Mobile: step indicator compresses to `①②③④` with labels on tap/hover
+- [ ] Academic Context panel label and all dropdown options pulled from admin settings
+- [ ] Admin level/style lists use `vue-draggable-plus` for reorder
+- [ ] Disabled levels/styles hidden from user dropdown — at least 1 must remain enabled (validated on save)
+
+---
+
 ## PART 15 — AI TOOLS DEVELOPMENT GUIDELINES
 
 > This part covers how every AI tool is architected, rendered, and connected — from DB template to streaming output. Follow this pattern for all 255 tools consistently.
@@ -5588,7 +6355,7 @@ Admin → Content → Announcements → "Broadcast Notification":
 
 ---
 
-## PART 24 — SUPPORT TICKET SYSTEM ✅
+## PART 24 — SUPPORT TICKET SYSTEM
 
 ### 42.1 Tables
 
@@ -5725,7 +6492,7 @@ ai_reply_suggestion          boolean  true
 
 ---
 
-## PART 25 — ANNOUNCEMENT SYSTEM ✅
+## PART 25 — ANNOUNCEMENT SYSTEM
 
 ### 29.1 Announcement Types
 
@@ -5808,11 +6575,11 @@ sort_order int, created_at, updated_at
 
 ### Payment Gateways
 Each gateway has its own Service class in `app/Services/Payment/`:
-- **Stripe** — subscriptions + one-time, webhooks for status sync (using laravel cashier)
+- **Stripe** — subscriptions + one-time, webhooks for status sync
 - **PayPal** — subscriptions + one-time
-- **Paddle** — handles VAT automatically (using laravel cashier)
+- **Paddle** — handles VAT automatically
 - **Razorpay** — India market
-- **SSLCommerz** — Bangladesh market
+- **SSLCommerz** — Bangladesh market (already in your roadmap)
 - **CoinGate** — crypto payments
 - **Paystack** — Africa market
 - **Bank Transfer** — manual, admin approval
@@ -5841,7 +6608,7 @@ interface PaymentGatewayInterface
 
 ---
 
-## PART 27 — AFFILIATE & REFERRAL SYSTEM ✅
+## PART 27 — AFFILIATE & REFERRAL SYSTEM
 
 ### 43.1 Tables
 
@@ -5969,7 +6736,7 @@ created_at, updated_at
 
 ---
 
-## PART 28 — ADS SYSTEM ✅
+## PART 28 — ADS SYSTEM
 
 Admin can place ads in predefined zones across the frontend. Fully controllable from admin panel.
 
@@ -5982,16 +6749,10 @@ Predefined zones (hardcoded in layout, rendered via `@ads('zone_slug')`):
 - `content_top` — above page content
 - `content_bottom` — below page content
 - `between_posts` — between blog post list items (every N posts, configurable)
-- `between_ai_tools` — between ai tools index items (every N items, configurable)
-- `tool_page_top` — top of tool page (above content below title hero)
-- `tool_page_bottom` — bottom of tool page (below content before tabs)
-- `temaplate_page` — top of template page (above content below title hero)
 - `chat_banner` — above AI chat input box
 - `dashboard_top` — top of user dashboard
 - `footer_banner` — above footer
-- `custom_zone_1` — custom zone 1
-- `custom_zone_2` — custom zone 2
-`
+
 ### 14.2 Ad Types
 
 **Table: `ads`**
@@ -6046,7 +6807,7 @@ Click tracking: image/link ads wrap in `/ads/click/{id}?redirect={url}` route th
 
 ## 🔷 LAYER 7 — FRONTEND & APPEARANCE
 
-## PART 29 — FRONTEND ARCHITECTURE ✅
+## PART 29 — FRONTEND ARCHITECTURE
 
 ### 7.1 Setup
 
@@ -6101,7 +6862,7 @@ Translations are passed from `HandleInertiaRequests` as shared props (only curre
 
 ---
 
-## PART 30 — LOCALIZATION OF VUE COMPONENTS ✅
+## PART 30 — LOCALIZATION OF VUE COMPONENTS
 
 ### 30.1 Architecture Overview
 
@@ -6482,7 +7243,7 @@ php artisan translations:sync
 ---
 
 
-## PART 31 — APPEARANCE & DESIGN SYSTEM ✅
+## PART 31 — APPEARANCE & DESIGN SYSTEM
 
 ### 16.1 Custom Color Scheme & Typography
 
@@ -6494,7 +7255,7 @@ id, scope enum('admin','theme_default','theme_sleek',...),
 key varchar(100), value text, created_at, updated_at
 ```
 
-**Admin Appearance Settings (Admin → System → Admin Panel):**
+**Admin Appearance Settings (Admin → Appearance → Admin Panel):**
 
 Colors:
 - Primary color (sidebar active, buttons, links)
@@ -6505,13 +7266,13 @@ Colors:
 - Accent/highlight color
 
 Typography:
-- Admin font family (dropdown: Inter, Poppins, DM Sans, Nunito, Plus Jakarta Sans + popular languages 1/2 standard font e.g for bangla noto sans bengali/hind siliguri... — loaded from Google Fonts or self-hosted)
-- Base font size (13px / 14px / 15px ... )
+- Admin font family (dropdown: Inter, Poppins, DM Sans, Nunito, Plus Jakarta Sans — loaded from Google Fonts or self-hosted)
+- Base font size (13px / 14px / 15px)
 - Font weight for headings (400/500)
 
 Live preview: changes reflected in real-time via CSS custom properties injected in `<head>` from `appearance_settings`.
 
-**Frontend Theme Appearance Settings (Admin → Appearance → Theme -> settings -> Typography)**
+**Frontend Theme Appearance Settings (Admin → Appearance → Theme):**
 
 Colors:
 - Primary color
@@ -6536,10 +7297,10 @@ Typography:
 
 All values injected as CSS custom properties in `:root {}` via a dynamic `GET /css/theme-variables.css` route (cached, invalidated on settings change).
 
-### 16.2 Frontend Container Width & Background
+### 16.2 Container Width & Background
 
 **Per-theme settings:**
-- Site container width: `full` (100%), `boxed` (1080px) `xl` (1280px), `2xl` (1536px), `custom` (px value input)
+- Site container width: `full` (100%), `xl` (1280px), `2xl` (1536px), `custom` (px value input)
 - Content area max-width override
 - Page background: solid color picker, gradient (2-color picker + direction), image upload
 - Background image settings: cover/contain/repeat, fixed/scroll, position (center/top/bottom)
@@ -6573,9 +7334,9 @@ Click on result → navigate to relevant page.
 
 ---
 
-## PART 32 — HOMEPAGE BUILDER ✅
+## PART 32 — HOMEPAGE BUILDER
 
-Admin → Site builder → Homepage
+Admin → Appearance → Homepage
 
 Visual section-based homepage builder. The homepage is composed of draggable sections — enable, disable, reorder, and configure each section from admin panel. No code editing required.
 
@@ -6725,6 +7486,112 @@ interface MenuGroup {
 - Active item and its parent both get `active` class
 - Smooth CSS transition (`max-height` + `opacity`) for all collapses
 
+### 39.2 Admin Menu Definition
+
+```
+📊 Dashboard
+   (direct link — no children)
+
+👥 Users                              [chevron ▾]
+   ├── All Users
+   ├── Add User
+   ├── Credit Transactions
+   └── Login History
+
+🤖 AI Tools                           [chevron ▾]
+   ├── Templates
+   ├── Categories
+   ├── Prompt Library
+   ├── Chatbot Builder
+   ├── Knowledge Bases
+   └── Access Settings
+
+📝 Content                            [chevron ▾]
+   ├── Blog Posts
+   ├── Blog Categories
+   ├── Pages
+   ├── FAQs
+   │     └── [sub-tab: FAQ Categories on same page]
+   ├── Testimonials
+   ├── Announcements                   [chevron ▾] (nested group)
+   │     ├── Top Bar
+   │     ├── Popups
+   │     └── Broadcast
+   └── Comments
+
+✉️ Mail                               [chevron ▾]
+   ├── Configuration
+   ├── Templates                       [chevron ▾] (nested group)
+   │     ├── Auth
+   │     ├── Account
+   │     ├── Subscription              [Pro badge — hidden if !isProAvailable()]
+   │     ├── Newsletter
+   │     └── Custom
+   ├── Layout Editor
+   └── Mail Logs
+
+📨 Newsletter                         [chevron ▾]
+   ├── Subscribers
+   ├── Campaigns
+   └── Settings
+
+💳 Plans & Billing                    [Pro badge — hidden if !isProAvailable()] [chevron ▾]
+   ├── Plans
+   ├── Coupons
+   ├── Transactions
+   ├── Subscriptions
+   └── Revenue Reports
+
+🎨 Appearance                         [chevron ▾]
+   ├── Themes
+   ├── Addons
+   ├── Homepage Builder
+   ├── Header Builder
+   ├── Footer Builder
+   ├── Sidebar Builder
+   ├── Menus
+   ├── Branding
+   └── Colors & Typography            [chevron ▾] (nested group)
+         ├── Admin Panel Style
+         └── Frontend Theme Style
+
+⚙️ Settings                           [chevron ▾]
+   ├── General
+   ├── AI
+   ├── Integrations                   [chevron ▾] (nested group)
+   │     ├── AI Models
+   │     ├── Image & Media
+   │     ├── Voice & Video
+   │     ├── Productivity
+   │     └── Utilities & Payments
+   ├── Social Media
+   ├── Security & Auth
+   ├── Notifications
+   ├── License
+   ├── Subscriptions                  [Pro badge — hidden if !isProAvailable()]
+   └── Advanced
+
+🖥️ System                             [chevron ▾]
+   ├── Site Health
+   ├── Cache Management
+   ├── Cron Jobs
+   ├── Updates                        [badge: "1 update" when available]
+   ├── Maintenance Mode
+   ├── Log Viewer
+   └── Demo Mode
+
+📈 Reports                            [chevron ▾]
+   ├── AI Usage
+   ├── Revenue
+   ├── Users
+   └── Export Center
+
+🛡️ Admins                             [chevron ▾] [Super Admin only]
+   ├── All Admins
+   ├── Roles & Permissions
+   └── Activity Log
+```
+
 ### 39.3 Menu Behavior Rules
 
 - **Auto-expand active group:** On any page load, the sidebar group containing the current route is automatically expanded. All others remain in their last `localStorage` state.
@@ -6774,7 +7641,7 @@ const toggle = (slug: string) => {
 
 ## PART 34 — SOCIAL FEATURES
 
-### 20.1 Social Share Buttons ✅
+### 20.1 Social Share Buttons
 
 **`app/View/Components/SocialShare.php`** + Vue component `SocialShare.vue`
 
@@ -6795,7 +7662,7 @@ Share count display: uses each platform's public share count API where available
 
 Placements: blog posts, AI-generated content (share your generated text/image), custom pages.
 
-### 20.2 Social Follow Counters ✅
+### 20.2 Social Follow Counters
 
 Admin → Settings → Social Media:
 - Add social profile URLs: Facebook page, X/Twitter, Instagram, LinkedIn, YouTube, TikTok, GitHub, Discord invite
@@ -6822,7 +7689,7 @@ Admin → Settings → Social Media:
 
 ## PART 35 — ADMIN DASHBOARD & SYSTEM TOOLS
 
-### 15.1 Site Health Monitor  ✅
+### 15.1 Site Health Monitor
 
 Admin → System → Site Health
 
@@ -6830,7 +7697,7 @@ Checks displayed as pass/warn/fail cards:
 
 **Server:**
 - PHP version (required 8.3+)
-- Required PHP extensions (curl, zip, gd, mbstring, pdo, redis, fileinfo, tokenizer, xml, etc.)
+- Required PHP extensions (curl, zip, gd, mbstring, pdo, redis, fileinfo, tokenizer, xml)
 - `storage/` and `bootstrap/cache/` writable
 - Max upload size (recommend 64MB+)
 - Max execution time (recommend 120s+)
@@ -6856,7 +7723,7 @@ Checks displayed as pass/warn/fail cards:
 
 Each check has a "Fix" suggestion link or button where applicable.
 
-### 15.2 One-Click Update (Envato)  ✅
+### 15.2 One-Click Update (Envato)
 
 Admin → System → Updates
 
@@ -6877,7 +7744,22 @@ Flow:
 
 **`app/Console/Commands/CheckUpdates.php`** — runs daily via scheduler, sets `update_available` in settings.
 
-### 15.4 Cron Job Setup  ✅
+### 15.3 Cache Management
+
+Admin → System → Cache
+
+Buttons with confirmation modals:
+- **Clear application cache** — `php artisan cache:clear`
+- **Clear config cache** — `php artisan config:clear` then `config:cache`
+- **Clear route cache** — `php artisan route:clear` then `route:cache`
+- **Clear view cache** — `php artisan view:clear` then `view:cache`
+- **Clear all caches** — all of the above in sequence
+- **Clear OPcache** — `opcache_reset()` if available
+- **Flush Redis** — flushes only the app's Redis DB (not all Redis keys)
+
+Each button shows last cleared timestamp. All operations run via artisan commands dispatched as synchronous jobs (not queued — needs immediate feedback).
+
+### 15.4 Cron Job Setup
 
 Admin → System → Cron Jobs
 
@@ -6903,7 +7785,7 @@ Schedule::command('ai:cleanup-temp-files')->daily();
 Schedule::command('analytics:aggregate')->hourly();
 ```
 
-### 15.5 Maintenance Mode  ✅
+### 15.5 Maintenance Mode
 
 Admin → System → Maintenance
 
@@ -6926,7 +7808,7 @@ Custom maintenance view at `resources/views/maintenance.blade.php` — standalon
 
 ## PART 36 — ADMIN MENU STRUCTURE (Collapsible)
 
-### 17.1 Menu Builder ✅
+### 17.1 Menu Builder
 
 Admin → Appearance → Menus
 
@@ -6969,7 +7851,7 @@ created_at
 // or Vue prop via Inertia shared data: $page.props.menus.top_header
 ```
 
-### 17.2 Header Builder ✅
+### 17.2 Header Builder
 
 Admin → Appearance → Header
 
@@ -6995,7 +7877,7 @@ Layout options:
 
 Mobile header: separate simplified builder — logo + hamburger (opens `mobile_offcanvas` menu).
 
-### 17.3 Footer Builder ✅
+### 17.3 Footer Builder
 
 Admin → Appearance → Footer
 
@@ -7017,9 +7899,9 @@ Bottom bar (sub-footer):
 - Payment icons (Visa, Mastercard, PayPal, Stripe — toggleable)
 - Back to top button toggle
 
-### 17.4 Widget Builder ✅
+### 17.4 Sidebar Builder
 
-Admin → Appearance → Widget
+Admin → Appearance → Sidebar
 
 Available sidebar widgets:
 - Search box
@@ -7030,8 +7912,6 @@ Available sidebar widgets:
 - Ad zone (select from defined zones)
 - Social follow
 - Custom HTML
-- popular tools
-- recently added tools
 
 Drag-and-drop reorder. Each widget has its own settings (e.g. Recent Posts: how many, show thumbnail toggle).
 
@@ -7047,7 +7927,7 @@ Sidebar position: left/right/hidden (per page template).
 
 ## 🔷 LAYER 9 — COMMUNITY
 
-## PART 37 — COMMUNITY FEATURES (Livewire)  ✅
+## PART 37 — COMMUNITY FEATURES (Livewire)
 
 Use **Laravel Livewire v3** for all real-time interactive community features — these are server-driven and do not require Vue, keeping them SEO-friendly and lightweight.
 
@@ -7359,7 +8239,7 @@ Auto-generated with **Dedoc Scramble** (`dedoc/scramble`) — served at `/api/do
 ---
 
 
-## PART 45 — QUEUE & JOB ARCHITECTURE
+## PART 39 — QUEUE & JOB ARCHITECTURE
 
 ### 45.1 Queue Infrastructure
 
@@ -7555,7 +8435,7 @@ Schedule::call(fn() => settings_set('last_scheduler_run', now()))->everyMinute()
 
 ---
 
-## 🔷 LAYER 11 — DEPLOYMENT ✅
+## 🔷 LAYER 11 — DEPLOYMENT
 
 ## PART 40 — SEEDER DATA (Complete)
 
@@ -7660,7 +8540,7 @@ database/
 
 ---
 
-## PART 42 — DEMO MODE ✅
+## PART 42 — DEMO MODE
 
 Critical for Envato preview and buyer confidence.
 
@@ -7842,6 +8722,11 @@ When demo mode is active:
 - [ ] PSR-12 passes: `./vendor/bin/pint --test`
 - [ ] PestPHP test suite: `./vendor/bin/pest` all green
 - [ ] Documentation covers: installation, admin guide, addon development, theme development, API reference
+
+---
+
+*End of MakeAI Complete Development Master Prompt*
+*Version: 1.1 | Sections: 40 | AI Templates: 255 | Mail Templates: 23 | Integrations: 60+ | Name: MakeAI*
 
 ---
 
@@ -8080,7 +8965,7 @@ This config included in `docs/server-setup.md` in the distributed zip.
 
 ---
 
-## PART 46 — GDPR & DATA PRIVACY ✅
+## PART 46 — GDPR & DATA PRIVACY
 
 ### 46.1 User Data Export
 
@@ -8177,17 +9062,16 @@ Extends homepage builder cookie banner (Part 31.3) with granular consent:
 
 ---
 
-## PART 47 — USER ONBOARDING FLOW ✅
+## PART 47 — USER ONBOARDING FLOW
 
-### 47.1 Welcome Onboarding (After registration Only)
+### 47.1 Welcome Onboarding (First Login Only)
 
 Shown once after first email OTP verification. Stored in `users.onboarding_completed_at`.
 
 **Step 1 — Welcome screen:**
-- "Welcome to {site_name}, {name}! Let's get you set up in 2 minutes."
+- "Welcome to MakeAI, {name}! Let's get you set up in 2 minutes."
 - Animated illustration
 - "Let's go →" button
-- "Skip for now" button always visible
 
 **Step 2 — Choose your primary use case:**
 ```
@@ -8195,13 +9079,11 @@ Shown once after first email OTP verification. Stored in `users.onboarding_compl
 [ 🎓 Student/Researcher] [ 🛒 eCommerce ]   [ 💼 Business Owner ]
 ```
 Selection stored in `users.use_case`. Used to reorder tool categories on dashboard.
-- "Skip for now" button always visible
 
 **Step 3 — Recommended tools** (based on use case):
 "Here are your top tools based on your goals:"
 - 6 tool cards shown (pre-selected based on use case mapping)
 - User can favorite (bookmark) them directly from this screen
-- "Skip for now" button always visible
 
 **Step 4 — Try your first generation:**
 - Pre-selected tool based on use case (e.g. Content Creator → Blog Intro)
@@ -8209,11 +9091,9 @@ Selection stored in `users.use_case`. Used to reorder tool categories on dashboa
 - One-click generate → streaming output shown in modal
 - "Amazing! Your first AI content is ready." → copy / save buttons
 - This "wow moment" is critical for activation
-- "Skip for now" button always visible
 
 **Step 5 — Profile completion (optional, skippable):**
 - Upload avatar
-- Set basic_info (country, profession, date_of_birth...)
 - Set brand voice (textarea with example placeholder)
 - Set preferred language
 - "Skip for now" button always visible
@@ -8261,7 +9141,7 @@ Tooltip shown state stored per-user in `users.dismissed_tooltips json`.
 
 ---
 
-## PART 48 — KEYBOARD SHORTCUTS & COMMAND PALETTE ✅
+## PART 48 — KEYBOARD SHORTCUTS & COMMAND PALETTE
 
 ### 48.1 Global Keyboard Shortcuts
 
@@ -8293,6 +9173,7 @@ Registered globally in `app.vue` via `useKeyboardShortcuts` composable:
 All standard Tiptap shortcuts plus:
 | Shortcut | Action |
 |----------|--------|
+| `Ctrl+Shift+I` | Open AI sidebar |
 | `Ctrl+Shift+X` | Export menu |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
 | `/` at line start | Slash command palette |
@@ -8306,8 +9187,7 @@ Inspired by Linear/Vercel command palette. Opens as centered modal with search i
 - User's recent documents (last 20)
 - User's recent conversations (last 10)
 - Navigation links (Settings, Dashboard, Documents, etc.)
-- Admin links (if admin — Settings, Users, etc.)
-- Actions: New Document, New Chat, Dark Mode Toggle, Clear Cache (admin)
+- Actions: New Document, New Chat, Dark Mode Toggle
 
 **UX:**
 - Opens instantly (< 50ms) — all items pre-indexed in Pinia store on app load
@@ -9795,6 +10675,1057 @@ Add `Ctrl+Shift+L` to the keyboard shortcut reference modal (`?` key).
 
 ---
 
+---
+# PART P63 — FLOATING AI ASSISTANT (Admin Panel + Frontend)
+
+## Overview
+
+A floating AI assistant widget embedded site-wide — both in the admin panel and the user-facing frontend. Configured entirely from Admin → Settings → AI Assistant. Uses **Laravel AI SDK (`laravel/ai`)** for all AI calls with streaming via `ReadableStream` (POST-based, not EventSource).
+
+---
+
+## Database
+
+### Migration: `create_assistant_settings_table`
+
+```php
+Schema::create('assistant_settings', function (Blueprint $table) {
+    $table->id();
+
+    // Global toggles
+    $table->boolean('enabled')->default(false);              // frontend on/off
+    $table->boolean('admin_enabled')->default(true);         // admin panel on/off
+
+    // AI model config
+    $table->string('model')->default('gpt-4o-mini');
+    $table->unsignedSmallInteger('max_tokens')->default(1024);
+    $table->decimal('temperature', 3, 2)->default(0.7);
+    $table->string('api_key_source')->default('global');     // global | custom
+    $table->text('custom_api_key')->nullable();              // encrypted if set
+
+    // Persona
+    $table->string('assistant_name')->default('AI Assistant');
+    $table->string('avatar_url')->nullable();
+    $table->string('designation')->default('Your AI Helper');
+    $table->text('greeting_message')->nullable();
+
+    // System prompts
+    $table->longText('system_prompt_frontend')->nullable();
+    $table->longText('system_prompt_admin')->nullable();
+
+    // Access control (frontend)
+    $table->enum('show_to', ['all', 'logged_in', 'pro_only'])->default('all');
+    $table->unsignedInteger('daily_message_limit')->default(20); // 0 = unlimited
+    $table->boolean('show_on_guest_pages')->default(true);
+
+    // UI options
+    $table->enum('position', ['bottom-right', 'bottom-left'])->default('bottom-right');
+    $table->string('accent_color')->default('#10b981');      // emerald
+
+    $table->timestamps();
+});
+```
+
+### Migration: `create_assistant_feedback_table`
+
+```php
+Schema::create('assistant_feedback', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+    $table->string('session_id', 64)->index();
+    $table->string('context_page')->nullable();             // e.g. '/tools/ai-writer'
+    $table->string('message_hash', 64);                     // sha256 of user message
+    $table->tinyInteger('rating');                          // 1 = thumbs up, -1 = thumbs down
+    $table->text('comment')->nullable();
+    $table->timestamps();
+});
+```
+
+---
+
+## Backend
+
+### Model: `app/Models/AssistantSetting.php`
+
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class AssistantSetting extends Model
+{
+    protected $fillable = [
+        'enabled', 'admin_enabled', 'model', 'max_tokens', 'temperature',
+        'api_key_source', 'custom_api_key', 'assistant_name', 'avatar_url',
+        'designation', 'greeting_message', 'system_prompt_frontend',
+        'system_prompt_admin', 'show_to', 'daily_message_limit',
+        'show_on_guest_pages', 'position', 'accent_color',
+    ];
+
+    protected $casts = [
+        'enabled'             => 'boolean',
+        'admin_enabled'       => 'boolean',
+        'temperature'         => 'float',
+        'show_on_guest_pages' => 'boolean',
+    ];
+
+    protected $hidden = ['custom_api_key'];
+
+    public static function current(): self
+    {
+        return static::firstOrCreate(['id' => 1]);
+    }
+}
+```
+
+---
+
+### Service: `app/Services/AI/AssistantService.php`
+
+```php
+<?php
+
+namespace App\Services\AI;
+
+use App\Models\AssistantSetting;
+use App\Models\User;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+
+class AssistantService
+{
+    public function __construct(private AiService $ai) {}
+
+    /**
+     * Build the system prompt for frontend users.
+     */
+    public function buildFrontendSystemPrompt(AssistantSetting $setting, ?User $user, string $currentPage): string
+    {
+        $appName = settings('app_name');
+        $base = $setting->system_prompt_frontend
+            ?? "You are {$setting->assistant_name}, a helpful AI assistant for {$appName}. "
+             . "You help users understand features, generate content, and get the most out of the platform. "
+             . "Be concise, friendly, and proactive. Never make up features that don't exist.";
+
+        $context = "\n\n[CONTEXT]\n";
+        $context .= "Platform: {$appName}\n";
+        $context .= "Current page: {$currentPage}\n";
+
+        if ($user) {
+            $context .= "User: {$user->name} | Plan: " . ($user->subscription_status === 'active' ? 'Pro' : 'Free') . "\n";
+            $context .= "Credits remaining: {$user->credits}\n";
+        } else {
+            $context .= "User: Guest (not logged in)\n";
+        }
+
+        return $base . $context;
+    }
+
+    /**
+     * Build the system prompt for admin panel — includes full site context.
+     */
+    public function buildAdminSystemPrompt(AssistantSetting $setting): string
+    {
+        $appName = settings('app_name');
+        $base = $setting->system_prompt_admin
+            ?? "You are {$setting->assistant_name}, an intelligent admin assistant for {$appName}. "
+             . "You have full visibility into the platform's performance metrics. "
+             . "Provide actionable insights, marketing advice, and optimization suggestions. "
+             . "Be direct and data-driven. Use the live site data provided to give specific, relevant advice.";
+
+        $siteData = $this->buildSiteContext();
+
+        return $base . "\n\n[LIVE SITE DATA]\n" . json_encode($siteData, JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Gather real-time site metrics for admin context.
+     * Cached for 2 minutes to avoid DB overload on every message.
+     */
+    public function buildSiteContext(): array
+    {
+        return Cache::remember('assistant.admin.site_context', 120, function () {
+            $now = now();
+            return [
+                'users' => [
+                    'total'       => DB::table('users')->count(),
+                    'verified'    => DB::table('users')->whereNotNull('email_verified_at')->count(),
+                    'new_today'   => DB::table('users')->whereDate('created_at', today())->count(),
+                    'new_7d'      => DB::table('users')->where('created_at', '>=', $now->copy()->subDays(7))->count(),
+                    'new_30d'     => DB::table('users')->where('created_at', '>=', $now->copy()->subDays(30))->count(),
+                ],
+                'subscriptions' => [
+                    'active'      => DB::table('subscriptions')->where('status', 'active')->count(),
+                    'trialing'    => DB::table('subscriptions')->where('status', 'trialing')->count(),
+                    'canceled_7d' => DB::table('subscriptions')
+                                      ->where('status', 'canceled')
+                                      ->where('updated_at', '>=', $now->copy()->subDays(7))
+                                      ->count(),
+                ],
+                'revenue' => [
+                    'today'       => DB::table('transactions')->whereDate('created_at', today())->where('status', 'paid')->sum('amount'),
+                    'this_month'  => DB::table('transactions')->whereMonth('created_at', $now->month)->where('status', 'paid')->sum('amount'),
+                    'last_month'  => DB::table('transactions')->whereMonth('created_at', $now->copy()->subMonth()->month)->where('status', 'paid')->sum('amount'),
+                ],
+                'ai_usage' => [
+                    'requests_today'    => DB::table('ai_usage_logs')->whereDate('created_at', today())->count(),
+                    'tokens_today'      => DB::table('ai_usage_logs')->whereDate('created_at', today())->sum('total_tokens'),
+                    'cost_today_usd'    => DB::table('ai_usage_logs')->whereDate('created_at', today())->sum('estimated_cost_usd'),
+                    'top_tools_7d'      => DB::table('ai_usage_logs')
+                                            ->select('tool', DB::raw('count(*) as uses'))
+                                            ->where('created_at', '>=', $now->copy()->subDays(7))
+                                            ->groupBy('tool')
+                                            ->orderByDesc('uses')
+                                            ->limit(5)
+                                            ->pluck('uses', 'tool'),
+                ],
+                'system' => [
+                    'failed_jobs'       => DB::table('failed_jobs')->count(),
+                    'pending_tickets'   => DB::table('support_tickets')->where('status', 'open')->count(),
+                    'queued_jobs'       => DB::table('jobs')->count(),
+                ],
+                'content' => [
+                    'total_ai_tools'    => DB::table('ai_tools')->where('is_active', true)->count(),
+                    'total_blog_posts'  => DB::table('posts')->where('status', 'published')->count(),
+                    'total_documents'   => DB::table('documents')->count(),
+                ],
+            ];
+        });
+    }
+
+    /**
+     * Check if the frontend assistant should be visible.
+     */
+    public function isVisibleForUser(AssistantSetting $setting, ?User $user): bool
+    {
+        if (!$setting->enabled) {
+            return false;
+        }
+
+        return match ($setting->show_to) {
+            'all'       => true,
+            'logged_in' => $user !== null,
+            'pro_only'  => $user !== null && isProAvailable() && $user->subscription_status === 'active',
+            default     => false,
+        };
+    }
+
+    /**
+     * Check daily message limit for a user/session.
+     */
+    public function checkDailyLimit(AssistantSetting $setting, ?User $user, string $sessionId): bool
+    {
+        if ($setting->daily_message_limit === 0) {
+            return true; // unlimited
+        }
+
+        $key = $user
+            ? "assistant.limit.user.{$user->id}." . today()->toDateString()
+            : "assistant.limit.session.{$sessionId}." . today()->toDateString();
+
+        $count = (int) Cache::get($key, 0);
+
+        return $count < $setting->daily_message_limit;
+    }
+
+    public function incrementDailyCount(?User $user, string $sessionId): void
+    {
+        $key = $user
+            ? "assistant.limit.user.{$user->id}." . today()->toDateString()
+            : "assistant.limit.session.{$sessionId}." . today()->toDateString();
+
+        Cache::increment($key);
+        Cache::expire($key, 86400);
+    }
+}
+```
+
+---
+
+### Controller: `app/Http/Controllers/Api/AssistantController.php`
+
+```php
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\AssistantFeedback;
+use App\Models\AssistantSetting;
+use App\Services\AI\AssistantService;
+use App\Services\AI\AiService;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class AssistantController extends Controller
+{
+    public function __construct(
+        private AssistantService $assistantService,
+        private AiService $ai,
+    ) {}
+
+    /**
+     * Stream a chat response — frontend users.
+     * POST /api/assistant/chat
+     */
+    public function chat(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'message'      => ['required', 'string', 'max:2000'],
+            'history'      => ['array', 'max:20'],
+            'history.*.role'    => ['required', 'in:user,assistant'],
+            'history.*.content' => ['required', 'string', 'max:4000'],
+            'current_page' => ['nullable', 'string', 'max:255'],
+            'session_id'   => ['required', 'string', 'max:64'],
+        ]);
+
+        $setting = AssistantSetting::current();
+        $user    = $request->user();
+
+        // Visibility check
+        if (!$this->assistantService->isVisibleForUser($setting, $user)) {
+            abort(403, 'Assistant is not available.');
+        }
+
+        // Daily limit check
+        if (!$this->assistantService->checkDailyLimit($setting, $user, $request->session_id)) {
+            return response()->json(['error' => 'daily_limit_reached', 'limit' => $setting->daily_message_limit], 429);
+        }
+
+        $systemPrompt = $this->assistantService->buildFrontendSystemPrompt(
+            $setting,
+            $user,
+            $request->current_page ?? '/'
+        );
+
+        $messages = $this->buildMessages($request->history ?? [], $request->message);
+
+        $this->assistantService->incrementDailyCount($user, $request->session_id);
+
+        return $this->streamResponse($setting, $systemPrompt, $messages);
+    }
+
+    /**
+     * Stream a chat response — admin panel (with site context).
+     * POST /api/admin/assistant/chat
+     */
+    public function adminChat(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'message'  => ['required', 'string', 'max:4000'],
+            'history'  => ['array', 'max:30'],
+            'history.*.role'    => ['required', 'in:user,assistant'],
+            'history.*.content' => ['required', 'string', 'max:8000'],
+        ]);
+
+        $setting = AssistantSetting::current();
+
+        if (!$setting->admin_enabled) {
+            abort(403, 'Admin assistant is disabled.');
+        }
+
+        $systemPrompt = $this->assistantService->buildAdminSystemPrompt($setting);
+        $messages     = $this->buildMessages($request->history ?? [], $request->message);
+
+        return $this->streamResponse($setting, $systemPrompt, $messages);
+    }
+
+    /**
+     * Log message feedback (thumbs up/down).
+     * POST /api/assistant/feedback
+     */
+    public function feedback(Request $request)
+    {
+        $request->validate([
+            'session_id'   => ['required', 'string', 'max:64'],
+            'message_hash' => ['required', 'string', 'max:64'],
+            'rating'       => ['required', 'in:1,-1'],
+            'context_page' => ['nullable', 'string', 'max:255'],
+            'comment'      => ['nullable', 'string', 'max:500'],
+        ]);
+
+        AssistantFeedback::updateOrCreate(
+            [
+                'session_id'   => $request->session_id,
+                'message_hash' => $request->message_hash,
+            ],
+            [
+                'user_id'      => $request->user()?->id,
+                'rating'       => (int) $request->rating,
+                'context_page' => $request->current_page,
+                'comment'      => $request->comment,
+            ]
+        );
+
+        return response()->json(['ok' => true]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function buildMessages(array $history, string $newMessage): array
+    {
+        $messages = [];
+        foreach ($history as $msg) {
+            $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
+        }
+        $messages[] = ['role' => 'user', 'content' => $newMessage];
+        return $messages;
+    }
+
+    private function streamResponse(AssistantSetting $setting, string $systemPrompt, array $messages): StreamedResponse
+    {
+        return response()->stream(function () use ($setting, $systemPrompt, $messages) {
+            // Use Laravel AI SDK (laravel/ai) streaming
+            $stream = $this->ai->stream(new \App\Services\AI\CompletionRequest(
+                model:        $setting->model,
+                messages:     $messages,
+                systemPrompt: $systemPrompt,
+                maxTokens:    $setting->max_tokens,
+                temperature:  $setting->temperature,
+            ));
+
+            foreach ($stream as $chunk) {
+                if (connection_aborted()) {
+                    break;
+                }
+                echo $chunk;
+                ob_flush();
+                flush();
+            }
+        }, 200, [
+            'Content-Type'      => 'text/event-stream',
+            'Cache-Control'     => 'no-cache',
+            'X-Accel-Buffering' => 'no',           // MANDATORY for Nginx streaming
+            'Connection'        => 'keep-alive',
+        ]);
+    }
+}
+```
+
+---
+
+### Routes: `routes/api.php`
+
+```php
+// Frontend assistant — rate limited: 30/min
+Route::middleware(['throttle:30,1'])->group(function () {
+    Route::post('/assistant/chat',     [AssistantController::class, 'chat']);
+    Route::post('/assistant/feedback', [AssistantController::class, 'feedback']);
+});
+
+// Admin assistant — must be admin auth
+Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+    Route::post('/assistant/chat', [AssistantController::class, 'adminChat']);
+});
+```
+
+---
+
+### Admin Settings Controller: `app/Http/Controllers/Admin/AssistantSettingsController.php`
+
+```php
+public function update(Request $request)
+{
+    $validated = $request->validate([
+        'enabled'                  => ['boolean'],
+        'admin_enabled'            => ['boolean'],
+        'model'                    => ['required', 'string'],
+        'max_tokens'               => ['required', 'integer', 'min:128', 'max:8192'],
+        'temperature'              => ['required', 'numeric', 'min:0', 'max:2'],
+        'assistant_name'           => ['required', 'string', 'max:60'],
+        'avatar_url'               => ['nullable', 'url', 'max:500'],
+        'designation'              => ['nullable', 'string', 'max:80'],
+        'greeting_message'         => ['nullable', 'string', 'max:300'],
+        'system_prompt_frontend'   => ['nullable', 'string', 'max:5000'],
+        'system_prompt_admin'      => ['nullable', 'string', 'max:5000'],
+        'show_to'                  => ['required', 'in:all,logged_in,pro_only'],
+        'daily_message_limit'      => ['required', 'integer', 'min:0'],
+        'show_on_guest_pages'      => ['boolean'],
+        'position'                 => ['required', 'in:bottom-right,bottom-left'],
+        'accent_color'             => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+    ]);
+
+    AssistantSetting::current()->update($validated);
+
+    Cache::forget('assistant.admin.site_context');
+
+    return back()->with('success', 'Assistant settings saved.');
+}
+```
+
+---
+
+## Frontend Vue Components
+
+### Component Tree
+
+```
+resources/js/Components/Assistant/
+├── FloatingAssistant.vue         ← main entry, injected in AppLayout & AdminLayout
+├── AssistantTrigger.vue          ← FAB button with unread badge
+├── AssistantWindow.vue           ← chat window container
+├── AssistantHeader.vue           ← avatar, name, designation, minimize/close
+├── AssistantMessages.vue         ← scrollable messages list
+├── AssistantMessage.vue          ← single message bubble + copy + rating
+├── AssistantInput.vue            ← textarea, send button, slash commands
+└── AssistantSuggestions.vue      ← context-aware prompt chips (shown when empty)
+```
+
+---
+
+### `FloatingAssistant.vue`
+
+```vue
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+import AssistantTrigger from './AssistantTrigger.vue'
+import AssistantWindow from './AssistantWindow.vue'
+
+const props = defineProps<{
+  isAdmin?: boolean
+}>()
+
+const page = usePage()
+const settings = computed(() => page.props.assistantSettings as AssistantSettings | null)
+
+const isOpen   = ref(false)
+const unread   = ref(0)
+
+const sessionId = computed(() =>
+  sessionStorage.getItem('assistant_session_id') ?? (() => {
+    const id = crypto.randomUUID()
+    sessionStorage.setItem('assistant_session_id', id)
+    return id
+  })()
+)
+
+function onNewMessage() {
+  if (!isOpen.value) unread.value++
+}
+
+function open() {
+  isOpen.value = true
+  unread.value = 0
+}
+</script>
+
+<template>
+  <template v-if="settings?.enabled || (isAdmin && settings?.admin_enabled)">
+    <AssistantTrigger
+      :is-open="isOpen"
+      :unread="unread"
+      :avatar-url="settings?.avatar_url"
+      :accent-color="settings?.accent_color"
+      :position="settings?.position"
+      @toggle="isOpen ? isOpen = false : open()"
+    />
+    <AssistantWindow
+      v-if="isOpen"
+      :settings="settings"
+      :session-id="sessionId"
+      :is-admin="isAdmin"
+      :position="settings?.position"
+      @close="isOpen = false"
+      @new-message="onNewMessage"
+    />
+  </template>
+</template>
+```
+
+---
+
+### `AssistantWindow.vue` (core logic)
+
+```vue
+<script setup lang="ts">
+import { ref, nextTick, computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
+import axios from 'axios'
+import AssistantHeader from './AssistantHeader.vue'
+import AssistantMessages from './AssistantMessages.vue'
+import AssistantInput from './AssistantInput.vue'
+import AssistantSuggestions from './AssistantSuggestions.vue'
+
+interface Message {
+  id:        string
+  role:      'user' | 'assistant'
+  content:   string
+  streaming: boolean
+  error:     boolean
+}
+
+const props = defineProps<{
+  settings:  any
+  sessionId: string
+  isAdmin:   boolean
+  position:  string
+}>()
+
+const emit = defineEmits<{
+  close:       []
+  newMessage:  []
+}>()
+
+const page        = usePage()
+const messages    = ref<Message[]>([])
+const isStreaming = ref(false)
+const messagesRef = ref<HTMLElement | null>(null)
+
+// Admin slash command shortcuts
+const SLASH_COMMANDS = [
+  { command: '/review-site',       label: '🔍 Full site review' },
+  { command: '/marketing-tips',    label: '📣 Marketing tips' },
+  { command: '/revenue-analysis',  label: '💰 Revenue analysis' },
+  { command: '/top-tools',         label: '📊 Top performing tools' },
+  { command: '/seo-check',         label: '🔎 SEO check' },
+]
+
+// Context-aware suggestions for frontend
+const PAGE_SUGGESTIONS: Record<string, string[]> = {
+  '/tools':     ['What tools are available?', 'Which tool should I start with?'],
+  '/pricing':   ['What\'s included in Pro?', 'Can I try Pro for free?'],
+  '/dashboard': ['How do I earn more credits?', 'Show me my usage summary'],
+  'default':    ['How do I get started?', 'What can you help me with?', 'Show me popular features'],
+}
+
+function getSuggestions(): string[] {
+  const path = window.location.pathname
+  return PAGE_SUGGESTIONS[path] ?? PAGE_SUGGESTIONS['default']
+}
+
+async function send(text: string) {
+  if (!text.trim() || isStreaming.value) return
+
+  const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, streaming: false, error: false }
+  messages.value.push(userMsg)
+  emit('newMessage')
+  await scrollToBottom()
+
+  const assistantMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: '', streaming: true, error: false }
+  messages.value.push(assistantMsg)
+  isStreaming.value = true
+
+  try {
+    const endpoint = props.isAdmin ? '/api/admin/assistant/chat' : '/api/assistant/chat'
+    const history  = messages.value
+      .slice(0, -2)   // exclude current pair
+      .filter(m => !m.error)
+      .map(m => ({ role: m.role, content: m.content }))
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'X-CSRF-TOKEN':  (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+        'Accept':        'text/event-stream',
+      },
+      body: JSON.stringify({
+        message:      text,
+        history,
+        current_page: window.location.pathname,
+        session_id:   props.sessionId,
+      }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      if (data.error === 'daily_limit_reached') {
+        assistantMsg.content = `You've reached the daily message limit (${props.settings.daily_message_limit} messages). Please try again tomorrow.`
+      } else {
+        assistantMsg.content = 'Something went wrong. Please try again.'
+        assistantMsg.error   = true
+      }
+      return
+    }
+
+    // ReadableStream consumption (POST streaming — NOT EventSource)
+    const reader = response.body!.getReader()
+    const decoder = new TextDecoder()
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      assistantMsg.content += decoder.decode(value, { stream: true })
+      await scrollToBottom()
+    }
+
+    assistantMsg.streaming = false
+
+  } catch {
+    assistantMsg.content = 'Connection error. Please try again.'
+    assistantMsg.error   = true
+    assistantMsg.streaming = false
+  } finally {
+    isStreaming.value = false
+    await scrollToBottom()
+  }
+}
+
+async function scrollToBottom() {
+  await nextTick()
+  if (messagesRef.value) {
+    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+  }
+}
+
+async function regenerate() {
+  const lastUser = [...messages.value].reverse().find(m => m.role === 'user')
+  if (!lastUser) return
+  // Remove last assistant message
+  const idx = messages.value.findLastIndex(m => m.role === 'assistant')
+  if (idx !== -1) messages.value.splice(idx, 1)
+  await send(lastUser.content)
+}
+</script>
+
+<template>
+  <div
+    class="fixed z-[9999] flex flex-col bg-background shadow-xl border border-border rounded-2xl overflow-hidden"
+    :class="[
+      position === 'bottom-left' ? 'bottom-6 left-6' : 'bottom-6 right-6',
+      'w-[380px] h-[560px]'
+    ]"
+  >
+    <AssistantHeader
+      :name="settings.assistant_name"
+      :designation="settings.designation"
+      :avatar-url="settings.avatar_url"
+      @close="emit('close')"
+    />
+
+    <div ref="messagesRef" class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <!-- Greeting + suggestions when empty -->
+      <template v-if="messages.length === 0">
+        <div class="text-sm text-muted-foreground text-center pt-4">
+          {{ settings.greeting_message || `Hi! I'm ${settings.assistant_name}. How can I help?` }}
+        </div>
+        <AssistantSuggestions
+          :suggestions="isAdmin ? SLASH_COMMANDS.map(c => c.label) : getSuggestions()"
+          @select="send"
+        />
+      </template>
+
+      <AssistantMessages
+        :messages="messages"
+        :session-id="sessionId"
+        :context-page="$page.url"
+        @regenerate="regenerate"
+      />
+    </div>
+
+    <!-- Pro upsell banner (frontend non-pro users) -->
+    <div
+      v-if="!isAdmin && settings.show_to === 'pro_only' && !$page.props.auth?.user?.is_pro"
+      class="px-4 py-2 bg-amber-50 dark:bg-amber-950 border-t border-amber-200 dark:border-amber-800 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between"
+    >
+      <span>Upgrade for unlimited messages</span>
+      <a :href="route('pricing')" class="font-medium underline">Go Pro →</a>
+    </div>
+
+    <AssistantInput
+      :disabled="isStreaming"
+      :is-admin="isAdmin"
+      :slash-commands="SLASH_COMMANDS"
+      @send="send"
+    />
+  </div>
+</template>
+```
+
+---
+
+### `AssistantMessage.vue`
+
+```vue
+<script setup lang="ts">
+import { ref } from 'vue'
+import axios from 'axios'
+
+const props = defineProps<{
+  message:     { id: string; role: string; content: string; streaming: boolean; error: boolean }
+  sessionId:   string
+  contextPage: string
+}>()
+
+const emit        = defineEmits(['regenerate'])
+const copied      = ref(false)
+const rated       = ref<1 | -1 | null>(null)
+
+function copy() {
+  navigator.clipboard.writeText(props.message.content)
+  copied.value = true
+  setTimeout(() => copied.value = false, 2000)
+}
+
+async function rate(rating: 1 | -1) {
+  if (rated.value !== null) return
+  rated.value = rating
+  await axios.post('/api/assistant/feedback', {
+    session_id:   props.sessionId,
+    message_hash: await hashMessage(props.message.content),
+    rating,
+    context_page: props.contextPage,
+  })
+}
+
+async function hashMessage(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+</script>
+
+<template>
+  <div :class="['flex gap-2', message.role === 'user' ? 'justify-end' : 'justify-start']">
+    <!-- Assistant avatar -->
+    <div v-if="message.role === 'assistant'" class="flex-shrink-0 w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center mt-1">
+      <i class="ti ti-robot text-emerald-600 text-sm"></i>
+    </div>
+
+    <div class="max-w-[85%] group">
+      <!-- Bubble -->
+      <div
+        :class="[
+          'rounded-2xl px-3 py-2 text-sm leading-relaxed',
+          message.role === 'user'
+            ? 'bg-emerald-600 text-white rounded-br-sm'
+            : message.error
+              ? 'bg-red-50 dark:bg-red-950 text-red-600 rounded-bl-sm'
+              : 'bg-muted text-foreground rounded-bl-sm'
+        ]"
+        v-html="message.role === 'assistant' ? renderMarkdown(message.content) : message.content"
+      />
+
+      <!-- Typing indicator -->
+      <div v-if="message.streaming && !message.content" class="flex gap-1 px-3 py-2">
+        <span v-for="i in 3" :key="i"
+          class="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
+          :style="`animation-delay: ${(i-1) * 0.15}s`"
+        />
+      </div>
+
+      <!-- Actions (assistant messages only, on hover) -->
+      <div v-if="message.role === 'assistant' && !message.streaming" class="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button @click="copy" class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" :title="copied ? 'Copied!' : 'Copy'">
+          <i :class="['ti text-xs', copied ? 'ti-check text-emerald-500' : 'ti-copy']"></i>
+        </button>
+        <button @click="$emit('regenerate')" class="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Regenerate">
+          <i class="ti ti-refresh text-xs"></i>
+        </button>
+        <span class="flex-1" />
+        <button @click="rate(1)" :class="['p-1 rounded transition-colors', rated === 1 ? 'text-emerald-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted']">
+          <i class="ti ti-thumb-up text-xs"></i>
+        </button>
+        <button @click="rate(-1)" :class="['p-1 rounded transition-colors', rated === -1 ? 'text-red-500' : 'text-muted-foreground hover:text-foreground hover:bg-muted']">
+          <i class="ti ti-thumb-down text-xs"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+// Simple markdown renderer (bold, inline code, line breaks only — no heavy deps)
+function renderMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.*?)`/g, '<code class="bg-muted px-1 rounded text-xs font-mono">$1</code>')
+    .replace(/\n/g, '<br>')
+}
+</script>
+```
+
+---
+
+### `AssistantInput.vue`
+
+```vue
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+
+const props = defineProps<{
+  disabled:      boolean
+  isAdmin:       boolean
+  slashCommands: { command: string; label: string }[]
+}>()
+
+const emit = defineEmits<{ send: [text: string] }>()
+
+const input         = ref('')
+const showSlashMenu = ref(false)
+
+const filteredCommands = computed(() =>
+  input.value.startsWith('/')
+    ? props.slashCommands.filter(c => c.command.startsWith(input.value))
+    : []
+)
+
+function onInput() {
+  showSlashMenu.value = props.isAdmin && filteredCommands.value.length > 0
+}
+
+function selectCommand(command: string) {
+  input.value     = command
+  showSlashMenu.value = false
+  submit()
+}
+
+function submit() {
+  const text = input.value.trim()
+  if (!text || props.disabled) return
+  emit('send', text)
+  input.value = ''
+  showSlashMenu.value = false
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    submit()
+  }
+  if (e.key === 'Escape') showSlashMenu.value = false
+}
+</script>
+
+<template>
+  <div class="px-3 pb-3 pt-2 border-t border-border relative">
+    <!-- Slash command menu -->
+    <div v-if="showSlashMenu" class="absolute bottom-full left-3 right-3 mb-1 bg-background border border-border rounded-xl shadow-lg overflow-hidden">
+      <button
+        v-for="cmd in filteredCommands"
+        :key="cmd.command"
+        @click="selectCommand(cmd.command)"
+        class="w-full text-left px-3 py-2 text-sm hover:bg-muted flex items-center gap-2 transition-colors"
+      >
+        <span class="font-mono text-xs text-muted-foreground">{{ cmd.command }}</span>
+        <span>{{ cmd.label }}</span>
+      </button>
+    </div>
+
+    <div class="flex items-end gap-2">
+      <textarea
+        v-model="input"
+        @input="onInput"
+        @keydown="onKeydown"
+        rows="1"
+        :disabled="disabled"
+        placeholder="Ask anything... (/ for commands)"
+        class="flex-1 resize-none rounded-xl bg-muted px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-50 min-h-[38px] max-h-[120px]"
+        style="field-sizing: content"
+      />
+      <button
+        @click="submit"
+        :disabled="disabled || !input.trim()"
+        class="flex-shrink-0 w-9 h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white flex items-center justify-center transition-colors"
+      >
+        <i v-if="!disabled" class="ti ti-send-2 text-sm"></i>
+        <i v-else class="ti ti-loader-2 text-sm animate-spin"></i>
+      </button>
+    </div>
+  </div>
+</template>
+```
+
+---
+
+## Admin Settings UI — `resources/js/Pages/Admin/Settings/AssistantSettings.vue`
+
+Settings page with tabs: General | AI Model | Persona | Access Control | System Prompts
+
+Key sections:
+
+```vue
+<!-- Tab: General -->
+<SettingToggle v-model="form.enabled"       label="Enable on Frontend" />
+<SettingToggle v-model="form.admin_enabled" label="Enable in Admin Panel" />
+<SettingSelect v-model="form.position"      label="Widget Position" :options="['bottom-right','bottom-left']" />
+<ColorPicker   v-model="form.accent_color"  label="Accent Color" />
+
+<!-- Tab: AI Model -->
+<ModelSelector   v-model="form.model"       label="Model" :providers="availableModels" />
+<RangeInput      v-model="form.max_tokens"  label="Max Tokens" :min="128" :max="8192" />
+<RangeInput      v-model="form.temperature" label="Temperature" :min="0" :max="2" :step="0.1" />
+
+<!-- Tab: Persona -->
+<TextInput  v-model="form.assistant_name"   label="Assistant Name" />
+<AvatarUpload v-model="form.avatar_url"     label="Avatar" />
+<TextInput  v-model="form.designation"      label="Designation" placeholder="Your AI Helper" />
+<Textarea   v-model="form.greeting_message" label="Greeting Message" />
+
+<!-- Tab: Access Control -->
+<SelectInput v-model="form.show_to"         label="Show To" :options="['all','logged_in','pro_only']" />
+<NumberInput v-model="form.daily_message_limit" label="Daily Message Limit (0 = unlimited)" />
+
+<!-- Tab: System Prompts -->
+<Textarea v-model="form.system_prompt_frontend" label="Frontend System Prompt" rows="8" />
+<Textarea v-model="form.system_prompt_admin"    label="Admin System Prompt" rows="8" />
+<!-- Info box: available variables: {app_name}, {assistant_name} -->
+```
+
+---
+
+## Admin Dashboard — Feedback Widget
+
+A small card in Admin → Dashboard showing assistant performance:
+
+```vue
+<!-- AssistantFeedbackCard.vue -->
+<!-- Shows: Total messages today, thumbs up %, top feedback pages, recent negative comments -->
+```
+
+Query:
+```php
+AssistantFeedback::selectRaw('
+    COUNT(*) as total,
+    SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as positive,
+    SUM(CASE WHEN rating = -1 THEN 1 ELSE 0 END) as negative
+')->whereDate('created_at', today())->first()
+```
+
+---
+
+## Inertia Shared Data (AppServiceProvider)
+
+```php
+// In HandleInertiaRequests middleware
+'assistantSettings' => fn () => AssistantSetting::current()->only([
+    'enabled', 'admin_enabled', 'assistant_name', 'avatar_url', 'designation',
+    'greeting_message', 'show_to', 'daily_message_limit', 'position', 'accent_color',
+    // NOTE: never expose system_prompt or custom_api_key to frontend
+]),
+```
+
+---
+
+## Layout Integration
+
+```vue
+<!-- AppLayout.vue (frontend) -->
+<FloatingAssistant v-if="$page.props.assistantSettings?.enabled" />
+
+<!-- AdminLayout.vue (admin panel) -->
+<FloatingAssistant v-if="$page.props.assistantSettings?.admin_enabled" :is-admin="true" />
+```
+
+---
+
+## Key Rules (non-negotiable)
+
+1. **Laravel AI SDK exclusively** (`laravel/ai`) — no raw OpenAI SDK, no LLPhant.
+2. **Streaming is POST + ReadableStream** — never EventSource.
+3. **`X-Accel-Buffering: no`** header is mandatory for all streaming responses.
+4. **`system_prompt` and `custom_api_key` are NEVER exposed** to the frontend via Inertia shared data.
+5. **`isProAvailable()`** must be checked before gating on `pro_only` access.
+6. **`settings('app_name')`** — never hardcode the app name anywhere.
+7. **No AI calls in the HTTP request cycle** — assistant streaming is the only exception (it IS the streaming response itself).
+8. **Admin context is cached for 2 minutes** — `Cache::remember('assistant.admin.site_context', 120, ...)`.
+9. **Session ID from `sessionStorage`** — not `localStorage` — resets per tab, preventing stale history.
+10. **Feedback uses `updateOrCreate`** — prevents duplicate ratings on same message.
+
+---
+
 ## PART 64 — EXPORT CENTER (EXCEL/CSV & PDF) ✅
 
 > **Packages (non-negotiable):**
@@ -10499,391 +12430,12 @@ public function handle(): void
 
 ---
 
----
-
-## 🔷 LAYER 10 — API & INFRASTRUCTURE (continued) ✅
-
-## PART 66 — BROADCASTING & INFRASTRUCTURE FALLBACKS (Redis-Optional)
-
-> **Goal:** MakeAI must run fully on shared hosting (no Redis) AND on VPS with Redis — same codebase,
-> zero manual code changes. Admin selects broadcasting driver from admin panel. All fallbacks are
-> automatic and transparent to end users.
-
----
-
-### 66.1 The Three-Tier Broadcasting Strategy
-
-```
-Admin Panel Setting: broadcasting_driver
-         │
-         ▼
-┌─────────────────────────────────────────────────────┐
-│  "reverb"  → Redis available? ──YES──► Laravel Reverb (WebSocket, self-hosted)
-│                                └─NO──► Auto-downgrade to HTTP Polling + warn in Site Health
-│                                                                                              │
-│  "pusher"  → Pusher API keys set? ──YES──► Pusher WebSocket
-│                                   └─NO──► Show config warning in admin, use Polling          │
-│                                                                                              │
-│  "polling" → HTTP Polling (30s interval) — zero config, works everywhere                   │
-└─────────────────────────────────────────────────────┘
-```
-
-**Key rule:** Broadcasting driver change takes effect immediately — no server restart, no cache clear.
-Laravel Echo on the frontend detects the driver from `$page.props.broadcasting` (Inertia shared data).
-
----
-
-### 66.2 Settings Table Entries
-
-```php
-// Added to SettingsSeeder.php — group: 'broadcasting'
-[
-    ['key' => 'broadcasting_driver',      'value' => 'reverb',  'type' => 'string',  'group' => 'broadcasting'],
-    ['key' => 'pusher_app_id',            'value' => '',        'type' => 'encrypted','group' => 'broadcasting'],
-    ['key' => 'pusher_app_key',           'value' => '',        'type' => 'string',  'group' => 'broadcasting'],
-    ['key' => 'pusher_app_secret',        'value' => '',        'type' => 'encrypted','group' => 'broadcasting'],
-    ['key' => 'pusher_app_cluster',       'value' => 'mt1',     'type' => 'string',  'group' => 'broadcasting'],
-    ['key' => 'polling_interval_seconds', 'value' => '30',      'type' => 'integer', 'group' => 'broadcasting'],
-]
-```
-
----
-
-### 66.3 BroadcastingService
-
-**`app/Services/BroadcastingService.php`**
-
-```php
-namespace App\Services;
-
-use Illuminate\Support\Facades\Redis;
-
-class BroadcastingService
-{
-    /**
-     * Resolve the effective broadcasting driver at runtime.
-     * Never read BROADCAST_DRIVER env directly — always use this method.
-     */
-    public function resolveDriver(): string
-    {
-        $selected = settings('broadcasting_driver', 'reverb'); // reverb | pusher | polling
-
-        return match ($selected) {
-            'reverb'  => $this->isRedisAvailable() ? 'reverb' : 'polling',
-            'pusher'  => $this->isPusherConfigured() ? 'pusher' : 'polling',
-            default   => 'polling',
-        };
-    }
-
-    public function isRedisAvailable(): bool
-    {
-        try {
-            Redis::ping();
-            return true;
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    public function isPusherConfigured(): bool
-    {
-        return filled(settings('pusher_app_key'))
-            && filled(settings('pusher_app_secret'))
-            && filled(settings('pusher_app_id'));
-    }
-
-    /**
-     * Returns config array for frontend (passed via Inertia shared data).
-     * Never exposes secret keys.
-     */
-    public function frontendConfig(): array
-    {
-        $driver = $this->resolveDriver();
-
-        return match ($driver) {
-            'reverb' => [
-                'driver'  => 'reverb',
-                'key'     => config('broadcasting.connections.reverb.key'),
-                'host'    => config('broadcasting.connections.reverb.options.host'),
-                'port'    => config('broadcasting.connections.reverb.options.port'),
-                'scheme'  => config('broadcasting.connections.reverb.options.scheme'),
-            ],
-            'pusher' => [
-                'driver'  => 'pusher',
-                'key'     => settings('pusher_app_key'),   // public key only — safe to expose
-                'cluster' => settings('pusher_app_cluster', 'mt1'),
-            ],
-            default => [
-                'driver'          => 'polling',
-                'interval_seconds'=> (int) settings('polling_interval_seconds', 30),
-            ],
-        };
-    }
-
-    /**
-     * Used in Site Health Monitor to surface warnings.
-     */
-    public function healthStatus(): array
-    {
-        $selected = settings('broadcasting_driver', 'reverb');
-        $effective = $this->resolveDriver();
-        $degraded  = $selected !== $effective;
-
-        return [
-            'selected'  => $selected,
-            'effective' => $effective,
-            'degraded'  => $degraded,
-            'reason'    => $degraded ? $this->degradationReason($selected) : null,
-        ];
-    }
-
-    private function degradationReason(string $selected): string
-    {
-        return match ($selected) {
-            'reverb' => 'Redis is not available. Reverb requires Redis. Falling back to HTTP polling.',
-            'pusher' => 'Pusher API keys are not configured. Falling back to HTTP polling.',
-            default  => 'Unknown',
-        };
-    }
-}
-```
-
----
-
-### 66.4 Inertia Shared Data — Broadcasting Config
-
-**`app/Http/Middleware/HandleInertiaRequests.php`** — `share()` method এ add করো:
-
-```php
-use App\Services\BroadcastingService;
-
-public function share(Request $request): array
-{
-    return array_merge(parent::share($request), [
-        // ... existing shared data ...
-        'broadcasting' => app(BroadcastingService::class)->frontendConfig(),
-    ]);
-}
-```
-
-Frontend এ `$page.props.broadcasting` হিসেবে সবসময় available থাকবে।
-
----
-
-### 66.5 Frontend Echo Bootstrap
-
-**`resources/js/bootstrap.ts`** — Echo initialization এখানে হবে:
-
-```typescript
-import Echo from 'laravel-echo'
-import Pusher from 'pusher-js'
-import { usePage } from '@inertiajs/vue3'
-
-export function initEcho(): Echo | null {
-    const broadcasting = usePage().props.broadcasting as BroadcastingConfig
-
-    if (broadcasting.driver === 'reverb') {
-        window.Echo = new Echo({
-            broadcaster: 'reverb',
-            key:         broadcasting.key,
-            wsHost:      broadcasting.host,
-            wsPort:      broadcasting.port ?? 80,
-            wssPort:     broadcasting.port ?? 443,
-            forceTLS:    broadcasting.scheme === 'https',
-            enabledTransports: ['ws', 'wss'],
-        })
-        return window.Echo
-    }
-
-    if (broadcasting.driver === 'pusher') {
-        window.Pusher = Pusher
-        window.Echo = new Echo({
-            broadcaster: 'pusher',
-            key:         broadcasting.key,
-            cluster:     broadcasting.cluster,
-            forceTLS:    true,
-        })
-        return window.Echo
-    }
-
-    // polling — Echo not initialized, composable handles polling
-    return null
-}
-```
-
----
-
-### 66.6 useNotifications Composable — Polling Fallback
-
-**`resources/js/composables/useNotifications.ts`**
-
-```typescript
-import { ref, onMounted, onUnmounted } from 'vue'
-import { usePage } from '@inertiajs/vue3'
-import axios from 'axios'
-
-export function useNotifications() {
-    const unreadCount   = ref(0)
-    const notifications = ref<Notification[]>([])
-    let pollingTimer: ReturnType<typeof setInterval> | null = null
-    let echoChannel: any = null
-
-    const fetchNotifications = async () => {
-        const { data } = await axios.get('/user/notifications')
-        notifications.value = data.notifications
-        unreadCount.value   = data.unread_count
-    }
-
-    const handleNewNotification = (notification: Notification) => {
-        notifications.value.unshift(notification)
-        unreadCount.value++
-    }
-
-    onMounted(() => {
-        const broadcasting = usePage().props.broadcasting as any
-
-        if (broadcasting.driver !== 'polling' && window.Echo) {
-            // WebSocket path (Reverb or Pusher)
-            const userId = usePage().props.auth?.user?.id
-            echoChannel = window.Echo
-                .private(`App.Models.User.${userId}`)
-                .notification(handleNewNotification)
-        } else {
-            // Polling fallback — fetch on mount + interval
-            fetchNotifications()
-            const interval = (broadcasting.interval_seconds ?? 30) * 1000
-            pollingTimer = setInterval(fetchNotifications, interval)
-        }
-    })
-
-    onUnmounted(() => {
-        if (pollingTimer) clearInterval(pollingTimer)
-        if (echoChannel) echoChannel.stopListening('.Illuminate\\Notifications\\Events\\BroadcastNotificationCreated')
-    })
-
-    return { unreadCount, notifications, fetchNotifications }
-}
-```
-
----
-
-### 66.8 Site Health Monitor Integration
-
-**`app/Services/SiteHealthService.php`** এ add করো:
-
-```php
-public function broadcastingCheck(): HealthCheck
-{
-    $status = app(BroadcastingService::class)->healthStatus();
-
-    if ($status['degraded']) {
-        return HealthCheck::warn(
-            title:      'Broadcasting Degraded',
-            detail:     $status['reason'],
-            suggestion: 'Go to Settings → Broadcasting to configure your driver.',
-        );
-    }
-
-    $label = match ($status['effective']) {
-        'reverb'  => 'Laravel Reverb (WebSocket)',
-        'pusher'  => 'Pusher (WebSocket)',
-        'polling' => 'HTTP Polling (30s)',
-    };
-
-    return HealthCheck::pass(
-        title:  'Broadcasting',
-        detail: "Active driver: {$label}",
-    );
-}
-```
-
-Site Health display:
-```
-✅ Broadcasting   — Laravel Reverb (WebSocket)        [VPS with Redis]
-🟡 Broadcasting   — Reverb selected but Redis missing  [shared hosting warning]
-                    Falling back to HTTP Polling
-                    → Go to Settings › Broadcasting
-✅ Broadcasting   — Pusher (WebSocket)                 [Pusher configured]
-✅ Broadcasting   — HTTP Polling (30s interval)        [polling selected]
-```
-
----
-
-### 66.9 Infrastructure Fallback Summary Table
-
-| Feature | With Redis (VPS) | Without Redis (Shared Hosting) |
-|---------|-----------------|-------------------------------|
-| **Cache** | Redis (fast) | File driver (auto) |
-| **Queue** | Redis + Horizon | Database driver (auto) |
-| **Sessions** | Redis | File driver (auto) |
-| **Broadcasting** | Reverb / Pusher | Pusher or Polling (admin choice) |
-| **Rate Limiting** | Sliding window (Redis sorted sets) | Fixed window (DB table) |
-| **Real-time Notifications** | WebSocket push | HTTP polling (30s) |
-| **Horizon Dashboard** | Available | Hidden (not available without Redis) |
-
----
-
-### 66.10 `.env.example` Entries
-
-```env
-# Broadcasting — set by installation wizard based on server detection
-# Options: reverb | pusher | polling (stored in settings table, not .env)
-# .env only needs REVERB_* if using Reverb
-REVERB_APP_ID=makeai
-REVERB_APP_KEY=makeai-key
-REVERB_APP_SECRET=makeai-secret
-REVERB_HOST="localhost"
-REVERB_PORT=8080
-REVERB_SCHEME=http
-
-# Pusher keys are stored encrypted in settings table — NOT in .env
-# Configure via Admin → Settings → Broadcasting
-```
-
----
-
-### 66.11 Installation Wizard Update (Step 1 — Server Requirements)
-
-Step 1 এ Redis row এ এই UI দেখাবে:
-
-```
-Redis            ✅ Found     → Reverb + Horizon available
-                 ⚠️ Not found → File/DB fallback mode
-                               Broadcasting: configure Pusher or use Polling
-                               (All features work, WebSocket notifications delayed 30s)
-```
-
-Wizard এ Redis not found হলে:
-- `CACHE_DRIVER=file` set
-- `QUEUE_CONNECTION=database` set
-- `queue:table` + `queue:failed-table` migration auto-run
-- Broadcasting driver default → `polling` (admin can change to Pusher later)
-
----
-
-### 66.12 Checklist: Broadcasting & Infrastructure Fallbacks
-
-- [ ] `BroadcastingService::resolveDriver()` returns correct driver based on settings + availability check
-- [ ] Redis unavailable + Reverb selected → auto-downgrade to polling (no crash, no error page)
-- [ ] Pusher selected + keys missing → auto-downgrade to polling + admin warning shown
-- [ ] `$page.props.broadcasting` always present in Inertia shared data
-- [ ] `useNotifications` composable: WebSocket path tested (Reverb + Pusher), polling path tested
-- [ ] Polling interval respects `polling_interval_seconds` setting (default 30s)
-- [ ] Pusher "Test Connection" returns clear success/error message
-- [ ] Reverb "Test Connection" correctly reports Redis availability
-- [ ] Site Health Monitor shows correct status for all 4 broadcasting states
-- [ ] Horizon dashboard hidden in admin menu when Redis unavailable
-- [ ] Queue `database` driver: `jobs` + `failed_jobs` tables created by wizard automatically
-- [ ] Rate limiting: DB fallback active when Redis unavailable (fixed window, `rate_limit_hits` table)
-- [ ] `pusher/pusher-php-server` added to `composer.json` (needed for test connection)
-- [ ] `pusher-js` added to `package.json` (needed for Echo Pusher driver)
-- [ ] Pusher App Secret + App ID stored encrypted in settings table — never in `.env` or frontend
-- [ ] Installation wizard auto-detects Redis and sets correct default drivers in `.env`
-- [ ] All fallback modes tested on a clean shared hosting environment (no Redis, no Horizon)
-
----
-
 # PART 67 — RAG TOOLS SUITE (Chat with PDF / Website / YouTube / KB Writer)
+
+> **Version note:** Adding this part bumps the master prompt to **v4.3 — 67 parts**.
+> Update the Final Stats table (P65/P52) and the Layer index:
+> add `P67 RAG TOOLS SUITE` under **LAYER 14 — CORE FEATURE ENHANCEMENTS**.
+
 ---
 
 ## 67.1 Overview
@@ -11346,14 +12898,14 @@ Each RAG tool can be plan-gated via the existing plan→tools mapping; subscript
 
 ## 🔷 FINAL STATS
 
-## PART 68 — FINAL COMPLETE STATS
+## PART 65 — FINAL COMPLETE STATS
 
 *End of MakeAI Complete Development Master Prompt*
 
 | Metric | Count |
 |--------|-------|
-| Version | 4.2 |
-| Total Parts | 64 |
+| Version | 4.1 |
+| Total Parts | 63 |
 | AI Templates | 255 |
 | Mail Templates | 23 |
 | API Endpoints | 80+ |

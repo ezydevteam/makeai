@@ -25,6 +25,7 @@ const isSuperAdmin = computed(() => (page.props.admin as any)?.isSuperAdmin ?? f
 const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
 const pendingCommentsCount = computed(() => Number((page.props.admin as any)?.pendingCommentsCount ?? 0))
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+const addonMenuItems = computed(() => (page.props.addonMenuItems as any[]) ?? [])
 const broadcasting = computed<SidebarBroadcastingConfig>(() => (page.props.broadcasting as SidebarBroadcastingConfig) ?? {})
 
 const can = (perm: string) => isSuperAdmin.value || permissions.value.includes(perm)
@@ -47,18 +48,29 @@ const isAiManagementActive = () =>
         'admin.ai.templates.*',
         'admin.ai.access.*',
         'admin.ai.logs.*',
+        'admin.ai.rag.*',
     )
 const isExportCenterActive = () => isCurrentPath('/admin/reports/export-center')
-const isRateLimitsActive = () => isCurrentPath('/admin/security/rate-limits')
+const isRateLimitsActive = () => isCurrentPath('/admin/system/rate-limits')
 const isNotificationsActive = () => isCurrentPath('/admin/notifications')
+const isContactMessagesActive = () => isCurrentPath('/admin/contact/messages', '/admin/contact/settings')
+const isSupportTicketsActive = () => isCurrentPath('/admin/support/tickets', '/admin/support/departments', '/admin/support/canned-responses', '/admin/support/settings')
 const isLanguagesActive = () => isCurrentPath('/admin/localization/languages', '/admin/localization/translations')
 const isOAuthActive = () => isCurrentRoute('admin.oauth.settings.edit', 'admin.oauth.settings.update')
+const isMarketingAdsActive = () => isCurrentPath('/admin/marketing/ads')
 const isMarketingSocialActive = () => isCurrentRoute('admin.social.settings.edit', 'admin.social.settings.update')
-const isNewsletterActive = () => isCurrentPath('/admin/community/newsletter')
+const isNewsletterActive = () => isCurrentPath('/admin/marketing/newsletter')
 const isMarketingSocialPageActive = () => isCurrentPath('/admin/marketing/social')
+const isSystemGroupActive = () => isCurrentPath('/admin/system', '/admin/system/style', '/admin/license')
+const isSystemHealthActive = () => isCurrentPath('/admin/system/health')
+const isSystemUpdatesActive = () => isCurrentPath('/admin/system/updates')
+const isSystemCronActive = () => isCurrentPath('/admin/system/cron-jobs')
+const isSystemMaintenanceActive = () => isCurrentPath('/admin/system/maintenance')
+const isCustomStyleActive = () => isCurrentPath('/admin/system/style')
 
 function toggleGroup(group: string) {
-    menuGroups.value[group] = !menuGroups.value[group]
+    const nextState = !menuGroups.value[group]
+    menuGroups.value = nextState ? { [group]: true } : {}
 }
 
 function isGroupOpen(group: string) {
@@ -75,13 +87,13 @@ function autoExpandOnRoute(group: string, patterns: string[]) {
 }
 
 autoExpandOnRoute('users', ['admin.users.*', 'admin.admins.*', 'admin.roles.*'])
-autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*'])
+autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
 autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.coupons.*'])
 autoExpandOnRoute('blog', ['admin.blog.posts.*', 'admin.blog.categories.*', 'admin.blog.tags.*', 'admin.blog.settings.*', 'admin.comments.*'])
 autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*'])
 autoExpandOnRoute('sitebuilder', ['admin.header.*', 'admin.footer.*', 'admin.homepage.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.appearance.*', 'admin.license.*'])
-autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.gdpr.settings*', 'admin.ai.integrations.*', 'admin.oauth.settings.*'])
+autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.features.settings*', 'admin.gdpr.settings*', 'admin.ai.integrations.*', 'admin.oauth.settings.*'])
 </script>
 
 <template>
@@ -143,11 +155,12 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
           </button>
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('ai') }">
-          <Link :href="route('admin.ai.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.index') || isActive('admin.ai.provider') }">{{ t('Providers & Keys') }}</Link>
           <Link :href="route('admin.ai.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.categories.*') }">{{ t('Categories') }}</Link>
           <Link :href="route('admin.ai.tools.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.tools.*') }">{{ t('Tools') }}</Link>
           <Link :href="route('admin.ai.templates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.templates.*') }">{{ t('Templates') }}</Link>
+          <Link :href="route('admin.ai.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.index') || isActive('admin.ai.provider') }">{{ t('Providers & Keys') }}</Link>
           <Link :href="route('admin.ai.access.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.access.*') }">{{ t('Access Settings') }}</Link>
+          <Link :href="route('admin.ai.rag.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.rag.*') }">{{ t('RAG Settings') }}</Link>
           <Link :href="route('admin.ai.logs.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.logs.*') }">{{ t('Usage & Logs') }}</Link>
         </div>
       </div>
@@ -193,18 +206,6 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
           <Link v-if="canAny(['content.comments', 'content.blog', 'content.pages'])" :href="route('admin.comments.index')" class="sidebar-subitem" :class="{ active: isActive('admin.comments.*') }">{{ t('Comments') }}</Link>
         </div>
       </div>
-      <Tooltip v-if="can('content.pages')" :content="t('Messages')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.contact.messages.index')" class="sidebar-item" :class="{ active: isActive('admin.contact.messages.*') || isActive('admin.contact.settings.*') }">
-        <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0l-7.5-4.615A2.25 2.25 0 012.25 6.993V6.75" /></svg>
-        <span v-show="!collapsed">{{ t('Messages') }}</span>
-        </Link>
-      </Tooltip>
-      <Tooltip v-if="can('support.tickets')" :content="t('Support')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.support.tickets.index')" class="sidebar-item" :class="{ active: isActive('admin.support.*') }">
-        <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
-        <span v-show="!collapsed">{{ t('Support') }}</span>
-        </Link>
-      </Tooltip>
       <Tooltip v-if="can('content.testimonials')" :content="t('Testimonials')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.testimonials.index')" class="sidebar-item" :class="{ active: isActive('admin.testimonials.*') }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
@@ -215,6 +216,19 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
         <Link :href="route('admin.faqs.index')" class="sidebar-item" :class="{ active: isActive('admin.faqs.*') }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         <span v-show="!collapsed">{{ t('FAQs') }}</span>
+        </Link>
+      </Tooltip>
+      <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Communications') }}</div>
+      <Tooltip v-if="can('content.pages')" :content="t('Messages')" placement="right" :full-width="true" :disabled="!collapsed">
+        <Link :href="route('admin.contact.messages.index')" class="sidebar-item" :class="{ active: isContactMessagesActive() }">
+        <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0l-7.5-4.615A2.25 2.25 0 012.25 6.993V6.75" /></svg>
+        <span v-show="!collapsed">{{ t('Messages') }}</span>
+        </Link>
+      </Tooltip>
+      <Tooltip v-if="can('support.tickets')" :content="t('Support')" placement="right" :full-width="true" :disabled="!collapsed">
+        <Link :href="route('admin.support.tickets.index')" class="sidebar-item" :class="{ active: isSupportTicketsActive() }">
+        <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
+        <span v-show="!collapsed">{{ t('Support') }}</span>
         </Link>
       </Tooltip>
 
@@ -272,7 +286,7 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
       <div v-if="can('settings.manage')">
         <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('System') }}</div>
         <Tooltip :content="t('Settings')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('system-settings')" class="sidebar-item w-full" :class="{ 'active !font-medium': isActive('admin.settings.index') || isActive('admin.settings.update') || isActive('admin.gdpr.settings*') || isActive('admin.ai.integrations.*') || isOAuthActive(), 'open': isGroupOpen('system-settings') }">
+          <button @click="toggleGroup('system-settings')" class="sidebar-item w-full" :class="{ 'active !font-medium': isActive('admin.settings.index') || isActive('admin.settings.update') || isActive('admin.features.settings*') || isActive('admin.gdpr.settings*') || isActive('admin.ai.integrations.*') || isOAuthActive(), 'open': isGroupOpen('system-settings') }">
             <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.213m5.102-4c0-1.315-.152-2.593-.44-3.815a.75.75 0 01.527-.895l.896-.24a.75.75 0 01.917.54C19.875 9.92 21 12.33 21 15s-1.125 5.08-3.264 7.605a.75.75 0 01-.917.54l-.896-.24a.75.75 0 01-.527-.895A21.036 21.036 0 0015.5 15c0-1.315-.152-2.593-.44-3.815z" /></svg>
             <span v-show="!collapsed" class="flex-1 text-left">{{ t('Settings') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
@@ -280,38 +294,34 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('system-settings') }">
           <Link :href="route('admin.settings.index')" class="sidebar-subitem" :class="{ active: isActive('admin.settings.index') }">{{ t('General') }}</Link>
+          <Link :href="route('admin.features.settings')" class="sidebar-subitem" :class="{ active: isActive('admin.features.settings*') }">{{ t('Features') }}</Link>
           <Link :href="route('admin.gdpr.settings')" class="sidebar-subitem" :class="{ active: isActive('admin.gdpr.settings*') }">{{ t('GDPR') }}</Link>
           <Link :href="route('admin.oauth.settings.edit')" class="sidebar-subitem" :class="{ active: isOAuthActive() }">{{ t('OAuth') }}</Link>
           <Link :href="route('admin.ai.integrations.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.integrations.*') }">{{ t('Integrations') }}</Link>
         </div>
         <Tooltip :content="t('System')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('system')" class="sidebar-item w-full" :class="{ 'active !font-medium': isActive('admin.system.*') || isActive('admin.appearance.*') || isActive('admin.license.*'), 'open': isGroupOpen('system') }">
+          <button @click="toggleGroup('system')" class="sidebar-item w-full" :class="{ 'active !font-medium': isSystemGroupActive(), 'open': isGroupOpen('system') }">
             <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" /></svg>
             <span v-show="!collapsed" class="flex-1 text-left">{{ t('System') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
           </button>
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('system') }">
-          <Link :href="route('admin.system.health')" class="sidebar-subitem" :class="{ active: isActive('admin.system.health') }">{{ t('Health Check') }}</Link>
-          <Link :href="route('admin.system.updates')" class="sidebar-subitem" :class="{ active: isActive('admin.system.updates') }">
+          <Link :href="route('admin.system.health')" class="sidebar-subitem" :class="{ active: isSystemHealthActive() }">{{ t('Health Check') }}</Link>
+          <Link :href="route('admin.system.updates')" class="sidebar-subitem" :class="{ active: isSystemUpdatesActive() }">
             {{ t('Update') }}
             <span v-if="page.props.updateAvailable" class="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">1</span>
           </Link>
-          <Link :href="route('admin.system.cron-jobs')" class="sidebar-subitem" :class="{ active: isActive('admin.system.cron-jobs') }">{{ t('Cron Jobs') }}</Link>
-          <Link :href="route('admin.system.maintenance')" class="sidebar-subitem" :class="{ active: isActive('admin.system.maintenance') }">{{ t('Maintenance') }}</Link>
-          <Link :href="route('admin.appearance.index')" class="sidebar-subitem" :class="{ active: isActive('admin.appearance.index') }">{{ t('Custom Style') }}</Link>
+          <Link :href="route('admin.system.cron-jobs')" class="sidebar-subitem" :class="{ active: isSystemCronActive() }">{{ t('Cron Jobs') }}</Link>
+          <Link :href="route('admin.system.maintenance')" class="sidebar-subitem" :class="{ active: isSystemMaintenanceActive() }">{{ t('Maintenance') }}</Link>
+          <Link :href="route('admin.system.rate-limits.index')" class="sidebar-subitem" :class="{ active: isRateLimitsActive() }">{{ t('Rate Limits') }}</Link>
+          <Link :href="route('admin.appearance.index')" class="sidebar-subitem" :class="{ active: isCustomStyleActive() }">{{ t('Custom Style') }}</Link>
           <a v-if="broadcasting.redis_available" href="/horizon" class="sidebar-subitem" target="_blank" rel="noopener">
             {{ t('Horizon') }}
             <svg class="ml-1 inline-block h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
           </a>
         </div>
       </div>
-      <Tooltip v-if="can('settings.manage')" :content="t('Rate Limits')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.security.rate-limits.index')" class="sidebar-item" :class="{ active: isRateLimitsActive() }">
-          <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-          <span v-show="!collapsed">{{ t('Rate Limits') }}</span>
-        </Link>
-      </Tooltip>
       <Tooltip v-if="can('settings.general')" :content="t('Notifications')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.notifications.settings')" class="sidebar-item" :class="{ active: isNotificationsActive() }">
           <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022 23.848 23.848 0 005.454 1.31m5.715 0a3 3 0 11-5.715 0" /></svg>
@@ -334,7 +344,7 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
       <!-- === Marketing === -->
       <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Marketing') }}</div>
       <Tooltip v-if="can('settings.manage')" :content="t('Advertisements')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.ads.index')" class="sidebar-item" :class="{ active: isActive('admin.ads.*') }">
+        <Link :href="route('admin.ads.index')" class="sidebar-item" :class="{ active: isMarketingAdsActive() }">
           <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.213m5.102-4c0-1.315-.152-2.593-.44-3.815a.75.75 0 01.527-.895l.896-.24a.75.75 0 01.917.54C19.875 9.92 21 12.33 21 15s-1.125 5.08-3.264 7.605a.75.75 0 01-.917.54l-.896-.24a.75.75 0 01-.527-.895A21.036 21.036 0 0015.5 15c0-1.315-.152-2.593-.44-3.815z" /></svg>
           <span v-show="!collapsed">{{ t('Advertisements') }}</span>
         </Link>
@@ -363,6 +373,17 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
           <span v-show="!collapsed">{{ t('Announcements') }}</span>
         </Link>
       </Tooltip>
+
+      <!-- Addon menu items -->
+      <template v-if="addonMenuItems.length">
+        <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Addons') }}</div>
+        <Tooltip v-for="item in addonMenuItems" :key="item.slug" :content="item.label" placement="right" :full-width="true" :disabled="!collapsed">
+          <Link v-if="can(item.permission)" :href="route(item.route, item.route_params || {})" class="sidebar-item" :class="{ active: isActive(item.route_pattern) }">
+            <i v-if="item.icon" :class="item.icon" class="sidebar-icon"></i>
+            <span v-show="!collapsed">{{ item.label }}</span>
+          </Link>
+        </Tooltip>
+      </template>
     </nav>
   </aside>
 </template>

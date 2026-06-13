@@ -23,9 +23,10 @@ class DocumentIngestionService
     /**
      * Ingest a document file into a knowledge base collection.
      */
-    public function ingest(UploadedFile|string $file, int $userId, string $collectionId): array
+    public function ingest(UploadedFile|string $file, int $userId, string $collectionId, ?\Closure $onStageChange = null, ?string $filename = null): array
     {
         $tempPath = null;
+        $notify = $onStageChange ?? fn (string $stage) => null;
 
         if ($file instanceof UploadedFile) {
             if (! $this->extractor->supports($file->getClientOriginalName())) {
@@ -33,20 +34,21 @@ class DocumentIngestionService
             }
 
             $tempPath = $file->store('temp/ingest');
-            $filePath = storage_path("app/{$tempPath}");
+            $filePath = \Illuminate\Support\Facades\Storage::path($tempPath);
         } else {
             $filePath = $file;
         }
 
         try {
             // 1. Extract text
+            $notify('extracting');
             $text = $this->extractor->extract($filePath);
 
             // 2. Create document record
             $document = \DB::table('knowledge_base_documents')->insertGetId([
                 'knowledge_base_id' => $collectionId,
                 'user_id' => $userId,
-                'filename' => $file instanceof UploadedFile ? $file->getClientOriginalName() : basename($filePath),
+                'filename' => $filename ?? ($file instanceof UploadedFile ? $file->getClientOriginalName() : basename($filePath)),
                 'filesize' => $file instanceof UploadedFile ? $file->getSize() : filesize($filePath),
                 'char_count' => mb_strlen($text),
                 'status' => 'processing',
@@ -55,9 +57,15 @@ class DocumentIngestionService
             ]);
 
             // 3. Chunk text
+            $notify('chunking');
             $chunks = $this->chunker->chunkForDocument($text, $document);
 
+            if (empty($chunks)) {
+                throw new RuntimeException('No readable text could be extracted from this document. The file may be image-only, encrypted, or in an unsupported format.');
+            }
+
             // 4. Generate embeddings in batches
+            $notify('embedding');
             $batchSize = 20;
             $chunkBatches = array_chunk($chunks, $batchSize);
 
@@ -107,6 +115,17 @@ class DocumentIngestionService
                 'char_count' => mb_strlen($text),
                 'status' => 'completed',
             ];
+        } catch (\Throwable $e) {
+            // Mark document as failed if any step errors
+            if (isset($document)) {
+                \DB::table('knowledge_base_documents')
+                    ->where('id', $document)
+                    ->update([
+                        'status' => 'failed',
+                        'updated_at' => now(),
+                    ]);
+            }
+            throw $e;
         } finally {
             // Cleanup temp file
             if ($tempPath && \Storage::exists($tempPath)) {
@@ -118,18 +137,37 @@ class DocumentIngestionService
     /**
      * Ingest text from a URL.
      */
-    public function ingestFromUrl(string $url, int $userId, string $collectionId): array
+    public function ingestFromUrl(string $url, int $userId, string $collectionId, ?\Closure $onStageChange = null): array
     {
+        $notify = $onStageChange ?? fn (string $stage) => null;
+
+        $notify('scraping');
         $text = $this->extractor->extractFromUrl($url);
 
         // Save as temp file for the pipeline
         $tempPath = 'temp/ingest_url_'.md5($url).'.txt';
         \Storage::put($tempPath, $text);
 
-        $filePath = storage_path("app/{$tempPath}");
+        $filePath = \Illuminate\Support\Facades\Storage::path($tempPath);
+
+        // Derive a readable name from the URL
+        $parsedUrl = parse_url($url);
+        $readableName = ($parsedUrl['host'] ?? 'website')
+            .($parsedUrl['path'] ?? '');
+        $readableName = mb_substr(preg_replace('/[^a-zA-Z0-9._\-\/]/', '', $readableName), 0, 100);
 
         try {
-            return $this->ingest($filePath, $userId, $collectionId);
+            // Override the basename by creating the document record with the URL-derived name
+            $result = $this->ingest($filePath, $userId, $collectionId, $onStageChange);
+
+            // Update the document record with a readable filename
+            if (isset($result['document_id'])) {
+                \DB::table('knowledge_base_documents')
+                    ->where('id', $result['document_id'])
+                    ->update(['filename' => $readableName ?: $url]);
+            }
+
+            return $result;
         } finally {
             if (\Storage::exists($tempPath)) {
                 \Storage::delete($tempPath);

@@ -10,9 +10,40 @@ import { useNumberFormat } from '@/Composables/useNumberFormat'
 
 defineOptions({ layout: AdminLayout })
 
+interface ToolCategory {
+    id: number
+    name: string
+    slug: string
+}
+
+interface ToolItem {
+    id: number
+    name: string
+    slug: string
+    icon?: string | null
+    color?: string | null
+    is_active: boolean
+    usage_count?: number | string | null
+    category?: ToolCategory | string | null
+}
+
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
 const props = defineProps<{
-    tools: any
-    categories: any[]
+    tools: {
+        data: ToolItem[]
+        links: PaginationLink[]
+        from?: number | null
+        to?: number | null
+        total?: number | null
+        current_page?: number | null
+        last_page?: number | null
+    }
+    categories: ToolCategory[]
     filters: { category?: string; search?: string; status?: string }
 }>()
 
@@ -24,7 +55,7 @@ const { formatNumber } = useNumberFormat()
 
 const categoryOptions = computed(() => [
     { value: '', label: t('All Categories') },
-    ...props.categories.map((c: any) => ({ value: String(c.id), label: c.name })),
+    ...props.categories.map((c) => ({ value: String(c.id), label: c.name })),
 ])
 
 const statusOptions = computed(() => [
@@ -38,16 +69,33 @@ const applyFilters = () => {
         search: search.value || undefined,
         category: selectedCategory.value || undefined,
         status: selectedStatus.value || undefined,
-    }, { preserveState: true, replace: true })
+    }, { preserveScroll: true, preserveState: true, replace: true })
 }
 
 const toggleTool = (id: number) => {
     router.post(route('admin.ai.tools.toggle', id), {}, { preserveScroll: true })
 }
 
-// ─── Tool display helpers ────────────────────
-const toolIcon = (tool: any) => tool.icon
-const toolInitial = (tool: any) => String(tool.name || '?').charAt(0).toUpperCase()
+const hasActiveFilters = computed(() => Boolean(search.value || selectedCategory.value || selectedStatus.value))
+
+let filterTimer: ReturnType<typeof setTimeout> | null = null
+const handleSearchInput = () => {
+    if (filterTimer) clearTimeout(filterTimer)
+    filterTimer = setTimeout(applyFilters, 350)
+}
+
+const clearSearch = () => {
+    if (!search.value) return
+    search.value = ''
+    applyFilters()
+}
+
+const resetFilters = () => {
+    search.value = ''
+    selectedCategory.value = ''
+    selectedStatus.value = ''
+    applyFilters()
+}
 
 // ─── Delete confirmation ──────────────────────
 const deleteModalOpen = ref(false)
@@ -76,57 +124,67 @@ const executeDelete = () => {
 <template>
     <Head :title="t('AI Tools — Admin')" />
 
-    <div class="max-w-7xl mx-auto space-y-6">
+    <div class="mx-auto max-w-7xl px-6 py-8 space-y-6">
         <!-- Header -->
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tools') }}</h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('Manage AI tools, prompts, and configurations.') }}</p>
             </div>
-            <Link :href="route('admin.ai.tools.create')" class="inline-flex items-center gap-2 btn-primary">
-                <i class="ti ti-plus text-lg"></i>
+            <Link :href="route('admin.ai.tools.create')" class="inline-flex items-center gap-2 btn-primary px-4 py-2 text-sm">
+                <i class="ti ti-plus"></i>
                 {{ t('New Tool') }}
             </Link>
         </div>
 
-        <!-- Filters -->
-        <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-200 dark:border-surface-800 p-4">
-            <div class="flex flex-wrap gap-3">
-                <input
-                    v-model="search"
-                    @keyup.enter="applyFilters"
-                    type="text"
-                    :placeholder="t('Search tools...')"
-                    class="flex-1 min-w-[200px] px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
+        <!-- Table -->
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
+                <div class="relative min-w-[240px] flex-1">
+                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
+                    <input
+                        v-model="search"
+                        @input="handleSearchInput"
+                        type="text"
+                        :placeholder="t('Search tools...')"
+                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    />
+                    <button
+                        v-if="search"
+                        type="button"
+                        class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                        :aria-label="t('Clear search')"
+                        @click="clearSearch"
+                    >
+                        <i class="ti ti-x text-sm"></i>
+                    </button>
+                </div>
                 <AppSelect
                     v-model="selectedCategory"
                     :options="categoryOptions"
                     :placeholder="t('All Categories')"
                     live-search
-                    class="w-56"
+                    class="w-full sm:w-56"
                     @update:model-value="applyFilters"
                 />
                 <AppSelect
                     v-model="selectedStatus"
                     :options="statusOptions"
                     :placeholder="t('All Status')"
-                    class="w-44"
+                    class="w-full sm:w-44"
                     @update:model-value="applyFilters"
                 />
             </div>
-        </div>
 
-        <!-- Table -->
-        <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-200 dark:border-surface-800 overflow-hidden overflow-x-auto">
-            <table class="w-full text-sm min-w-[700px]">
+            <div class="overflow-x-auto">
+                <table class="min-w-[700px] w-full text-sm">
                 <thead>
-                    <tr class="border-b border-gray-100 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-800/50">
-                        <th class="text-left px-6 py-3.5 font-semibold text-gray-600 dark:text-gray-400">{{ t('Tool') }}</th>
-                        <th class="text-left px-4 py-3.5 font-semibold text-gray-600 dark:text-gray-400">{{ t('Category') }}</th>
-                        <th class="text-center px-4 py-3.5 font-semibold text-gray-600 dark:text-gray-400">{{ t('Status') }}</th>
-                        <th class="text-center px-4 py-3.5 font-semibold text-gray-600 dark:text-gray-400">{{ t('Uses') }}</th>
-                        <th class="text-right px-6 py-3.5 font-semibold text-gray-600 dark:text-gray-400">{{ t('Actions') }}</th>
+                    <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
+                        <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
+                        <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
+                        <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                        <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Uses') }}</th>
+                        <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
@@ -147,7 +205,7 @@ const executeDelete = () => {
                             <span v-if="tool.category" class="text-xs font-medium px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-400">
                                 {{ typeof tool.category === 'object' ? tool.category.name : tool.category }}
                             </span>
-                            <span v-else class="text-xs text-gray-400">—</span>
+                            <span v-else class="text-xs text-gray-400">{{ t('—') }}</span>
                         </td>
                         <td class="px-4 py-4 text-center">
                             <button
@@ -167,29 +225,44 @@ const executeDelete = () => {
                         </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex items-center justify-end gap-2">
-                                <Link :href="route('admin.ai.tools.edit', tool.id)" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-800 text-gray-500 dark:text-gray-400 hover:text-primary-600 transition-colors" :title="t('Edit')">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                <Link :href="route('admin.ai.tools.edit', tool.id)" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-surface-800" :title="t('Edit')">
+                                    <i class="ti ti-edit text-base"></i>
                                 </Link>
-                                <button @click="confirmDelete(tool.id)" class="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors" :title="t('Delete')">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                <button @click="confirmDelete(tool.id)" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" :title="t('Delete')">
+                                    <i class="ti ti-trash text-base"></i>
                                 </button>
                             </div>
                         </td>
                     </tr>
                     <tr v-if="!tools.data?.length">
                         <td colspan="5" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
-                            <svg class="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                            <i class="ti ti-table-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
                             <p class="font-medium">{{ t('No tools found') }}</p>
+                            <button
+                                v-if="hasActiveFilters"
+                                type="button"
+                                class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                @click="resetFilters"
+                            >
+                                {{ t('Clear filters') }}
+                            </button>
                         </td>
                     </tr>
                 </tbody>
-            </table>
-        </div>
+                </table>
+            </div>
 
-        <!-- Pagination -->
-        <div v-if="tools.links && tools.links.length > 3">
-            <Pagination :links="tools.links" />
-        </div>
+            <div v-if="tools.links && tools.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
+                <Pagination
+                    :links="tools.links"
+                    :from="tools.from"
+                    :to="tools.to"
+                    :total="tools.total"
+                    :current-page="tools.current_page"
+                    :last-page="tools.last_page"
+                />
+            </div>
+        </section>
     </div>
 
     <!-- Delete Confirmation Modal -->

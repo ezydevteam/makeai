@@ -32,7 +32,7 @@ const form = useForm({
     name: props.user.name,
     email: props.user.email,
     credits: props.user.credits,
-    plan_id: props.user.plan_id,
+    plan_id: props.user.plan_id ?? '',
     is_active: props.user.is_active,
     password: '',
     password_confirmation: '',
@@ -55,7 +55,7 @@ const notificationModalOpen = ref(false);
 const deleteModalOpen = ref(false);
 
 const planOptions = computed(() => [
-    { value: null, label: t('No Plan (Free)') },
+    { value: '', label: t('No Plan') },
     ...props.plans.map((plan) => ({
         value: plan.id,
         label: plan.name,
@@ -86,7 +86,10 @@ const statusBadgeClass = (status: string) => {
 };
 
 const submit = () => {
-    form.post(route('admin.users.update', props.user.ulid), {
+    form.transform((data) => ({
+        ...data,
+        plan_id: data.plan_id || null,
+    })).post(route('admin.users.update', props.user.ulid), {
         onSuccess: () => {
             form.password = '';
             form.password_confirmation = '';
@@ -115,15 +118,20 @@ const disableTwoFactor = () => {
 
 <template>
     <Head :title="`${user.name} - ${t('User Details')}`" />
-    <div class="max-w-5xl mx-auto px-6 py-8">
-        <div class="flex items-center gap-3 mb-8">
-            <Link :href="route('admin.users.index')" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-500 hover:text-gray-900 transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
-            </Link>
+    <div class="mx-auto w-full sm:max-w-5xl px-6 py-8">
+        <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">{{ t('Edit User') }}: {{ user.name }}</h1>
                 <p class="text-sm text-gray-500">{{ t('ULID') }}: <span class="font-mono text-gray-400">{{ user.ulid }}</span></p>
             </div>
+
+            <Link
+                :href="route('admin.users.index')"
+                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+                <i class="ti ti-arrow-left text-base"></i>
+                {{ t('Back') }}
+            </Link>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -190,26 +198,6 @@ const disableTwoFactor = () => {
                         </button>
                     </div>
                 </form>
-
-                <!-- Usage Stats -->
-                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <div>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Today Usage</p>
-                        <p class="text-xl font-bold text-gray-900">{{ parseFloat(user.credits_used_today).toFixed(2) }}</p>
-                    </div>
-                    <div>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Month Usage</p>
-                        <p class="text-xl font-bold text-gray-900">{{ parseFloat(user.credits_used_month).toFixed(2) }}</p>
-                    </div>
-                    <div>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Referrals</p>
-                        <p class="text-xl font-bold text-gray-900">{{ user.referral_count }}</p>
-                    </div>
-                    <div>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Referral Earned</p>
-                        <p class="text-xl font-bold text-gray-900">${{ parseFloat(user.referral_earnings).toFixed(2) }}</p>
-                    </div>
-                </div>
             </div>
 
             <!-- Right: Activity & Sidebar -->
@@ -239,7 +227,7 @@ const disableTwoFactor = () => {
                         <button
                             type="button"
                             @click="deleteModalOpen = true"
-                            class="w-full py-3 bg-danger-50 border border-danger-200 text-danger-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors"
+                            class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors"
                         >
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i class="ti ti-trash text-base"></i>
@@ -251,7 +239,7 @@ const disableTwoFactor = () => {
                             type="button"
                             :disabled="twoFactorForm.processing"
                             @click="disableTwoFactor"
-                            class="w-full py-3 bg-danger-50 border border-danger-200 text-danger-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors disabled:opacity-50"
+                            class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors disabled:opacity-50"
                         >
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i class="ti ti-shield-x text-base"></i>
@@ -278,10 +266,30 @@ const disableTwoFactor = () => {
             </div>
         </div>
 
+        <!-- Usage Stats -->
+        <div class="mt-8 bg-white border border-gray-200 rounded-2xl shadow-sm p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Today Usage</p>
+                <p class="text-xl font-bold text-gray-900">{{ parseFloat(user.credits_used_today).toFixed(2) }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Month Usage</p>
+                <p class="text-xl font-bold text-gray-900">{{ parseFloat(user.credits_used_month).toFixed(2) }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Referrals</p>
+                <p class="text-xl font-bold text-gray-900">{{ user.referral_count }}</p>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Referral Earned</p>
+                <p class="text-xl font-bold text-gray-900">${{ parseFloat(user.referral_earnings).toFixed(2) }}</p>
+            </div>
+        </div>
+
         <div class="mt-8 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="border-b border-gray-100 bg-gray-50/80 px-6 py-4">
+            <div class="border-b border-gray-100 bg-gray-50/80 px-6 py-3">
                 <h3 class="text-lg font-semibold text-gray-900">{{ t('Usage History') }}</h3>
-                <p class="mt-1 text-sm text-gray-500">{{ t('Recent AI usage activity for this user.') }}</p>
+                <p class="text-sm text-gray-500">{{ t('Recent AI usage activity for this user.') }}</p>
             </div>
 
             <div v-if="usageHistory.length === 0" class="px-6 py-12 text-center text-sm text-gray-500">

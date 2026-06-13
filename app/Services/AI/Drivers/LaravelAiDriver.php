@@ -274,7 +274,9 @@ class LaravelAiDriver implements AiDriverInterface
         }
 
         // Set the dynamic API key in config so the SDK can read it
-        config()->set("ai.providers.{$this->driverName}.key", $this->apiKey);
+        if ($this->apiKey !== '') {
+            config()->set("ai.providers.{$this->driverName}.key", $this->apiKey);
+        }
         if ($this->baseUrl) {
             config()->set("ai.providers.{$this->driverName}.url", $this->baseUrl);
         }
@@ -293,7 +295,9 @@ class LaravelAiDriver implements AiDriverInterface
 
     private function resolveEmbeddingProvider(): EmbeddingProvider
     {
-        config()->set("ai.providers.{$this->driverName}.key", $this->apiKey);
+        if ($this->apiKey !== '') {
+            config()->set("ai.providers.{$this->driverName}.key", $this->apiKey);
+        }
         if ($this->baseUrl) {
             config()->set("ai.providers.{$this->driverName}.url", $this->baseUrl);
         }

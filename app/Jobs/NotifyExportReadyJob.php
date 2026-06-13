@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Mail\Message;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Mail;
 
 class NotifyExportReadyJob implements ShouldQueue
@@ -42,12 +43,20 @@ class NotifyExportReadyJob implements ShouldQueue
         ]);
 
         if ($admin->email) {
-            Mail::raw(
-                "Your export \"{$this->filename}\" is ready.\n\nDownload it here:\n{$downloadUrl}",
-                fn (Message $message) => $message
-                    ->to($admin->email)
-                    ->subject('Export ready: ' . $this->filename)
-            );
+            try {
+                Mail::raw(
+                    "Your export \"{$this->filename}\" is ready.\n\nDownload it here:\n{$downloadUrl}",
+                    fn (Message $message) => $message
+                        ->to($admin->email)
+                        ->subject('Export ready: ' . $this->filename)
+                );
+            } catch (\Throwable $e) {
+                Log::warning('NotifyExportReadyJob: email send failed', [
+                    'admin_id' => $this->adminId,
+                    'filename' => $this->filename,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 }

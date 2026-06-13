@@ -50,6 +50,7 @@ const form = useForm({
 })
 
 const editingId = ref<number | null>(null)
+const formModalOpen = ref(false)
 const deletingCoupon = ref<Coupon | null>(null)
 const deleteProcessing = ref(false)
 const actionMenuOpen = ref<number | null>(null)
@@ -103,6 +104,7 @@ const toggleHeader = (coupon: Coupon) => {
 
 const edit = (coupon: Coupon) => {
     editingId.value = coupon.id
+    formModalOpen.value = true
     form.code = coupon.code
     form.type = coupon.type
     form.value = String(coupon.value)
@@ -116,8 +118,14 @@ const edit = (coupon: Coupon) => {
     form.expires_at = coupon.expires_at?.slice(0, 10) ?? ''
 }
 
+const openCreateModal = () => {
+    reset()
+    formModalOpen.value = true
+}
+
 const reset = () => {
     editingId.value = null
+    formModalOpen.value = false
     form.reset()
     form.clearErrors()
 }
@@ -181,6 +189,216 @@ const openActionMenu = (couponId: number, event: MouseEvent) => {
     <Head :title="t('Coupons')" />
 
     <AdminLayout>
+        <Teleport to="body">
+            <Transition
+                enter-active-class="transition duration-200 ease-out"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition duration-150 ease-in"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div
+                    v-if="formModalOpen"
+                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+                    @click.self="reset"
+                >
+                    <Transition
+                        appear
+                        enter-active-class="transition duration-200 ease-out"
+                        enter-from-class="translate-y-2 scale-95 opacity-0"
+                        enter-to-class="translate-y-0 scale-100 opacity-100"
+                        leave-active-class="transition duration-150 ease-in"
+                        leave-from-class="translate-y-0 scale-100 opacity-100"
+                        leave-to-class="translate-y-2 scale-95 opacity-0"
+                    >
+                        <section
+                            v-if="formModalOpen"
+                            class="flex max-h-[90vh] w-full sm:max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900"
+                        >
+                            <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-3 dark:border-surface-800">
+                                <div>
+                                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ editingId ? t('Edit Coupon') : t('Create Coupon') }}</h2>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set discount rules, visibility, plan restrictions, and schedule in one place.') }}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800"
+                                    @click="reset"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                            </div>
+
+                            <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
+                                <div class="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
+                                    <div v-if="Object.keys(form.errors).length" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
+                                        <ul class="space-y-1">
+                                            <li v-for="(error, key) in form.errors" :key="key">{{ error }}</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="grid gap-4 md:grid-cols-2">
+                                        <label class="block md:col-span-2">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Coupon code') }}</span>
+                                            <input
+                                                v-model="form.code"
+                                                type="text"
+                                                required
+                                                :placeholder="t('e.g. SUMMER25')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm uppercase text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                            <span v-if="form.errors.code" class="mt-2 block text-xs text-red-600 dark:text-red-300">{{ form.errors.code }}</span>
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Discount type') }}</span>
+                                            <AppSelect
+                                                v-model="form.type"
+                                                :options="typeOptions"
+                                                :placeholder="t('Select type')"
+                                            />
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Discount value') }}</span>
+                                            <input
+                                                v-model="form.value"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                :placeholder="form.type === 'percent' ? t('e.g. 25') : t('e.g. 10.00')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Max discount') }}</span>
+                                            <input
+                                                v-model="form.max_discount"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                :placeholder="t('Leave blank for unlimited')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Max uses') }}</span>
+                                            <input
+                                                v-model="form.max_uses"
+                                                type="number"
+                                                min="1"
+                                                :placeholder="t('Leave blank for unlimited')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                        </label>
+                                    </div>
+
+                                    <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
+                                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Eligibility & Schedule') }}</h3>
+                                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Target specific plans or user groups and define when the coupon can be used.') }}</p>
+                                    </div>
+
+                                    <div class="grid gap-4 md:grid-cols-2">
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Limit to plan') }}</span>
+                                            <AppSelect
+                                                v-model="form.plan_id"
+                                                :options="planOptions"
+                                                :placeholder="t('All plans')"
+                                                live-search
+                                            />
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Limit to users') }}</span>
+                                            <AppSelect
+                                                v-model="form.user_limit"
+                                                :options="userLimitSelectOptions"
+                                                :placeholder="t('All users')"
+                                            />
+                                            <span class="mt-2 block text-xs text-gray-500 dark:text-gray-400">
+                                                {{ userLimitOptions.find((option) => option.value === form.user_limit)?.description }}
+                                            </span>
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Starts on') }}</span>
+                                            <input
+                                                v-model="form.starts_at"
+                                                type="date"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                        </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Expires on') }}</span>
+                                            <input
+                                                v-model="form.expires_at"
+                                                type="date"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                        </label>
+                                    </div>
+
+                                    <div class="grid gap-4 md:grid-cols-2">
+                                        <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
+                                            <span>{{ t('Recurring coupon') }}</span>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                :aria-checked="form.is_recurring"
+                                                class="relative inline-flex h-6 w-11 rounded-full transition"
+                                                :class="form.is_recurring ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                                                @click="form.is_recurring = !form.is_recurring"
+                                            >
+                                                <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.is_recurring ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                            </button>
+                                        </label>
+
+                                        <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
+                                            <span>{{ t('Active') }}</span>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                :aria-checked="form.is_active"
+                                                class="relative inline-flex h-6 w-11 rounded-full transition"
+                                                :class="form.is_active ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                                                @click="form.is_active = !form.is_active"
+                                            >
+                                                <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.is_active ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                            </button>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="shrink-0 border-t border-gray-100 bg-gray-50/80 px-5 py-3 dark:border-surface-800 dark:bg-surface-950">
+                                    <div class="flex items-center justify-end gap-3">
+                                        <button
+                                            type="button"
+                                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                            @click="reset"
+                                        >
+                                            {{ t('Cancel') }}
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            :disabled="form.processing"
+                                            class="rounded-lg btn-primary px-5 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        >
+                                            {{ form.processing ? (editingId ? t('Saving...') : t('Creating...')) : (editingId ? t('Update Coupon') : t('Create Coupon')) }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </section>
+                    </Transition>
+                </div>
+            </Transition>
+        </Teleport>
+
         <div class="mx-auto max-w-7xl px-6 py-8" @click="closeActionMenu">
             <div class="space-y-6">
                 <div class="flex items-center justify-between gap-4">
@@ -188,14 +406,14 @@ const openActionMenu = (couponId: number, event: MouseEvent) => {
                         <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Coupons') }}</h1>
                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Create flexible checkout discounts and manage where they appear.') }}</p>
                     </div>
-
-                    <Link
-                        :href="route('admin.payment-gateways.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+                        @click="openCreateModal"
                     >
-                        <i class="ti ti-credit-card text-base"></i>
-                        {{ t('Payment Gateways') }}
-                    </Link>
+                        <i class="ti ti-plus text-base"></i>
+                        {{ t('Create Coupon') }}
+                    </button>
                 </div>
 
                 <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -217,182 +435,8 @@ const openActionMenu = (couponId: number, event: MouseEvent) => {
                     </div>
                 </section>
 
-                <div class="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
-                    <form class="space-y-6" @submit.prevent="submit">
-                        <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ editingId ? t('Edit Coupon') : t('Create Coupon') }}</h2>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set discount rules, visibility, plan restrictions, and schedule in one place.') }}</p>
-                                </div>
-                            </div>
-
-                            <div class="grid gap-6 p-6">
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <label class="block md:col-span-2">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Coupon code') }}</span>
-                                        <input
-                                            v-model="form.code"
-                                            type="text"
-                                            :placeholder="t('e.g. SUMMER25')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm uppercase text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Discount type') }}</span>
-                                        <AppSelect
-                                            v-model="form.type"
-                                            :options="typeOptions"
-                                            :placeholder="t('Select type')"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Discount value') }}</span>
-                                        <input
-                                            v-model="form.value"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            :placeholder="form.type === 'percent' ? t('e.g. 25') : t('e.g. 10.00')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Max discount') }}</span>
-                                        <input
-                                            v-model="form.max_discount"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            :placeholder="t('Leave blank for unlimited')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Max uses') }}</span>
-                                        <input
-                                            v-model="form.max_uses"
-                                            type="number"
-                                            min="1"
-                                            :placeholder="t('Leave blank for unlimited')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        />
-                                    </label>
-                                </div>
-
-                                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Eligibility & Schedule') }}</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Target specific plans or user groups and define when the coupon can be used.') }}</p>
-                                </div>
-
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Limit to plan') }}</span>
-                                        <AppSelect
-                                            v-model="form.plan_id"
-                                            :options="planOptions"
-                                            :placeholder="t('All plans')"
-                                            live-search
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Limit to users') }}</span>
-                                        <AppSelect
-                                            v-model="form.user_limit"
-                                            :options="userLimitSelectOptions"
-                                            :placeholder="t('All users')"
-                                        />
-                                        <span class="mt-2 block text-xs text-gray-500 dark:text-gray-400">
-                                            {{ userLimitOptions.find((option) => option.value === form.user_limit)?.description }}
-                                        </span>
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Starts on') }}</span>
-                                        <input
-                                            v-model="form.starts_at"
-                                            type="date"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        />
-                                    </label>
-
-                                    <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Expires on') }}</span>
-                                        <input
-                                            v-model="form.expires_at"
-                                            type="date"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        />
-                                    </label>
-                                </div>
-
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
-                                        <span>{{ t('Recurring coupon') }}</span>
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            :aria-checked="form.is_recurring"
-                                            class="relative inline-flex h-6 w-11 rounded-full transition"
-                                            :class="form.is_recurring ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                                            @click="form.is_recurring = !form.is_recurring"
-                                        >
-                                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.is_recurring ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                        </button>
-                                    </label>
-
-                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
-                                        <span>{{ t('Active') }}</span>
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            :aria-checked="form.is_active"
-                                            class="relative inline-flex h-6 w-11 rounded-full transition"
-                                            :class="form.is_active ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                                            @click="form.is_active = !form.is_active"
-                                        >
-                                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.is_active ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                        </button>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/60">
-                                <button
-                                    type="button"
-                                    class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                                    @click="reset"
-                                >
-                                    <i class="ti ti-refresh text-base"></i>
-                                    {{ t('Reset') }}
-                                </button>
-                                <button
-                                    type="submit"
-                                    :disabled="form.processing"
-                                    class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    <i class="ti ti-device-floppy text-base"></i>
-                                    {{ form.processing ? t('Saving...') : (editingId ? t('Update Coupon') : t('Create Coupon')) }}
-                                </button>
-                            </div>
-                        </section>
-                    </form>
-
+                <div>
                     <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                        <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-                            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                <div>
-                                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Coupon List') }}</h2>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Review usage, visibility, and quickly edit existing coupons.') }}</p>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="overflow-visible">
                             <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">

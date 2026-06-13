@@ -2,8 +2,8 @@
     <Head :title="t('AI Access Settings')" />
 
     <AdminLayout>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="px-4 py-8 sm:px-6">
+            <div class="mx-auto w-full sm:max-w-7xl">
                 <div class="mb-6">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         {{ t('AI Access Settings') }}
@@ -13,48 +13,39 @@
                     </p>
                 </div>
 
-                <!-- Filters -->
-                <div class="mb-4 flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-4">
-                        <div class="w-64">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                                    </svg>
-                                </span>
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
+                    <div class="flex flex-col gap-3 border-b border-gray-100 p-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+                            <div class="relative w-full sm:max-w-xs">
+                                <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
                                 <input
                                     v-model="searchQuery"
                                     type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                                     :placeholder="t('Search tools...')"
                                 />
                                 <button
                                     v-if="searchQuery"
                                     type="button"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
                                     :aria-label="t('Clear search')"
-                                    :title="t('Clear search')"
                                     @click="clearSearch"
                                 >
-                                    <i class="ti ti-x text-base"></i>
+                                    <i class="ti ti-x text-sm"></i>
                                 </button>
                             </div>
-                        </div>
-                        <div class="w-48">
+
                             <AppSelect
                                 v-model="form.category"
                                 :options="categoryOptions"
                                 :placeholder="t('All Categories')"
+                                class="w-full sm:w-52"
                                 live-search
                                 @update:model-value="applyFilters"
                             />
                         </div>
-                    </div>
-                    
-                    <div class="flex items-center gap-4">
-                        <!-- Bulk Action Dropdown -->
-                        <div class="flex items-center gap-2">
+
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                             <span v-if="selectedIds.length > 0" class="text-sm text-gray-500 dark:text-gray-400">
                                 {{ t(':count selected', { count: selectedIds.length }) }}
                             </span>
@@ -62,28 +53,25 @@
                                 v-model="bulkAction"
                                 :options="accessLevels"
                                 :placeholder="t('Select Access Level')"
-                                class="w-56"
+                                class="w-full sm:w-56"
                             />
                             <div :title="selectedIds.length === 0 ? t('Select at 1 tool to apply') : ''">
-                                <button @click="applyBulkUpdate" :disabled="!bulkAction || selectedIds.length === 0" class="px-4 py-2 btn-primary rounded-lg transition-colors text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
+                                <button @click="applyBulkUpdate" :disabled="!bulkAction || selectedIds.length === 0" class="inline-flex items-center justify-center rounded-lg btn-primary px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50">
                                     {{ t('Apply') }}
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Data Table -->
-                <div class="overflow-hidden border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-                            <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
+                        <table class="min-w-[760px] w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                            <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-surface-800 dark:bg-surface-800 dark:text-gray-400">
                                 <tr>
                                     <th scope="col" class="p-4 w-4">
                                         <div class="flex items-center">
                                             <input
                                                 type="checkbox"
-                                                class="w-4 h-4 bg-gray-50 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                                 :checked="isAllSelected"
                                                 @change="toggleAll"
                                             />
@@ -99,7 +87,7 @@
                                 <tr
                                     v-for="tool in filteredTools"
                                     :key="tool.id"
-                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50/70 dark:border-surface-800 dark:bg-surface-900 dark:hover:bg-surface-800/50"
                                 >
                                     <td class="w-4 p-4">
                                         <div class="flex items-center">
@@ -107,7 +95,7 @@
                                                 type="checkbox"
                                                 v-model="selectedIds"
                                                 :value="tool.id"
-                                                class="w-4 h-4 bg-gray-50 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                             />
                                         </div>
                                     </td>
@@ -134,18 +122,27 @@
                                     </td>
                                 </tr>
                                 <tr v-if="filteredTools.length === 0">
-                                    <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                        {{ t('No tools found.') }}
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                        <div class="flex flex-col items-center justify-center">
+                                            <i class="ti ti-search-off mb-3 text-4xl opacity-40"></i>
+                                            <p>{{ t('No tools found.') }}</p>
+                                        </div>
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-                </div>
-                
-                <!-- Pagination -->
-                <div class="mt-4" v-if="tools.links && tools.links.length > 3">
-                    <Pagination :links="tools.links" />
+
+                    <div class="border-t border-gray-100 px-4 py-4 dark:border-surface-800" v-if="tools.links && tools.links.length > 3 && !searchQuery">
+                        <Pagination
+                            :links="tools.links"
+                            :from="tools.from"
+                            :to="tools.to"
+                            :total="tools.total"
+                            :current-page="tools.current_page"
+                            :last-page="tools.last_page"
+                        />
+                    </div>
                 </div>
 
             </div>
@@ -199,6 +196,11 @@ interface PaginationLink {
 interface ToolsResponse {
     data: ToolItem[]
     links?: PaginationLink[]
+    from?: number | null
+    to?: number | null
+    total?: number | null
+    current_page?: number | null
+    last_page?: number | null
 }
 
 interface Filters {

@@ -16,11 +16,11 @@ class AiTool extends Model
     protected $table = 'ai_tools';
 
     protected $fillable = [
-        'ulid', 'name', 'slug', 'description',
+        'ulid', 'name', 'slug', 'type', 'description',
         'prompt_system', 'prompt_user',
         'category_id',
         'icon', 'color',
-        'fields',
+        'fields', 'tags',
 
         // Generation config
         'output_type', 'model_override', 'max_tokens_override',
@@ -28,7 +28,7 @@ class AiTool extends Model
 
         // Access control
         'access_level', 'requires_pro',
-        'is_active', 'is_featured', 'is_system', 'supports_brand_voice',
+        'is_active', 'is_featured', 'is_system', 'supports_brand_voice', 'show_header', 'show_footer',
 
         // Stats
         'sort_order', 'usage_count', 'views_count', 'avg_output_tokens', 'avg_latency_ms',
@@ -48,6 +48,7 @@ class AiTool extends Model
     {
         return [
             'fields' => 'array',
+            'tags' => 'array',
             'how_it_works' => 'array',
             'usage_examples' => 'array',
             'faq_items' => 'array',
@@ -56,6 +57,8 @@ class AiTool extends Model
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
             'is_system' => 'boolean',
+            'show_header' => 'boolean',
+            'show_footer' => 'boolean',
             'requires_pro' => 'boolean',
             'supports_brand_voice' => 'boolean',
             'show_about' => 'boolean',
@@ -70,6 +73,50 @@ class AiTool extends Model
             'views_count' => 'integer',
             'max_variants' => 'integer',
         ];
+    }
+
+    public function getFieldsAttribute($value)
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+        return is_array($value) ? $value : [];
+    }
+
+    public function getHowItWorksAttribute($value)
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+        return is_array($value) ? $value : [];
+    }
+
+    public function getUsageExamplesAttribute($value)
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+        return is_array($value) ? $value : [];
+    }
+
+    public function getFaqItemsAttribute($value)
+    {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+        return is_array($value) ? $value : [];
     }
 
     protected static function booted(): void
@@ -97,8 +144,8 @@ class AiTool extends Model
         static::saved(function (AiTool $tool) {
             if ($tool->wasRecentlyCreated || $tool->wasChanged([
                 'name', 'slug', 'description', 'category_id',
-                'icon', 'color', 'fields', 'output_type', 'access_level',
-                'is_active', 'is_featured', 'requires_pro', 'supports_brand_voice',
+                'icon', 'color', 'fields', 'tags', 'output_type', 'access_level',
+                'is_active', 'is_featured', 'requires_pro', 'supports_brand_voice', 'show_header', 'show_footer',
                 'sort_order', 'avg_rating', 'review_count',
                 'meta_title', 'meta_description', 'og_image',
                 'about_content', 'how_it_works', 'usage_examples', 'faq_items',

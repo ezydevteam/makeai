@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import { sanitizeErrorMessage } from '@/Composables/useErrorSanitizer'
 
 export interface ChatProduct {
     id: number; slug: string; name: string; icon: string; color_hex: string
@@ -251,7 +252,7 @@ export function useChat() {
             } else if (e instanceof Error && e.message === 'Unauthorized') {
                 error.value = 'Please sign in to use the chatbot.'
             } else {
-                error.value = e instanceof Error ? e.message : 'Failed to send message'
+                error.value = sanitizeErrorMessage(e instanceof Error ? e.message : 'Failed to send message')
             }
             const msgs = [...messages.value]
             const last = msgs[msgs.length - 1]

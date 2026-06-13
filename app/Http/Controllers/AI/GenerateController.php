@@ -17,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Laravel\Ai\Exceptions\FailoverableException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -245,7 +244,7 @@ class GenerateController extends Controller
                 // Check if we can failover to the fallback provider
                 $fallback = $this->resolveFallback($completion->provider ?? 'unknown');
 
-                if ($e instanceof FailoverableException && $fallback) {
+                if ($fallback) {
                     Log::warning('AI generation failed, attempting fallback', [
                         'primary_provider' => $completion->provider,
                         'primary_model' => $completion->model,
@@ -737,5 +736,48 @@ class GenerateController extends Controller
             'provider' => $fbProvider,
             'model' => $fbModel,
         ];
+    }
+
+    /**
+     * Sanitize raw provider error messages before sending to the client.
+     *
+     * @param  string  $message  Raw exception message from provider SDK
+     */
+    private function sanitizeError(string $message): string
+    {
+        $lower = mb_strtolower($message);
+
+        if (preg_match('/rate.?limit|too many requests|quota exceeded|insufficient_?quota|credits? exhausted|429/i', $lower)) {
+            return (string) translate('Rate limit reached. Please try again in a moment.');
+        }
+        if (preg_match('/content.?policy|content.?filter|safety filter|flagged by|inappropriate|violates.*policy/i', $lower)) {
+            return (string) translate('Your request was flagged. Please modify your input and try again.');
+        }
+        if (preg_match('/context.?length|token.?limit|max.?tokens|too long|exceed.*token|exceed.*context/i', $lower)) {
+            return (string) translate('Your input is too long. Please shorten it and try again.');
+        }
+        if (preg_match('/timeout|timed.?out/i', $lower)) {
+            return (string) translate('Generation timed out. Try a shorter length or a different model.');
+        }
+        if (preg_match('/api.?key|invalid.?key|authentication|unauthorized|401|not.?authorized/i', $lower)) {
+            return (string) translate('This AI provider is not configured. Please contact support.');
+        }
+        if (preg_match('/model.?not.?found|model.?unavailable|invalid.?model|unsupported.?model|no.?such.?model|deprecated/i', $lower)) {
+            return (string) translate('The selected model is unavailable. Please try a different one.');
+        }
+        if (preg_match('/network.?error|connection.?refused|connection.?reset|econnrefused|econnreset|enotfound|etimedout/i', $lower)) {
+            return (string) translate('Connection error. Please check your internet and try again.');
+        }
+        if (preg_match('/internal.?server.?error|bad.?gateway|gateway.?timeout|service.?unavailable|overloaded|500|502|503|504/i', $lower)) {
+            return (string) translate('The AI service is temporarily unavailable. Please try again later.');
+        }
+        if (preg_match('/stream.?error|sse.?error/i', $lower)) {
+            return (string) translate('Generation interrupted. Please try again.');
+        }
+        if (preg_match('/exception|stack.?trace/i', $lower)) {
+            return (string) translate('Something went wrong. Please try again or contact support.');
+        }
+
+        return $message;
     }
 }

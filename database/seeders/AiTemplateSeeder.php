@@ -18,7 +18,7 @@ class AiTemplateSeeder extends Seeder
     {
         $categories = Category::aiTools()->where('is_active', true)->get()->keyBy('slug');
         $catalog = $this->catalog();
-        $expectedTotal = 255;
+        $expectedTotal = 283;
         $actualTotal = collect($catalog)->flatten(1)->count();
 
         if ($actualTotal !== $expectedTotal) {
@@ -47,7 +47,12 @@ class AiTemplateSeeder extends Seeder
             $category->updateToolsCount();
         }
 
-        AiTool::whereNotIn('slug', $activeSlugs)->update(['is_active' => false]);
+        AiTool::where('type', 'text')->whereNotIn('slug', $activeSlugs)->update(['is_active' => false]);
+
+        // Assign marketing funnel stage tags for Marketing Suite template
+        foreach ($this->stageTags() as $slug => $tags) {
+            AiTool::where('slug', $slug)->update(['tags' => json_encode($tags)]);
+        }
 
         foreach ($categories as $category) {
             $category->updateToolsCount();
@@ -71,6 +76,7 @@ class AiTemplateSeeder extends Seeder
             'icon' => $tool['icon'] ?? $category->icon,
             'color' => $tool['color'] ?? $category->color,
             'fields' => json_encode($this->fieldsFor($category->slug, $tool['slug'])),
+            'tags' => isset($tool['tags']) ? json_encode($tool['tags']) : null,
             'output_type' => $outputType,
             'model_override' => null,
             'max_tokens_override' => $this->maxTokens($category->slug, $tool['slug']),
@@ -189,7 +195,29 @@ PROMPT;
             ]);
         }
 
+        if ($categorySlug === 'social-media') {
+            $platform = $this->platformFromSlug($toolSlug);
+            if ($platform) {
+                array_splice($fields, 1, 0, [
+                    ['name' => 'platform', 'key' => 'platform', 'label' => 'Platform', 'type' => 'hidden', 'default' => $platform],
+                ]);
+            }
+        }
+
         return $fields;
+    }
+
+    private function platformFromSlug(string $toolSlug): ?string
+    {
+        return match (true) {
+            str_starts_with($toolSlug, 'instagram-') => 'Instagram',
+            str_starts_with($toolSlug, 'tiktok-') => 'TikTok',
+            str_starts_with($toolSlug, 'facebook-') => 'Facebook',
+            str_starts_with($toolSlug, 'twitter-') => 'Twitter/X',
+            str_starts_with($toolSlug, 'linkedin-') => 'LinkedIn',
+            str_starts_with($toolSlug, 'youtube-') && !str_contains($toolSlug, 'to-blog') => 'YouTube',
+            default => null,
+        };
     }
 
     private function outputType(string $slug, string $categorySlug): string
@@ -254,34 +282,40 @@ PROMPT;
                 'tldr-summary', 'explain-to-child', 'news-article', 'press-release',
                 'ebook-generator', 'undetectable-rewriter', 'proofreading', 'rephrase',
                 'text-expander', 'text-summarizer', 'rss-content', 'youtube-to-blog',
-                'wiki-to-article',
+                'wiki-to-article', 'listicle-generator',
             ]),
             'social-media' => $this->tools([
-                'instagram-caption', 'instagram-hashtags', 'instagram-reel-script', 'tiktok-script',
-                'tiktok-caption', 'facebook-post', 'facebook-headline', 'facebook-video-script',
-                'twitter-tweet', 'twitter-thread', 'viral-tweet-ideas', 'linkedin-post',
-                'linkedin-summary', 'youtube-title', 'youtube-description', 'youtube-tags',
-                'youtube-to-blog-post', 'pinterest-description', 'social-media-reply', 'ama-post',
+                'instagram-caption', 'instagram-bio', 'instagram-hashtags', 'instagram-reel-script',
+                'tiktok-script', 'tiktok-caption', 'tiktok-hook',
+                'facebook-post', 'facebook-headline', 'facebook-video-script',
+                'twitter-tweet', 'twitter-thread', 'twitter-bio', 'viral-tweet-ideas',
+                'linkedin-post', 'linkedin-headline', 'linkedin-summary',
+                'youtube-title', 'youtube-description', 'youtube-tags', 'youtube-to-blog-post',
+                'pinterest-description', 'social-media-reply', 'ama-post',
                 'trending-ideas', 'clickbait-title', 'social-bio', 'content-calendar',
                 'hashtag-strategy', 'video-description', 'video-ideas',
+                'newsletter-intro',
             ]),
             'advertising' => $this->tools([
                 'google-ads-headline', 'google-ads-description', 'facebook-ad', 'instagram-ad',
                 'linkedin-ad', 'youtube-ads-script', 'tiktok-ad-script', 'display-ad-copy',
                 'native-ad-copy', 'aida', 'pas', 'before-after-bridge', 'ad-hook-generator',
                 'retargeting-ad', 'product-ad-copy', 'app-install-ad', 'classified-ad',
+                'cta-generator',
             ]),
             'email-marketing' => $this->tools([
                 'cold-email', 'follow-up-email', 'welcome-email', 'newsletter-content',
                 'sales-email', 'subject-lines', 'email-sequence', 'drip-campaign',
                 'reactivation-email', 'thank-you-email', 'apology-email', 'event-invitation-email',
                 'product-launch-email', 'testimonial-request-email', 'referral-email',
+                'email-generator', 'winback-email',
             ]),
             'ecommerce' => $this->tools([
-                'product-description', 'product-features', 'product-name-ideas',
+                'product-description', 'product-features', 'product-name-ideas', 'product-title',
                 'why-choose-product', 'customer-review', 'review-responder', 'amazon-listing',
                 'shopify-product', 'product-comparison', 'upsell-message', 'flash-sale-copy',
-                'abandoned-cart-email',
+                'abandoned-cart-email', 'order-confirmation-email', 'promo-sms',
+                'discount-announcement', 'holiday-sale-copy',
             ]),
             'business' => $this->tools([
                 'business-plan', 'swot-analysis', 'pitch-deck-script', 'meeting-minutes',
@@ -292,15 +326,19 @@ PROMPT;
                 'stakeholder-email',
             ]),
             'academic' => $this->tools([
-                'essay-writer', 'academic-outline', 'research-summary', 'thesis-statement',
-                'citation-generator', 'lesson-plan', 'quiz-generator', 'flashcards',
+                'research-outline', 'literature-review', 'research-question',
+                'essay-outline', 'thesis-statement', 'argument-builder',
+                'essay-writer', 'paragraph-generator', 'abstract-writer',
+                'content-improver', 'grammar-checker', 'citation-generator', 'study-guide',
+                'lesson-plan', 'quiz-generator', 'flashcards',
                 'study-notes', 'discussion-post', 'lab-report', 'scholarship-essay',
                 'academic-cover-letter', 'lecture-summary', 'multiple-choice-questions',
                 'rubric-generator',
             ]),
             'development' => $this->tools([
-                'code-generator', 'bug-fixer', 'unit-test', 'api-docs', 'git-commit',
-                'code-explainer', 'regex-generator', 'sql-query-generator', 'code-review',
+                'code-generator', 'api-endpoint-generator', 'bug-fixer', 'unit-test',
+                'api-docs', 'git-commit', 'code-explainer', 'regex-generator',
+                'sql-query-generator', 'code-reviewer', 'code-optimizer', 'complexity-analyzer',
                 'refactor-code', 'docstring-generator', 'readme-generator', 'dockerfile-generator',
                 'cli-command-helper', 'algorithm-explainer', 'error-message-explainer',
             ]),
@@ -310,7 +348,7 @@ PROMPT;
                 'feature-page-copy', 'service-page-copy', 'seo-title-generator',
                 'meta-description', 'keyword-cluster', 'content-brief',
                 'internal-link-suggestions', 'robots-txt-generator', 'sitemap-plan',
-                'local-seo-page', 'product-page-seo',
+                'local-seo-page', 'product-page-seo', 'paraphrasing-tool', 'seo-blog',
             ]),
             'creative-writing' => $this->tools([
                 'story-generator', 'song-lyrics', 'poem-writer', 'dialogue-writer',
@@ -345,6 +383,7 @@ PROMPT;
                 'gtm-strategy', 'positioning-statement', 'marketing-plan',
                 'campaign-brief', 'buyer-persona', 'value-proposition', 'brand-story',
                 'content-strategy', 'channel-strategy', 'survey-questions',
+                'case-study',
             ]),
             'customer-support' => $this->tools([
                 'ticket-reply', 'kb-article', 'onboarding-guide', 'chatbot-script',
@@ -381,6 +420,34 @@ PROMPT;
             'youtube-to-blog-post' => 'YouTube Video to Blog',
             'twitter-tweet' => 'X / Twitter Tweet',
             'twitter-thread' => 'X / Twitter Thread',
+            'twitter-bio' => 'X / Twitter Bio Writer',
+            'linkedin-headline' => 'LinkedIn Headline Writer',
+            'instagram-bio' => 'Instagram Bio Writer',
+            'tiktok-hook' => 'TikTok Hook Writer',
+            'email-generator' => 'Email Campaign Generator',
+            'winback-email' => 'Win-Back Email',
+            'case-study' => 'Case Study Generator',
+            'cta-generator' => 'CTA Button Text Generator',
+            'listicle-generator' => 'Listicle Generator',
+            'seo-blog' => 'SEO-Optimized Blog Post',
+            'paraphrasing-tool' => 'Paraphrasing Tool',
+            'newsletter-intro' => 'Newsletter Intro',
+            'product-title' => 'Product Title Optimizer',
+            'order-confirmation-email' => 'Order Confirmation Email',
+            'promo-sms' => 'Promotional SMS',
+            'discount-announcement' => 'Discount Announcement',
+            'holiday-sale-copy' => 'Holiday Sale Copy',
+            'api-endpoint-generator' => 'API Endpoint Generator',
+            'code-reviewer' => 'Code Reviewer',
+            'code-optimizer' => 'Code Optimizer',
+            'complexity-analyzer' => 'Complexity Analyzer',
+            'research-outline' => 'Research Outline Generator',
+            'literature-review' => 'Literature Review Helper',
+            'research-question' => 'Research Question Generator',
+            'argument-builder' => 'Argument Builder',
+            'abstract-writer' => 'Abstract Writer',
+            'grammar-checker' => 'Grammar Checker',
+            'study-guide' => 'Study Guide Generator',
             'ama-post' => 'AMA Post',
             'aida' => 'AIDA Copywriting Formula',
             'pas' => 'PAS Copywriting Formula',
@@ -392,5 +459,73 @@ PROMPT;
         ];
 
         return $names[$slug] ?? Str::headline($slug);
+    }
+
+    private function stageTags(): array
+    {
+        return [
+            'value-proposition' => ['stage' => 'awareness', 'pairs_with' => 'landing-page-copy'],
+            'brand-story' => ['stage' => 'awareness', 'pairs_with' => 'value-proposition'],
+            'press-release' => ['stage' => 'awareness', 'pairs_with' => 'brand-story'],
+            'competitor-analysis' => ['stage' => 'consideration', 'pairs_with' => 'value-proposition'],
+            'landing-page-copy' => ['stage' => 'consideration', 'pairs_with' => 'facebook-ad'],
+            'case-study' => ['stage' => 'consideration', 'pairs_with' => 'landing-page-copy'],
+            'facebook-ad' => ['stage' => 'conversion', 'pairs_with' => 'landing-page-copy'],
+            'google-ads-headline' => ['stage' => 'conversion', 'pairs_with' => 'facebook-ad'],
+            'cta-generator' => ['stage' => 'conversion', 'pairs_with' => 'landing-page-copy'],
+            'email-generator' => ['stage' => 'retention', 'pairs_with' => 'facebook-ad'],
+            'abandoned-cart-email' => ['stage' => 'retention', 'pairs_with' => 'email-generator'],
+            'winback-email' => ['stage' => 'retention', 'pairs_with' => 'email-generator'],
+            'blog-article' => ['content_type' => 'articles'],
+            'blog-outline' => ['content_type' => 'articles'],
+            'listicle-generator' => ['content_type' => 'articles'],
+            'seo-blog' => ['content_type' => 'seo'],
+            'meta-seo' => ['content_type' => 'seo'],
+            'faq-generator' => ['content_type' => 'seo'],
+            'article-rewriter' => ['content_type' => 'rewriting'],
+            'content-improver' => ['content_type' => 'rewriting', 'writing_stage' => 'polish'],
+            'paraphrasing-tool' => ['content_type' => 'rewriting'],
+            'linkedin-post' => ['content_type' => 'social'],
+            'twitter-thread' => ['content_type' => 'social'],
+            'newsletter-intro' => ['content_type' => 'social'],
+            'product-description' => ['ecom_stage' => 'product-listing'],
+            'amazon-listing' => ['ecom_stage' => 'product-listing'],
+            'product-title' => ['ecom_stage' => 'product-listing'],
+            'review-responder' => ['ecom_stage' => 'product-listing'],
+            'abandoned-cart-email' => ['ecom_stage' => 'email-retention'],
+            'winback-email' => ['ecom_stage' => 'email-retention'],
+            'order-confirmation-email' => ['ecom_stage' => 'email-retention'],
+            'upsell-message' => ['ecom_stage' => 'email-retention'],
+            'flash-sale-copy' => ['ecom_stage' => 'promotions'],
+            'promo-sms' => ['ecom_stage' => 'promotions'],
+            'discount-announcement' => ['ecom_stage' => 'promotions'],
+            'holiday-sale-copy' => ['ecom_stage' => 'promotions'],
+            'code-generator' => ['dev_category' => 'generate'],
+            'api-endpoint-generator' => ['dev_category' => 'generate'],
+            'regex-generator' => ['dev_category' => 'generate'],
+            'sql-query-generator' => ['dev_category' => 'generate'],
+            'bug-fixer' => ['dev_category' => 'debug'],
+            'code-explainer' => ['dev_category' => 'debug'],
+            'error-message-explainer' => ['dev_category' => 'debug'],
+            'code-reviewer' => ['dev_category' => 'optimize'],
+            'code-optimizer' => ['dev_category' => 'optimize'],
+            'complexity-analyzer' => ['dev_category' => 'optimize'],
+            'api-docs' => ['dev_category' => 'document'],
+            'unit-test' => ['dev_category' => 'document'],
+            'git-commit' => ['dev_category' => 'document'],
+            'readme-generator' => ['dev_category' => 'document'],
+            'research-outline' => ['writing_stage' => 'research'],
+            'literature-review' => ['writing_stage' => 'research'],
+            'research-question' => ['writing_stage' => 'research'],
+            'essay-outline' => ['writing_stage' => 'outline'],
+            'thesis-statement' => ['writing_stage' => 'outline'],
+            'argument-builder' => ['writing_stage' => 'outline'],
+            'essay-writer' => ['writing_stage' => 'write'],
+            'paragraph-generator' => ['writing_stage' => 'write'],
+            'abstract-writer' => ['writing_stage' => 'write'],
+            'grammar-checker' => ['writing_stage' => 'polish'],
+            'citation-generator' => ['writing_stage' => 'polish'],
+            'study-guide' => ['writing_stage' => 'polish'],
+        ];
     }
 }

@@ -442,4 +442,120 @@ class AiManagementController extends Controller
 
         return "{$prefix}•••{$suffix}";
     }
+
+    /**
+     * Show RAG settings page.
+     */
+    public function ragSettings()
+    {
+        $embeddingModels = AiModel::active()
+            ->where('type', 'embedding')
+            ->get(['slug', 'name', 'provider'])
+            ->map(fn (AiModel $m) => [
+                'value' => $m->slug,
+                'label' => "{$m->name} ({$m->provider})",
+                'provider' => $m->provider,
+            ])
+            ->values()
+            ->toArray();
+
+        $defaultEmbeddingProvider = settings('ai_embedding_provider')
+            ?: settings('default_ai_provider')
+            ?: config('ai.default_for_embeddings', 'openai');
+
+        // Resolve the fallback model: explicit rag_embedding_model → first active embedding model for the resolved provider → provider-aware fallback
+        $defaultEmbeddingModel = settings('rag_embedding_model', '');
+
+        if (! $defaultEmbeddingModel) {
+            $fallbackDbModel = AiModel::active()
+                ->where('type', 'embedding')
+                ->where('provider', $defaultEmbeddingProvider)
+                ->first(['slug', 'name', 'provider']);
+
+            if ($fallbackDbModel) {
+                $defaultEmbeddingModel = $fallbackDbModel->slug;
+            } else {
+                $defaultEmbeddingModel = match ($defaultEmbeddingProvider) {
+                    'google' => 'text-embedding-004',
+                    'cohere' => 'embed-v4.0',
+                    'jina' => 'jina-embeddings-v3',
+                    'voyageai' => 'voyage-3',
+                    default => 'text-embedding-3-small',
+                };
+            }
+        }
+
+        // Resolve a human name for the fallback model
+        $fallbackModel = AiModel::where('slug', $defaultEmbeddingModel)
+            ->where('provider', $defaultEmbeddingProvider)
+            ->first();
+
+        $fallbackLabel = $fallbackModel
+            ? "{$fallbackModel->name} ({$fallbackModel->provider})"
+            : "{$defaultEmbeddingModel} ({$defaultEmbeddingProvider})";
+
+        return Inertia::render('Admin/AI/RagSettings', [
+            'settings' => [
+                'max_file_mb' => (int) settings('rag_max_file_mb', 25),
+                'max_pages' => (int) settings('rag_max_pages', 300),
+                'top_k' => (int) settings('rag_top_k', 6),
+                'chunk_size' => (int) settings('rag_chunk_size', 800),
+                'chunk_overlap' => (int) settings('rag_chunk_overlap', 100),
+                'embedding_model' => settings('rag_embedding_model', ''),
+                'system_prompt' => settings('rag_system_prompt', ''),
+                'ephemeral_retention_days' => (int) settings('rag_ephemeral_retention_days', 7),
+                'chunks_per_credit' => (int) settings('rag_chunks_per_credit', 50),
+                'youtube_whisper_fallback' => (bool) settings('rag_youtube_whisper_fallback', false),
+                'search_mode' => settings('rag_search_mode', 'vector'),
+                'chunking_mode' => settings('rag_chunking_mode', 'fixed'),
+                'map_reduce_batch_size' => (int) settings('rag_map_reduce_batch_size', 10),
+            ],
+            'embeddingModels' => $embeddingModels,
+            'fallbackEmbedding' => [
+                'provider' => $defaultEmbeddingProvider,
+                'model' => $defaultEmbeddingModel,
+                'label' => $fallbackLabel,
+            ],
+        ]);
+    }
+
+    /**
+     * Update RAG settings.
+     */
+    public function updateRagSettings(Request $request)
+    {
+        $data = $request->validate([
+            'max_file_mb' => 'required|integer|min:1|max:500',
+            'max_pages' => 'required|integer|min:1|max:5000',
+            'top_k' => 'required|integer|min:1|max:50',
+            'chunk_size' => 'required|integer|min:100|max:8000',
+            'chunk_overlap' => 'required|integer|min:0|max:2000',
+            'embedding_model' => 'nullable|string|max:100',
+            'system_prompt' => 'required|string|max:4000',
+            'ephemeral_retention_days' => 'required|integer|min:1|max:90',
+            'chunks_per_credit' => 'required|integer|min:1|max:1000',
+            'youtube_whisper_fallback' => 'required|boolean',
+            'search_mode' => 'required|string|in:vector,hybrid',
+            'chunking_mode' => 'required|string|in:fixed,semantic',
+            'map_reduce_batch_size' => 'required|integer|min:1|max:50',
+        ]);
+
+        Setting::setValue('rag_max_file_mb', $data['max_file_mb'], 'integer', 'rag');
+        Setting::setValue('rag_max_pages', $data['max_pages'], 'integer', 'rag');
+        Setting::setValue('rag_top_k', $data['top_k'], 'integer', 'rag');
+        Setting::setValue('rag_chunk_size', $data['chunk_size'], 'integer', 'rag');
+        Setting::setValue('rag_chunk_overlap', $data['chunk_overlap'], 'integer', 'rag');
+
+        // Empty embedding_model = use default provider/model from global AI settings
+        Setting::setValue('rag_embedding_model', $data['embedding_model'] ?? '', 'string', 'rag');
+        Setting::setValue('rag_system_prompt', $data['system_prompt'], 'string', 'rag');
+        Setting::setValue('rag_ephemeral_retention_days', $data['ephemeral_retention_days'], 'integer', 'rag');
+        Setting::setValue('rag_chunks_per_credit', $data['chunks_per_credit'], 'integer', 'rag');
+        Setting::setValue('rag_youtube_whisper_fallback', $data['youtube_whisper_fallback'], 'boolean', 'rag');
+        Setting::setValue('rag_search_mode', $data['search_mode'], 'string', 'rag');
+        Setting::setValue('rag_chunking_mode', $data['chunking_mode'], 'string', 'rag');
+        Setting::setValue('rag_map_reduce_batch_size', $data['map_reduce_batch_size'], 'integer', 'rag');
+
+        return back()->with('success', translate('RAG settings updated successfully.'));
+    }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 const props = defineProps<{
@@ -28,6 +28,36 @@ const showSaveModal = ref(false)
 const saveTitle = ref('')
 const showReasoning = ref(false)
 const { t } = useTranslate()
+
+const reasoningVerbs = [
+    t('Thinking'),
+    t('Analyzing prompt'),
+    t('Structuring outline'),
+    t('Generating response'),
+    t('Polishing content')
+]
+const reasoningIndex = ref(0)
+const currentReasoningVerb = computed(() => reasoningVerbs[reasoningIndex.value])
+let reasoningInterval: ReturnType<typeof setInterval> | null = null
+
+watch(() => props.loading, (isLoading) => {
+    if (isLoading) {
+        reasoningIndex.value = 0
+        if (reasoningInterval) clearInterval(reasoningInterval)
+        reasoningInterval = setInterval(() => {
+            reasoningIndex.value = (reasoningIndex.value + 1) % reasoningVerbs.length
+        }, 1800)
+    } else {
+        if (reasoningInterval) {
+            clearInterval(reasoningInterval)
+            reasoningInterval = null
+        }
+    }
+}, { immediate: true })
+
+onUnmounted(() => {
+    if (reasoningInterval) clearInterval(reasoningInterval)
+})
 
 const reasoningVisible = computed(() => showReasoning.value || (props.isReasoning && props.reasoning))
 
@@ -273,7 +303,7 @@ const saveDocument = async () => {
                         <div class="absolute inset-0 border-2 border-primary-500/20 rounded-full"></div>
                         <div class="absolute inset-0 border-2 border-transparent border-t-primary-500 rounded-full animate-spin"></div>
                     </div>
-                    <p class="text-gray-500 dark:text-gray-400 text-sm animate-pulse">{{ t('AI is writing your content...') }}</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm animate-pulse select-none">{{ currentReasoningVerb }}...</p>
                 </div>
             </div>
 

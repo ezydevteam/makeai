@@ -80,9 +80,6 @@ const positionOptions = [
     { value: 'right', label: 'Right' },
 ];
 
-const recentPostCountOptions = [1, 2, 3, 4, 5, 6, 8, 10].map((count) => ({ value: count, label: String(count) }));
-const toolCountOptions = [1, 3, 5, 6, 8, 10, 12, 15, 20].map((count) => ({ value: count, label: String(count) }));
-
 const getBlockLabel = (type: string) => {
     return blockTypes.find((b) => b.type === type)?.label || type;
 };
@@ -415,21 +412,21 @@ const importConfig = () => {
                     <template v-if="editingBlock.data.type === 'recent_posts'">
                         <div>
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Number of Posts to Show') }}</label>
-                            <AppSelect v-model="editingBlock.data.config.count" :options="recentPostCountOptions" :placeholder="t('Select count')" />
+                            <input v-model.number="editingBlock.data.config.count" type="number" min="1" max="10" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('3')">
                         </div>
                     </template>
 
                     <template v-if="editingBlock.data.type === 'popular_tools'">
                         <div>
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Number of Tools to Show') }}</label>
-                            <AppSelect v-model="editingBlock.data.config.count" :options="toolCountOptions" :placeholder="t('Select count')" />
+                            <input v-model.number="editingBlock.data.config.count" type="number" min="1" max="20" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('5')">
                         </div>
                     </template>
 
                     <template v-if="editingBlock.data.type === 'recently_added'">
                         <div>
                             <label class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Number of Tools to Show') }}</label>
-                            <AppSelect v-model="editingBlock.data.config.count" :options="recentPostCountOptions" :placeholder="t('Select count')" />
+                            <input v-model.number="editingBlock.data.config.count" type="number" min="1" max="10" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('3')">
                         </div>
                     </template>
 

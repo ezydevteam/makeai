@@ -20,6 +20,7 @@
         "maatwebsite/excel": "^3.1",
         "mpdf/mpdf": "^8.3",
         "predis/predis": "^3.4",
+        "smalot/pdfparser": "^2.12",
         "tightenco/ziggy": "^2.6"
     },
     "require-dev": {
@@ -35,6 +36,7 @@
     "autoload": {
         "psr-4": {
             "App\\": "app/",
+            "Addons\\AiAssistant\\": "addons/ai-assistant/app/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         },

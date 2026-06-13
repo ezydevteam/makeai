@@ -2,9 +2,11 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import Layout from '@/Layouts/AppLayout.vue'
+import TemplateToolGrid from '@/Components/TemplateToolGrid.vue'
+import AllToolsSection from '@/Components/AllToolsSection.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
-type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'integrations' | 'custom_html'
+type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'integrations' | 'custom_html' | 'template_grid' | 'all_tools'
 type SectionItem = Record<string, string | number | boolean>
 type SectionConfigValue = string | number | boolean | string[] | SectionItem[]
 type SectionConfig = Record<string, SectionConfigValue>
@@ -59,8 +61,12 @@ interface HomepageConfig {
 
 const props = defineProps<{
     homepage: HomepageConfig | null
+    templateData?: Record<string, any> | null
     testimonials: Testimonial[]
     faqs: Faq[]
+    scrollToTopEnabled?: boolean
+    allTools?: any[]
+    allToolCategories?: string[]
 }>()
 
 const { t } = useTranslate()
@@ -390,9 +396,58 @@ onUnmounted(() => {
             </section>
 
             <section v-else-if="section.type === 'custom_html'" class="bg-white dark:bg-surface-950" v-html="asString(section.config.content)"></section>
+
+            <section v-else-if="section.type === 'template_grid'" class="py-24 bg-white dark:bg-surface-950">
+              <div class="max-w-7xl mx-auto px-6">
+                <div v-if="asString(section.config.title)" class="text-center mb-12">
+                  <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">
+                    {{ asString(section.config.title) }}
+                  </h2>
+                  <p v-if="asString(section.config.subtitle)" class="text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto">
+                    {{ asString(section.config.subtitle) }}
+                  </p>
+                </div>
+                <TemplateToolGrid
+                  v-if="templateData && templateData[asString(section.config.template_slug)]"
+                  v-bind="templateData[asString(section.config.template_slug)]"
+                  :max-items="Number(section.config.max_items ?? 12)"
+                  :show-filter="asBoolean(section.config.show_filter, true)"
+                />
+                <div v-else class="text-center py-16 text-gray-400 dark:text-gray-500">
+                  {{ t('Template tools are not available.') }}
+                </div>
+              </div>
+            </section>
+
+            <section v-else-if="section.type === 'all_tools'" class="py-24 bg-white dark:bg-surface-950">
+              <div class="max-w-7xl mx-auto px-6">
+                <div v-if="asString(section.config.title)" class="text-center mb-12">
+                  <h2 class="text-3xl md:text-5xl font-black text-gray-900 dark:text-white mb-4">
+                    {{ asString(section.config.title) }}
+                  </h2>
+                  <p v-if="asString(section.config.subtitle)" class="text-gray-500 dark:text-gray-400 font-medium max-w-2xl mx-auto">
+                    {{ asString(section.config.subtitle) }}
+                  </p>
+                </div>
+                <AllToolsSection
+                  :tools="props.allTools ?? []"
+                  :categories="props.allToolCategories ?? []"
+                  :max-items="Number(section.config.max_items ?? 12)"
+                />
+              </div>
+            </section>
         </template>
 
-        <button v-if="homepageConfig.settings.scroll_to_top.enabled && showScrollButton" @click="scrollToTop" type="button" :class="homepageConfig.settings.scroll_to_top.position === 'left' ? 'left-6' : 'right-6'" class="fixed bottom-6 z-40 w-12 h-12 rounded-full btn-primary shadow-xl shadow-primary-600/30 transition-colors">↑</button>
+        <button
+            v-if="props.scrollToTopEnabled !== false && showScrollButton"
+            @click="scrollToTop"
+            type="button"
+            :class="homepageConfig.settings.scroll_to_top.position === 'left' ? 'left-6' : 'right-6'"
+            class="fixed bottom-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-white shadow-xl shadow-primary-600/30 transition-colors"
+            :aria-label="t('Scroll to top')"
+        >
+            <i class="ti ti-arrow-up text-lg"></i>
+        </button>
 
         <div v-if="homepageConfig.settings.chat_widget_embed" v-html="homepageConfig.settings.chat_widget_embed"></div>
     </Layout>

@@ -274,7 +274,7 @@ class ChatController extends Controller
             } catch (\Throwable $e) {
                 echo 'data: '.json_encode([
                     'type' => 'error',
-                    'message' => $e->getMessage(),
+                    'message' => $this->sanitizeError($e->getMessage()),
                 ])."\n\n";
 
                 if (! empty($fullContent)) {
@@ -322,5 +322,43 @@ class ChatController extends Controller
         }
 
         return max(1, (int) (str_word_count($text, 0) * 1.3));
+    }
+
+    private function sanitizeError(string $message): string
+    {
+        $lower = mb_strtolower($message);
+
+        if (preg_match('/rate.?limit|too many requests|quota exceeded|insufficient_?quota|billing.*quota|credits? exhausted|429/i', $lower)) {
+            return (string) translate('Rate limit reached. Please try again in a moment.');
+        }
+        if (preg_match('/content.?policy|content.?filter|safety filter|flagged by|inappropriate|violates.*policy/i', $lower)) {
+            return (string) translate('Your request was flagged. Please modify your input and try again.');
+        }
+        if (preg_match('/context.?length|token.?limit|max.?tokens|too long|exceed.*token|exceed.*context/i', $lower)) {
+            return (string) translate('Your input is too long. Please shorten it and try again.');
+        }
+        if (preg_match('/timeout|timed.?out/i', $lower)) {
+            return (string) translate('Generation timed out. Try a shorter length or a different model.');
+        }
+        if (preg_match('/api.?key|api.?key|invalid.?key|authentication|unauthorized|401|not.?authorized/i', $lower)) {
+            return (string) translate('This AI provider is not configured. Please contact support.');
+        }
+        if (preg_match('/model.?not.?found|model.?unavailable|invalid.?model|unsupported.?model|no.?such.?model|deprecated/i', $lower)) {
+            return (string) translate('The selected model is unavailable. Please try a different one.');
+        }
+        if (preg_match('/network.?error|connection.?refused|connection.?reset|econnrefused|econnreset|enotfound|etimedout/i', $lower)) {
+            return (string) translate('Connection error. Please check your internet and try again.');
+        }
+        if (preg_match('/internal.?server.?error|bad.?gateway|gateway.?timeout|service.?unavailable|overloaded|500|502|503|504/i', $lower)) {
+            return (string) translate('The AI service is temporarily unavailable. Please try again later.');
+        }
+        if (preg_match('/stream.?error|sse.?error/i', $lower)) {
+            return (string) translate('Generation interrupted. Please try again.');
+        }
+        if (preg_match('/exception|stack.?trace|\.php/i', $lower)) {
+            return (string) translate('Something went wrong. Please try again or contact support.');
+        }
+
+        return $message;
     }
 }
