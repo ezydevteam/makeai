@@ -8,6 +8,28 @@ use Illuminate\Support\Collection;
 
 class PlanPriceResolver
 {
+    private function normalizeFeatures(mixed $features): array
+    {
+        if (is_array($features)) {
+            return array_values(array_filter(array_map(function (mixed $feature): string {
+                return trim((string) $feature);
+            }, $features), fn (string $feature): bool => $feature !== ''));
+        }
+
+        if (! is_string($features) || trim($features) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($features, true);
+        if (is_array($decoded)) {
+            return $this->normalizeFeatures($decoded);
+        }
+
+        $lines = preg_split('/[\r\n,]+/', $features) ?: [];
+
+        return array_values(array_filter(array_map(fn (string $feature): string => trim($feature), $lines), fn (string $feature): bool => $feature !== ''));
+    }
+
     public function resolve(Plan $plan, ?string $countryCode = null): array
     {
         $countryCode = $this->normalizeCountryCode($countryCode);
@@ -40,7 +62,7 @@ class PlanPriceResolver
                 'description' => $plan->description,
                 'bottom_info_text' => $plan->bottom_info_text,
                 'credits' => $plan->credits,
-                'features' => $plan->features ?: [],
+                'features' => $this->normalizeFeatures($plan->features),
                 'is_featured' => $plan->is_featured,
                 'is_free' => $plan->is_free,
                 'is_active' => $plan->is_active,

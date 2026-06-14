@@ -10,12 +10,25 @@ import NotificationBell from '@/Components/NotificationBell.vue'
 import SocialFollow from '@/Components/SocialFollow.vue'
 
 type HeaderStyle = CSSProperties & Record<`--${string}`, string>
+type Branding = {
+    site_name?: string
+    site_logo_light?: string
+    site_logo_dark?: string
+}
+type AppHeaderUser = {
+    name?: string
+    email?: string
+    credits?: number
+    subscription_status?: string | null
+}
 
 const { isDark, toggleDark } = useTheme()
 const { t } = useTranslate()
 const page = usePage()
+const branding = computed(() => page.props.branding as Branding | undefined)
+const siteName = computed(() => String(branding.value?.site_name || page.props.appName || t('Application')))
 
-const user = computed(() => page.props.auth?.user as any)
+const user = computed(() => page.props.auth?.user as AppHeaderUser | undefined)
 const rawHeaderConfig = computed(() => page.props.headerConfig as any)
 const headerConfig = computed(() => rawHeaderConfig.value?.main ?? rawHeaderConfig.value)
 const topHeaderConfig = computed(() => rawHeaderConfig.value?.top)
@@ -159,15 +172,23 @@ const sectionStyle = (config: any, section: 'top' | 'main' | 'mobile' | 'mobile_
 const mobileIconButtonClass = 'flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
 const mobileBottomItemClass = 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
 const configString = (config: Record<string, unknown> | undefined, key: string, fallback = '') => typeof config?.[key] === 'string' ? (config[key] as string) : fallback
+const ctaStyleValue = (block: any) => {
+    const style = String(block.config?.style || 'filled')
+    return ['filled', 'bg_light', 'outline', 'ghost', 'custom'].includes(style) ? style : 'filled'
+}
 const mobileCtaClass = (block: any, bottom = false) => [
     bottom ? 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-bold transition-colors' : (block.config?.icon_only ? 'inline-flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold transition-colors' : 'inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors'),
-    block.config?.style === 'outline' ? 'border border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
-    block.config?.style === 'ghost' ? 'text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
-    block.config?.style === 'bg_light' ? 'bg-gray-50 text-gray-600 hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300' : '',
-    !block.config?.style || block.config?.style === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
+    ctaStyleValue(block) === 'outline' ? 'border border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
+    ctaStyleValue(block) === 'ghost' ? 'text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
+    ctaStyleValue(block) === 'bg_light' ? 'bg-gray-50 text-gray-600 hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300' : '',
+    ctaStyleValue(block) === 'custom' ? 'hover:opacity-90' : '',
+    ctaStyleValue(block) === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
 ]
 const blockIconClass = (block: any, fallback = '') => String(block.config?.icon_class || fallback)
 const ctaIconSizeClass = (bottom = false) => bottom ? 'text-xl leading-none' : 'text-[20px] leading-none'
+const notificationButtonClass = (block: any, bottom = false) => iconSurfaceClass(block, bottom
+    ? 'relative flex min-w-0 w-full flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
+    : 'relative flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700 dark:hover:text-white')
 const isIconOnly = (block: any) => Boolean(block.config?.icon_only)
 const blockText = (block: any, fallback: string) => String(block.config?.text || fallback)
 const blockLabel = (block: any, fallback: string) => String(block.config?.label || fallback)
@@ -177,6 +198,16 @@ const languageShowName = (block: any) => block.config?.show_name !== false
 const socialDisplayMode = (block: any): 'icons' | 'counts' | 'cards' => {
     const mode = String(block.config?.display_mode || 'icons')
     return ['icons', 'counts', 'cards'].includes(mode) ? mode as 'icons' | 'counts' | 'cards' : 'icons'
+}
+const canShowCtaButton = (block: any) => {
+    const accessLevel = String(block.config?.access_level || 'all')
+    const isLoggedIn = Boolean(user.value)
+    const isProUser = user.value?.subscription_status === 'active'
+
+    if (accessLevel === 'auth') return isLoggedIn
+    if (accessLevel === 'pro') return isProUser
+
+    return true
 }
 
 const menuAlignmentClass = (block: any) => {
@@ -210,9 +241,11 @@ const blockVisualStyle = (block: any): CSSProperties => {
     const iconColor = configString(block.config, 'icon_color')
     const bgColor = configString(block.config, 'bg_color')
     const textColor = configString(block.config, 'text_color')
+    const ctaStyle = ctaStyleValue(block)
+    const isCustomCta = block.type === 'cta_button' && ctaStyle === 'custom'
     if (iconColor) style.color = iconColor
-    if (bgColor && (block.config?.bg_style === 'custom' || block.type === 'cta_button')) style.backgroundColor = bgColor
-    if (textColor && block.type === 'cta_button') style.color = textColor
+    if (bgColor && (block.config?.bg_style === 'custom' || isCustomCta)) style.backgroundColor = bgColor
+    if (textColor && isCustomCta) style.color = textColor
     return style
 }
 const iconSurfaceClass = (block: any, baseClass: string) => [
@@ -228,13 +261,36 @@ const openCommandPalette = () => {
 
 const userIconHref = computed(() => user.value ? route('user.dashboard') : '/login')
 const userIconLabel = computed(() => user.value ? t('Dashboard') : t('Sign In'))
+const guestActionMode = (block: any) => {
+    const mode = String(block.config?.guest_mode || 'login_only')
+    return ['login_only', 'register_only', 'both'].includes(mode) ? mode : 'login_only'
+}
+const authDisplayMode = (block: any) => String(block.config?.auth_display || 'avatar_name') === 'avatar_only' ? 'avatar_only' : 'avatar_name'
+const showUserMenuArrow = (block: any) => block.config?.show_arrow_icon !== false
+const authButtonStyle = (value: unknown) => {
+    const style = String(value || 'primary')
+    return ['primary', 'dark', 'green', 'purple', 'gradient'].includes(style) ? style : 'primary'
+}
+const authActionButtonClass = (style: string, mobile = false) => [
+    mobile ? 'flex h-10 w-10 items-center justify-center rounded-xl transition-all shrink-0' : 'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all shrink-0',
+    style === 'primary' ? 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-600/20' : '',
+    style === 'dark' ? 'bg-gray-900 text-white hover:bg-black dark:bg-surface-700 dark:hover:bg-surface-600' : '',
+    style === 'green' ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20' : '',
+    style === 'purple' ? 'bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-600/20' : '',
+    style === 'gradient' ? 'bg-gradient-to-r from-primary-600 via-emerald-500 to-accent-500 text-white hover:opacity-95 shadow-lg shadow-primary-600/20' : '',
+]
+const guestLoginHref = '/login'
+const guestRegisterHref = '/register'
+const guestLoginIconClass = (block: any) => String(block.config?.guest_login_icon_class || 'ti ti-login-2')
+const guestRegisterIconClass = (block: any) => String(block.config?.guest_register_icon_class || 'ti ti-user-plus')
+const userMenuInitial = computed(() => String(user.value?.name || 'U').trim().charAt(0).toUpperCase() || 'U')
 const closeMobileMenu = () => { mobileMenuOpen.value = false }
 
-const getLogoImage = (block: any) => {
-    const mobileImg = configString(block.config, 'mobile_image')
-    const image = configString(block.config, 'image')
-    return window.innerWidth < 768 && mobileImg ? mobileImg : image
-}
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const getLogoImage = () => isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)
+const logoAltText = computed(() => siteName.value)
+const logoInitial = computed(() => siteName.value.trim().charAt(0).toUpperCase() || 'A')
 
 const updateScrollState = () => {
     const currentY = Math.max(window.scrollY, 0)
@@ -327,7 +383,7 @@ onUnmounted(() => {
             </div>
             <div class="flex items-center gap-3" :class="topColFlexClass('right')">
                 <template v-for="block in topRightBlocks" :key="block.id">
-                    <Link v-if="block.type === 'cta_button'" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block)" :style="blockVisualStyle(block)">
+                    <Link v-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block)" :style="blockVisualStyle(block)">
                         <i v-if="blockIconClass(block) || isIconOnly(block)" :class="[blockIconClass(block, 'ti ti-rocket'), ctaIconSizeClass()]" aria-hidden="true" />
                         <span v-if="!isIconOnly(block)">{{ blockText(block, t('Get Started')) }}</span>
                     </Link>
@@ -355,12 +411,12 @@ onUnmounted(() => {
             <div class="flex items-center gap-3" :class="mainColFlexClass('left')">
                 <template v-for="block in mainLeftBlocks" :key="block.id">
                     <!-- LOGO -->
-                    <Link v-if="block.type === 'logo'" :href="block.config.link || '/'" class="flex items-center gap-2.5 group">
-                        <img v-if="block.config.image" :src="String(block.config.image)" :alt="String(block.config.alt || block.config.text || page.props.appName)" class="h-9 w-auto max-w-36 shrink-0 object-contain" />
-                        <div v-else class="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/20 shrink-0 group-hover:scale-105 transition-transform">
-                            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                    <Link v-if="block.type === 'logo'" href="/" class="flex items-center gap-2.5 group">
+                        <img v-if="getLogoImage()" :src="getLogoImage()" :alt="logoAltText" class="h-9 w-auto max-w-36 shrink-0 object-contain" />
+                        <div v-else class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 text-sm font-bold text-white shadow-lg shadow-primary-500/20 transition-transform group-hover:scale-105">
+                            {{ logoInitial }}
                         </div>
-                        <span v-if="block.config.show_text" class="text-lg font-bold text-gray-900 dark:text-white tracking-tight hidden sm:block whitespace-nowrap">{{ block.config.text || page.props.appName }}</span>
+                        <span v-if="!getLogoImage()" class="hidden whitespace-nowrap text-lg font-bold tracking-tight text-gray-900 sm:block dark:text-white">{{ siteName }}</span>
                     </Link>
                 </template>
             </div>
@@ -416,7 +472,7 @@ onUnmounted(() => {
             <div class="flex items-center gap-3" :class="mainColFlexClass('right')">
                 <template v-for="block in mainRightBlocks" :key="block.id">
                     <LanguageSwitcher v-if="block.type === 'language_switcher'" :show-flag="languageShowFlag(block)" :show-name="languageShowName(block)" />
-                    <NotificationBell v-else-if="block.type === 'notification_bell' && user" context="user" />
+                    <NotificationBell v-else-if="block.type === 'notification_bell' && user" context="user" :button-class="notificationButtonClass(block).join(' ')" :icon-class="blockIconClass(block)" :icon-style="blockVisualStyle(block)" />
 
                     <div v-else-if="block.type === 'credit_balance' && user" class="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary-50 px-3 text-sm font-bold text-primary-700 dark:bg-primary-900/20 dark:text-primary-300" :style="blockVisualStyle(block)">
                         <i :class="blockIconClass(block, 'ti ti-bolt')" class="text-[18px]" aria-hidden="true" />
@@ -432,12 +488,13 @@ onUnmounted(() => {
                     </button>
 
                     <!-- CTA BUTTON -->
-                    <Link v-else-if="block.type === 'cta_button'" :href="block.config.link" class="rounded-xl text-sm font-bold transition-all whitespace-nowrap shrink-0" :style="blockVisualStyle(block)" :class="[
+                    <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" class="rounded-xl text-sm font-bold transition-all whitespace-nowrap shrink-0" :style="blockVisualStyle(block)" :class="[
                         isIconOnly(block) ? 'flex h-10 w-10 items-center justify-center' : 'px-5 py-2',
-                        block.config.style === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
-                        block.config.style === 'bg_light' ? 'bg-gray-50 text-gray-600 hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300' : '',
-                        block.config.style === 'outline' ? 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
-                        block.config.style === 'ghost' ? 'text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : ''
+                        ctaStyleValue(block) === 'outline' ? 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
+                        ctaStyleValue(block) === 'ghost' ? 'text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20' : '',
+                        ctaStyleValue(block) === 'bg_light' ? 'bg-gray-50 text-gray-600 hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300' : '',
+                        ctaStyleValue(block) === 'custom' ? 'hover:opacity-90' : '',
+                        ctaStyleValue(block) === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
                     ]">
                         <span class="inline-flex items-center gap-1.5">
                             <i v-if="blockIconClass(block) || isIconOnly(block)" :class="[blockIconClass(block, 'ti ti-rocket'), ctaIconSizeClass()]" aria-hidden="true" />
@@ -453,8 +510,9 @@ onUnmounted(() => {
                                 <span class="text-sm font-semibold text-primary-600 dark:text-primary-400">{{ user.credits ?? 0 }}</span>
                             </div>
                             <button @click="profileOpen = !profileOpen" class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/5 transition-colors">
-                                <div v-if="block.config.show_avatar" class="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0">{{ user.name?.charAt(0) ?? 'U' }}</div>
-                                <svg class="w-4 h-4 text-gray-500 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                <div class="w-8 h-8 bg-gradient-to-br from-primary-500 to-accent-500 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0">{{ userMenuInitial }}</div>
+                                <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ user.name }}</span>
+                                <svg v-if="showUserMenuArrow(block)" class="w-4 h-4 text-gray-500 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                             </button>
                             <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0 scale-95">
                                 <div v-if="profileOpen" class="absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-50">
@@ -481,8 +539,14 @@ onUnmounted(() => {
                             </Transition>
                         </div>
                         <div v-else class="flex items-center gap-3">
-                            <Link href="/login" class="text-sm font-bold text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors px-4 py-2">{{ t('Sign In') }}</Link>
-                            <Link href="/register" class="btn-primary px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg shadow-primary-600/20 whitespace-nowrap">{{ t('Get Started') }}</Link>
+                            <Link v-if="guestActionMode(block) === 'login_only' || guestActionMode(block) === 'both'" :href="guestLoginHref" :class="authActionButtonClass(authButtonStyle(block.config?.guest_login_style))">
+                                <i :class="[guestLoginIconClass(block), 'text-base leading-none']" aria-hidden="true" />
+                                <span>{{ t('Login') }}</span>
+                            </Link>
+                            <Link v-if="guestActionMode(block) === 'register_only' || guestActionMode(block) === 'both'" :href="guestRegisterHref" :class="authActionButtonClass(authButtonStyle(block.config?.guest_register_style))">
+                                <i :class="[guestRegisterIconClass(block), 'text-base leading-none']" aria-hidden="true" />
+                                <span>{{ t('Register') }}</span>
+                            </Link>
                         </div>
                     </template>
 
@@ -510,9 +574,12 @@ onUnmounted(() => {
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
                     </button>
-                    <Link v-else-if="block.type === 'logo'" :href="block.config.link || '/'" class="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white">
-                        <img v-if="getLogoImage(block)" :src="getLogoImage(block)" :alt="String(block.config.alt || block.config.text || page.props.appName)" class="h-9 w-auto max-w-32 object-contain" />
-                        <span v-if="!getLogoImage(block) || block.config.show_text">{{ block.config.text || page.props.appName }}</span>
+                    <Link v-else-if="block.type === 'logo'" href="/" class="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white">
+                        <img v-if="getLogoImage()" :src="getLogoImage()" :alt="logoAltText" class="h-9 w-auto max-w-32 object-contain" />
+                        <div v-else class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 text-sm font-bold text-white shadow-lg shadow-primary-500/20">
+                            {{ logoInitial }}
+                        </div>
+                        <span v-if="!getLogoImage()">{{ siteName }}</span>
                     </Link>
                 </template>
             </div>
@@ -530,9 +597,9 @@ onUnmounted(() => {
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
                     </Link>
-                    <NotificationBell v-else-if="block.type === 'notification_bell' && user" context="user" />
+                    <NotificationBell v-else-if="block.type === 'notification_bell' && user" context="user" :button-class="notificationButtonClass(block).join(' ')" :icon-class="blockIconClass(block)" :icon-style="blockVisualStyle(block)" />
                     <LanguageSwitcher v-else-if="block.type === 'language_switcher'" :show-flag="languageShowFlag(block)" :show-name="languageShowName(block)" />
-                    <Link v-else-if="block.type === 'cta_button'" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block)" :style="blockVisualStyle(block)">
+                    <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block)" :style="blockVisualStyle(block)">
                         <i v-if="blockIconClass(block) || isIconOnly(block)" :class="[blockIconClass(block, 'ti ti-rocket'), ctaIconSizeClass()]" aria-hidden="true" />
                         <span v-if="!isIconOnly(block)">{{ blockText(block, t('Get Started')) }}</span>
                     </Link>
@@ -631,12 +698,12 @@ onUnmounted(() => {
                     <span v-if="showBlockLabel(block)">{{ user ? blockLabel(block, t('Dashboard')) : String(block.config?.guest_label || blockLabel(block, t('Sign In'))) }}</span>
                 </Link>
                 <div v-else-if="block.type === 'notification_bell' && user" class="flex min-w-0 flex-1 justify-center">
-                    <NotificationBell context="user" :label="showBlockLabel(block) ? blockLabel(block, t('Notifications')) : ''" root-class="flex min-w-0 w-full" button-class="relative flex min-w-0 w-full flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" dropdown-class="fixed inset-x-4 bottom-20 z-50 max-h-[70vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900" />
+                    <NotificationBell context="user" :label="showBlockLabel(block) ? blockLabel(block, t('Notifications')) : ''" root-class="flex min-w-0 w-full" :button-class="notificationButtonClass(block, true).join(' ')" dropdown-class="fixed inset-x-4 bottom-20 z-50 max-h-[70vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900" :icon-class="blockIconClass(block)" :icon-style="blockVisualStyle(block)" />
                 </div>
                 <div v-else-if="block.type === 'language_switcher'" class="flex min-w-0 flex-1 justify-center">
                     <LanguageSwitcher variant="bottom" :show-flag="languageShowFlag(block)" :show-name="languageShowName(block)" />
                 </div>
-                <Link v-else-if="block.type === 'cta_button'" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block, true)" :style="blockVisualStyle(block)">
+                <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block, true)" :style="blockVisualStyle(block)">
                     <i v-if="blockIconClass(block, 'ti ti-arrow-right')" :class="[blockIconClass(block, 'ti ti-arrow-right'), ctaIconSizeClass(true)]" aria-hidden="true" />
                     <span v-if="!isIconOnly(block)" class="max-w-full truncate">{{ blockText(block, t('Start')) }}</span>
                 </Link>

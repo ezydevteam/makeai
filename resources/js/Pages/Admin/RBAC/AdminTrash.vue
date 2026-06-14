@@ -2,9 +2,9 @@
     <Head :title="t('Administrator Trash')" />
 
     <AdminLayout>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div class="py-6">
+            <div class="mx-auto w-full sm:max-w-7xl sm:px-6 lg:px-8">
+                <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                             {{ t('Administrator Trash') }}
@@ -23,82 +23,80 @@
                     </Link>
                 </div>
 
-                <div class="mb-4 flex flex-col gap-4">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                                    </svg>
-                                </span>
-                                <input
-                                    v-model="searchQuery"
-                                    type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Filter this table by name, email, or role...')"
-                                />
-                                <button
-                                    v-if="searchQuery"
-                                    type="button"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                    :aria-label="t('Clear search')"
-                                    @click="searchQuery = ''"
-                                >
-                                    <i class="ti ti-x text-base"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
-                            <div class="w-full md:w-52">
-                                <AppSelect
-                                    v-model="filtersForm.status"
-                                    :options="statusOptions"
-                                    :placeholder="t('All Status')"
-                                    @update:model-value="applyFilters"
-                                />
+                <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                    <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div class="w-full xl:max-w-md">
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                        <i class="ti ti-search text-base"></i>
+                                    </span>
+                                    <input
+                                        v-model="searchQuery"
+                                        type="text"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        :placeholder="t('Filter this table by name, email, or role...')"
+                                    />
+                                    <button
+                                        v-if="searchQuery"
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                        :aria-label="t('Clear search')"
+                                        @click="searchQuery = ''"
+                                    >
+                                        <i class="ti ti-x text-base"></i>
+                                    </button>
+                                </div>
                             </div>
 
-                            <div class="w-full md:w-56">
-                                <AppSelect
-                                    v-model="filtersForm.role"
-                                    :options="roleOptions"
-                                    :placeholder="t('All Roles')"
-                                    live-search
-                                    @update:model-value="applyFilters"
-                                />
-                            </div>
-
-                            <template v-if="selectedIds.length > 0">
-                                <span class="text-sm text-gray-500 dark:text-gray-400 xl:whitespace-nowrap">
-                                    {{ t(':count selected', { count: selectedIds.length }) }}
-                                </span>
-
-                                <div class="w-full md:w-64">
+                            <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
+                                <div class="w-full md:w-52">
                                     <AppSelect
-                                        v-model="bulkAction"
-                                        :options="bulkActionOptions"
-                                        :placeholder="t('Bulk Actions')"
+                                        v-model="filtersForm.status"
+                                        :options="statusOptions"
+                                        :placeholder="t('All Status')"
+                                        @update:model-value="applyFilters"
                                     />
                                 </div>
 
-                                <div :title="applyDisabledReason">
-                                    <button
-                                        type="button"
-                                        class="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                                        :disabled="isApplyDisabled"
-                                        @click="applyBulkAction"
-                                    >
-                                        {{ t('Apply') }}
-                                    </button>
+                                <div class="w-full md:w-56">
+                                    <AppSelect
+                                        v-model="filtersForm.role"
+                                        :options="roleOptions"
+                                        :placeholder="t('All Roles')"
+                                        live-search
+                                        @update:model-value="applyFilters"
+                                    />
                                 </div>
-                            </template>
+
+                                <template v-if="selectedIds.length > 0">
+                                    <span class="text-sm text-gray-500 dark:text-gray-400 xl:whitespace-nowrap">
+                                        {{ t(':count selected', { count: selectedIds.length }) }}
+                                    </span>
+
+                                    <div class="w-full md:w-64">
+                                        <AppSelect
+                                            v-model="bulkAction"
+                                            :options="bulkActionOptions"
+                                            :placeholder="t('Bulk Actions')"
+                                        />
+                                    </div>
+
+                                    <div :title="applyDisabledReason">
+                                        <button
+                                            type="button"
+                                            class="btn-primary rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                            :disabled="isApplyDisabled"
+                                            @click="applyBulkAction"
+                                        >
+                                            {{ t('Apply') }}
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="overflow-hidden border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
                             <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
@@ -201,10 +199,15 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
 
-                <div v-if="admins.links.length > 3" class="mt-4">
-                    <Pagination :links="admins.links" />
+                    <div v-if="admins.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                        <Pagination
+                            :links="admins.links"
+                            :from="admins.from"
+                            :to="admins.to"
+                            :total="admins.total"
+                        />
+                    </div>
                 </div>
             </div>
         </div>
@@ -258,6 +261,9 @@ interface PaginationLink {
 interface AdminsResponse {
     data: AdminItem[]
     links: PaginationLink[]
+    from?: number
+    to?: number
+    total?: number
 }
 
 interface Filters {

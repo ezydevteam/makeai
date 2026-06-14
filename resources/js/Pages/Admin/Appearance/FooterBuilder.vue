@@ -6,14 +6,15 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppColorPicker from '@/Components/AppColorPicker.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import IconClassSelect from '@/Components/IconClassSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 declare const route: (name: string, params?: unknown) => string
 
-type FooterBlockType = 'about_text' | 'menu_list' | 'contact_info' | 'social_icons' | 'newsletter' | 'custom_html' | 'recent_blog_posts' | 'ai_tool_categories' | 'legal_links' | 'language_switcher' | 'dark_mode' | 'trust_badges' | 'store_badges' | 'divider' | 'copyright_text' | 'payment_icons' | 'back_to_top'
+type FooterBlockType = 'about_text' | 'menu_list' | 'contact_info' | 'social_icons' | 'newsletter' | 'custom_html' | 'recent_blog_posts' | 'ai_tool_categories' | 'legal_links' | 'custom_link' | 'image' | 'language_switcher' | 'dark_mode' | 'trust_badges' | 'store_badges' | 'divider' | 'copyright_text' | 'payment_icons' | 'back_to_top'
 type ColumnFlex = 'default' | 'column-1' | 'column-2' | 'column-3' | 'column-4'
-type ConfigValue = string | number | null | string[]
+type ConfigValue = string | number | boolean | null | string[]
 type HeadingStyle = 'default' | 'accent' | 'minimal'
 type FooterContainerWidth = 'default' | 'full' | 'boxed'
 
@@ -81,6 +82,12 @@ interface AiCategoryOption {
     tools_count: number
 }
 
+interface PageOption {
+    id: number
+    title: string
+    slug: string
+}
+
 interface BlockPaletteItem {
     type: FooterBlockType
     label: string
@@ -92,6 +99,7 @@ interface BlockPaletteItem {
 const props = defineProps<{
     config: FooterConfig
     menus: MenuOption[]
+    pages: PageOption[]
     aiCategories: AiCategoryOption[]
 }>()
 
@@ -230,26 +238,23 @@ const normalizeConfig = (config: FooterConfig): FooterConfig => {
 const form = useForm<FooterConfig>(normalizeConfig(props.config))
 
 const availableBlocks: BlockPaletteItem[] = [
-    { type: 'about_text', label: 'About Text', description: 'Logo, alt text, and short brand description.', config: { logo: null, alt: '', description: '' } },
+    { type: 'about_text', label: 'About Text', description: 'Site default logo and short brand description.', config: { description: '', show_social_icon: false } },
     { type: 'menu_list', label: 'Menu List', description: 'Render links from a saved menu.', config: { title: t('Quick Links'), menu_slug: '' } },
-    { type: 'contact_info', label: 'Contact Info', description: 'Address, phone, and email rows with icons.', config: { title: t('Contact Us'), address: '', phone: '', email: '' } },
+    { type: 'contact_info', label: 'Contact Info', description: 'Address, phone, email, and supporting details.', config: { title: t('Contact Us'), details: '', address: '', phone: '', email: '' } },
     { type: 'social_icons', label: 'Social Icons', description: 'Show configured social follow buttons.', config: { title: t('Follow Us'), display_mode: 'icons' } },
     { type: 'newsletter', label: 'Newsletter Form', description: 'Embed the public newsletter subscription form.', config: { title: t('Subscribe'), description: t('Get the latest updates.') } },
     { type: 'custom_html', label: 'Custom HTML', description: 'Sanitized trusted footer markup.', config: { title: '', content: '' } },
     { type: 'recent_blog_posts', label: 'Recent Blog Posts', description: 'Show latest published posts.', config: { title: t('Latest Posts'), count: 3 } },
     { type: 'ai_tool_categories', label: 'AI Tool Categories', description: 'List active AI tool categories.', config: { title: t('AI Tools'), count: 6 } },
-    { type: 'legal_links', label: 'Legal Links', description: 'Privacy, terms, refund, and contact links.', config: { title: t('Legal'), links: ['privacy', 'terms', 'refund', 'contact'] } },
+    { type: 'custom_link', label: 'Custom Link', description: 'Single custom footer link with access and target rules.', config: { label: t('Learn More'), link_type: 'page', page_slug: '', tool_category_slug: '', custom_url: '', target: '_self', access: 'all', display_mode: 'vertical' } },
+    { type: 'image', label: 'Image', description: 'Optional label with linked uploaded image.', config: { title: '', image_url: '', link: '', width: 120, height: 40, target: '_self' } },
     { type: 'language_switcher', label: 'Language Switcher', description: 'Locale selector slot.', config: { title: '' } },
     { type: 'dark_mode', label: 'Dark Mode Toggle', description: 'Theme toggle slot.', config: { title: '' } },
-    { type: 'trust_badges', label: 'Trust Badges', description: 'Payment security or guarantee text.', config: { title: t('Secure Checkout'), text: t('Secure payments powered by trusted providers.') } },
-    { type: 'store_badges', label: 'Store Badges', description: 'External CTA buttons or app store badges.', config: { title: t('Get the App'), links: [] } },
-    { type: 'divider', label: 'Divider / Spacer', description: 'Visual divider or spacing block.', config: { spacing: 24 } },
+    { type: 'divider', label: 'Divider / Spacer', description: 'Visual divider or spacing block.', config: { spacing: 24, color: '' } },
     { type: 'copyright_text', label: 'Copyright Text', description: 'Copyright text with {year} support.', bottomOnly: true, config: { text: form.bottom_bar.copyright_text || t('© {year} All rights reserved.') } },
-    { type: 'payment_icons', label: 'Payment Icons', description: 'Accepted payment method badges.', bottomOnly: true, config: { icons: form.bottom_bar.payment_icons.length ? [...form.bottom_bar.payment_icons] : ['visa', 'mastercard', 'paypal', 'stripe'] } },
-    { type: 'back_to_top', label: 'Back to Top', description: 'Scroll-to-top control.', bottomOnly: true, config: { label: t('Back to top') } },
+    { type: 'payment_icons', label: 'Payment Icons', description: 'Uploaded payment method images.', bottomOnly: true, config: { icons: form.bottom_bar.payment_icons.length ? [...form.bottom_bar.payment_icons] : [] } },
+    { type: 'back_to_top', label: 'Back to Top', description: 'Scroll-to-top control.', bottomOnly: true, config: { label: t('Back to top'), icon: 'ti ti-arrow-up', bg_color: '', text_color: '', shape: 'rounded' } },
 ]
-
-const paymentIcons = ['visa', 'mastercard', 'paypal', 'stripe', 'amex', 'discover', 'apple_pay', 'google_pay']
 
 const containerWidthOptions: Array<{ value: FooterContainerWidth; label: string }> = [
     { value: 'default', label: 'Default' },
@@ -296,6 +301,35 @@ const socialDisplayModeOptions = [
     { value: 'icons', label: 'Icons Only' },
     { value: 'labels', label: 'Labels Only' },
     { value: 'stacked', label: 'Icons + Labels' },
+]
+
+const customLinkTypeOptions = [
+    { value: 'page', label: 'Existing Page' },
+    { value: 'tool_category', label: 'Tool Category' },
+    { value: 'custom', label: 'Custom Link' },
+]
+
+const customLinkTargetOptions = [
+    { value: '_self', label: 'Same Tab' },
+    { value: '_blank', label: 'New Tab' },
+]
+
+const customLinkAccessOptions = [
+    { value: 'all', label: 'All Users' },
+    { value: 'logged_in', label: 'Logged In' },
+    { value: 'free', label: 'Free Users' },
+]
+
+const customLinkDisplayModeOptions = [
+    { value: 'vertical', label: 'Vertical' },
+    { value: 'horizontal', label: 'Horizontal' },
+]
+
+const backToTopShapeOptions = [
+    { value: 'square', label: 'Square' },
+    { value: 'rounded', label: 'Rounded' },
+    { value: 'pill', label: 'Pill' },
+    { value: 'circle', label: 'Circle' },
 ]
 
 const blockDragOptions = {
@@ -445,18 +479,6 @@ const moveColumn = (columnIndex: number, direction: -1 | 1) => {
     form.columns.splice(target, 0, column)
 }
 
-const togglePaymentIcon = (icons: ConfigValue, icon: string) => {
-    if (!Array.isArray(icons)) return
-
-    const index = icons.indexOf(icon)
-    if (index >= 0) {
-        icons.splice(index, 1)
-        return
-    }
-
-    icons.push(icon)
-}
-
 const submit = () => {
     form.bottom_blocks = form.bottom_columns.flatMap((column) => column.blocks)
 
@@ -506,6 +528,68 @@ const handleBackgroundUpload = async (event: Event) => {
     } finally {
         input.value = ''
     }
+}
+
+const handlePaymentIconUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement
+    if (!input.files?.length || !selectedBlock.value || selectedBlock.value.type !== 'payment_icons') return
+
+    const icons = Array.isArray(selectedBlock.value.config.icons) ? selectedBlock.value.config.icons : []
+
+    for (const file of Array.from(input.files)) {
+        const payload = new FormData()
+        payload.append('file', file)
+        payload.append('directory', 'footer-payments')
+
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
+        const response = await fetch('/admin/appearance/header/upload-logo', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': csrf,
+                Accept: 'application/json',
+            },
+            body: payload,
+        })
+
+        const result = await response.json()
+        if (result.url) {
+            icons.push(String(result.url))
+        }
+    }
+
+    selectedBlock.value.config.icons = icons
+    input.value = ''
+}
+
+const removePaymentIconImage = (index: number) => {
+    if (!selectedBlock.value || selectedBlock.value.type !== 'payment_icons' || !Array.isArray(selectedBlock.value.config.icons)) return
+    selectedBlock.value.config.icons.splice(index, 1)
+}
+
+const handleFooterImageUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement
+    if (!input.files?.length || !selectedBlock.value || selectedBlock.value.type !== 'image') return
+
+    const payload = new FormData()
+    payload.append('file', input.files[0])
+    payload.append('directory', 'footer-images')
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
+    const response = await fetch('/admin/appearance/header/upload-logo', {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': csrf,
+            Accept: 'application/json',
+        },
+        body: payload,
+    })
+
+    const result = await response.json()
+    if (result.url) {
+        selectedBlock.value.config.image_url = String(result.url)
+    }
+
+    input.value = ''
 }
 
 const clearBackgroundImage = () => {
@@ -700,7 +784,7 @@ const resetFooter = () => {
                 <section class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
                     <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                         <div>
-                            <h3 class="text-xs font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t(blockLabel(selectedBlock.type)) }}</h3>
+                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t(blockLabel(selectedBlock.type)) }}</h3>
                             <p class="mt-1 text-xs text-gray-500">{{ t(blockDescription(selectedBlock.type)) }}</p>
                         </div>
                         <Tooltip :content="t('Close')">
@@ -735,17 +819,18 @@ const resetFooter = () => {
 
                         <template v-if="selectedBlock.type === 'about_text'">
                             <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                                {{ t('Logo URL') }}
-                                <input v-model="selectedBlock.config.logo" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('https://example.com/logo.svg')">
-                            </label>
-                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                                {{ t('Alt Text') }}
-                                <input v-model="selectedBlock.config.alt" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('Brand logo alt text')">
-                            </label>
-                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
                                 {{ t('Description') }}
                                 <textarea v-model="selectedBlock.config.description" rows="4" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('Add a short brand summary for the footer.')"></textarea>
                             </label>
+                            <button type="button" class="mt-4 flex w-full items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="selectedBlock.config.show_social_icon = !Boolean(selectedBlock.config.show_social_icon)">
+                                <span>
+                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Social Icon') }}</span>
+                                    <span class="text-xs text-gray-500">{{ t('Show social follow icons after the about text.') }}</span>
+                                </span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="Boolean(selectedBlock.config.show_social_icon) ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="Boolean(selectedBlock.config.show_social_icon) ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
                         </template>
 
                         <template v-if="selectedBlock.type === 'menu_list'">
@@ -756,10 +841,99 @@ const resetFooter = () => {
                             />
                         </template>
 
+                        <template v-if="selectedBlock.type === 'custom_link'">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">
+                                    {{ t('Label') }}
+                                    <input v-model="selectedBlock.config.label" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('Learn More')">
+                                </label>
+                                <AppSelect
+                                    v-model="selectedBlock.config.link_type"
+                                    :label="t('Link Type')"
+                                    :options="customLinkTypeOptions.map((option) => ({ label: t(option.label), value: option.value }))"
+                                />
+                                <AppSelect
+                                    v-model="selectedBlock.config.target"
+                                    :label="t('Link Target')"
+                                    :options="customLinkTargetOptions.map((option) => ({ label: t(option.label), value: option.value }))"
+                                />
+                                <AppSelect
+                                    v-if="selectedBlock.config.link_type === 'page'"
+                                    v-model="selectedBlock.config.page_slug"
+                                    :label="t('Existing Page')"
+                                    :options="[{ label: t('Select a page'), value: '' }, ...pages.map((page) => ({ label: page.title, value: page.slug }))]"
+                                />
+                                <AppSelect
+                                    v-if="selectedBlock.config.link_type === 'tool_category'"
+                                    v-model="selectedBlock.config.tool_category_slug"
+                                    :label="t('Tool Category')"
+                                    :options="[{ label: t('Select a category'), value: '' }, ...aiCategories.map((category) => ({ label: category.name, value: category.slug }))]"
+                                />
+                                <label v-if="selectedBlock.config.link_type === 'custom'" class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    {{ t('Custom Link') }}
+                                    <input v-model="selectedBlock.config.custom_url" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('https://example.com')">
+                                </label>
+                                <AppSelect
+                                    v-model="selectedBlock.config.access"
+                                    :label="t('Access')"
+                                    :options="customLinkAccessOptions.map((option) => ({ label: t(option.label), value: option.value }))"
+                                />
+                                <AppSelect
+                                    v-model="selectedBlock.config.display_mode"
+                                    :label="t('Display Mode')"
+                                    :options="customLinkDisplayModeOptions.map((option) => ({ label: t(option.label), value: option.value }))"
+                                />
+                            </div>
+                        </template>
+
+                        <template v-if="selectedBlock.type === 'image'">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">
+                                    {{ t('Label') }} <span class="text-gray-400">{{ t('(Optional)') }}</span>
+                                    <input v-model="selectedBlock.config.title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('Optional image label')">
+                                </label>
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300 sm:col-span-2">
+                                    {{ t('Link') }}
+                                    <input v-model="selectedBlock.config.link" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('https://example.com')">
+                                </label>
+                                <AppSelect
+                                    v-model="selectedBlock.config.target"
+                                    :label="t('Link Target')"
+                                    :options="customLinkTargetOptions.map((option) => ({ label: t(option.label), value: option.value }))"
+                                />
+                                <div class="grid grid-cols-2 gap-4">
+                                    <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                        {{ t('Width') }}
+                                        <input v-model.number="selectedBlock.config.width" type="number" min="20" max="600" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                                    </label>
+                                    <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                        {{ t('Height') }}
+                                        <input v-model.number="selectedBlock.config.height" type="number" min="20" max="400" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                                    </label>
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('Image Upload') }}</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        class="mt-2 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:file:bg-primary-900/30 dark:file:text-primary-200"
+                                        @change="handleFooterImageUpload"
+                                    >
+                                    <div v-if="selectedBlock.config.image_url" class="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+                                        <img :src="String(selectedBlock.config.image_url)" :alt="t('Footer image preview')" class="max-h-32 w-full object-contain">
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
                         <template v-if="selectedBlock.type === 'contact_info'">
                             <label v-for="field in ['address', 'phone', 'email']" :key="field" class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
                                 {{ t(field) }}
                                 <input v-model="selectedBlock.config[field]" :type="field === 'email' ? 'email' : 'text'" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="field === 'address' ? t('123 Main Street, City') : field === 'phone' ? t('+1 (555) 123-4567') : t('support@example.com')">
+                            </label>
+                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                {{ t('Details') }}
+                                <textarea v-model="selectedBlock.config.details" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200" :placeholder="t('Add extra contact details or support notes.')"></textarea>
                             </label>
                         </template>
 
@@ -797,13 +971,16 @@ const resetFooter = () => {
                         </template>
 
                         <template v-if="selectedBlock.type === 'divider'">
-                            <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
-                                {{ t('Spacing') }}
-                                <div class="mt-2 flex items-center rounded-lg border border-gray-200 bg-gray-50 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:focus-within:border-primary-500/70 dark:focus-within:ring-primary-500/10">
-                                    <input v-model.number="selectedBlock.config.spacing" type="number" min="8" max="96" class="w-full rounded-l-lg bg-transparent px-3 py-2 text-sm text-gray-700 outline-none dark:text-gray-200" :placeholder="t('24')">
-                                    <span class="border-l border-gray-200 px-3 text-sm text-gray-500 dark:border-surface-700 dark:text-gray-400">px</span>
-                                </div>
-                            </label>
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                    {{ t('Spacing') }}
+                                    <div class="mt-2 flex items-center rounded-lg border border-gray-200 bg-gray-50 focus-within:border-primary-400 focus-within:ring-4 focus-within:ring-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:focus-within:border-primary-500/70 dark:focus-within:ring-primary-500/10">
+                                        <input v-model.number="selectedBlock.config.spacing" type="number" min="8" max="96" class="w-full rounded-l-lg bg-transparent px-3 py-2 text-sm text-gray-700 outline-none dark:text-gray-200" :placeholder="t('24')">
+                                        <span class="border-l border-gray-200 px-3 text-sm text-gray-500 dark:border-surface-700 dark:text-gray-400">px</span>
+                                    </div>
+                                </label>
+                                <AppColorPicker v-model="selectedBlock.config.color" :label="t('Color')" />
+                            </div>
                         </template>
 
                         <template v-if="selectedBlock.type === 'copyright_text'">
@@ -816,12 +993,39 @@ const resetFooter = () => {
 
                         <template v-if="selectedBlock.type === 'payment_icons'">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('Payment Icons') }}</label>
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    <button v-for="icon in paymentIcons" :key="icon" type="button" class="rounded-lg border px-3 py-1.5 text-xs font-semibold capitalize transition" :class="Array.isArray(selectedBlock.config.icons) && selectedBlock.config.icons.includes(icon) ? 'border-primary-300 bg-primary-100 text-primary-700 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-300' : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-primary-200 dark:border-surface-700 dark:bg-surface-800'" @click="togglePaymentIcon(selectedBlock.config.icons, icon)">
-                                        {{ icon.replace('_', ' ') }}
-                                    </button>
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-300">{{ t('Payment Images') }}</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    class="mt-3 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:file:bg-primary-900/30 dark:file:text-primary-200"
+                                    @change="handlePaymentIconUpload"
+                                >
+                                <span class="mt-2 block text-[11px] text-gray-400">{{ t('Upload payment logos. Drag to reorder is not available here yet.') }}</span>
+                                <div v-if="Array.isArray(selectedBlock.config.icons) && selectedBlock.config.icons.length" class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    <div v-for="(icon, index) in selectedBlock.config.icons" :key="`${icon}-${index}`" class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-surface-700 dark:bg-surface-800">
+                                        <img :src="String(icon)" :alt="t('Payment icon preview')" class="h-10 w-full object-contain">
+                                        <button type="button" class="mt-3 w-full rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300" @click="removePaymentIconImage(index)">
+                                            {{ t('Remove') }}
+                                        </button>
+                                    </div>
                                 </div>
+                            </div>
+                        </template>
+
+                        <template v-if="selectedBlock.type === 'back_to_top'">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <IconClassSelect
+                                    v-model="selectedBlock.config.icon"
+                                    :label="t('Icon')"
+                                />
+                                <AppSelect
+                                    v-model="selectedBlock.config.shape"
+                                    :label="t('Shape')"
+                                    :options="backToTopShapeOptions.map((option) => ({ label: t(option.label), value: option.value }))"
+                                />
+                                <AppColorPicker v-model="selectedBlock.config.bg_color" :label="t('Background Color')" />
+                                <AppColorPicker v-model="selectedBlock.config.text_color" :label="t('Text Color')" />
                             </div>
                         </template>
                     </div>

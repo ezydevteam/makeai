@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<{
     required?: boolean
     id?: string
     name?: string
+    dropdownPlacement?: 'auto' | 'top' | 'bottom'
     /** Auto-enable virtual scrolling when options exceed this threshold. Default 100. */
     virtualThreshold?: number
 }>(), {
@@ -40,6 +41,7 @@ const props = withDefaults(defineProps<{
     required: false,
     id: undefined,
     name: undefined,
+    dropdownPlacement: 'auto',
     virtualThreshold: 100,
 })
 
@@ -128,6 +130,11 @@ function onListScroll(e: Event) {
 // --- End virtual scroll ---
 
 const detectPlacement = () => {
+    if (props.dropdownPlacement !== 'auto') {
+        placement.value = props.dropdownPlacement
+        return
+    }
+
     if (!triggerRef.value) return
     const rect = triggerRef.value.getBoundingClientRect()
     const menuHeight = props.size * ITEM_HEIGHT + (showSearch.value ? 50 : 0) + 8

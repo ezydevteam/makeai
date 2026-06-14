@@ -33,7 +33,7 @@ class LicenseSettingsController extends Controller
             403
         );
 
-        $result = $this->licenseService->activate($request->validated('purchase_code'));
+        $result = $this->licenseService->verify($request->validated('purchase_code'));
 
         if (! $result->valid) {
             return back()->with('error', $result->error);

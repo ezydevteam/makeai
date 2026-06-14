@@ -165,7 +165,11 @@ const pricingCountryLabel = computed(() => {
 })
 
 const planFeatures = (plan: Plan) => {
-    const features = [...plan.features]
+    const features = Array.isArray(plan.features)
+        ? [...plan.features]
+        : typeof plan.features === 'string'
+            ? plan.features.split(/[\r\n,]+/).map((feature) => feature.trim()).filter(Boolean)
+            : []
 
     if (Number(plan.credits) > 0) {
         features.push(t(':count credits', { count: Number(plan.credits).toLocaleString() }))
@@ -183,6 +187,20 @@ const planActionUrl = (plan: Plan) => {
 
     return `${authUser ? '/checkout' : '/register'}?${query.toString()}`
 }
+
+const planCardClass = (plan: Plan) => [
+    plan.is_featured
+        ? 'border-primary-200 bg-white shadow-2xl shadow-primary-500/10 ring-1 ring-primary-100'
+        : 'border-gray-100 bg-white hover:border-gray-200',
+    'relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1',
+]
+
+const planButtonClass = (plan: Plan) => [
+    'inline-flex w-full items-center justify-center rounded-2xl px-5 py-3.5 text-sm font-black leading-none transition-all duration-200 ease-out hover:-translate-y-0.5',
+    plan.is_featured
+        ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-xl shadow-primary-600/20 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-600/25'
+        : 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+]
 </script>
 
 <template>
@@ -216,7 +234,7 @@ const planActionUrl = (plan: Plan) => {
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-24">
-                <div v-for="plan in plans" :key="plan.id" :class="[plan.is_featured ? 'border-primary-200 bg-white shadow-2xl shadow-primary-500/10 scale-105 z-10' : 'border-gray-100 bg-white hover:border-gray-200']" class="relative border rounded-3xl p-8 flex flex-col transition-all duration-300">
+                <div v-for="plan in plans" :key="plan.id" :class="planCardClass(plan)">
                     <div v-if="plan.is_featured" class="absolute -top-4 left-1/2 -translate-x-1/2 px-5 py-1.5 bg-gradient-to-r from-primary-600 to-accent-600 text-white text-[10px] font-black uppercase tracking-widest rounded-full shadow-lg">
                         {{ settings.pricing_featured_label_text }}
                     </div>
@@ -237,9 +255,9 @@ const planActionUrl = (plan: Plan) => {
                         <p v-if="activeCycle(plan).is_trial" class="text-xs text-primary-600 font-bold mt-1">
                             {{ t(':days days trial, then renews at :price', { days: String(activeCycle(plan).trial_days ?? 0), price: activeCycle(plan).formatted }) }}
                         </p>
-                        <p v-else-if="billing === 'yearly' && savingsText(plan)" class="text-xs text-primary-600 font-bold mt-1">{{ savingsText(plan) }}</p>
-                        <p v-else-if="billing === 'lifetime'" class="text-xs text-primary-600 font-bold mt-1">{{ t('One-time lifetime access') }}</p>
-                        <p v-if="billing === 'lifetime' && savingsText(plan)" class="text-xs text-primary-600 font-bold mt-1">{{ savingsText(plan) }}</p>
+                        <p v-else-if="billing === 'yearly' && savingsText(plan)" class="text-xs font-bold mt-1 text-success-600">{{ savingsText(plan) }}</p>
+                        <p v-else-if="billing === 'lifetime'" class="text-xs font-bold mt-1 text-success-600">{{ t('One-time lifetime access') }}</p>
+                        <p v-if="billing === 'lifetime' && savingsText(plan)" class="text-xs font-bold mt-1 text-success-600">{{ savingsText(plan) }}</p>
                         <p v-if="activeCycle(plan).vat_percentage > 0" class="text-xs text-gray-500 font-semibold mt-1">
                             {{ t('Includes :percentage% VAT (:amount)', { percentage: String(activeCycle(plan).vat_percentage), amount: activeCycle(plan).vat_formatted }) }}
                         </p>
@@ -247,13 +265,17 @@ const planActionUrl = (plan: Plan) => {
                     </div>
 
                     <ul class="space-y-3.5 flex-1 mb-8">
-                        <li v-for="feature in planFeatures(plan)" :key="feature" class="flex items-start gap-3 text-sm text-gray-600 font-medium leading-tight">
-                            <svg class="w-5 h-5 text-success-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                            <li v-for="feature in planFeatures(plan)" :key="feature" class="flex items-start gap-3 text-sm text-gray-600 font-medium leading-tight">
+                            <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 shadow-sm shadow-primary-500/20">
+                                <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                            </span>
                             {{ feature }}
                         </li>
                     </ul>
 
-                    <Link :href="planActionUrl(plan)" :class="[plan.is_featured ? 'btn-primary shadow-xl shadow-primary-600/20' : 'bg-gray-100 text-gray-900 hover:bg-gray-200']" class="block text-center py-4 rounded-2xl font-black text-sm transition-all hover:-translate-y-1">
+                    <Link :href="planActionUrl(plan)" :class="planButtonClass(plan)">
                         {{ activeCycle(plan).is_trial ? settings.pricing_trial_button_text : settings.pricing_checkout_button_text }}
                     </Link>
 

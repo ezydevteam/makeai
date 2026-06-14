@@ -21,7 +21,10 @@
     "include": [
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
-        "resources/js/**/*.vue"
+        "resources/js/**/*.vue",
+        "addons/**/*.ts",
+        "addons/**/*.d.ts",
+        "addons/**/*.vue"
     ],
     "exclude": ["node_modules"]
 }

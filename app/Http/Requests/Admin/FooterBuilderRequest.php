@@ -7,6 +7,8 @@ use Illuminate\Support\Str;
 
 class FooterBuilderRequest extends FormRequest
 {
+    private const BLOCK_TYPES = 'about_text,menu_list,contact_info,social_icons,newsletter,custom_html,recent_blog_posts,ai_tool_categories,legal_links,custom_link,image,language_switcher,dark_mode,trust_badges,store_badges,divider,copyright_text,payment_icons,back_to_top';
+
     public function authorize(): bool
     {
         return auth('admin')->check();
@@ -35,12 +37,12 @@ class FooterBuilderRequest extends FormRequest
             'columns.*.subtitle' => ['nullable', 'string', 'max:180'],
             'columns.*.blocks' => ['present', 'array'],
             'columns.*.blocks.*.id' => ['required', 'string', 'max:120'],
-            'columns.*.blocks.*.type' => ['required', 'string', 'in:about_text,menu_list,contact_info,social_icons,newsletter,custom_html,recent_blog_posts,ai_tool_categories,legal_links,language_switcher,dark_mode,trust_badges,store_badges,divider,copyright_text,payment_icons,back_to_top'],
+            'columns.*.blocks.*.type' => ['required', 'string', 'in:'.self::BLOCK_TYPES],
             'columns.*.blocks.*.enabled' => ['required', 'boolean'],
             'columns.*.blocks.*.config' => ['required', 'array'],
             'bottom_blocks' => ['present', 'array'],
             'bottom_blocks.*.id' => ['required', 'string', 'max:120'],
-            'bottom_blocks.*.type' => ['required', 'string', 'in:about_text,menu_list,contact_info,social_icons,newsletter,custom_html,recent_blog_posts,ai_tool_categories,legal_links,language_switcher,dark_mode,trust_badges,store_badges,divider,copyright_text,payment_icons,back_to_top'],
+            'bottom_blocks.*.type' => ['required', 'string', 'in:'.self::BLOCK_TYPES],
             'bottom_blocks.*.enabled' => ['required', 'boolean'],
             'bottom_blocks.*.config' => ['required', 'array'],
             'bottom_columns' => ['required', 'array', 'size:2'],
@@ -48,7 +50,7 @@ class FooterBuilderRequest extends FormRequest
             'bottom_columns.*.title' => ['required', 'string', 'max:80'],
             'bottom_columns.*.blocks' => ['present', 'array'],
             'bottom_columns.*.blocks.*.id' => ['required', 'string', 'max:120'],
-            'bottom_columns.*.blocks.*.type' => ['required', 'string', 'in:about_text,menu_list,contact_info,social_icons,newsletter,custom_html,recent_blog_posts,ai_tool_categories,legal_links,language_switcher,dark_mode,trust_badges,store_badges,divider,copyright_text,payment_icons,back_to_top'],
+            'bottom_columns.*.blocks.*.type' => ['required', 'string', 'in:'.self::BLOCK_TYPES],
             'bottom_columns.*.blocks.*.enabled' => ['required', 'boolean'],
             'bottom_columns.*.blocks.*.config' => ['required', 'array'],
             'bottom_bar' => ['required', 'array'],
@@ -56,7 +58,7 @@ class FooterBuilderRequest extends FormRequest
             'bottom_bar.menu_slug' => ['nullable', 'string', 'max:120'],
             'bottom_bar.show_payment_icons' => ['required', 'boolean'],
             'bottom_bar.payment_icons' => ['present', 'array'],
-            'bottom_bar.payment_icons.*' => ['string', 'in:visa,mastercard,paypal,stripe,amex,discover,apple_pay,google_pay'],
+            'bottom_bar.payment_icons.*' => ['string', 'max:2048'],
             'bottom_bar.show_back_to_top' => ['required', 'boolean'],
             'bottom_bar.border_top' => ['required', 'boolean'],
             'bottom_bar.padding' => ['required', 'integer', 'min:8', 'max:80'],

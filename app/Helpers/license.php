@@ -60,7 +60,21 @@ if (! function_exists('license_verified')) {
             return true;
         }
 
-        return (bool) settings('license_verified', false);
+        return \Illuminate\Support\Facades\Cache::remember('license.status', 3600, function () {
+            $status = settings('license_status');
+            if ($status === 'grace') {
+                $graceStart = settings('license_grace_started_at');
+                if (filled($graceStart)) {
+                    $graceHours = config('license.grace_period', 72);
+                    $startedAt = \Illuminate\Support\Carbon::parse($graceStart);
+                    $expiresAt = $startedAt->copy()->addHours($graceHours);
+                    if (now()->greaterThan($expiresAt)) {
+                        return false;
+                    }
+                }
+            }
+            return $status === 'valid' || $status === 'grace';
+        });
     }
 }
 

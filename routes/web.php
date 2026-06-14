@@ -472,6 +472,42 @@ Route::post('/{slug}/password', function (Request $request, string $slug) {
     return redirect()->route('page.show', $page->slug);
 })->name('page.password');
 
+// ─── Voiceover Studio (addon — must be before CMS catch-all) ──────────
+Route::middleware(['web', 'auth'])->prefix('voiceover-studio')->name('addon.vo.user.')->group(function () {
+    Route::get('/', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'index'])->name('studio');
+    Route::post('/projects', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'storeProject'])->name('projects.store');
+    Route::get('/projects/{project:ulid}', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'showProject'])->name('projects.show');
+    Route::put('/projects/{project:ulid}', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'updateProject'])->name('projects.update');
+    Route::delete('/projects/{project:ulid}', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'destroyProject'])->name('projects.destroy');
+    Route::post('/projects/{project:ulid}/episodes', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'storeEpisode'])->middleware('throttle:20,1')->name('episodes.store');
+    Route::delete('/episodes/{episode:ulid}', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'destroyEpisode'])->name('episodes.destroy');
+    Route::post('/episodes/{episode:ulid}/transcribe', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'transcribeEpisode'])->name('episodes.transcribe');
+    Route::post('/episodes/{episode:ulid}/share', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'toggleShare'])->name('episodes.share');
+    Route::post('/episodes/{episode:ulid}/publish', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'publishEpisode'])->name('episodes.publish');
+    Route::post('/episodes/{episode:ulid}/unpublish', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'unpublishEpisode'])->name('episodes.unpublish');
+    Route::get('/episodes/{episode:ulid}/download', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'download'])->name('episodes.download');
+    Route::post('/music/upload', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'uploadMusic'])->name('music.upload');
+    Route::post('/auto-split', [\Addons\AiVoiceover\Http\Controllers\User\StudioController::class, 'autoSplitScript'])->middleware('throttle:10,1')->name('auto-split');
+});
+
+// Podcast public routes (no auth)
+Route::middleware(['web'])->prefix('podcast')->name('addon.vo.public.')->group(function () {
+    Route::get('/rss/{token}', [\Addons\AiVoiceover\Http\Controllers\Public\PodcastController::class, 'rss'])->name('rss');
+    Route::get('/player/{token}', [\Addons\AiVoiceover\Http\Controllers\Public\PodcastController::class, 'sharePlayer'])->name('player');
+});
+
+// ─── Content Repurposer (addon — must be before CMS catch-all) ──────────
+Route::middleware(['web', 'auth'])->prefix('content-repurposer')->name('addon.rp.user.')->group(function () {
+    Route::get('/', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'index'])->name('index');
+    Route::post('/', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'store'])->middleware('throttle:10,1');
+    Route::post('/bulk', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'storeBulk'])->middleware('throttle:3,1')->name('bulk');
+    Route::get('/{job}', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'show'])->name('show');
+    Route::get('/{job}/status', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'status'])->name('status');
+    Route::post('/{job}/regenerate/{format}', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'regenerate'])->name('regenerate');
+    Route::post('/outputs/{output}/save-blog', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'saveToBlog'])->name('save-blog');
+    Route::delete('/{job}', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'destroy'])->name('destroy');
+});
+
 Route::get('/{slug}', function (string $slug) {
     $page = Page::query()->where('slug', $slug)->published()->firstOrFail();
     $isPasswordProtected = filled($page->getAttribute('password'));
@@ -522,4 +558,4 @@ Route::get('/{slug}', function (string $slug) {
             'success_message' => settings('contact_success_message', 'Your message has been sent successfully. We will get back to you soon!'),
         ] : null,
     ]);
-})->name('page.show');
+})->where('slug', '^(?!admin|api|install|chat|ai-tools|blog|help|image-editor|social|video|video-creator).*$')->name('page.show');

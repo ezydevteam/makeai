@@ -63,7 +63,7 @@ Schedule::command('exports:cleanup')
     ->withoutOverlapping();
 
 Schedule::command('license:reverify')
-    ->weekly()
+    ->dailyAt('03:00')
     ->withoutOverlapping();
 
 Schedule::command('addon:reverify-licenses')

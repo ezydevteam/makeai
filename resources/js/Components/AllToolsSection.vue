@@ -1,7 +1,7 @@
 <template>
   <div class="relative">
     <!-- Search bar -->
-    <div class="max-w-2xl mx-auto mb-8">
+    <div v-if="showSearch" class="max-w-2xl mx-auto mb-8">
       <div class="relative">
         <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
         <input
@@ -14,7 +14,7 @@
     </div>
 
     <!-- Category chips -->
-    <div v-if="categories.length > 0" class="flex flex-wrap justify-center gap-2 mb-8">
+    <div v-if="showCategories && categories.length > 0" class="flex flex-wrap justify-center gap-2 mb-8">
       <button
         class="category-chip"
         :class="{ 'category-chip-active': activeCategory === null }"
@@ -138,16 +138,24 @@ interface ToolItem {
 
 const { t } = useTranslate()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   tools: ToolItem[]
   categories: string[]
   maxItems?: number
-}>()
+  defaultTab?: 'popular' | 'featured' | 'recent'
+  showSearch?: boolean
+  showCategories?: boolean
+}>(), {
+  maxItems: 12,
+  defaultTab: 'popular',
+  showSearch: true,
+  showCategories: true,
+})
 
 const searchQuery = ref('')
 const activeCategory = ref<string | null>(null)
-const activeTab = ref<'popular' | 'featured' | 'recent'>('popular')
-const displayLimit = ref(props.maxItems ?? 12)
+const activeTab = ref<'popular' | 'featured' | 'recent'>(props.defaultTab)
+const displayLimit = ref(props.maxItems)
 
 function isNewTool(tool: ToolItem): boolean {
   if (!tool.created_at) return false

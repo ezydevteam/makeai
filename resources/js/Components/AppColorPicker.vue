@@ -84,13 +84,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="relative">
+    <div class="relative w-full min-w-0">
         <label v-if="label" :for="id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             {{ label }}
         </label>
 
         <!-- Trigger -->
-        <div ref="triggerRef" class="relative">
+        <div ref="triggerRef" class="relative w-full">
             <span
                 class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 rounded-md border border-gray-300 shadow-sm dark:border-surface-600"
                 :style="{ backgroundColor: hexValue || '#cccccc' }"
@@ -120,7 +120,7 @@ onUnmounted(() => {
             <div
                 v-if="isOpen"
                 ref="pickerRef"
-                class="absolute left-0 top-full z-50 mt-2 w-fit rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-surface-700 dark:bg-surface-900"
+                class="absolute left-0 top-full z-50 mt-2 w-full min-w-[16rem] rounded-xl border border-gray-200 bg-white p-3 shadow-lg sm:w-auto dark:border-surface-700 dark:bg-surface-900"
             >
                 <!-- Hex input -->
                 <div class="mb-3 flex items-center gap-1.5">

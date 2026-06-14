@@ -2,8 +2,8 @@
     <Head :title="t('Roles & Permissions')" />
 
     <AdminLayout>
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div class="py-6">
+            <div class="mx-auto w-full sm:max-w-7xl sm:px-6 lg:px-8">
                 <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -35,41 +35,49 @@
                     </div>
                 </div>
 
-                <div class="mb-4 flex flex-col gap-4">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
-                                    </svg>
-                                </span>
-                                <input
-                                    v-model="searchQuery"
-                                    type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Filter this table by role name, slug, or description...')"
+                <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                    <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div class="w-full xl:max-w-md">
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                        <i class="ti ti-search text-base"></i>
+                                    </span>
+                                    <input
+                                        v-model="searchQuery"
+                                        type="text"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-10 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        :placeholder="t('Filter this table by role name, slug, or description...')"
+                                    />
+                                    <button
+                                        v-if="searchQuery"
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                        :aria-label="t('Clear search')"
+                                        @click="searchQuery = ''"
+                                    >
+                                        <i class="ti ti-x text-base"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="w-full md:w-56 xl:w-64">
+                                <AppSelect
+                                    v-model="roleFilter"
+                                    :options="roleFilterOptions"
+                                    :placeholder="t('All Role Types')"
                                 />
-                                <button
-                                    v-if="searchQuery"
-                                    type="button"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                    :aria-label="t('Clear search')"
-                                    @click="searchQuery = ''"
-                                >
-                                    <i class="ti ti-x text-base"></i>
-                                </button>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div v-if="filteredRoles.length > 0" class="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-                    <div
-                        v-for="role in filteredRoles"
-                        :key="role.id"
-                        class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md dark:border-gray-800 dark:bg-gray-800 dark:hover:border-primary-900/40"
-                    >
+                    <div v-if="filteredRoles.length > 0" class="p-4 sm:p-6">
+                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                            <div
+                                v-for="role in filteredRoles"
+                                :key="role.id"
+                                class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-900/40 dark:hover:border-primary-900/40"
+                            >
                         <div class="flex items-start justify-between gap-4">
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
@@ -94,17 +102,6 @@
                             </div>
 
                             <div class="inline-flex items-center gap-2">
-                                <Tooltip :content="t('Edit role')" placement="top">
-                                    <button
-                                        type="button"
-                                        :aria-label="t('Edit role')"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                                        @click="openModal(role)"
-                                    >
-                                        <i class="ti ti-edit text-base"></i>
-                                    </button>
-                                </Tooltip>
-
                                 <Tooltip v-if="!role.is_system" :content="t('Delete role')" placement="top">
                                     <button
                                         type="button"
@@ -141,7 +138,7 @@
                         <div class="mt-5 flex items-center justify-between rounded-xl border border-primary-100 bg-primary-50/70 px-4 py-3 dark:border-primary-900/30 dark:bg-primary-900/10">
                             <div>
                                 <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                    {{ role.has_default_permissions ? t('Seeded permission set available') : t('Custom permission set') }}
+                                    {{ role.has_default_permissions ? t('Manage permission for ' + role.name) : t('Custom permission set') }}
                                 </p>
                                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     {{ role.has_default_permissions ? t('This role can be restored to its default permission bundle.') : t('This role uses a manually maintained permission bundle.') }}
@@ -156,20 +153,22 @@
                                 {{ t('Manage') }}
                             </button>
                         </div>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div
-                    v-else
-                    class="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm dark:border-gray-700 dark:bg-gray-800"
-                >
-                    <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
-                        <i class="ti ti-shield-lock text-xl"></i>
+                    <div
+                        v-else
+                        class="px-6 py-14 text-center"
+                    >
+                        <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
+                            <i class="ti ti-shield-lock text-xl"></i>
+                        </div>
+                        <p class="mt-4 text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('No roles found.') }}</p>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('Try a different filter or create a new role.') }}
+                        </p>
                     </div>
-                    <p class="mt-4 text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('No roles found.') }}</p>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Try a different filter or create a new role.') }}
-                    </p>
                 </div>
             </div>
         </div>
@@ -347,6 +346,7 @@
 import { computed, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -395,6 +395,7 @@ const props = defineProps<{
 const { t } = useTranslate()
 
 const searchQuery = ref('')
+const roleFilter = ref('')
 const showModal = ref(false)
 const isEditing = ref(false)
 const currentRole = ref<RoleItem | null>(null)
@@ -419,6 +420,14 @@ const confirmModal = ref<ConfirmModalState>({
 
 const allPermissions = computed(() => Object.values(props.permissions).flat())
 
+const roleFilterOptions = computed(() => [
+    { value: '', label: t('All Role Types') },
+    { value: 'system', label: t('System Roles') },
+    { value: 'custom', label: t('Custom Roles') },
+    { value: 'default', label: t('Default Permission Roles') },
+    { value: 'manual', label: t('Manual Permission Roles') },
+])
+
 const permissionGroups = computed(() => {
     return Object.entries(props.permissions).map(([key, items]) => ({
         key,
@@ -430,16 +439,21 @@ const permissionGroups = computed(() => {
 const filteredRoles = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
 
-    if (!query) {
-        return props.roles
-    }
-
     return props.roles.filter((role) => {
-        return [
+        const matchesQuery = !query || [
             role.name,
             role.slug,
             role.description ?? '',
         ].some((value) => value.toLowerCase().includes(query))
+
+        const matchesFilter =
+            roleFilter.value === ''
+            || (roleFilter.value === 'system' && role.is_system)
+            || (roleFilter.value === 'custom' && !role.is_system)
+            || (roleFilter.value === 'default' && role.has_default_permissions)
+            || (roleFilter.value === 'manual' && !role.has_default_permissions)
+
+        return matchesQuery && matchesFilter
     })
 })
 

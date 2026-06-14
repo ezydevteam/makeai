@@ -22,12 +22,16 @@ const props = withDefaults(defineProps<{
     rootClass?: string
     buttonClass?: string
     dropdownClass?: string
+    iconClass?: string
+    iconStyle?: Record<string, string>
 }>(), {
     context: 'user',
     label: '',
     rootClass: '',
     buttonClass: '',
     dropdownClass: '',
+    iconClass: '',
+    iconStyle: () => ({}),
 })
 
 const { t } = useTranslate()
@@ -212,7 +216,8 @@ watch(realtime, () => {
             :aria-label="notificationLabel"
             @click="open = !open"
         >
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <i v-if="props.iconClass" :class="[props.iconClass, 'text-[20px] leading-none']" :style="props.iconStyle" aria-hidden="true" />
+            <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022 23.848 23.848 0 005.454 1.31m5.715 0a3 3 0 11-5.715 0" />
             </svg>
             <span v-if="props.label" class="max-w-full truncate text-[11px] leading-none">{{ props.label }}</span>

@@ -15,7 +15,7 @@ class TextExtractionService
 {
     private static array $supportedExtensions = [
         'txt', 'md', 'markdown', 'html', 'htm', 'csv', 'json',
-        'pdf', 'docx', 'xlsx', 'pptx',
+        'pdf', 'docx', 'xlsx', 'pptx', 'png', 'jpg', 'jpeg', 'webp', 'gif',
     ];
 
     /**
@@ -49,6 +49,9 @@ class TextExtractionService
 
             $extension === 'pptx'
                 || $mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' => $this->extractPptx($filePath),
+
+            in_array($extension, ['png', 'jpg', 'jpeg', 'webp', 'gif'])
+                || str_starts_with($mimeType, 'image/') => $this->extractImage($filePath),
 
             default => throw new RuntimeException("Unsupported file type: {$extension} ({$mimeType})"),
         };
@@ -269,6 +272,56 @@ class TextExtractionService
         $zip->close();
 
         return trim($text);
+    }
+
+    private function extractImage(string $filePath): string
+    {
+        try {
+            $agent = new \Laravel\Ai\AnonymousAgent(
+                instructions: 'You are an OCR assistant. Your sole job is to transcribe all text found in the image. Do not explain, do not add notes, do not summarize, and do not introduce your response. Just transcribe the exact text from the image. If there is no text, reply with nothing.',
+                messages: [],
+                tools: []
+            );
+
+            $providerName = addon_setting('ai-assistant', 'provider') ?: settings('default_ai_provider', 'openai');
+            $modelName = addon_setting('ai-assistant', 'model') ?: settings('default_ai_model', 'gpt-4o-mini');
+
+            // Inject the API key into config so the SDK can read it
+            $customApiKey = addon_setting('ai-assistant', 'custom_api_key');
+            if (!empty($customApiKey)) {
+                config()->set("ai.providers.{$providerName}.key", $customApiKey);
+            } else {
+                $driverName = strtolower($providerName);
+                if ($driverName === 'gemini') {
+                    $driverName = 'google';
+                }
+                $keyRecord = \App\Models\AiKey::forProvider($driverName)->available()->orderBy('usage_count', 'asc')->first();
+                if ($keyRecord) {
+                    config()->set("ai.providers.{$providerName}.key", $keyRecord->api_key);
+                }
+            }
+
+            $visionModel = $modelName;
+            if (str_contains($modelName, 'gpt-3.5') || str_contains($modelName, 'gpt-3.5-turbo')) {
+                $visionModel = 'gpt-4o-mini';
+            }
+
+            $imageAttachment = new \Laravel\Ai\Files\LocalImage($filePath);
+
+            $response = $agent->prompt(
+                prompt: 'Transcribe the text in this image.',
+                attachments: [$imageAttachment],
+                provider: $providerName,
+                model: $visionModel
+            );
+
+            return trim($response->text);
+        } catch (\Throwable $e) {
+            \Log::error('OCR extraction failed: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw new \RuntimeException('Image OCR extraction failed: ' . $e->getMessage());
+        }
     }
 
     // ─── Private Extractors ──────────────────────────────────────

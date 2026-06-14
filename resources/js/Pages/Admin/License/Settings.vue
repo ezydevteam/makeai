@@ -65,6 +65,14 @@ function formatGraceTime(hours: number): string {
     }
     return `${remainingHours}h ${t('remaining')}`
 }
+
+function applyMask(value: string) {
+    return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
+}
+
+function onPurchaseCodeInput(e: Event) {
+    activateForm.purchase_code = applyMask((e.target as HTMLInputElement).value)
+}
 </script>
 
 <template>
@@ -205,7 +213,8 @@ function formatGraceTime(hours: number): string {
                     </label>
                     <input
                         id="purchase_code"
-                        v-model="activateForm.purchase_code"
+                        :value="activateForm.purchase_code"
+                        @input="onPurchaseCodeInput"
                         type="text"
                         autocomplete="off"
                         :placeholder="'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'"

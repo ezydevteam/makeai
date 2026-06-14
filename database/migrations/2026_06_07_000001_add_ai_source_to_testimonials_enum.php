@@ -9,11 +9,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
         DB::statement("ALTER TABLE `testimonials` CHANGE `source` `source` ENUM('manual','google','trustpilot','import','ai') NOT NULL DEFAULT 'manual'");
     }
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
         DB::statement("ALTER TABLE `testimonials` CHANGE `source` `source` ENUM('manual','google','trustpilot','import') NOT NULL DEFAULT 'manual'");
     }
 };

@@ -54,6 +54,11 @@ class TemplateController extends Controller
 
     public function show(string $slug)
     {
+        // Redirect voiceover-studio tool to the addon page
+        if ($slug === 'voiceover-studio' && is_addon_active('ai-voiceover')) {
+            return redirect()->route('addon.vo.user.studio');
+        }
+
         $toolData = $this->toolCatalog->toolBySlug($slug);
 
         $tool = AiTool::find($toolData['id']);

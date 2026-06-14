@@ -91,24 +91,45 @@ class NotificationController extends Controller
 
         settings_set('notifications_enabled', (bool) $validated['notifications_enabled'], 'boolean', 'notifications');
         settings_set('notifications_driver', $validated['notifications_driver'], 'string', 'notifications');
+        settings_set('broadcasting_driver', $validated['notifications_driver'], 'string', 'notifications');
+
         settings_set('notifications_polling_interval', (int) $validated['notifications_polling_interval'], 'integer', 'notifications');
+        settings_set('broadcasting_polling_interval_seconds', (int) ($validated['notifications_polling_interval'] / 1000), 'integer', 'notifications');
 
         $reverb = $validated['reverb'] ?? [];
         settings_set('notifications_reverb_app_id', $reverb['app_id'] ?? '', 'string', 'notifications');
+        settings_set('broadcasting_reverb_app_id', $reverb['app_id'] ?? '', 'string', 'notifications');
+
         settings_set('notifications_reverb_app_key', $reverb['app_key'] ?? '', 'string', 'notifications');
+        settings_set('broadcasting_reverb_app_key', $reverb['app_key'] ?? '', 'string', 'notifications');
+
         settings_set('notifications_reverb_host', $reverb['host'] ?? '', 'string', 'notifications');
+        settings_set('broadcasting_reverb_host', $reverb['host'] ?? '', 'string', 'notifications');
+
         settings_set('notifications_reverb_port', (int) ($reverb['port'] ?? 8080), 'integer', 'notifications');
+        settings_set('broadcasting_reverb_port', (int) ($reverb['port'] ?? 8080), 'integer', 'notifications');
+
         settings_set('notifications_reverb_scheme', $reverb['scheme'] ?? 'http', 'string', 'notifications');
+        settings_set('broadcasting_reverb_scheme', $reverb['scheme'] ?? 'http', 'string', 'notifications');
+
         if (! empty($reverb['app_secret'])) {
             settings_set('notifications_reverb_app_secret', $reverb['app_secret'], 'encrypted', 'notifications');
+            settings_set('broadcasting_reverb_app_secret', $reverb['app_secret'], 'encrypted', 'notifications');
         }
 
         $pusher = $validated['pusher'] ?? [];
         settings_set('notifications_pusher_app_id', $pusher['app_id'] ?? '', 'string', 'notifications');
+        settings_set('broadcasting_pusher_app_id', $pusher['app_id'] ?? '', 'string', 'notifications');
+
         settings_set('notifications_pusher_key', $pusher['key'] ?? '', 'string', 'notifications');
+        settings_set('broadcasting_pusher_key', $pusher['key'] ?? '', 'string', 'notifications');
+
         settings_set('notifications_pusher_cluster', $pusher['cluster'] ?? 'mt1', 'string', 'notifications');
+        settings_set('broadcasting_pusher_cluster', $pusher['cluster'] ?? 'mt1', 'string', 'notifications');
+
         if (! empty($pusher['secret'])) {
             settings_set('notifications_pusher_secret', $pusher['secret'], 'encrypted', 'notifications');
+            settings_set('broadcasting_pusher_secret', $pusher['secret'], 'encrypted', 'notifications');
         }
 
         return back()->with('success', translate('Notification settings saved.'));

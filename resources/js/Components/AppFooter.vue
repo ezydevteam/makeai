@@ -6,7 +6,7 @@ import { useTheme } from '@/Composables/useTheme'
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue'
 import SocialFollow from '@/Components/SocialFollow.vue'
 
-type FooterBlockType = 'about_text' | 'menu_list' | 'contact_info' | 'social_icons' | 'newsletter' | 'custom_html' | 'recent_blog_posts' | 'ai_tool_categories' | 'legal_links' | 'language_switcher' | 'dark_mode' | 'trust_badges' | 'store_badges' | 'divider' | 'copyright_text' | 'payment_icons' | 'back_to_top'
+type FooterBlockType = 'about_text' | 'menu_list' | 'contact_info' | 'social_icons' | 'newsletter' | 'custom_html' | 'recent_blog_posts' | 'ai_tool_categories' | 'legal_links' | 'custom_link' | 'image' | 'language_switcher' | 'dark_mode' | 'trust_badges' | 'store_badges' | 'divider' | 'copyright_text' | 'payment_icons' | 'back_to_top'
 type ConfigValue = string | number | boolean | null | string[]
 type SocialDisplayMode = 'icons' | 'counts' | 'cards'
 type HeadingStyle = 'default' | 'accent' | 'minimal'
@@ -89,6 +89,11 @@ interface FooterData {
     aiCategories?: FooterAiCategory[]
 }
 
+interface Branding {
+    site_logo_light?: string
+    site_logo_dark?: string
+}
+
 const page = usePage()
 const { t } = useTranslate()
 const { isDark, toggleDark } = useTheme()
@@ -96,8 +101,10 @@ const { isDark, toggleDark } = useTheme()
 const footerConfig = computed(() => page.props.footerConfig as FooterConfig | null)
 const footerData = computed(() => (page.props.footerData as FooterData | undefined) ?? {})
 const globalMenus = computed(() => (page.props.globalMenus as MenuOption[] | undefined) ?? [])
+const branding = computed(() => (page.props.branding as Branding | undefined) ?? {})
 const appName = computed(() => String(page.props.appName || ''))
 const currentYear = new Date().getFullYear()
+const footerLogo = computed(() => isDark.value ? (branding.value.site_logo_dark || branding.value.site_logo_light || '') : (branding.value.site_logo_light || branding.value.site_logo_dark || ''))
 
 const footerColumns = computed<FooterColumn[]>(() => {
     const columns = footerConfig.value?.columns ?? []
@@ -250,10 +257,29 @@ const limitedCategories = (count: ConfigValue) => footerData.value.aiCategories?
 const socialDisplayMode = (value: ConfigValue): SocialDisplayMode => {
     return value === 'icons' || value === 'counts' || value === 'cards' ? value : 'icons'
 }
+const showSocialIcon = (value: ConfigValue) => value === true
 
 const withYear = (value: ConfigValue) => String(value ?? '').replace('{year}', currentYear.toString())
 
 const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+const backToTopShapeClass = (shape: ConfigValue) => {
+    if (shape === 'square') return 'rounded-none'
+    if (shape === 'pill') return 'rounded-full px-3 w-auto'
+    if (shape === 'circle') return 'rounded-full'
+    return 'rounded-lg'
+}
+
+const backToTopStyle = (config: Record<string, ConfigValue>) => {
+    const style: Record<string, string> = {}
+    if (typeof config.bg_color === 'string' && config.bg_color) style.backgroundColor = config.bg_color
+    if (typeof config.text_color === 'string' && config.text_color) style.color = config.text_color
+    return style
+}
+
+const backToTopIcon = (config: Record<string, ConfigValue>) => {
+    return typeof config.icon === 'string' && config.icon ? config.icon : 'ti ti-arrow-up'
+}
 
 const legalLinks = [
     { key: 'privacy', label: t('Privacy Policy'), href: '/privacy-policy' },
@@ -266,6 +292,36 @@ const legalLinks = [
 const enabledLegalLinks = (links: ConfigValue) => {
     if (!Array.isArray(links)) return legalLinks
     return legalLinks.filter((link) => links.includes(link.key))
+}
+
+const customLinkHref = (config: Record<string, ConfigValue>) => {
+    if (config.link_type === 'page' && typeof config.page_slug === 'string' && config.page_slug) {
+        return `/${config.page_slug}`
+    }
+    if (config.link_type === 'tool_category' && typeof config.tool_category_slug === 'string' && config.tool_category_slug) {
+        return `/ai-tools/category/${config.tool_category_slug}`
+    }
+    if (config.link_type === 'custom' && typeof config.custom_url === 'string') {
+        return config.custom_url
+    }
+    return ''
+}
+
+const canShowCustomLink = (config: Record<string, ConfigValue>) => {
+    const access = typeof config.access === 'string' ? config.access : 'all'
+    const loggedIn = Boolean(page.props.auth?.user)
+    const isFreeUser = loggedIn && page.props.auth?.user?.subscription_status !== 'active'
+
+    if (access === 'logged_in') return loggedIn
+    if (access === 'free') return isFreeUser
+    return true
+}
+
+const customLinkClass = (config: Record<string, ConfigValue>) => {
+    const displayMode = typeof config.display_mode === 'string' ? config.display_mode : 'vertical'
+    return displayMode === 'horizontal'
+        ? 'inline-flex items-center'
+        : 'block'
 }
 </script>
 
@@ -283,7 +339,7 @@ const enabledLegalLinks = (links: ConfigValue) => {
                     <template v-for="block in column.blocks?.filter((item) => item.enabled !== false)" :key="block.id">
                         <div v-if="block.type === 'about_text'" class="space-y-6">
                             <Link href="/" class="flex items-center gap-3">
-                                <img v-if="block.config.logo" :src="String(block.config.logo)" :alt="String(block.config.alt || appName)" class="h-9 max-w-36 object-contain">
+                                <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-9 max-w-36 object-contain">
                                 <template v-else>
                                     <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary-600 to-accent-600">
                                         <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
@@ -292,6 +348,7 @@ const enabledLegalLinks = (links: ConfigValue) => {
                                 </template>
                             </Link>
                             <p v-if="block.config.description" class="text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ block.config.description }}</p>
+                            <SocialFollow v-if="showSocialIcon(block.config.show_social_icon)" style="icons" />
                         </div>
 
                         <div v-else-if="block.type === 'menu_list'">
@@ -322,6 +379,7 @@ const enabledLegalLinks = (links: ConfigValue) => {
                                     <a :href="`mailto:${block.config.email}`" class="transition-colors hover:text-primary-600">{{ block.config.email }}</a>
                                 </li>
                             </ul>
+                            <p v-if="block.config.details" class="pt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ block.config.details }}</p>
                         </div>
 
                         <div v-else-if="block.type === 'newsletter'" class="rounded-xl border border-gray-100 bg-gray-50 p-6 dark:border-surface-700 dark:bg-surface-800">
@@ -370,6 +428,19 @@ const enabledLegalLinks = (links: ConfigValue) => {
                             </ul>
                         </div>
 
+                        <div v-else-if="block.type === 'custom_link' && canShowCustomLink(block.config)">
+                            <Link v-if="customLinkHref(block.config)" :href="customLinkHref(block.config)" :target="typeof block.config.target === 'string' ? block.config.target : '_self'" class="text-sm font-medium text-gray-500 transition hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400" :class="customLinkClass(block.config)">
+                                {{ block.config.label }}
+                            </Link>
+                        </div>
+
+                        <div v-else-if="block.type === 'image'">
+                            <h4 v-if="block.config.title" class="mb-4 footer-heading-title">{{ block.config.title }}</h4>
+                            <component :is="block.config.link ? 'a' : 'div'" :href="block.config.link || undefined" :target="typeof block.config.target === 'string' ? block.config.target : '_self'" class="inline-flex max-w-full">
+                                <img v-if="block.config.image_url" :src="String(block.config.image_url)" :alt="block.config.title || appName" class="object-contain" :style="{ width: `${Number(block.config.width || 120)}px`, height: `${Number(block.config.height || 40)}px` }">
+                            </component>
+                        </div>
+
                         <div v-else-if="block.type === 'trust_badges'" class="rounded-xl border border-primary-100 bg-primary-50 p-4 dark:border-primary-900/40 dark:bg-primary-900/10">
                             <h4 v-if="block.config.title" class="footer-heading-title text-sm font-bold text-gray-900 dark:text-white" style="color: inherit">{{ block.config.title }}</h4>
                             <p v-if="block.config.text" class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ block.config.text }}</p>
@@ -401,7 +472,7 @@ const enabledLegalLinks = (links: ConfigValue) => {
                             </div>
                         </div>
 
-                        <div v-else-if="block.type === 'divider'" class="border-t border-gray-100 dark:border-surface-800" :style="{ marginBlock: `${Number(block.config.spacing || 24) / 2}px` }"></div>
+                        <div v-else-if="block.type === 'divider'" class="border-t border-gray-100 dark:border-surface-800" :style="{ marginBlock: `${Number(block.config.spacing || 24) / 2}px`, borderColor: typeof block.config.color === 'string' && block.config.color ? block.config.color : undefined }"></div>
                     </template>
                 </div>
             </div>
@@ -415,12 +486,12 @@ const enabledLegalLinks = (links: ConfigValue) => {
                             <Link v-for="link in enabledLegalLinks(block.config.links)" :key="link.key" :href="link.href" class="text-xs font-medium transition hover:text-primary-600 dark:hover:text-primary-400">{{ t(link.label) }}</Link>
                         </div>
                         <div v-else-if="block.type === 'custom_html'" class="text-xs" v-html="block.config.content"></div>
-                        <span v-else-if="block.type === 'divider'" class="h-px w-full bg-gray-200 dark:bg-surface-700"></span>
+                        <span v-else-if="block.type === 'divider'" class="h-px w-full bg-gray-200 dark:bg-surface-700" :style="{ backgroundColor: typeof block.config.color === 'string' && block.config.color ? block.config.color : undefined }"></span>
                         <div v-else-if="block.type === 'payment_icons' && Array.isArray(block.config.icons) && block.config.icons.length" class="flex flex-wrap items-center gap-2">
-                            <span v-for="icon in block.config.icons" :key="icon" class="flex h-6 items-center justify-center rounded border border-gray-100 bg-gray-50 px-2 text-[10px] font-black uppercase dark:border-surface-700 dark:bg-surface-800">{{ icon.replace('_', ' ') }}</span>
+                            <img v-for="(icon, index) in block.config.icons" :key="`${icon}-${index}`" :src="String(icon)" :alt="t('Payment icon')" class="h-6 w-auto rounded object-contain">
                         </div>
-                        <button v-else-if="block.type === 'back_to_top'" type="button" class="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 shadow-sm transition hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:hover:bg-primary-900/20" :aria-label="t('Back to top')" @click="scrollToTop">
-                            <i class="ti ti-arrow-up"></i>
+                        <button v-else-if="block.type === 'back_to_top'" type="button" class="flex h-8 w-8 items-center justify-center bg-gray-50 shadow-sm transition hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:hover:bg-primary-900/20" :class="backToTopShapeClass(block.config.shape)" :style="backToTopStyle(block.config)" :aria-label="t('Back to top')" @click="scrollToTop">
+                            <i :class="backToTopIcon(block.config)"></i>
                         </button>
                     </div>
                     <div v-if="column.id === 'right' && footerConfig.bottom_bar.menu_slug && visibleMenuItems(getMenu(footerConfig.bottom_bar.menu_slug)).length" class="footer-bottom-item">

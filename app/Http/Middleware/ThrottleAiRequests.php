@@ -11,18 +11,17 @@ class ThrottleAiRequests
 {
     public function __construct(private RateLimiterService $rateLimiter) {}
 
-    public function handle(Request $request, Closure $next, string $params = 'public'): mixed
+    public function handle(Request $request, Closure $next, ...$args): mixed
     {
-        $parts = explode(',', $params);
-        $category = $parts[0];
+        $category = $args[0] ?? 'public';
 
         // Skip Laravel's default 'api' throttle — we apply specific categories per route
         if ($category === 'api') {
             return $next($request);
         }
 
-        $maxAttempts = isset($parts[1]) && is_numeric($parts[1]) ? (int) $parts[1] : null;
-        $windowSeconds = isset($parts[2]) && is_numeric($parts[2]) ? (int) $parts[2] : null;
+        $maxAttempts = isset($args[1]) && is_numeric($args[1]) ? (int) $args[1] : null;
+        $windowSeconds = isset($args[2]) && is_numeric($args[2]) ? (int) $args[2] : null;
 
         // Check per-model rate limit if a model slug is in the request
         if ($category === 'text_gen' && ! $maxAttempts) {
@@ -43,6 +42,9 @@ class ThrottleAiRequests
         }
 
         $user = $request->user();
+        if ($user && ! $user instanceof \App\Models\User) {
+            $user = null;
+        }
         $ip = $request->ip();
 
         if ($this->rateLimiter->isIpBanned($ip)) {

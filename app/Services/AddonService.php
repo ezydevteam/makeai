@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\Addon;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class AddonService
 {
@@ -94,6 +96,7 @@ class AddonService
             $manifest['is_active'] = $addon->is_active;
             $manifest['license_ok'] = $this->checkLicenseRequirement($manifest);
             $manifest['envato_item_id'] = $manifest['envato_item_id'] ?? null;
+            $manifest['has_logo'] = $this->hasLogo($addon->slug);
             return $manifest;
         })->toArray();
     }
@@ -115,8 +118,14 @@ class AddonService
         $manifest['is_active'] = $addon->is_active;
         $manifest['license_ok'] = $this->checkLicenseRequirement($manifest);
         $manifest['envato_item_id'] = $manifest['envato_item_id'] ?? null;
+        $manifest['has_logo'] = $this->hasLogo($addon->slug);
 
         return $manifest;
+    }
+
+    private function hasLogo(string $slug): bool
+    {
+        return File::exists($this->addonsPath . '/' . $slug . '/logo.png');
     }
 
     /**
@@ -210,6 +219,28 @@ class AddonService
         return true;
     }
 
+    public function delete(string $slug): bool
+    {
+        $addon = Addon::where('slug', $slug)->first();
+
+        if (! $addon || $addon->is_active) {
+            return false;
+        }
+
+        $this->dropAddonTables($slug);
+
+        Setting::where('key', 'like', 'addon_' . $slug . '\_%')->delete();
+        Cache::forget('settings:all');
+
+        $addon->delete();
+
+        File::deleteDirectory($this->addonsPath . '/' . $slug);
+
+        Cache::forget('active_addons_list');
+
+        return true;
+    }
+
     // ─── settings ────────────────────────────────────────────
 
     public function getAddonSettings(string $slug): array
@@ -257,6 +288,7 @@ class AddonService
             foreach ($menuEntries as $entry) {
                 $items[] = [
                     'slug' => $addon->slug,
+                    'addon_name' => $addon->manifest['name'] ?? $addon->name,
                     'label' => $entry['label'] ?? $addon->name,
                     'route' => $entry['route'] ?? '',
                     'route_params' => $entry['route_params'] ?? [],
@@ -341,17 +373,44 @@ class AddonService
     }
 
     /**
-     * GATE: addons with envato_item_id must have a verified addon license from AddonLicenseService.
+     * GATE: addons with requires_license must have a verified addon license from AddonLicenseService.
      */
     private function checkAddonLicense(string $slug, array $manifest): bool
     {
-        $envatoItemId = $manifest['envato_item_id'] ?? null;
-        if (! $envatoItemId) {
+        $requiresLicense = $manifest['requires_license'] ?? false;
+        if (! $requiresLicense) {
             return true; // no separate license needed
         }
 
         $licenseService = app(\App\Services\AddonLicenseService::class);
 
         return $licenseService->isLicensed($slug);
+    }
+
+    private function dropAddonTables(string $slug): void
+    {
+        $migrationsPath = $this->addonsPath . '/' . $slug . '/database/migrations';
+
+        if (! File::isDirectory($migrationsPath)) {
+            return;
+        }
+
+        $tables = [];
+
+        foreach (File::files($migrationsPath) as $file) {
+            $contents = File::get($file->getPathname());
+
+            if (preg_match_all("/Schema::create\\(['\"]([^'\"]+)['\"]/", $contents, $matches)) {
+                foreach ($matches[1] as $tableName) {
+                    $tables[] = $tableName;
+                }
+            }
+        }
+
+        $tables = array_values(array_unique($tables));
+
+        foreach (array_reverse($tables) as $table) {
+            Schema::dropIfExists($table);
+        }
     }
 }

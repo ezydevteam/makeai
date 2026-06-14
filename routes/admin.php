@@ -105,13 +105,15 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('appearance/themes/{slug}/settings', [ThemeAddonController::class, 'saveThemeSettings'])->name('admin.themes.settings.save');
 
         // Addons
-        Route::get('addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
-        Route::post('addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:5,1');
-        Route::post('addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
-        Route::post('addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
-        Route::post('addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
-        Route::get('addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
-        Route::post('addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
+        Route::get('appearance/addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
+        Route::get('appearance/addons/{slug}/logo', [ThemeAddonController::class, 'addonLogo'])->name('admin.addons.logo');
+        Route::post('appearance/addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:public,5,60');
+        Route::post('appearance/addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
+        Route::post('appearance/addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
+        Route::delete('appearance/addons/{slug}', [ThemeAddonController::class, 'deleteAddon'])->name('admin.addons.delete');
+        Route::post('appearance/addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
+        Route::get('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
+        Route::post('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
     });
 
     // Users Management
@@ -157,13 +159,13 @@ Route::middleware('admin.auth')->group(function () {
         Route::delete('/overrides/{override}', [RateLimitController::class, 'deleteOverride'])->name('overrides.delete');
     });
 
-    Route::get('roles', [RoleController::class, 'index'])->name('admin.roles.index');
-    Route::get('roles/create', [RoleController::class, 'create'])->name('admin.roles.create');
-    Route::post('roles', [RoleController::class, 'store'])->name('admin.roles.store');
-    Route::get('roles/{role}/edit', [RoleController::class, 'edit'])->name('admin.roles.edit');
-    Route::post('roles/{role}/restore-default', [RoleController::class, 'restoreDefault'])->name('admin.roles.restore-default');
-    Route::post('roles/{role}', [RoleController::class, 'update'])->name('admin.roles.update');
-    Route::delete('roles/{role}', [RoleController::class, 'destroy'])->name('admin.roles.delete');
+    Route::get('roles/admins/permissions', [RoleController::class, 'index'])->name('admin.roles.index');
+    Route::get('roles/admins/permissions/create', [RoleController::class, 'create'])->name('admin.roles.create');
+    Route::post('roles/admins/permissions', [RoleController::class, 'store'])->name('admin.roles.store');
+    Route::get('roles/admins/permissions/{role}/edit', [RoleController::class, 'edit'])->name('admin.roles.edit');
+    Route::post('roles/admins/permissions/{role}/restore-default', [RoleController::class, 'restoreDefault'])->name('admin.roles.restore-default');
+    Route::post('roles/admins/permissions/{role}', [RoleController::class, 'update'])->name('admin.roles.update');
+    Route::delete('roles/admins/permissions/{role}', [RoleController::class, 'destroy'])->name('admin.roles.delete');
 
     // Localization
     Route::middleware('admin.permission:translations.manage')->group(function () {
@@ -296,6 +298,7 @@ Route::middleware('admin.auth')->group(function () {
         Route::get('builder/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
         Route::post('builder/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
         Route::post('builder/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
+        Route::post('builder/homepage/upload-media', [HomepageBuilderController::class, 'upload'])->name('admin.homepage.upload');
 
         // Appearance: Header Builder
         Route::get('builder/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');

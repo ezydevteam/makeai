@@ -1,0 +1,61 @@
+{
+    "slug": "ai-voiceover",
+    "name": "AI Voiceover Studio",
+    "version": "1.0.0",
+    "description": "Generate AI voiceovers, produce multi-speaker podcast episodes with background music, auto-transcribe audio, and publish a podcast RSS feed.",
+    "author": "MakeAI",
+    "min_makeai_version": "1.0.0",
+    "envato_item_id": null,
+    "requires_license": 1,
+    "requires_pro": false,
+    "admin_menu": [
+        {
+            "parent": "Content",
+            "label": "Overview",
+            "route": "addon.vo.admin.overview",
+            "route_params": {},
+            "route_pattern": "addon.vo.admin.overview",
+            "icon": "ti ti-microphone",
+            "permission": "addon.vo.manage"
+        },
+        {
+            "parent": "Settings",
+            "label": "Settings",
+            "route": "addon.vo.admin.settings",
+            "route_params": {},
+            "route_pattern": "addon.vo.admin.settings*",
+            "icon": "ti ti-settings",
+            "permission": "addon.vo.settings"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",                         "type": "boolean",   "label": "Enable Voiceover Studio",                "default": true,             "group": "general" },
+        { "key": "show_to",                         "type": "select",    "label": "Access for",                             "options": ["all","logged_in","pro"], "default": "logged_in", "group": "general" },
+        { "key": "default_provider",                "type": "select",    "label": "Default TTS provider",                   "options": ["elevenlabs","openai","murf","playht"], "default": "openai", "group": "ai" },
+        { "key": "default_voice_id",                "type": "string",    "label": "Default voice ID",                       "default": "alloy",          "group": "ai" },
+        { "key": "speed_default",                   "type": "string",    "label": "Default speed (OpenAI)",                 "default": "1.0",            "group": "ai" },
+        { "key": "stability_default",               "type": "string",    "label": "Default stability (ElevenLabs)",         "default": "0.5",            "group": "ai" },
+        { "key": "similarity_boost_default",        "type": "string",    "label": "Default similarity boost (ElevenLabs)",  "default": "0.75",           "group": "ai" },
+        { "key": "podcast_enabled",                 "type": "boolean",   "label": "Enable Podcast RSS feeds",               "default": true,             "group": "podcast" },
+        { "key": "podcast_base_url",                "type": "string",    "label": "Podcast public base URL",                "default": "",               "group": "podcast" },
+        { "key": "credits_per_1k_chars",            "type": "integer",   "label": "Credits per 1,000 characters TTS",       "default": 5,                "group": "credits" },
+        { "key": "credits_stt",                     "type": "integer",   "label": "Credits per STT transcription",          "default": 10,               "group": "credits" },
+        { "key": "max_script_chars",                "type": "integer",   "label": "Max script characters per generation",   "default": 5000,             "group": "limits" },
+        { "key": "max_file_size_mb",                "type": "integer",   "label": "Max audio file size for STT (MB)",       "default": 25,               "group": "limits" },
+        { "key": "background_music_max_size_mb",    "type": "integer",   "label": "Max background music file size (MB)",    "default": 10,               "group": "limits" },
+        { "key": "auto_transcribe",                 "type": "boolean",   "label": "Auto-transcribe generated audio",        "default": false,            "group": "ai" },
+        { "key": "ffmpeg_path",                     "type": "string",    "label": "ffmpeg binary path",                     "default": "/usr/bin/ffmpeg","group": "technical" },
+        { "key": "auto_delete_days",                "type": "integer",   "label": "Auto-delete audio after N days (0=never)", "default": 0,              "group": "storage" },
+        { "key": "elevenlabs_api_key",              "type": "encrypted", "label": "ElevenLabs API Key",                     "default": null,             "group": "provider_keys", "secret": true },
+        { "key": "openai_api_key",                  "type": "encrypted", "label": "OpenAI API Key (TTS fallback)",          "default": null,             "group": "provider_keys", "secret": true },
+        { "key": "murf_api_key",                    "type": "encrypted", "label": "Murf API Key",                           "default": null,             "group": "provider_keys", "secret": true },
+        { "key": "playht_api_key",                  "type": "encrypted", "label": "PlayHT API Key",                         "default": null,             "group": "provider_keys", "secret": true },
+        { "key": "playht_user_id",                  "type": "encrypted", "label": "PlayHT User ID",                         "default": null,             "group": "provider_keys", "secret": true }
+    ],
+    "permissions": [
+        { "slug": "addon.vo.use",      "name": "Use Voiceover Studio",            "group": "Voiceover" },
+        { "slug": "addon.vo.manage",   "name": "View Voiceover Admin Overview",    "group": "Voiceover" },
+        { "slug": "addon.vo.settings", "name": "Manage Voiceover Settings",        "group": "Voiceover" }
+    ],
+    "hooks": []
+}

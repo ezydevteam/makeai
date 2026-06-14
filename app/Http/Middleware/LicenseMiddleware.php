@@ -57,7 +57,7 @@ class LicenseMiddleware
         }
 
         // License NOT verified — check if grace period is active
-        $graceStart = settings('license_grace_start');
+        $graceStart = settings('license_grace_started_at');
 
         if (filled($graceStart)) {
             $graceHours = config('license.grace_period', 72);

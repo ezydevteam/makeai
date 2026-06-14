@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Requests\Admin\FooterBuilderRequest;
 use App\Models\Category;
 use App\Models\Menu;
+use App\Models\Page;
 use App\Models\Setting;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
@@ -36,7 +37,7 @@ class FooterBuilderController extends Controller
                     'title' => '',
                     'subtitle' => '',
                     'blocks' => [
-                        ['id' => 'default_about', 'type' => 'about_text', 'enabled' => true, 'config' => ['logo' => null, 'alt' => $appName, 'description' => translate('The ultimate AI platform for creators, developers, and businesses. Generate anything you can imagine.')]],
+                        ['id' => 'default_about', 'type' => 'about_text', 'enabled' => true, 'config' => ['description' => translate('The ultimate AI platform for creators, developers, and businesses. Generate anything you can imagine.'), 'show_social_icon' => false]],
                     ],
                 ],
                 [
@@ -60,14 +61,14 @@ class FooterBuilderController extends Controller
                     'title' => '',
                     'subtitle' => '',
                     'blocks' => [
-                        ['id' => 'default_contact', 'type' => 'contact_info', 'enabled' => true, 'config' => ['title' => translate('Contact Us'), 'address' => '', 'phone' => '', 'email' => '']],
+                        ['id' => 'default_contact', 'type' => 'contact_info', 'enabled' => true, 'config' => ['title' => translate('Contact Us'), 'details' => '', 'address' => '', 'phone' => '', 'email' => '']],
                     ],
                 ],
             ],
             'bottom_blocks' => [
                 ['id' => 'bottom_copyright', 'type' => 'copyright_text', 'enabled' => true, 'config' => ['text' => translate('© {year} :app. All rights reserved.', ['app' => $appName])]],
-                ['id' => 'bottom_payment_icons', 'type' => 'payment_icons', 'enabled' => true, 'config' => ['icons' => ['visa', 'mastercard', 'paypal', 'stripe']]],
-                ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => true, 'config' => ['label' => translate('Back to top')]],
+                ['id' => 'bottom_payment_icons', 'type' => 'payment_icons', 'enabled' => true, 'config' => ['icons' => []]],
+                ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => true, 'config' => ['label' => translate('Back to top'), 'icon' => 'ti ti-arrow-up', 'bg_color' => '', 'text_color' => '', 'shape' => 'rounded']],
             ],
             'bottom_columns' => [
                 [
@@ -81,8 +82,8 @@ class FooterBuilderController extends Controller
                     'id' => 'right',
                     'title' => translate('Right Column'),
                     'blocks' => [
-                        ['id' => 'bottom_payment_icons', 'type' => 'payment_icons', 'enabled' => true, 'config' => ['icons' => ['visa', 'mastercard', 'paypal', 'stripe']]],
-                        ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => true, 'config' => ['label' => translate('Back to top')]],
+                        ['id' => 'bottom_payment_icons', 'type' => 'payment_icons', 'enabled' => true, 'config' => ['icons' => []]],
+                        ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => true, 'config' => ['label' => translate('Back to top'), 'icon' => 'ti ti-arrow-up', 'bg_color' => '', 'text_color' => '', 'shape' => 'rounded']],
                     ],
                 ],
             ],
@@ -90,7 +91,7 @@ class FooterBuilderController extends Controller
                 'copyright_text' => translate('© {year} :app. All rights reserved.', ['app' => $appName]),
                 'menu_slug' => null,
                 'show_payment_icons' => true,
-                'payment_icons' => ['visa', 'mastercard', 'paypal', 'stripe'],
+                'payment_icons' => [],
                 'show_back_to_top' => true,
                 'border_top' => true,
                 'padding' => 32,
@@ -151,7 +152,7 @@ class FooterBuilderController extends Controller
             $bottomBlocks = [
                 ['id' => 'bottom_copyright', 'type' => 'copyright_text', 'enabled' => true, 'config' => ['text' => $config['bottom_bar']['copyright_text'] ?? '']],
                 ['id' => 'bottom_payment_icons', 'type' => 'payment_icons', 'enabled' => (bool) ($config['bottom_bar']['show_payment_icons'] ?? true), 'config' => ['icons' => $config['bottom_bar']['payment_icons'] ?? []]],
-                ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => (bool) ($config['bottom_bar']['show_back_to_top'] ?? true), 'config' => ['label' => translate('Back to top')]],
+                ['id' => 'bottom_back_to_top', 'type' => 'back_to_top', 'enabled' => (bool) ($config['bottom_bar']['show_back_to_top'] ?? true), 'config' => ['label' => translate('Back to top'), 'icon' => 'ti ti-arrow-up', 'bg_color' => '', 'text_color' => '', 'shape' => 'rounded']],
             ];
         }
 
@@ -252,6 +253,10 @@ class FooterBuilderController extends Controller
         }
 
         $menus = Menu::orderBy('name')->get(['id', 'name', 'slug']);
+        $pages = Page::query()
+            ->published()
+            ->orderBy('title')
+            ->get(['id', 'title', 'slug']);
         $aiCategories = Category::active()->aiTools()
             ->orderBy('sort_order')
             ->orderBy('name')
@@ -260,6 +265,7 @@ class FooterBuilderController extends Controller
         return Inertia::render('Admin/Appearance/FooterBuilder', [
             'config' => $config,
             'menus' => $menus,
+            'pages' => $pages,
             'aiCategories' => $aiCategories,
         ]);
     }

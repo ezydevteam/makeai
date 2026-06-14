@@ -9,7 +9,15 @@ const props = defineProps<{
 const purchaseCode = ref(props.formData?.step_4?.purchase_code ?? '')
 const { t } = useTranslate()
 
-defineExpose({ getData: () => ({ purchase_code: purchaseCode.value }) })
+function applyMask(value: string) {
+    return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
+}
+
+function onInput(e: Event) {
+    purchaseCode.value = applyMask((e.target as HTMLInputElement).value)
+}
+
+defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })
 </script>
 
 <template>
@@ -24,7 +32,8 @@ defineExpose({ getData: () => ({ purchase_code: purchaseCode.value }) })
             <label class="block">
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Purchase Code') }}</span>
                 <input
-                    v-model="purchaseCode"
+                    :value="purchaseCode"
+                    @input="onInput"
                     type="text"
                     autocomplete="off"
                     :placeholder="t('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')"

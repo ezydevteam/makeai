@@ -254,7 +254,7 @@ class HandleInertiaRequests extends Middleware
                     'background' => ['color' => '', 'image_url' => '', 'overlay_opacity' => 0],
                     'custom_css' => '',
                     'blocks' => [
-                        ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'mobile_image' => null, 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
+                        ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['block_align' => 'left']],
                         ['id' => 'nav', 'type' => 'navigation', 'enabled' => true, 'config' => ['menu_slug' => 'main', 'alignment' => 'center', 'text_color' => '', 'hover_color' => '', 'hover_style' => 'underline', 'submenu_bg_color' => '', 'submenu_text_color' => '']],
                         ['id' => 'search', 'type' => 'search', 'enabled' => false, 'config' => ['compact' => false, 'search_style' => 'box', 'enable_live_search' => true, 'show_suggestions' => true, 'icon_class' => 'ti ti-search', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                         ['id' => 'lang', 'type' => 'language_switcher', 'enabled' => false, 'config' => []],
@@ -284,7 +284,7 @@ class HandleInertiaRequests extends Middleware
                     'custom_css' => '',
                     'blocks' => [
                         ['id' => 'mobile_hamburger', 'type' => 'hamburger', 'enabled' => true, 'config' => ['menu_slug' => 'mobile', 'label' => translate('Menu'), 'icon_class' => 'ti ti-menu-2', 'show_label' => true, 'drawer_title' => '', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
-                        ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['image' => $resolveImage(settings('site_logo_light', null)), 'mobile_image' => null, 'alt' => $siteName, 'link' => '/', 'show_text' => true, 'text' => $siteName]],
+                        ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['block_align' => 'left']],
                         ['id' => 'mobile_notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => []],
                         ['id' => 'mobile_dark', 'type' => 'dark_mode', 'enabled' => true, 'config' => ['label' => translate('Theme'), 'icon_class' => '', 'show_label' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '']],
                     ],
@@ -435,11 +435,12 @@ class HandleInertiaRequests extends Middleware
                     ]),
                 'recentTools' => fn () => AiTool::active()->latest()->limit(5)->get(['id', 'name', 'slug', 'description', 'color', 'icon']),
                 'popularTools' => fn () => AiTool::active()->orderByDesc('usage_count')->limit(10)->get(['id', 'name', 'slug', 'description', 'color', 'icon', 'usage_count']),
-                'recentPosts' => fn () => BlogPost::published()->latest('published_at')->limit(5)->get(['title', 'slug', 'published_at', 'featured_image'])->map(fn (BlogPost $post) => [
+                'recentPosts' => fn () => BlogPost::published()->latest('published_at')->limit(5)->get(['title', 'slug', 'published_at', 'featured_image', 'is_featured'])->map(fn (BlogPost $post) => [
                     'title' => $post->title,
                     'slug' => $post->slug,
                     'published_at' => $post->published_at?->toDateString(),
                     'image' => $post->featured_image,
+                    'is_featured' => $post->is_featured,
                 ]),
                 'tags' => fn () => BlogTag::where('posts_count', '>', 0)->orderByDesc('posts_count')->limit(30)->get(['name', 'slug', 'posts_count'])->map(fn (BlogTag $tag) => [
                     'name' => $tag->name,
@@ -497,6 +498,10 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         if (! $user) {
+            return ['user' => null];
+        }
+
+        if ($user instanceof \App\Models\Admin) {
             return ['user' => null];
         }
 
@@ -692,7 +697,7 @@ class HandleInertiaRequests extends Middleware
             return null;
         }
 
-        $graceStart = settings('license_grace_start');
+        $graceStart = settings('license_grace_started_at');
 
         if (filled($graceStart)) {
             $graceHours = config('license.grace_period', 72);

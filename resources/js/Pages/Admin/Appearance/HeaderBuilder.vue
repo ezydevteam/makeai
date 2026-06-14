@@ -106,7 +106,6 @@ const showImportModal = ref(false)
 const importJsonText = ref('')
 const isDraggingBlock = ref(false)
 const manualSortMode = ref(false)
-const logoUploading = ref(false)
 const removeBlockTarget = ref<RemoveBlockTarget | null>(null)
 
 let blockIdSequence = 0
@@ -183,6 +182,46 @@ const centerAlignmentSelectOptions = centerAlignmentOptions.map((option) => ({ v
 const columnFlexSelectOptions = columnFlexOptions.map((option) => ({ value: option.value, label: t(option.label) }))
 const stickyBehaviorSelectOptions = stickyBehaviorOptions.map((option) => ({ value: option.value, label: t(option.label) }))
 const mobileBottomStickyBehaviorSelectOptions = mobileBottomStickyBehaviorOptions.map((option) => ({ value: option.value, label: t(option.label) }))
+const menuAlignmentSelectOptions = menuAlignmentOptions.map((option) => ({ value: option.value, label: t(option.label) }))
+const menuHoverStyleSelectOptions = menuHoverStyleOptions.map((option) => ({ value: option.value, label: t(option.label) }))
+const searchStyleSelectOptions = searchStyleOptions.map((option) => ({ value: option.value, label: t(option.label) }))
+const menuSourceSelectOptions = computed(() => [
+    { value: '', label: t('Choose a menu') },
+    ...props.menus.map((menu) => ({ value: menu.slug, label: menu.name })),
+])
+const ctaStyleSelectOptions = [
+    { value: 'filled', label: 'Filled Primary' },
+    { value: 'bg_light', label: 'Light' },
+    { value: 'outline', label: 'Outline' },
+    { value: 'ghost', label: 'Ghost' },
+    { value: 'custom', label: 'Custom' },
+].map((option) => ({ value: option.value, label: t(option.label) }))
+const ctaAccessLevelSelectOptions = [
+    { value: 'all', label: 'All Visitors' },
+    { value: 'auth', label: 'Logged In Users' },
+    { value: 'pro', label: 'Pro Users' },
+].map((option) => ({ value: option.value, label: t(option.label) }))
+const guestActionModeSelectOptions = [
+    { value: 'login_only', label: 'Login Button Only' },
+    { value: 'register_only', label: 'Register Only' },
+    { value: 'both', label: 'Both' },
+].map((option) => ({ value: option.value, label: t(option.label) }))
+const authDisplaySelectOptions = [
+    { value: 'avatar_only', label: 'Avatar Only' },
+    { value: 'avatar_name', label: 'Avatar + User Name' },
+].map((option) => ({ value: option.value, label: t(option.label) }))
+const authButtonStyleSelectOptions = [
+    { value: 'primary', label: 'Primary' },
+    { value: 'dark', label: 'Dark' },
+    { value: 'green', label: 'Green' },
+    { value: 'purple', label: 'Purple' },
+    { value: 'gradient', label: 'Gradient' },
+].map((option) => ({ value: option.value, label: t(option.label) }))
+const socialDisplayModeSelectOptions = [
+    { value: 'icons', label: 'Icons' },
+    { value: 'counts', label: 'Counts' },
+    { value: 'cards', label: 'Cards' },
+].map((option) => ({ value: option.value, label: t(option.label) }))
 
 const showSectionSettingsModal = ref(false)
 
@@ -266,19 +305,19 @@ const getBlockLabel = (type: BlockType) => ({
 }[type])
 
 const availableElements: Array<{ type: BlockType; label: string; description: string; sections: HeaderSectionKey[]; config: Record<string, HeaderConfigValue> }> = [
-    { type: 'logo', label: 'Logo', description: 'Brand mark and text.', sections: ['top', 'main', 'mobile'], config: { image: null, mobile_image: null, alt: '', link: '/', show_text: true, text: '', block_align: 'left' } },
+    { type: 'logo', label: 'Logo', description: 'Brand mark and text.', sections: ['top', 'main', 'mobile'], config: { block_align: 'left' } },
     { type: 'navigation', label: 'Navigation Menu', description: 'Render a menu.', sections: ['top', 'main'], config: { menu_slug: 'main', alignment: 'center', text_color: '', hover_color: '', hover_style: 'underline', submenu_bg_color: '', submenu_text_color: '', block_align: 'center' } },
     { type: 'hamburger', label: 'Hamburger Menu', description: 'Open mobile drawer.', sections: ['mobile', 'mobile_bottom'], config: { menu_slug: 'mobile', label: 'Menu', icon_class: 'ti ti-menu-2', show_label: true, drawer_title: '', icon_color: '', bg_style: 'light', bg_color: '', block_align: 'left' } },
     { type: 'search', label: 'Search Bar', description: 'Public live search.', sections: ['main'], config: { compact: false, search_style: 'box', enable_live_search: true, show_suggestions: true, icon_class: 'ti ti-search', icon_color: '', bg_style: 'light', bg_color: '', block_align: 'center' } },
     { type: 'search_icon', label: 'Search Icon', description: 'Icon-triggered search.', sections: ['mobile', 'mobile_bottom'], config: { label: 'Search', icon_class: 'ti ti-search', show_label: true, enable_live_search: true, show_suggestions: true, icon_color: '', bg_style: 'light', bg_color: '', block_align: 'right' } },
     { type: 'home_link', label: 'Home Icon', description: 'Homepage link.', sections: ['mobile', 'mobile_bottom'], config: { link: '/', label: 'Home', icon_class: 'ti ti-home', show_label: true, icon_color: '', bg_style: 'light', bg_color: '', block_align: 'right' } },
     { type: 'user_menu_icon', label: 'Login / User Icon', description: 'Auth link.', sections: ['mobile', 'mobile_bottom'], config: { label: 'Account', guest_label: 'Sign In', icon_class: 'ti ti-user', show_label: true, icon_color: '', bg_style: 'light', bg_color: '', block_align: 'right' } },
-    { type: 'cta_button', label: 'CTA Button', description: 'Prominent link button.', sections: ['top', 'main', 'mobile', 'mobile_bottom'], config: { text: 'Get Started', link: '/register', style: 'filled', color: 'primary', icon_class: '', icon_only: false, icon_color: '', bg_style: 'filled', bg_color: '', text_color: '', block_align: 'right' } },
+    { type: 'cta_button', label: 'CTA Button', description: 'Prominent link button.', sections: ['top', 'main', 'mobile', 'mobile_bottom'], config: { text: 'Get Started', link: '/register', style: 'filled', color: 'primary', access_level: 'all', icon_class: '', icon_only: false, icon_color: '', bg_style: 'filled', bg_color: '', text_color: '', block_align: 'right' } },
     { type: 'language_switcher', label: 'Language Switcher', description: 'Locale selector.', sections: ['top', 'main', 'mobile', 'mobile_bottom'], config: { show_flag: true, show_name: true, label: 'Language', show_label: true, block_align: 'left' } },
     { type: 'dark_mode', label: 'Dark Mode Toggle', description: 'Theme toggle.', sections: ['main', 'mobile'], config: { label: 'Theme', icon_class: '', show_label: true, icon_color: '', bg_style: 'light', bg_color: '', block_align: 'right' } },
-    { type: 'user_menu', label: 'User Menu / Login', description: 'Account menu.', sections: ['main'], config: { show_credits: true, show_avatar: true, block_align: 'right' } },
+    { type: 'user_menu', label: 'User Menu / Login', description: 'Account menu.', sections: ['main'], config: { guest_mode: 'login_only', guest_login_icon_class: 'ti ti-login-2', guest_login_style: 'primary', guest_register_icon_class: 'ti ti-user-plus', guest_register_style: 'gradient', auth_display: 'avatar_name', show_arrow_icon: true, show_credits: true, block_align: 'right' } },
     { type: 'credit_balance', label: 'Credit Balance', description: 'Credit indicator.', sections: ['main'], config: { label: 'Credits', icon_class: 'ti ti-bolt', icon_color: '', bg_style: 'light', bg_color: '', block_align: 'right' } },
-    { type: 'notification_bell', label: 'Notifications', description: 'Notification bell.', sections: ['main', 'mobile', 'mobile_bottom'], config: { label: 'Notifications', show_label: true, block_align: 'right' } },
+    { type: 'notification_bell', label: 'Notifications', description: 'Notification bell.', sections: ['main', 'mobile', 'mobile_bottom'], config: { label: 'Notifications', show_label: true, icon_class: 'ti ti-bell', icon_color: '', bg_style: 'light', bg_color: '', block_align: 'right' } },
     { type: 'social_icons', label: 'Social Icons', description: 'Social links.', sections: ['top', 'main'], config: { icons: [], display_mode: 'icons', block_align: 'right' } },
     { type: 'custom_html', label: 'Custom HTML', description: 'Custom markup slot.', sections: ['top', 'main'], config: { content: '', block_align: 'left' } },
 ]
@@ -365,8 +404,12 @@ const updateBlockConfig = (key: string, value: HeaderConfigValue) => {
 }
 
 const hasLabelOptions = computed(() => selectedBlock.value ? ['hamburger', 'search_icon', 'home_link', 'user_menu_icon', 'notification_bell', 'dark_mode', 'language_switcher', 'credit_balance'].includes(selectedBlock.value.type) : false)
-const hasIconOptions = computed(() => selectedBlock.value ? ['hamburger', 'search_icon', 'home_link', 'user_menu_icon', 'dark_mode', 'credit_balance'].includes(selectedBlock.value.type) || (selectedBlock.value.type === 'search' && selectedBlock.value.config.search_style === 'icon') : false)
-const hasIconAppearanceOptions = computed(() => selectedBlock.value ? ['hamburger', 'search', 'search_icon', 'home_link', 'user_menu_icon', 'dark_mode', 'credit_balance', 'cta_button'].includes(selectedBlock.value.type) : false)
+const hasIconOptions = computed(() => selectedBlock.value ? ['hamburger', 'search_icon', 'home_link', 'user_menu_icon', 'dark_mode', 'credit_balance', 'notification_bell'].includes(selectedBlock.value.type) || (selectedBlock.value.type === 'search' && selectedBlock.value.config.search_style === 'icon') : false)
+const hasIconAppearanceOptions = computed(() => selectedBlock.value ? ['hamburger', 'search', 'search_icon', 'home_link', 'user_menu_icon', 'dark_mode', 'credit_balance', 'notification_bell'].includes(selectedBlock.value.type) : false)
+const showCtaIconAppearanceOptions = computed(() => selectedBlock.value?.type === 'cta_button' && Boolean(selectedBlock.value.config?.icon_only))
+const showCtaCustomColorOptions = computed(() => selectedBlock.value?.type === 'cta_button' && String(selectedBlock.value.config?.style ?? 'filled') === 'custom')
+const showGuestLoginButtonOptions = computed(() => selectedBlock.value?.type === 'user_menu' && ['login_only', 'both'].includes(String(selectedBlock.value.config?.guest_mode ?? 'login_only')))
+const showGuestRegisterButtonOptions = computed(() => selectedBlock.value?.type === 'user_menu' && ['register_only', 'both'].includes(String(selectedBlock.value.config?.guest_mode ?? 'login_only')))
 const hasBlockAlignSelector = computed(() => selectedBlock.value ? selectedBlockSection.value !== 'mobile_bottom' : false)
 const blockAlignOptionsForBlock = computed(() => {
     if (!selectedBlock.value) return blockAlignOptions
@@ -450,31 +493,6 @@ const getDragOptions = (section: HeaderSectionKey) => ({
 
 const dragOptions = computed(() => getDragOptions(activeSection.value))
 
-const handleLogoUpload = async (event: Event) => {
-    const input = event.target as HTMLInputElement
-    if (!input.files?.length) return
-    logoUploading.value = true
-    const formData = new FormData()
-    formData.append('file', input.files[0])
-    formData.append('directory', 'logos')
-    try {
-        const response = await fetch('/admin/builder/header/upload-logo', {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '' },
-        })
-        const data = await response.json()
-        if (data.url) {
-            updateBlockConfig('image', data.url)
-        }
-    } catch {
-        // silently fail, user can paste URL manually
-    } finally {
-        logoUploading.value = false
-        input.value = ''
-    }
-}
-
 const handleBackgroundUpload = async (event: Event, section: HeaderSectionKey = activeSection.value) => {
     const input = event.target as HTMLInputElement
     if (!input.files?.length) return
@@ -520,29 +538,6 @@ const toggleMobileBottomBooleanField = (key: 'shadow' | 'progressbar') => {
     section[key] = !section[key]
 }
 
-const handleMobileLogoUpload = async (event: Event) => {
-    const input = event.target as HTMLInputElement
-    if (!input.files?.length) return
-    logoUploading.value = true
-    const formData = new FormData()
-    formData.append('file', input.files[0])
-    formData.append('directory', 'logos')
-    try {
-        const response = await fetch('/admin/builder/header/upload-logo', {
-            method: 'POST',
-            body: formData,
-            headers: { 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '' },
-        })
-        const data = await response.json()
-        if (data.url) {
-            updateBlockConfig('mobile_image', data.url)
-        }
-    } catch {
-    } finally {
-        logoUploading.value = false
-        input.value = ''
-    }
-}
 </script>
 
 <template>
@@ -605,7 +600,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                         <div class="flex items-center gap-2">
                             <Tooltip :content="t('Header settings')" placement="top">
                                 <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Header settings')" @click="showSectionSettingsModal = true">
-                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <i class="ti ti-settings text-base"></i>
                                 </button>
                             </Tooltip>
                             <Tooltip :content="manualSortMode ? t('Disable manual sort') : t('Enable manual sort')" placement="top">
@@ -614,7 +609,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                                 </button>
                             </Tooltip>
                             <button type="button" class="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 dark:bg-gray-800" @click="openAddElementModal(activeSection)">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" /></svg>
+                                <i class="ti ti-plus text-base"></i>
                                 {{ t('Add Element') }}
                             </button>
                         </div>
@@ -652,7 +647,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                                 </div>
                                 <Tooltip v-else :content="t('Drag element')" placement="top">
                                     <button type="button" class="header-block-drag-handle cursor-grab rounded-lg p-2 text-gray-400 hover:bg-white hover:text-primary-600 active:cursor-grabbing dark:hover:bg-surface-900" :aria-label="t('Drag block')">
-                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" /></svg>
+                                        <i class="ti ti-grip-vertical text-base"></i>
                                     </button>
                                 </Tooltip>
                                 <div>
@@ -676,7 +671,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                                 </Tooltip>
                                 <Tooltip :content="t('Remove element')" placement="top">
                                     <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Remove element')" @click="promptRemoveBlock(Number(index), activeSection)">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                                        <i class="ti ti-x text-base"></i>
                                     </button>
                                 </Tooltip>
                             </div>
@@ -692,7 +687,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                             <p class="mt-1 text-xs text-gray-500">{{ t('Fixed bottom mobile bar.') }}</p>
                         </div>
                         <button type="button" class="inline-flex items-center gap-2 rounded-lg btn-primary transition" @click="openAddElementModal('mobile_bottom')">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" /></svg>
+                            <i class="ti ti-plus text-base"></i>
                             {{ t('Add Element') }}
                         </button>
                     </div>
@@ -727,7 +722,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                                 </div>
                                 <Tooltip v-else :content="t('Drag element')" placement="top">
                                     <button type="button" class="header-block-drag-handle cursor-grab rounded-lg p-2 text-gray-400 hover:bg-white hover:text-primary-600 active:cursor-grabbing dark:hover:bg-surface-900" :aria-label="t('Drag block')">
-                                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" /></svg>
+                                        <i class="ti ti-grip-vertical text-base"></i>
                                     </button>
                                 </Tooltip>
                                 <div>
@@ -748,7 +743,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                                 </Tooltip>
                                 <Tooltip :content="t('Remove element')" placement="top">
                                     <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-900/20" :aria-label="t('Remove element')" @click="promptRemoveBlock(Number(index), 'mobile_bottom')">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                                        <i class="ti ti-x text-base"></i>
                                     </button>
                                 </Tooltip>
                             </div>
@@ -760,8 +755,8 @@ const handleMobileLogoUpload = async (event: Event) => {
 
         <!-- Section Settings Modal -->
         <Teleport to="body">
-            <div v-if="showSectionSettingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showSectionSettingsModal = false">
-                <div class="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-800 dark:bg-surface-900">
+            <div v-if="showSectionSettingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-0 sm:p-4 backdrop-blur-sm" @click.self="showSectionSettingsModal = false">
+                <div class="flex max-h-screen w-full max-w-5xl flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-2xl sm:border sm:border-gray-200 dark:bg-surface-900 dark:sm:border-surface-800">
                     <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                         <div>
                             <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t(':section Settings', { section: t(activeSectionMeta.label) }) }}</h3>
@@ -781,7 +776,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                             </button>
                             <Tooltip :content="t('Close')" placement="top">
                                 <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700" :aria-label="t('Close')" @click="showSectionSettingsModal = false">
-                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                                    <i class="ti ti-x text-lg"></i>
                                 </button>
                             </Tooltip>
                         </div>
@@ -981,18 +976,18 @@ const handleMobileLogoUpload = async (event: Event) => {
 
         <!-- Add Element Modal -->
         <Teleport to="body">
-            <div v-if="showAddElementModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showAddElementModal = false">
-                <div class="w-full max-w-2xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900">
+            <div v-if="showAddElementModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-0 sm:p-4 backdrop-blur-sm" @click.self="showAddElementModal = false">
+                <div class="flex w-full max-w-2xl flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:max-h-[80vh] sm:rounded-2xl sm:border sm:border-gray-200 dark:bg-surface-900 dark:sm:border-surface-800">
                     <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                         <div>
-                            <h3 class="text-sm font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Add Element') }}</h3>
-                            <p class="mt-1 text-xs text-gray-500">{{ t('Choose an element for :section.', { section: t(addElementSectionMeta.label) }) }}</p>
+                            <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Add Element') }}</h3>
+                            <p class="mt-1 text-sm text-gray-500">{{ t('Choose an element for :section.', { section: t(addElementSectionMeta.label) }) }}</p>
                         </div>
-                        <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showAddElementModal = false">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                        <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700" :aria-label="t('Close')" @click="showAddElementModal = false">
+                            <i class="ti ti-x text-lg"></i>
                         </button>
                     </div>
-                    <div class="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
+                    <div class="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
                         <button
                             v-for="element in addableElements"
                             :key="element.type"
@@ -1001,7 +996,7 @@ const handleMobileLogoUpload = async (event: Event) => {
                             @click="addElement(element)"
                         >
                             <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700">
-                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m7-7H5" /></svg>
+                                <i class="ti ti-plus text-base"></i>
                             </span>
                             <span>
                                 <span class="block text-sm font-bold text-gray-900 dark:text-white">{{ t(element.label) }}</span>
@@ -1009,22 +1004,28 @@ const handleMobileLogoUpload = async (event: Event) => {
                             </span>
                         </button>
                     </div>
+                    <div class="flex justify-end border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-800">
+                        <button type="button" class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700" @click="showAddElementModal = false">{{ t('Close') }}</button>
+                    </div>
                 </div>
             </div>
         </Teleport>
 
         <!-- Block Settings Modal -->
         <Teleport to="body">
-            <div v-if="selectedBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="selectedBlockIndex = null">
-                <div class="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900">
+            <div v-if="selectedBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-0 sm:p-4 backdrop-blur-sm" @click.self="selectedBlockIndex = null">
+                <div class="flex w-full max-w-3xl flex-col overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:max-h-[88vh] sm:rounded-2xl sm:border sm:border-gray-200 dark:bg-surface-900 dark:sm:border-surface-800">
                     <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
-                        <h3 class="text-sm font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Configure') }}: {{ t(getBlockLabel(selectedBlock.type)) }}</h3>
-                        <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="selectedBlockIndex = null">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                        <div>
+                            <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t(getBlockLabel(selectedBlock.type)) }}</h3>
+                            <p class="mt-1 text-sm text-gray-500">{{ t('Adjust the element behavior, content, and appearance.') }}</p>
+                        </div>
+                        <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700" :aria-label="t('Close')" @click="selectedBlockIndex = null">
+                            <i class="ti ti-x text-lg"></i>
                         </button>
                     </div>
 
-                    <div class="max-h-[70vh] space-y-4 overflow-y-auto p-6">
+                    <div class="flex-1 space-y-4 overflow-y-auto p-6">
                         <!-- Label options -->
                         <div v-if="hasLabelOptions" class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                             <div class="grid grid-cols-1 gap-4">
@@ -1032,10 +1033,12 @@ const handleMobileLogoUpload = async (event: Event) => {
                                     {{ t('Display Label') }}
                                     <input :value="String(selectedBlock.config.label ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="updateBlockConfig('label', ($event.target as HTMLInputElement).value)">
                                 </label>
-                                <label v-if="selectedBlockSection === 'mobile_bottom'" class="flex items-center justify-between gap-4">
+                                <button v-if="selectedBlockSection === 'mobile_bottom'" type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('show_label', !(selectedBlock.config.show_label !== false))">
                                     <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Label') }}</span></span>
-                                    <input :checked="selectedBlock.config.show_label !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_label', ($event.target as HTMLInputElement).checked)">
-                                </label>
+                                    <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.show_label !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                        <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.show_label !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                    </span>
+                                </button>
                             </div>
                         </div>
 
@@ -1051,111 +1054,65 @@ const handleMobileLogoUpload = async (event: Event) => {
                         <div v-if="hasIconAppearanceOptions" class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                             <h4 class="text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">{{ t('Icon Appearance') }}</h4>
                             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Icon Color') }}
-                                    <input :value="String(selectedBlock.config.icon_color ?? '')" type="text" :placeholder="t('var(--color-primary-600)')" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="updateBlockConfig('icon_color', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Background Style') }}
-                                    <select :value="String(selectedBlock.config.bg_style ?? 'light')" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @change="updateBlockConfig('bg_style', ($event.target as HTMLSelectElement).value)">
-                                        <option v-for="option in iconBgStyleOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option>
-                                    </select>
-                                </label>
-                                <label v-if="selectedBlock.config.bg_style === 'custom' || selectedBlock.type === 'cta_button'" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Background Color') }}
-                                    <input :value="String(selectedBlock.config.bg_color ?? '')" type="text" :placeholder="t('#10b981')" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="updateBlockConfig('bg_color', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <label v-if="selectedBlock.type === 'cta_button'" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Text Color') }}
-                                    <input :value="String(selectedBlock.config.text_color ?? '')" type="text" :placeholder="t('#ffffff')" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="updateBlockConfig('text_color', ($event.target as HTMLInputElement).value)">
-                                </label>
+                                <AppColorPicker :model-value="String(selectedBlock.config.icon_color ?? '')" :label="t('Icon Color')" @update:model-value="updateBlockConfig('icon_color', $event)" />
+                                <AppSelect :model-value="String(selectedBlock.config.bg_style ?? 'light')" :label="t('Background Style')" :options="iconBgStyleOptions.map((option) => ({ value: option.value, label: t(option.label) }))" @update:model-value="updateBlockConfig('bg_style', $event)" />
+                                <AppColorPicker v-if="selectedBlock.config.bg_style === 'custom'" :model-value="String(selectedBlock.config.bg_color ?? '')" :label="t('Background Color')" @update:model-value="updateBlockConfig('bg_color', $event)" />
                             </div>
                         </div>
 
                         <!-- Navigation -->
-                        <div v-if="selectedBlock.type === 'navigation'" class="grid grid-cols-1 gap-4">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Menu Source') }}
-                                <select :value="String(selectedBlock.config.menu_slug ?? '')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('menu_slug', ($event.target as HTMLSelectElement).value)">
-                                    <option value="">{{ t('Choose a menu') }}</option>
-                                    <option v-for="menu in menus" :key="menu.id" :value="menu.slug">{{ menu.name }}</option>
-                                </select>
-                            </label>
-                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Alignment') }}
-                                    <select :value="String(selectedBlock.config.alignment ?? 'center')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('alignment', ($event.target as HTMLSelectElement).value)">
-                                        <option v-for="option in menuAlignmentOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option>
-                                    </select>
-                                </label>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Hover Style') }}
-                                    <select :value="String(selectedBlock.config.hover_style ?? 'underline')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('hover_style', ($event.target as HTMLSelectElement).value)">
-                                        <option v-for="option in menuHoverStyleOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option>
-                                    </select>
-                                </label>
+                        <div v-if="selectedBlock.type === 'navigation'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <AppSelect :model-value="String(selectedBlock.config.menu_slug ?? '')" :label="t('Menu Source')" :options="menuSourceSelectOptions" @update:model-value="updateBlockConfig('menu_slug', $event)" />
                             </div>
-                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Menu Text Color') }}
-                                    <input :value="String(selectedBlock.config.text_color ?? '')" type="text" :placeholder="t('Fallback')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('text_color', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Hover Color') }}
-                                    <input :value="String(selectedBlock.config.hover_color ?? '')" type="text" :placeholder="t('var(--color-primary-600)')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('hover_color', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Submenu BG Color') }}
-                                    <input :value="String(selectedBlock.config.submenu_bg_color ?? '')" type="text" :placeholder="t('var(--surface-card)')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('submenu_bg_color', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Submenu Text Color') }}
-                                    <input :value="String(selectedBlock.config.submenu_text_color ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('submenu_text_color', ($event.target as HTMLInputElement).value)">
-                                </label>
-                            </div>
+                            <AppSelect :model-value="String(selectedBlock.config.alignment ?? 'center')" :label="t('Alignment')" :options="menuAlignmentSelectOptions" @update:model-value="updateBlockConfig('alignment', $event)" />
+                            <AppSelect :model-value="String(selectedBlock.config.hover_style ?? 'underline')" :label="t('Hover Style')" :options="menuHoverStyleSelectOptions" @update:model-value="updateBlockConfig('hover_style', $event)" />
+                            <AppColorPicker :model-value="String(selectedBlock.config.text_color ?? '')" :label="t('Menu Text Color')" @update:model-value="updateBlockConfig('text_color', $event)" />
+                            <AppColorPicker :model-value="String(selectedBlock.config.hover_color ?? '')" :label="t('Hover Color')" @update:model-value="updateBlockConfig('hover_color', $event)" />
+                            <AppColorPicker :model-value="String(selectedBlock.config.submenu_bg_color ?? '')" :label="t('Submenu BG Color')" @update:model-value="updateBlockConfig('submenu_bg_color', $event)" />
+                            <AppColorPicker :model-value="String(selectedBlock.config.submenu_text_color ?? '')" :label="t('Submenu Text Color')" @update:model-value="updateBlockConfig('submenu_text_color', $event)" />
                         </div>
 
                         <!-- Search -->
-                        <div v-if="selectedBlock.type === 'search'" class="grid grid-cols-1 gap-4">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Search Style') }}
-                                <select :value="String(selectedBlock.config.search_style ?? 'box')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('search_style', ($event.target as HTMLSelectElement).value)">
-                                    <option v-for="option in searchStyleOptions" :key="option.value" :value="option.value">{{ t(option.label) }}</option>
-                                </select>
-                            </label>
-                            <div class="space-y-3">
-                                <label class="flex items-center justify-between gap-4">
-                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Live Search') }}</span>
-                                    <input :checked="selectedBlock.config.enable_live_search !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('enable_live_search', ($event.target as HTMLInputElement).checked)">
-                                </label>
-                                <label class="flex items-center justify-between gap-4">
-                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Suggestions') }}</span>
-                                    <input :checked="selectedBlock.config.show_suggestions !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_suggestions', ($event.target as HTMLInputElement).checked)">
-                                </label>
+                        <div v-if="selectedBlock.type === 'search'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <AppSelect :model-value="String(selectedBlock.config.search_style ?? 'box')" :label="t('Search Style')" :options="searchStyleSelectOptions" @update:model-value="updateBlockConfig('search_style', $event)" />
                             </div>
+                            <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900 sm:col-span-1" @click="updateBlockConfig('enable_live_search', !(selectedBlock.config.enable_live_search !== false))">
+                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Live Search') }}</span></span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.enable_live_search !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.enable_live_search !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
+                            <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900 sm:col-span-1" @click="updateBlockConfig('show_suggestions', !(selectedBlock.config.show_suggestions !== false))">
+                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Suggestions') }}</span></span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.show_suggestions !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.show_suggestions !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
                         </div>
 
                         <!-- Search Icon -->
-                        <div v-if="selectedBlock.type === 'search_icon'" class="space-y-3">
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Live Search') }}</span>
-                                <input :checked="selectedBlock.config.enable_live_search !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('enable_live_search', ($event.target as HTMLInputElement).checked)">
-                            </label>
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Suggestions') }}</span>
-                                <input :checked="selectedBlock.config.show_suggestions !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_suggestions', ($event.target as HTMLInputElement).checked)">
-                            </label>
+                        <div v-if="selectedBlock.type === 'search_icon'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('enable_live_search', !(selectedBlock.config.enable_live_search !== false))">
+                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Live Search') }}</span></span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.enable_live_search !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.enable_live_search !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
+                            <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('show_suggestions', !(selectedBlock.config.show_suggestions !== false))">
+                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Suggestions') }}</span></span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.show_suggestions !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.show_suggestions !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
                         </div>
 
                         <!-- Hamburger -->
-                        <div v-if="selectedBlock.type === 'hamburger'" class="grid grid-cols-1 gap-4">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Drawer Menu Source') }}
-                                <select :value="String(selectedBlock.config.menu_slug ?? '')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('menu_slug', ($event.target as HTMLSelectElement).value)">
-                                    <option value="">{{ t('Choose a menu') }}</option>
-                                    <option v-for="menu in menus" :key="menu.id" :value="menu.slug">{{ menu.name }}</option>
-                                </select>
-                            </label>
+                        <div v-if="selectedBlock.type === 'hamburger'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <AppSelect :model-value="String(selectedBlock.config.menu_slug ?? '')" :label="t('Drawer Menu Source')" :options="menuSourceSelectOptions" @update:model-value="updateBlockConfig('menu_slug', $event)" />
+                            </div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Drawer Title') }}
                                 <input :value="String(selectedBlock.config.drawer_title ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('drawer_title', ($event.target as HTMLInputElement).value)">
@@ -1163,112 +1120,128 @@ const handleMobileLogoUpload = async (event: Event) => {
                         </div>
 
                         <!-- Language Switcher -->
-                        <div v-if="selectedBlock.type === 'language_switcher'" class="space-y-3">
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Flag') }}</span>
-                                <input :checked="selectedBlock.config.show_flag !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_flag', ($event.target as HTMLInputElement).checked)">
-                            </label>
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Language Name') }}</span>
-                                <input :checked="selectedBlock.config.show_name !== false" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_name', ($event.target as HTMLInputElement).checked)">
-                            </label>
+                        <div v-if="selectedBlock.type === 'language_switcher'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('show_flag', !(selectedBlock.config.show_flag !== false))">
+                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Flag') }}</span></span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.show_flag !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.show_flag !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
+                            <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('show_name', !(selectedBlock.config.show_name !== false))">
+                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Language Name') }}</span></span>
+                                <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="selectedBlock.config.show_name !== false ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                    <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="selectedBlock.config.show_name !== false ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                </span>
+                            </button>
                         </div>
 
                         <!-- CTA Button -->
-                        <div v-if="selectedBlock.type === 'cta_button'" class="grid grid-cols-1 gap-4">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Button Text') }}
-                                <input :value="String(selectedBlock.config.text ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('text', ($event.target as HTMLInputElement).value)">
-                            </label>
-                            <IconClassSelect :model-value="String(selectedBlock.config.icon_class ?? '')" :label="t('Icon Class')" @update:model-value="updateBlockConfig('icon_class', $event)" />
-                            <label class="flex items-center justify-between gap-4">
-                                <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Icon Only') }}</span></span>
-                                <input :checked="Boolean(selectedBlock.config.icon_only)" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('icon_only', ($event.target as HTMLInputElement).checked)">
-                            </label>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('URL / Link') }}
-                                <input :value="String(selectedBlock.config.link ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('link', ($event.target as HTMLInputElement).value)">
-                            </label>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Button Style') }}
-                                <select :value="String(selectedBlock.config.style ?? 'filled')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('style', ($event.target as HTMLSelectElement).value)">
-                                    <option value="filled">{{ t('Filled') }}</option>
-                                    <option value="bg_light">{{ t('Background Light') }}</option>
-                                    <option value="outline">{{ t('Outline') }}</option>
-                                    <option value="ghost">{{ t('Ghost') }}</option>
-                                </select>
-                            </label>
+                        <div v-if="selectedBlock.type === 'cta_button'" class="space-y-4">
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Button Text') }}
+                                    <input :value="String(selectedBlock.config.text ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('text', ($event.target as HTMLInputElement).value)">
+                                </label>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ t('Button Link') }}
+                                    <input :value="String(selectedBlock.config.link ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('link', ($event.target as HTMLInputElement).value)">
+                                </label>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <AppSelect :model-value="String(selectedBlock.config.access_level ?? 'all')" :label="t('Access Level')" :options="ctaAccessLevelSelectOptions" @update:model-value="updateBlockConfig('access_level', $event)" />
+                                <AppSelect :model-value="String(selectedBlock.config.style ?? 'filled')" :label="t('Button Style')" :options="ctaStyleSelectOptions" @update:model-value="updateBlockConfig('style', $event)" />
+                            </div>
+
+                            <div v-if="showCtaCustomColorOptions" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <AppColorPicker :model-value="String(selectedBlock.config.bg_color ?? '')" :label="t('Button Background Color')" @update:model-value="updateBlockConfig('bg_color', $event)" />
+                                <AppColorPicker :model-value="String(selectedBlock.config.text_color ?? '')" :label="t('Button Text Color')" @update:model-value="updateBlockConfig('text_color', $event)" />
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <IconClassSelect :model-value="String(selectedBlock.config.icon_class ?? '')" :label="t('Icon Class')" @update:model-value="updateBlockConfig('icon_class', $event)" />
+                                <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('icon_only', !Boolean(selectedBlock.config.icon_only))">
+                                    <span>
+                                        <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Icon Only') }}</span>
+                                        <span class="text-xs text-gray-500">{{ t('Show only the icon and hide button text.') }}</span>
+                                    </span>
+                                    <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="Boolean(selectedBlock.config.icon_only) ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                        <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="Boolean(selectedBlock.config.icon_only) ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                    </span>
+                                </button>
+                            </div>
+
+                            <div v-if="showCtaIconAppearanceOptions" class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/60">
+                                <h4 class="text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">{{ t('Icon Appearance') }}</h4>
+                                <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <AppColorPicker :model-value="String(selectedBlock.config.icon_color ?? '')" :label="t('Icon Color')" @update:model-value="updateBlockConfig('icon_color', $event)" />
+                                    <AppSelect :model-value="String(selectedBlock.config.bg_style ?? 'light')" :label="t('Background Style')" :options="iconBgStyleOptions.map((option) => ({ value: option.value, label: t(option.label) }))" @update:model-value="updateBlockConfig('bg_style', $event)" />
+                                    <AppColorPicker v-if="selectedBlock.config.bg_style === 'custom'" :model-value="String(selectedBlock.config.bg_color ?? '')" :label="t('Icon Background Color')" @update:model-value="updateBlockConfig('bg_color', $event)" />
+                                </div>
+                            </div>
                         </div>
 
                         <!-- User Menu -->
-                        <div v-if="selectedBlock.type === 'user_menu'" class="space-y-3">
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Avatar') }}</span>
-                                <input :checked="Boolean(selectedBlock.config.show_avatar)" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_avatar', ($event.target as HTMLInputElement).checked)">
-                            </label>
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Credit Balance') }}</span>
-                                <input :checked="Boolean(selectedBlock.config.show_credits)" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_credits', ($event.target as HTMLInputElement).checked)">
-                            </label>
+                        <div v-if="selectedBlock.type === 'user_menu'" class="space-y-4">
+                            <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/40">
+                                <div class="mb-4">
+                                    <h4 class="text-sm font-bold text-gray-900 dark:text-white">{{ t('Unauthenticated') }}</h4>
+                                    <p class="mt-1 text-xs text-gray-500">{{ t('Configure guest login and register actions.') }}</p>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div class="sm:col-span-2">
+                                        <AppSelect :model-value="String(selectedBlock.config.guest_mode ?? 'login_only')" :label="t('Guest Buttons')" :options="guestActionModeSelectOptions" @update:model-value="updateBlockConfig('guest_mode', $event)" />
+                                    </div>
+                                    <template v-if="showGuestLoginButtonOptions">
+                                        <IconClassSelect :model-value="String(selectedBlock.config.guest_login_icon_class ?? '')" :label="t('Login Button Icon')" @update:model-value="updateBlockConfig('guest_login_icon_class', $event)" />
+                                        <AppSelect :model-value="String(selectedBlock.config.guest_login_style ?? 'primary')" :label="t('Login Button Style')" :options="authButtonStyleSelectOptions" @update:model-value="updateBlockConfig('guest_login_style', $event)" />
+                                    </template>
+                                    <template v-if="showGuestRegisterButtonOptions">
+                                        <IconClassSelect :model-value="String(selectedBlock.config.guest_register_icon_class ?? '')" :label="t('Register Button Icon')" @update:model-value="updateBlockConfig('guest_register_icon_class', $event)" />
+                                        <AppSelect :model-value="String(selectedBlock.config.guest_register_style ?? 'gradient')" :label="t('Register Button Style')" :options="authButtonStyleSelectOptions" @update:model-value="updateBlockConfig('guest_register_style', $event)" />
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/40">
+                                <div class="mb-4">
+                                    <h4 class="text-sm font-bold text-gray-900 dark:text-white">{{ t('Authenticated') }}</h4>
+                                    <p class="mt-1 text-xs text-gray-500">{{ t('Configure how the signed-in account trigger appears.') }}</p>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <AppSelect :model-value="String(selectedBlock.config.auth_display ?? 'avatar_name')" :label="t('Display Mode')" :options="authDisplaySelectOptions" @update:model-value="updateBlockConfig('auth_display', $event)" />
+                                    <button type="button" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('show_arrow_icon', !Boolean(selectedBlock.config.show_arrow_icon ?? true))">
+                                        <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Arrow Icon') }}</span><span class="text-xs text-gray-500">{{ t('Show arrow after avatar or name.') }}</span></span>
+                                        <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="Boolean(selectedBlock.config.show_arrow_icon ?? true) ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                            <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="Boolean(selectedBlock.config.show_arrow_icon ?? true) ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                        </span>
+                                    </button>
+                                    <button type="button" class="sm:col-span-2 flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left dark:border-surface-700 dark:bg-surface-900" @click="updateBlockConfig('show_credits', !Boolean(selectedBlock.config.show_credits))">
+                                        <span><span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Credit Balance') }}</span></span>
+                                        <span class="relative inline-flex h-6 w-11 rounded-full transition-colors" :class="Boolean(selectedBlock.config.show_credits) ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'">
+                                            <span class="mt-0.5 inline-block h-5 w-5 rounded-full bg-white shadow transition-transform" :class="Boolean(selectedBlock.config.show_credits) ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-0.5 rtl:-translate-x-0.5'"></span>
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Logo -->
                         <div v-if="selectedBlock.type === 'logo'" class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Logo Image URL') }}
-                                    <input :value="String(selectedBlock.config.image ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('image', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <div class="mt-2">
-                                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:text-gray-300">
-                                        <svg v-if="!logoUploading" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                                        <svg v-else class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                        {{ logoUploading ? t('Uploading...') : t('Upload Logo') }}
-                                        <input type="file" accept="image/*" class="hidden" @change="handleLogoUpload">
-                                    </label>
-                                </div>
+                            <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
+                                <p class="font-semibold">{{ t('Logo content is managed from General Settings.') }}</p>
+                                <p class="mt-1">
+                                    {{ t('Update light logo, dark logo, and site name from') }}
+                                    <Link :href="route('admin.settings.index')" class="font-semibold underline underline-offset-2 hover:no-underline">
+                                        {{ t('Settings > General') }}
+                                    </Link>.
+                                </p>
                             </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Mobile Logo Image URL') }}
-                                    <input :value="String(selectedBlock.config.mobile_image ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('mobile_image', ($event.target as HTMLInputElement).value)">
-                                </label>
-                                <div class="mt-2">
-                                    <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:text-gray-300">
-                                        <svg v-if="!logoUploading" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                                        <svg v-else class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle class="opacity-25" cx="12" cy="12" r="10" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                                        {{ logoUploading ? t('Uploading...') : t('Upload Mobile Logo') }}
-                                        <input type="file" accept="image/*" class="hidden" @change="handleMobileLogoUpload">
-                                    </label>
-                                </div>
-                            </div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Logo Link') }}
-                                <input :value="String(selectedBlock.config.link ?? '/')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('link', ($event.target as HTMLInputElement).value)">
-                            </label>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Logo Text') }}
-                                <input :value="String(selectedBlock.config.text ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('text', ($event.target as HTMLInputElement).value)">
-                            </label>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Alt Text') }}
-                                <input :value="String(selectedBlock.config.alt ?? '')" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="updateBlockConfig('alt', ($event.target as HTMLInputElement).value)">
-                            </label>
-                            <label class="flex items-center justify-between gap-4">
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Show Text') }}</span>
-                                <input :checked="Boolean(selectedBlock.config.show_text)" type="checkbox" class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="updateBlockConfig('show_text', ($event.target as HTMLInputElement).checked)">
-                            </label>
                         </div>
 
                         <!-- Social Icons -->
-                        <label v-if="selectedBlock.type === 'social_icons'" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {{ t('Display Mode') }}
-                            <select :value="String(selectedBlock.config.display_mode ?? 'icons')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @change="updateBlockConfig('display_mode', ($event.target as HTMLSelectElement).value)">
-                                <option value="icons">{{ t('Icons') }}</option>
-                                <option value="counts">{{ t('Counts') }}</option>
-                                <option value="cards">{{ t('Cards') }}</option>
-                            </select>
-                        </label>
+                        <div v-if="selectedBlock.type === 'social_icons'" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <AppSelect :model-value="String(selectedBlock.config.display_mode ?? 'icons')" :label="t('Display Mode')" :options="socialDisplayModeSelectOptions" @update:model-value="updateBlockConfig('display_mode', $event)" />
+                        </div>
 
                         <!-- Home Link -->
                         <label v-if="selectedBlock.type === 'home_link'" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1307,12 +1280,15 @@ const handleMobileLogoUpload = async (event: Event) => {
 
         <!-- Import Modal -->
         <Teleport to="body">
-            <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showImportModal = false">
-                <div class="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900">
+            <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-0 sm:p-4 backdrop-blur-sm" @click.self="showImportModal = false">
+                <div class="w-full max-w-lg overflow-hidden rounded-none border-0 bg-white shadow-2xl sm:rounded-2xl sm:border sm:border-gray-200 dark:bg-surface-900 dark:sm:border-surface-800">
                     <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
-                        <h3 class="text-sm font-bold uppercase tracking-wide text-gray-900 dark:text-white">{{ t('Import Header Config') }}</h3>
-                        <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="showImportModal = false">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                        <div>
+                            <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Import Header Config') }}</h3>
+                            <p class="mt-1 text-sm text-gray-500">{{ t('Paste a full header configuration JSON payload.') }}</p>
+                        </div>
+                        <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700" :aria-label="t('Close')" @click="showImportModal = false">
+                            <i class="ti ti-x text-lg"></i>
                         </button>
                     </div>
                     <div class="p-6">

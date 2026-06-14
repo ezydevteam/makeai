@@ -36,6 +36,9 @@ onUnmounted(() => {
 const workspaceOpen = ref(route().current('user.dashboard.playground.*') || route().current('user.dashboard.chains.*') || route().current('user.dashboard.embeds.*'))
 const libraryOpen = ref(route().current('user.dashboard.collections.*') || route().current('user.dashboard.favorites.*') || route().current('user.dashboard.history.*') || Boolean(route().current()?.startsWith('user.dashboard.documents.') || route().current()?.startsWith('documents.')))
 const accountOpen = ref(route().current('user.dashboard.profile*') || route().current('user.dashboard.security*') || route().current('user.dashboard.api-keys*') || route().current('user.dashboard.privacy*'))
+const socialOpen = ref(route().current('addon.social.user.*'))
+const videoOpen = ref(route().current('addon.video.user.*'))
+const voiceoverOpen = ref(route().current('addon.vo.user.*'))
 
 interface NavItem {
     label: string
@@ -45,6 +48,10 @@ interface NavItem {
     children?: { label: string; routeName: string; active: boolean }[]
     sectionKey?: string
 }
+
+const socialScheduler = computed(() => (page.props.socialScheduler as any) ?? { enabled: false })
+const videoCreator = computed(() => (page.props.videoCreator as any) ?? { enabled: false })
+const voiceover = computed(() => (page.props.voiceover as any) ?? { enabled: false })
 
 const navItems = computed<NavItem[]>(() => {
     const is = (name: string) => route().current(name)
@@ -75,6 +82,38 @@ const navItems = computed<NavItem[]>(() => {
             ],
         },
         { label: t('My Usage'), routeName: 'user.dashboard.usage.index', active: is('user.dashboard.usage.*'), icon: 'ti ti-chart-bar' },
+        ...(videoCreator.value.enabled ? [{
+            label: t('Video Creator'),
+            icon: 'ti ti-video',
+            active: is('addon.video.user.*'),
+            sectionKey: 'video',
+            children: [
+                { label: t('Library'), routeName: 'addon.video.user.library', active: is('addon.video.user.library') },
+                { label: t('Create'), routeName: 'addon.video.user.create', active: is('addon.video.user.create') },
+            ],
+        }] : []),
+        ...(voiceover.value.enabled ? [{
+            label: t('Voiceover Studio'),
+            icon: 'ti ti-microphone',
+            active: is('addon.vo.user.*'),
+            sectionKey: 'voiceover',
+            children: [
+                { label: t('My Projects'), routeName: 'addon.vo.user.studio', active: is('addon.vo.user.studio') },
+            ],
+        }] : []),
+        ...(socialScheduler.value.enabled ? [{
+            label: t('Social Scheduler'),
+            icon: 'ti ti-calendar-share',
+            active: is('addon.social.user.*'),
+            sectionKey: 'social',
+            children: [
+                { label: t('Calendar'), routeName: 'addon.social.user.calendar', active: is('addon.social.user.calendar') },
+                { label: t('Composer'), routeName: 'addon.social.user.posts.create', active: is('addon.social.user.posts.create') },
+                { label: t('Posts'), routeName: 'addon.social.user.posts.index', active: is('addon.social.user.posts.*') },
+                { label: t('Accounts'), routeName: 'addon.social.user.accounts', active: is('addon.social.user.accounts') },
+                { label: t('Analytics'), routeName: 'addon.social.user.analytics', active: is('addon.social.user.analytics') },
+            ],
+        }] : []),
         ...(affiliateEnabled.value ? [{ label: t('Affiliate'), routeName: 'user.dashboard.affiliate', active: is('user.dashboard.affiliate*'), icon: 'ti ti-affiliate' }] : []),
         {
             label: t('Account'),
@@ -97,6 +136,9 @@ function isSectionOpen(key: string): boolean {
     if (key === 'workspace') return workspaceOpen.value
     if (key === 'library') return libraryOpen.value
     if (key === 'account') return accountOpen.value
+    if (key === 'social') return socialOpen.value
+    if (key === 'video') return videoOpen.value
+    if (key === 'voiceover') return voiceoverOpen.value
     return false
 }
 
@@ -104,6 +146,9 @@ function toggleSection(key: string) {
     if (key === 'workspace') workspaceOpen.value = !workspaceOpen.value
     if (key === 'library') libraryOpen.value = !libraryOpen.value
     if (key === 'account') accountOpen.value = !accountOpen.value
+    if (key === 'social') socialOpen.value = !socialOpen.value
+    if (key === 'video') videoOpen.value = !videoOpen.value
+    if (key === 'voiceover') voiceoverOpen.value = !voiceoverOpen.value
 }
 </script>
 

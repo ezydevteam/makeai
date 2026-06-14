@@ -21,6 +21,7 @@ readonly class LicenseResult
         public string $license = '',
         public string $error = '',
         public string $errorCode = '',
+        public ?string $supportedUntil = null,
     ) {}
 
     public static function success(array $data): self
@@ -31,6 +32,7 @@ readonly class LicenseResult
             buyer: $data['buyer'],
             purchaseDate: $data['purchase_date'],
             license: $data['license'],
+            supportedUntil: $data['supported_until'] ?? null,
         );
     }
 

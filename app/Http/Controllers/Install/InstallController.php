@@ -65,9 +65,9 @@ class InstallController extends Controller
             }
         }
 
-        // Verify purchase code against Envato API before storing
+        // Verify purchase code against License Server before storing (do not write to database yet)
         if ($step === 4) {
-            $licenseResult = app(LicenseService::class)->validate($validated['purchase_code']);
+            $licenseResult = app(LicenseService::class)->verify($validated['purchase_code'], false);
 
             if (! $licenseResult->valid) {
                 return back()->with('error', translate($licenseResult->error));
@@ -78,6 +78,7 @@ class InstallController extends Controller
                 'type' => $licenseResult->type,
                 'buyer' => $licenseResult->buyer,
                 'purchase_date' => $licenseResult->purchaseDate,
+                'supported_until' => $licenseResult->supportedUntil,
             ];
         }
 
@@ -215,21 +216,21 @@ class InstallController extends Controller
         settings_set('site_name', $data['step_3']['site_name'], 'string', 'general');
         settings_set('site_url', rtrim($data['step_3']['site_url'], '/'), 'string', 'general');
 
-        // ─── 6. Store license (already verified in step 4 against Envato API) ───
+        // ─── 6. Store license (already verified in step 4) ───
         $license = $data['step_4']['license_result'] ?? null;
 
         if ($license) {
-            $licenseService = app(LicenseService::class);
-            $domainHash = hash('sha256', rtrim((string) config('app.url'), '/') . $data['step_4']['purchase_code']);
-
-            settings_set('license_key', $data['step_4']['purchase_code'], 'encrypted', 'license');
+            settings_set('license_purchase_code', \Illuminate\Support\Facades\Crypt::encryptString($data['step_4']['purchase_code']), 'encrypted', 'license');
             settings_set('license_type', $license['type'], 'integer', 'license');
-            settings_set('license_verified', true, 'boolean', 'license');
             settings_set('license_buyer', $license['buyer'], 'string', 'license');
-            settings_set('license_purchase_date', $license['purchase_date'], 'string', 'license');
-            settings_set('license_domain', $domainHash, 'encrypted', 'license');
-            settings_set('license_last_reverify', now()->toDateTimeString(), 'string', 'license');
-            settings_set('license_grace_start', null, 'string', 'license');
+            settings_set('license_purchased_at', $license['purchase_date'], 'string', 'license');
+            settings_set('license_supported_until', $license['supported_until'] ?? null, 'string', 'license');
+            settings_set('license_verified_at', now()->toDateTimeString(), 'string', 'license');
+            settings_set('license_domain', request()->getHost(), 'string', 'license');
+            settings_set('license_status', 'valid', 'string', 'license');
+            settings_set('license_grace_started_at', null, 'string', 'license');
+
+            \Illuminate\Support\Facades\Cache::forget('license.status');
         }
 
         // ─── 7. Import demo content (optional) ───

@@ -37,6 +37,16 @@
         "psr-4": {
             "App\\": "app/",
             "Addons\\AiAssistant\\": "addons/ai-assistant/app/",
+            "Addons\\PublicKnowledgeBase\\": "addons/public-knowledge-base/app/",
+            "Addons\\SocialScheduler\\": "addons/social-scheduler/app/",
+            "Addons\\SocialScheduler\\Database\\Factories\\": "addons/social-scheduler/database/factories/",
+            "Addons\\SocialScheduler\\Database\\Seeders\\": "addons/social-scheduler/database/seeders/",
+            "Addons\\AiVideoCreator\\": "addons/ai-video-creator/app/",
+            "Addons\\AiImageEditor\\": "addons/ai-image-editor/app/",
+            "Addons\\AiImageEditor\\Database\\Seeders\\": "addons/ai-image-editor/database/seeders/",
+            "Addons\\AiVideoCreator\\Database\\Seeders\\": "addons/ai-video-creator/database/seeders/",
+        "Addons\\AiVoiceover\\": "addons/ai-voiceover/app/",
+        "Addons\\AiVoiceover\\Database\\Seeders\\": "addons/ai-voiceover/database/seeders/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         },

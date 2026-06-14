@@ -13,21 +13,58 @@ class AiAssistantService
         private AiService $ai,
     ) {}
 
+    // ─── message automation ──────────────────────────────
+
+    public function findMatchingAutomationRule(string $message): ?\Addons\AiAssistant\Models\AiAssistantRule
+    {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('ai_assistant_rules')) {
+            return null;
+        }
+
+        $rules = \Addons\AiAssistant\Models\AiAssistantRule::where('is_active', true)->get();
+        $messageLower = mb_strtolower(trim($message));
+
+        foreach ($rules as $rule) {
+            $triggerLower = mb_strtolower(trim($rule->trigger));
+            if ($rule->match_type === 'exact') {
+                if ($messageLower === $triggerLower) {
+                    return $rule;
+                }
+            } elseif ($rule->match_type === 'contains') {
+                if (mb_strpos($messageLower, $triggerLower) !== false) {
+                    return $rule;
+                }
+            }
+        }
+
+        return null;
+    }
+
     // ─── system prompts ────────────────────────────────────
 
     public function buildFrontendSystemPrompt(?User $user, string $page): string
     {
         $base = addon_setting('ai-assistant', 'system_prompt_frontend')
-            ?: 'You are a helpful AI assistant. Reply concisely and accurately.';
+            ?: 'You are a helpful AI assistant. Reply concisely and accurately. You are embedded in the {site_name} platform. Current page: {current_page}';
 
         $appName = settings('site_name', 'MakeAI');
+        
+        $replacements = [
+            '{site_name}' => $appName,
+            '{current_page}' => $page ?: 'unknown',
+            '{user_name}' => $user ? $user->name : 'Guest',
+            '{user_email}' => $user ? $user->email : 'Guest Email',
+        ];
+
+        $base = str_replace(array_keys($replacements), array_values($replacements), $base);
+
         $base .= "\n\nYou are embedded in the {$appName} platform.";
         $base .= "\nCurrent page: " . ($page ?: 'unknown');
 
         if ($user) {
-            $plan = $user->subscription?->plan;
+            $plan = $user->plan;
             $base .= "\nUser plan: " . ($plan?->name ?? 'Free');
-            $base .= "\nCredits remaining: " . ($user->credits_balance ?? 0);
+            $base .= "\nCredits remaining: " . ($user->credits ?? 0);
         }
 
         return $base;
@@ -36,9 +73,12 @@ class AiAssistantService
     public function buildAdminSystemPrompt(): string
     {
         $base = addon_setting('ai-assistant', 'system_prompt_admin')
-            ?: 'You are an expert admin assistant. Help manage the platform efficiently.';
+            ?: 'You are an expert admin assistant. Help manage the {site_name} platform efficiently.';
 
         $appName = settings('site_name', 'MakeAI');
+        
+        $base = str_replace('{site_name}', $appName, $base);
+
         $context = $this->buildSiteContext();
 
         $base .= "\n\n--- {$appName} Admin Context ---\n";
@@ -139,5 +179,19 @@ class AiAssistantService
         } catch (\Throwable) {
             // silent
         }
+    }
+
+    public function interpolateVariables(string $text, \Illuminate\Contracts\Auth\Authenticatable|null $user, string $page): string
+    {
+        $appName = settings('site_name', 'MakeAI');
+        
+        $replacements = [
+            '{site_name}' => $appName,
+            '{current_page}' => $page ?: 'unknown',
+            '{user_name}' => $user ? $user->name : 'Guest',
+            '{user_email}' => $user ? $user->email : 'Guest Email',
+        ];
+
+        return str_replace(array_keys($replacements), array_values($replacements), $text);
     }
 }

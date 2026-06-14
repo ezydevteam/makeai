@@ -333,19 +333,17 @@ const submitItem = () => {
     itemForm.post(route('admin.menus.item.store', selectedMenu.value.id), options)
 }
 
-const addCategoryShortcut = (category: CategoryOption, source: 'blog' | 'ai') => {
+const addQuickShortcut = (shortcut: { label: string; url: string; icon: string }) => {
     if (!selectedMenu.value) return
 
-    itemForm.label = category.name
+    itemForm.label = shortcut.label
     itemForm.type = 'url'
-    itemForm.url = source === 'blog'
-        ? `/blog/category/${category.slug}`
-        : `/ai-tools/category/${category.slug}`
+    itemForm.url = shortcut.url
     itemForm.page_id = ''
     itemForm.route_name = ''
     itemForm.parent_id = ''
     itemForm.target = '_self'
-    itemForm.icon = source === 'blog' ? 'ti ti-news' : 'ti ti-sparkles'
+    itemForm.icon = shortcut.icon
     itemForm.badge_text = ''
     itemForm.badge_color = ''
     itemForm.is_active = true
@@ -356,6 +354,16 @@ const addCategoryShortcut = (category: CategoryOption, source: 'blog' | 'ai') =>
     itemForm.post(route('admin.menus.item.store', selectedMenu.value.id), {
         preserveScroll: true,
         onSuccess: resetItemForm,
+    })
+}
+
+const addCategoryShortcut = (category: CategoryOption, source: 'blog' | 'ai') => {
+    addQuickShortcut({
+        label: category.name,
+        url: source === 'blog'
+            ? `/blog/category/${category.slug}`
+            : `/ai-tools/category/${category.slug}`,
+        icon: source === 'blog' ? 'ti ti-news' : 'ti ti-sparkles',
     })
 }
 
@@ -526,6 +534,26 @@ const importMenu = () => {
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Create ready-made links from your active blog and AI categories.') }}</p>
 
                     <div class="mt-5 space-y-5">
+                        <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Featured Pages') }}</h4>
+                            <div class="mt-3 flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
+                                    @click="addQuickShortcut({ label: t('AI Templates'), url: '/ai-tools', icon: 'ti ti-layout-grid' })"
+                                >
+                                    {{ t('AI Templates') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
+                                    @click="addQuickShortcut({ label: t('Chat'), url: '/chat', icon: 'ti ti-message-circle' })"
+                                >
+                                    {{ t('Chat') }}
+                                </button>
+                            </div>
+                        </section>
+
                         <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
                             <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Blog Categories') }}</h4>
                             <div class="mt-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">

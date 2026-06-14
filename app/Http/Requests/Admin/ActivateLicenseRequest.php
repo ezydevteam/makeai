@@ -14,7 +14,7 @@ class ActivateLicenseRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'purchase_code' => ['required', 'string', 'regex:/^[a-zA-Z0-9\-]{20,50}$/'],
+            'purchase_code' => ['required', 'string', 'regex:/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i'],
         ];
     }
 

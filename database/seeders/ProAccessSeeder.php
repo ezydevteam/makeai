@@ -14,7 +14,7 @@ class ProAccessSeeder extends Seeder
     public function run(): void
     {
         settings_set('license_type', 2, 'integer', 'license');
-        settings_set('license_verified', true, 'boolean', 'license');
+        settings_set('license_status', 'valid', 'string', 'license');
         settings_set('subscriptions_enabled', true, 'boolean', 'license');
 
         $proPermissions = [

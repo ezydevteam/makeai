@@ -16,6 +16,8 @@ const props = defineProps<{
     isLoading: boolean
     sessionId: string
     isAdmin: boolean
+    avatarUrl?: string
+    assistantName?: string
 }>()
 
 defineEmits<{
@@ -54,6 +56,28 @@ function renderMarkdown(text: string): string {
         .replace(/\n/g, '<br>')
 }
 
+function copyToClipboard(text: string) {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(text).catch(() => {
+            fallbackCopyToClipboard(text)
+        })
+    } else {
+        fallbackCopyToClipboard(text)
+    }
+}
+
+function fallbackCopyToClipboard(text: string) {
+    const el = document.createElement('textarea')
+    el.value = text
+    el.setAttribute('readonly', '')
+    el.style.position = 'absolute'
+    el.style.left = '-9999px'
+    document.body.appendChild(el)
+    el.select()
+    document.execCommand('copy')
+    document.body.removeChild(el)
+}
+
 defineExpose({ container })
 </script>
 
@@ -70,17 +94,12 @@ defineExpose({ container })
                 :message="msg"
                 :session-id="sessionId"
                 :show-feedback="msg.role === 'assistant'"
+                :avatar-url="avatarUrl"
+                :assistant-name="assistantName"
                 @feedback="(data) => $emit('feedback', { ...data, messageIndex: idx })"
-                @copy="() => navigator.clipboard?.writeText(msg.content)"
+                @copy="copyToClipboard(msg.content)"
             />
         </template>
-
-        <!-- Loading indicator -->
-        <div v-if="isLoading && messages[messages.length - 1]?.content === ''" class="flex items-start gap-2">
-            <div class="flex-1 bg-gray-100 dark:bg-gray-800 rounded-lg px-4 py-3 text-gray-500 dark:text-gray-400">
-                <span class="ai-typing-dots">Thinking</span>
-            </div>
-        </div>
 
         <!-- Error -->
         <div v-if="error" class="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 px-2">
@@ -99,15 +118,24 @@ defineExpose({ container })
 </template>
 
 <style scoped>
-.ai-typing-dots::after {
-    content: '';
-    animation: ai-dots 1.4s infinite;
+/* Thin premium scrollbar for messages list */
+.ai-messages::-webkit-scrollbar {
+    width: 6px;
 }
-
-@keyframes ai-dots {
-    0% { content: ''; }
-    25% { content: '.'; }
-    50% { content: '..'; }
-    75% { content: '...'; }
+.ai-messages::-webkit-scrollbar-track {
+    background: transparent;
+}
+.ai-messages::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 3px;
+}
+.dark .ai-messages::-webkit-scrollbar-thumb {
+    background: #374151;
+}
+.ai-messages::-webkit-scrollbar-thumb:hover {
+    background: #d1d5db;
+}
+.dark .ai-messages::-webkit-scrollbar-thumb:hover {
+    background: #4b5563;
 }
 </style>

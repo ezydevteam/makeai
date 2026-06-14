@@ -23,22 +23,22 @@ class HeaderBuilderController extends Controller
                 ['id' => 'top_html', 'type' => 'custom_html', 'enabled' => false, 'config' => ['content' => '', 'block_align' => 'left']],
             ]),
             'main' => $this->defaultSection(72, true, [
-                ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => array_merge($this->defaultLogoConfig(), ['block_align' => 'left'])],
+                ['id' => 'logo', 'type' => 'logo', 'enabled' => true, 'config' => ['block_align' => 'left']],
                 ['id' => 'nav', 'type' => 'navigation', 'enabled' => true, 'config' => ['menu_slug' => 'main', 'alignment' => 'center', 'text_color' => '', 'hover_color' => '', 'hover_style' => 'underline', 'submenu_bg_color' => '', 'submenu_text_color' => '', 'block_align' => 'center']],
                 ['id' => 'search', 'type' => 'search', 'enabled' => false, 'config' => ['compact' => false, 'search_style' => 'box', 'enable_live_search' => true, 'show_suggestions' => true, 'icon_class' => 'ti ti-search', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '', 'block_align' => 'center']],
                 ['id' => 'lang', 'type' => 'language_switcher', 'enabled' => false, 'config' => ['block_align' => 'right']],
                 ['id' => 'dark', 'type' => 'dark_mode', 'enabled' => true, 'config' => ['block_align' => 'right']],
                 ['id' => 'cta', 'type' => 'cta_button', 'enabled' => true, 'config' => ['text' => translate('Get Started'), 'link' => '/register', 'style' => 'filled', 'color' => 'primary', 'icon_class' => '', 'icon_only' => false, 'icon_color' => '', 'bg_style' => 'filled', 'bg_color' => '', 'text_color' => '', 'block_align' => 'right']],
-                ['id' => 'user', 'type' => 'user_menu', 'enabled' => true, 'config' => ['show_credits' => true, 'show_avatar' => true, 'block_align' => 'right']],
+                ['id' => 'user', 'type' => 'user_menu', 'enabled' => true, 'config' => ['guest_mode' => 'login_only', 'guest_login_icon_class' => 'ti ti-login-2', 'guest_login_style' => 'primary', 'guest_register_icon_class' => 'ti ti-user-plus', 'guest_register_style' => 'gradient', 'auth_display' => 'avatar_name', 'show_arrow_icon' => true, 'show_credits' => true, 'block_align' => 'right']],
                 ['id' => 'credits', 'type' => 'credit_balance', 'enabled' => false, 'config' => ['label' => translate('Credits'), 'icon_class' => 'ti ti-bolt', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '', 'block_align' => 'right']],
-                ['id' => 'notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => ['block_align' => 'right']],
+                ['id' => 'notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => ['icon_class' => 'ti ti-bell', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '', 'block_align' => 'right']],
                 ['id' => 'social', 'type' => 'social_icons', 'enabled' => false, 'config' => ['icons' => [], 'block_align' => 'right']],
                 ['id' => 'html', 'type' => 'custom_html', 'enabled' => false, 'config' => ['content' => '', 'block_align' => 'right']],
             ]),
             'mobile' => $this->defaultSection(64, true, [
                 ['id' => 'mobile_hamburger', 'type' => 'hamburger', 'enabled' => true, 'config' => ['menu_slug' => 'mobile', 'label' => translate('Menu'), 'icon_class' => 'ti ti-menu-2', 'show_label' => true, 'drawer_title' => '', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '', 'block_align' => 'left']],
-                ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => array_merge($this->defaultLogoConfig(true), ['block_align' => 'left'])],
-                ['id' => 'mobile_notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => ['block_align' => 'right']],
+                ['id' => 'mobile_logo', 'type' => 'logo', 'enabled' => true, 'config' => ['block_align' => 'left']],
+                ['id' => 'mobile_notify', 'type' => 'notification_bell', 'enabled' => true, 'config' => ['icon_class' => 'ti ti-bell', 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '', 'block_align' => 'right']],
                 ['id' => 'mobile_dark', 'type' => 'dark_mode', 'enabled' => true, 'config' => ['label' => translate('Theme'), 'icon_class' => '', 'show_label' => true, 'icon_color' => '', 'bg_style' => 'light', 'bg_color' => '', 'block_align' => 'right']],
             ]),
             'mobile_bottom' => $this->defaultSection(64, true, [
@@ -51,19 +51,6 @@ class HeaderBuilderController extends Controller
         $defaults['main']['center_alignment'] = 'center';
 
         return $defaults;
-    }
-
-    private function defaultLogoConfig(bool $isMobile = false): array
-    {
-        return [
-            'image' => null,
-            'mobile_image' => $isMobile ? null : null,
-            'alt' => settings('app_name', translate('Application')),
-            'link' => '/',
-            'show_text' => true,
-            'text' => settings('app_name', translate('Application')),
-            'block_align' => 'left',
-        ];
     }
 
     private function defaultSection(int $height, bool $enabled, array $blocks = [], bool $shadow = false): array

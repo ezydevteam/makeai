@@ -129,7 +129,13 @@ class InAppNotificationService
      */
     public function settingsPayload(): array
     {
-        return app(BroadcastingService::class)->configPayload();
+        $payload = app(BroadcastingService::class)->configPayload();
+
+        return array_merge($payload, [
+            'notifications_enabled' => $this->enabled(),
+            'notifications_driver' => $payload['driver'] ?? 'reverb',
+            'notifications_polling_interval' => (int) settings('notifications_polling_interval', 30000),
+        ]);
     }
 
     /**

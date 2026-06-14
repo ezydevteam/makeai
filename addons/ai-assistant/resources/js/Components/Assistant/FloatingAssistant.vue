@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import AssistantTrigger from './AssistantTrigger.vue'
 import AssistantWindow from './AssistantWindow.vue'
@@ -18,6 +18,18 @@ if (typeof sessionStorage !== 'undefined') {
         sessionStorage.setItem('ai_assistant_session_id', sessionId.value)
     }
 }
+
+onMounted(() => {
+    if (settings.value?.auto_open) {
+        if (typeof sessionStorage !== 'undefined') {
+            const opened = sessionStorage.getItem('ai_assistant_auto_opened')
+            if (!opened) {
+                isOpen.value = true
+                sessionStorage.setItem('ai_assistant_auto_opened', '1')
+            }
+        }
+    }
+})
 
 const toggle = () => {
     isOpen.value = !isOpen.value

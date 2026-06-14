@@ -8,9 +8,12 @@ use App\Services\AddonLicenseService;
 use App\Services\AddonService;
 use App\Services\ThemeService;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use ZipArchive;
+
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Admin Theme & Addon Management Controller.
@@ -191,11 +194,35 @@ class ThemeAddonController extends Controller
         $addons = array_map(function ($addon) {
             $addon['license'] = $this->addonLicenseService->getLicenseInfo($addon['slug']);
             $addon['envato_item_id'] = $addon['envato_item_id'] ?? null;
+            $addon['logo_url'] = ! empty($addon['has_logo'])
+                ? route('admin.addons.logo', ['slug' => $addon['slug']])
+                : null;
             return $addon;
         }, $addons);
 
         return Inertia::render('Admin/Addons', [
             'addons' => $addons,
+        ]);
+    }
+
+    /**
+     * Serve addon logo from the addon directory when available.
+     */
+    public function addonLogo(string $slug)
+    {
+        $config = $this->addonService->getAddonConfig($slug);
+        if (! $config) {
+            abort(404);
+        }
+
+        $logoPath = config('addons.path', base_path('addons')) . '/' . $slug . '/logo.png';
+
+        if (! File::exists($logoPath)) {
+            abort(404);
+        }
+
+        return response()->file($logoPath, [
+            'Cache-Control' => 'public, max-age=3600',
         ]);
     }
 
@@ -219,6 +246,25 @@ class ThemeAddonController extends Controller
         $this->addonService->deactivate($slug);
 
         return back()->with('success', translate('Addon :addon deactivated.', ['addon' => $slug]));
+    }
+
+    public function deleteAddon(Request $request, string $slug)
+    {
+        $config = $this->addonService->getAddonConfig($slug);
+
+        if (! $config) {
+            return back()->with('error', translate('Addon not found.'));
+        }
+
+        if (! empty($config['is_active'])) {
+            return back()->with('error', translate('Deactivate the addon before deleting it.'));
+        }
+
+        if (! $this->addonService->delete($slug)) {
+            return back()->with('error', translate('Failed to delete addon.'));
+        }
+
+        return redirect()->route('admin.addons')->with('success', translate('Addon :addon deleted successfully.', ['addon' => $slug]));
     }
 
     /**
@@ -249,17 +295,20 @@ class ThemeAddonController extends Controller
                 'provider' => $m->provider,
             ]);
 
+        $rules = [];
+        if ($slug === 'ai-assistant' && \Illuminate\Support\Facades\Schema::hasTable('ai_assistant_rules')) {
+            $rules = \Addons\AiAssistant\Models\AiAssistantRule::orderBy('id', 'desc')->get();
+        }
+
         // Resolve from either the generic page or the addon-specific page
         return Inertia::render('Addons/' . $slug . '/Admin/Settings', [
             'addon' => $config,
             'settings' => $settings,
             'aiModels' => $aiModels,
+            'rules' => $rules,
         ]);
     }
 
-    /**
-     * Save addon settings.
-     */
     public function saveAddonSettings(Request $request, string $slug)
     {
         $config = $this->addonService->getAddonConfig($slug);
@@ -267,7 +316,54 @@ class ThemeAddonController extends Controller
             return back()->with('error', translate('Addon not found.'));
         }
 
-        $this->addonService->saveAddonSettings($slug, $request->except('_token'));
+        $data = $request->except('_token');
+
+        // Loop through the fields and intercept file uploads
+        foreach ($request->files->keys() as $key) {
+            if ($request->hasFile($key)) {
+                $file = $request->file($key);
+                if ($file->isValid()) {
+                    // Delete the old file if one exists
+                    $oldPath = addon_setting($slug, $key);
+                    if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                        Storage::disk('public')->delete($oldPath);
+                    }
+
+                    // Store the file and save the relative path
+                    $data[$key] = $file->store('assistant', 'public');
+                }
+            }
+        }
+
+        // Also check if any file field was explicitly set to null or cleared or needs clean relative path
+        if (!empty($config['settings'])) {
+            foreach ($config['settings'] as $setting) {
+                if (($setting['type'] ?? '') === 'file' && ! $request->hasFile($setting['key'])) {
+                    if ($request->input($setting['key']) === null) {
+                        $oldPath = addon_setting($slug, $setting['key']);
+                        if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                            Storage::disk('public')->delete($oldPath);
+                        }
+                        $data[$setting['key']] = null;
+                    } else {
+                        $val = $request->input($setting['key']);
+                        if (is_string($val)) {
+                            if (str_starts_with($val, '/storage/')) {
+                                $val = substr($val, 9);
+                            } else {
+                                $diskUrl = Storage::disk('public')->url('');
+                                if (str_starts_with($val, $diskUrl)) {
+                                    $val = str_replace($diskUrl, '', $val);
+                                }
+                            }
+                            $data[$setting['key']] = $val;
+                        }
+                    }
+                }
+            }
+        }
+
+        $this->addonService->saveAddonSettings($slug, $data);
 
         return back()->with('success', translate('Addon settings saved.'));
     }
@@ -355,8 +451,8 @@ class ThemeAddonController extends Controller
             return response()->json(['error' => translate('Addon not found.')], 404);
         }
 
-        $envatoItemId = $config['envato_item_id'] ?? null;
-        if (! $envatoItemId) {
+        $requiresLicense = $config['requires_license'] ?? false;
+        if (! $requiresLicense) {
             return response()->json(['error' => translate('This addon does not require a separate license.')], 422);
         }
 
@@ -366,8 +462,7 @@ class ThemeAddonController extends Controller
 
         $result = $this->addonLicenseService->verify(
             $slug,
-            $request->input('purchase_code'),
-            (int) $envatoItemId
+            $request->input('purchase_code')
         );
 
         if (! $result->valid) {

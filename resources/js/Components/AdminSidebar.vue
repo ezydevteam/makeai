@@ -26,6 +26,23 @@ const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
 const pendingCommentsCount = computed(() => Number((page.props.admin as any)?.pendingCommentsCount ?? 0))
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 const addonMenuItems = computed(() => (page.props.addonMenuItems as any[]) ?? [])
+
+// Group addon menu items by slug, flatten single-item addons
+const addonGroups = computed(() => {
+  const groups: Record<string, any> = {}
+  for (const item of addonMenuItems.value) {
+    if (!item?.slug) continue
+    if (!groups[item.slug]) {
+      groups[item.slug] = { name: item.addon_name || item.label, slug: item.slug, icon: '', items: [] }
+    }
+    if (!groups[item.slug].icon && item.icon) {
+      groups[item.slug].icon = item.icon
+    }
+    groups[item.slug].items.push(item)
+  }
+  return groups
+})
+
 const broadcasting = computed<SidebarBroadcastingConfig>(() => (page.props.broadcasting as SidebarBroadcastingConfig) ?? {})
 
 const can = (perm: string) => isSuperAdmin.value || permissions.value.includes(perm)
@@ -94,6 +111,13 @@ autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.
 autoExpandOnRoute('sitebuilder', ['admin.header.*', 'admin.footer.*', 'admin.homepage.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.appearance.*', 'admin.license.*'])
 autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.features.settings*', 'admin.gdpr.settings*', 'admin.ai.integrations.*', 'admin.oauth.settings.*'])
+
+// Auto-expand addon groups when on their pages
+for (const item of addonMenuItems.value) {
+  if (item?.slug && item?.route_pattern && route().current(item.route_pattern)) {
+    menuGroups.value['addon-' + item.slug] = true
+  }
+}
 </script>
 
 <template>
@@ -377,12 +401,42 @@ autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.up
       <!-- Addon menu items -->
       <template v-if="addonMenuItems.length">
         <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Addons') }}</div>
-        <Tooltip v-for="item in addonMenuItems" :key="item.slug" :content="item.label" placement="right" :full-width="true" :disabled="!collapsed">
-          <Link v-if="can(item.permission)" :href="route(item.route, item.route_params || {})" class="sidebar-item" :class="{ active: isActive(item.route_pattern) }">
-            <i v-if="item.icon" :class="item.icon" class="sidebar-icon"></i>
-            <span v-show="!collapsed">{{ item.label }}</span>
-          </Link>
-        </Tooltip>
+        <template v-for="(group, slug) in addonGroups" :key="slug">
+          <template v-if="group.items.length > 1">
+            <Tooltip :content="group.name" placement="right" :full-width="true" :disabled="!collapsed">
+              <button
+                @click="toggleGroup('addon-' + slug)"
+                class="sidebar-item w-full"
+                :class="{
+                  'active !font-medium': isGroupOpen('addon-' + slug)
+                    || group.items.some((i: any) => i?.route_pattern && isActive(i.route_pattern)),
+                  'open': isGroupOpen('addon-' + slug)
+                }"
+              >
+                <i v-if="group.icon" :class="group.icon" class="sidebar-icon"></i>
+                <span v-show="!collapsed" class="flex-1 text-left">{{ group.name }}</span>
+                <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+            </Tooltip>
+            <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('addon-' + slug) }">
+              <Link
+                v-for="item in group.items"
+                :key="item.label ?? slug"
+                :href="route(item.route, item.route_params || {})"
+                class="sidebar-subitem"
+                :class="{ active: item.route_pattern ? isActive(item.route_pattern) : false }"
+              >{{ item.label }}</Link>
+            </div>
+          </template>
+          <Tooltip v-else v-for="item in group.items" :key="item.route ?? slug" :content="item.label" placement="right" :full-width="true" :disabled="!collapsed">
+            <Link :href="route(item.route, item.route_params || {})" class="sidebar-item" :class="{ active: item.route_pattern ? isActive(item.route_pattern) : false }">
+              <i v-if="item.icon" :class="item.icon" class="sidebar-icon"></i>
+              <span v-show="!collapsed">{{ item.label }}</span>
+            </Link>
+          </Tooltip>
+        </template>
       </template>
     </nav>
   </aside>

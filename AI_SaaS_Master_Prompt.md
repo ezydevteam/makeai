@@ -207,37 +207,145 @@ const { appName, appLogo, appTagline } = usePage().props.branding
 
 ## 🔷 LAYER 1 — FOUNDATION
 
+# P03 UPDATE — ENVATO LICENSE SYSTEM (Core MakeAI)
+
+> **Patch document for `AI_SaaS_Master_Prompt.md` → PART 03**
+> Replaces direct Envato API verification with the Author License Server architecture
+> (same model now used by the addon system — see Addon Guide § 4.1).
+
+---
+
+## WHY THIS UPDATE IS REQUIRED
+
+The current P03 has `LicenseService::verify()` calling
+`https://api.envato.com/v3/market/author/sale` directly from the buyer's installation.
+**This is unimplementable:** that endpoint only accepts the **author's personal token**.
+The author token can never ship inside the distributed product (it exposes the author's
+full sales history), and a buyer's own token cannot query `author/sale` for the author's
+items. All verification must therefore proxy through the author-hosted License Server.
+
+---
+
+## WHAT EXISTS (current P03) vs WHAT CHANGES
+
+| # | Current P03 (exists) | Updated P03 (should be) |
+|---|---------------------|------------------------|
+| 1 | `LicenseService::verify()` calls Envato API directly | `verify()` calls Author License Server `POST /api/v1/verify` with `product: 'core'` |
+| 2 | Buyer never specified who supplies the Envato token (implicitly impossible) | **No Envato token required from buyer** — author's server holds it |
+| 3 | No response authentication | **Ed25519 signature verification** on every License Server response; public key hardcoded as class constant in core |
+| 4 | License result stored encrypted in settings table + `.env` | Unchanged — stored encrypted in `settings` table (group `license`), NOT in `.env` (`.env` writes are fragile on shared hosting; settings table is the single source of truth) |
+| 5 | Re-verified against Envato API every 7 days | Re-verified against **License Server** every 7 days (`settings('license_recheck_days', 7)`) |
+| 6 | Verification failure → 72h grace → stop frontend | **Refined:** only a *signed* `valid:false` response starts grace. Network failure / License Server downtime NEVER punishes the buyer — silent retry next day |
+| 7 | Anti-nulling: license hash in settings, domain warning, `LicenseMiddleware` | Unchanged + signature check added; item ID enforcement moves server-side |
+| 8 | Installation wizard step 4: "purchase code input → Envato API verify" | Step 4: "purchase code input → **License Server** verify (signed response)" |
+| 9 | Helpers (`get_license_type()`, `isProAvailable()`, etc.) | **Unchanged** — all helpers, signatures, and gating logic stay identical. Nothing downstream of `LicenseService` changes |
+| 10 | License types 1=regular / 2=extended | **Unchanged** |
+
+**Blast radius: only `LicenseService` internals + wizard step 4 wording.**
+Every consumer (`isProAvailable()`, `get_license_type()`, `LicenseMiddleware`, subscription
+gating) is untouched.
+
+---
+
+## ▼▼▼ READY-TO-PASTE REPLACEMENT — PART 03 ▼▼▼
+
+Replace the entire existing `## PART 03 — ENVATO LICENSE SYSTEM ✅` section with the following:
+
+---
+
 ## PART 03 — ENVATO LICENSE SYSTEM ✅
 
-### 1.1 License Types
+### 3.1 License Types
+
 Envato issues two license types:
 - **Regular License** — single end product, end users not charged → enables all core features
-- **Extended License** — end users can be charged → enables subscription/billing system (handle using isProAvaiable())
+- **Extended License** — end users can be charged → enables subscription/billing system (gated via `isProAvailable()`)
 
-### 1.2 License Verification Architecture
+### 3.2 Verification Architecture — Author License Server
+
+> ⚠️ **All purchase-code verification proxies through the author-hosted License Server.**
+> The Envato endpoint that looks up a sale by purchase code (`/v3/market/author/sale`)
+> only works with the **author's personal token**, which must never ship inside the
+> product. Buyers therefore never need any Envato token — they only enter their
+> purchase code. See `MakeAI_License_Server_Spec.md` for the server build spec.
+
+```
+Buyer's MakeAI install                  Author's License Server              Envato API
+┌──────────────────────┐               ┌─────────────────────────┐         ┌──────────────┐
+│ LicenseService       │ POST /verify  │ license.yourdomain.com  │  GET    │ /v3/market/  │
+│ ::verify()           │ ────────────► │ • holds Envato token    │ ──────► │ author/sale  │
+│ product: 'core'      │               │ • slug→item_id mapping  │         │ ?code=...    │
+│                      │ ◄──────────── │ • signs every response  │ ◄────── │              │
+│ verifies Ed25519 sig │  signed JSON  │   (Ed25519 private key) │         │              │
+└──────────────────────┘               └─────────────────────────┘         └──────────────┘
+```
 
 **`app/Services/LicenseService.php`**
 
 ```php
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+
 class LicenseService
 {
+    // Public key shipped in core — pairs with the private key on the License Server.
+    // Class constant, NOT settings/DB/.env — settings can be edited by a nuller.
+    private const LICENSE_SERVER_PUBLIC_KEY = 'base64-ed25519-public-key';
+    private const LICENSE_SERVER_URL        = 'https://license.yourdomain.com/api/v1/verify';
+
+    /**
+     * Verify a purchase code via the Author License Server.
+     * Called during installation wizard step 4, manual re-entry, and scheduled re-verify.
+     */
     public function verify(string $purchaseCode): LicenseResult
-    // Calls Envato Market API: https://api.envato.com/v3/market/author/sale
-    // Stores: license_key, license_type (1=regular, 2=extended), buyer, purchase_date, item_id
-    // Encrypts and stores in settings table + .env
-    // Returns LicenseResult { valid, type, buyer, expires_at }
+    // 1. Validate format locally: /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i → fail fast
+    // 2. POST LICENSE_SERVER_URL:
+    //    { product: 'core', slug: 'makeai', purchase_code, domain: request()->getHost(),
+    //      version: config('app.version') }
+    //    timeout 15s, 2 retries with backoff
+    // 3. Verify Ed25519 signature:
+    //    sodium_crypto_sign_verify_detached(
+    //        base64_decode($signature), json_encode($payload),
+    //        base64_decode(self::LICENSE_SERVER_PUBLIC_KEY))
+    //    → invalid/missing signature = hard fail ('Could not verify license server response')
+    // 4. Reject if payload.valid === false (map payload.error → user-facing message:
+    //    invalid_format | not_found | wrong_item | refunded | revoked)
+    // 5. Store encrypted in settings table, group 'license':
+    //    license_purchase_code (encrypted), license_type (1|2), license_buyer,
+    //    license_purchased_at, license_supported_until, license_verified_at,
+    //    license_domain, license_status ('valid'|'grace'|'invalid')
+    // 6. Clear cache key 'license.status'
+    // 7. Return LicenseResult { valid, type, buyer, supportedUntil, error }
 
-    public function getLicenseType(): int  // 1 or 2
+    public function getLicenseType(): int  // 1 or 2 — from settings, cached
 
-    public function isExtended(): bool     // type === 2
+    public function isExtended(): bool     // getLicenseType() === 2
 
-    public function isValid(): bool        // checks stored license + optional re-verify interval
+    public function isValid(): bool        // cached check: license_status === 'valid' or 'grace'
 
-    public function reactivate(string $code): bool
+    public function reactivate(string $code): bool  // alias of verify() for the re-entry flow
+
+    /**
+     * Scheduled re-verification — daily job `license:reverify` (queue: low, 03:00),
+     * runs only when license_verified_at > settings('license_recheck_days', 7) days ago.
+     *
+     * Network failure / License Server unreachable: keep current status, retry next
+     *   day — NEVER punish buyers for author-side downtime.
+     * Signed valid:false (refunded/revoked): license_status = 'grace',
+     *   license_grace_started_at = now().
+     * After 72h grace: license_status = 'invalid' → frontend features stopped,
+     *   persistent banner shown, admin emailed.
+     */
+    public function reverify(): void
 }
 ```
 
-**Helper functions (`app/Helpers/license.php`):**
+**Helper functions (`app/Helpers/license.php`) — UNCHANGED:**
 
 ```php
 function get_license_type(): int            // returns 1 or 2
@@ -248,35 +356,84 @@ function isProAvailable(): bool
 // Logic: is_extended_license() AND settings('subscriptions_enabled') === true
 // Used everywhere to gate subscription features
 
-function license_verified(): bool           // quick check from cache
-function get_license_buyer(): string        // buyer username from Envato
+function license_verified(): bool           // quick check from cache ('license.status', TTL 3600)
+function get_license_buyer(): string        // buyer username from Envato (via License Server)
 ```
 
 **Anti-nulling protection:**
-- License hash stored in `settings` table (encrypted with APP_KEY)
-- Re-verified against Envato API every 7 days (configurable)
-- If verification fails: grace period 72h, then show a banner in frontend to buy license / verify and stop frontend all functions/features
-- No offline bypass possible — API call is mandatory on first install
-- License tied to domain — domain mismatch triggers warning in admin
-- `LicenseMiddleware` applied on every admin and API route
+- Purchase code + license result stored **encrypted** in `settings` table (group `license`), encrypted with APP_KEY. Never plaintext, never in `.env`, masked in admin UI as `xxxxxxxx-…-xxxx1234`
+- **Ed25519 signature verification on every License Server response** — public key is a hardcoded class constant. Hosts-file redirection to a fake server fails the signature check
+- Re-verified via License Server every 7 days (`settings('license_recheck_days', 7)`) — daily scheduled job, queue `low`
+- Only a **signed** `valid:false` response starts the 72h grace period (persistent banner, then frontend features stopped + admin emailed). Network failures never trigger grace
+- **No offline bypass** — License Server call mandatory on first install (wizard step 4 cannot be skipped)
+- Domain sent on every verify/re-verify; License Server flags one code on many domains (author-side abuse detection). Local domain change → admin warning banner prompting re-verification
+- License/item enforcement is **server-side** — the slug→item_id mapping lives on the License Server, not in editable shipped files
+- `LicenseMiddleware` applied on every admin and API route (checks cached `license_verified()`)
+- Demo mode: license entry blocked with tooltip "Disabled in demo"
 
-### 1.3 Installation Wizard
+**Error states (wizard + re-entry modal, all inline):**
+
+| Machine code | User-facing message |
+|---|---|
+| `invalid_format` | "Invalid purchase code format" |
+| `not_found` | "Purchase code not found" |
+| `wrong_item` | "This code belongs to a different product" |
+| `refunded` | "This purchase was refunded" |
+| `revoked` | "This license has been revoked — contact support" |
+| (network) | "Could not reach the license server — try again" |
+| (bad signature) | "Could not verify license server response — try again" |
+
+### 3.3 Installation Wizard
 
 ***Make a beautiful installation wizard with step indicators, main color scheme is royal blue***
 
 Route: `/install` — only accessible when `INSTALLED=false` in `.env`
 
 **Steps:**
-1. **System requirements check** — PHP version, extensions (curl, zip, gd, mbstring, redis, and other necessary...), writable dirs
+1. **System requirements check** — PHP version, extensions (curl, zip, gd, mbstring, sodium, redis, and other necessary...), writable dirs
 2. **Database configuration** — host, port, db name, user, password → test connection
 3. **Site setup** — site name, URL, timezone, mail driver
-4. **License activation** — purchase code input → Envato API verify → store result
+4. **License activation** — purchase code input → **License Server verify (signed response)** → store result encrypted in settings. Inline error states per table above. UUID-format input mask + paste support + auto-trim
 5. **Admin account creation** — name, email, password, confirm password
-6. **One click/manual demo install** - first try one click, if not success then manual upload demo.sql file. for one click demo thumnail with preview & install button shows via seed.
-6. **Final setup** — run migrations (fix conflicts with demo.sql file if needed), generate APP_KEY, set `INSTALLED=true`
-7. **Done** — redirect to admin dashboard
+6. **One click/manual demo install** — first try one click, if not success then manual upload demo.sql file. For one click demo, thumbnail with preview & install button shows via seed
+7. **Final setup** — run migrations (fix conflicts with demo.sql file if needed), generate APP_KEY, set `INSTALLED=true`
+8. **Done** — redirect to admin dashboard
 
 After installation, `/install` must return 404.
+
+### 3.4 Pest test cases (`tests/Feature/LicenseServiceTest.php`)
+
+```php
+it('rejects a purchase code with invalid uuid format without calling the license server')
+it('rejects a response with an invalid or missing ed25519 signature')
+it('rejects signed wrong_item / refunded / revoked responses with the correct messages')
+it('stores all license fields encrypted in settings and never returns the code in any response')
+it('activates with license_type 1 on a regular license and 2 on an extended license')
+it('isProAvailable returns true only when extended AND subscriptions_enabled')
+it('reverify keeps status on network failure and never starts grace')
+it('reverify starts 72h grace only on a signed invalid response')
+it('marks license invalid after 72h grace and stops frontend features')
+it('license middleware blocks admin routes when license is invalid')
+it('install wizard step 4 cannot be skipped or bypassed via direct POST')
+```
+
+## ▲▲▲ END OF REPLACEMENT — PART 03 ▲▲▲
+
+---
+
+## ALSO UPDATE (small touch-ups elsewhere in the master prompt)
+
+1. **P04 / file structure references** — `LicenseService.php` description: change "Envato API verify" → "License Server verify (Ed25519-signed)". No path changes.
+2. **P44 Envato Submission Checklist** — add:
+   - `[ ]` License Server deployed and reachable over HTTPS before item goes live
+   - `[ ]` `LICENSE_SERVER_PUBLIC_KEY` constant matches the deployed server's keypair
+   - `[ ]` Core slug→item_id mapping row added on License Server after CodeCanyon upload
+3. **System requirements (wizard step 1 + docs)** — add PHP `sodium` extension (required for Ed25519; bundled by default in PHP 8.3 but must be verified — some shared hosts disable it).
+4. **Settings table** — license group keys listed in 3.2 step 5 must appear in the P40 seeder defaults (empty values, group `license`).
+
+---
+
+*Patch version: 1.0 — pairs with MakeAI_License_Server_Spec.md and Addon Guide § 4.1*
 
 ---
 
