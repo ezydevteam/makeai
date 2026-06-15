@@ -19,12 +19,13 @@ class SystemCheckService
             'php_version' => [
                 [
                     'label'    => 'PHP Version',
-                    'required' => '8.1.0+',
+                    'required' => '8.3.0+',
                     'current'  => PHP_VERSION,
-                    'pass'     => version_compare(PHP_VERSION, '8.1.0', '>='),
+                    'pass'     => version_compare(PHP_VERSION, '8.3.0', '>='),
                     'severity' => 'error', // hard-blocker
                 ],
             ],
+            'core_files'      => $this->checkCoreFiles(),
             'extensions'      => $this->checkExtensions(),
             'writable_dirs'   => $this->checkWritableDirs(),
             'server_config'   => $this->checkServerConfig(),
@@ -48,6 +49,24 @@ class SystemCheckService
     }
 
     // ─── Private helpers ─────────────────────────────
+
+    private function checkCoreFiles(): array
+    {
+        $vendorAutoload = base_path('vendor/autoload.php');
+
+        return [
+            [
+                'label'    => 'Vendor Autoloader',
+                'required' => 'Present',
+                'current'  => file_exists($vendorAutoload) ? 'Found' : 'Missing',
+                'pass'     => file_exists($vendorAutoload),
+                'severity' => 'error',
+                'message'  => file_exists($vendorAutoload) 
+                    ? '' 
+                    : 'vendor folder missing — please re-extract the zip, do not delete the app/vendor folder.',
+            ],
+        ];
+    }
 
     private function checkExtensions(): array
     {

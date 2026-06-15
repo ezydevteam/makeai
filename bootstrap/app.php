@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
+        then: function () {
+            require __DIR__.'/../routes/install.php';
+        },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->replace(

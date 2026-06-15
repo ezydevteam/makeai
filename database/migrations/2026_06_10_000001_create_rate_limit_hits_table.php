@@ -17,7 +17,7 @@ return new class extends Migration
             $table->unsignedInteger('window_seconds');
             $table->timestamps();
 
-            $table->index(['key', 'window_start']);
+            $table->unique(['key', 'window_start']);
         });
     }
 

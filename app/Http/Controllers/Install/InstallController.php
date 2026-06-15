@@ -56,8 +56,8 @@ class InstallController extends Controller
 
         $validated = $this->validateStep($request, $step);
 
-        // Test DB connection for step 2 before storing
-        if ($step === 2) {
+        // Test DB connection for step 2 before storing (skip for SQLite)
+        if ($step === 2 && ($validated['db_driver'] ?? 'mysql') === 'mysql') {
             try {
                 $this->testDatabaseConnection($validated);
             } catch (\Exception $e) {
@@ -128,33 +128,64 @@ class InstallController extends Controller
         }
 
         $envService = app(EnvFileService::class);
+        $dbDriver = $data['step_2']['db_driver'] ?? 'mysql';
 
-        // ─── 1. Write database credentials to .env ───
-        $envService->writeMultiple([
+        // ─── 1. Prepare database configuration ───
+        $dbConfig = [
             'APP_NAME' => $data['step_3']['site_name'],
             'APP_URL' => rtrim($data['step_3']['site_url'], '/'),
-            'DB_CONNECTION' => 'mysql',
-            'DB_HOST' => $data['step_2']['db_host'],
-            'DB_PORT' => (string) $data['step_2']['db_port'],
-            'DB_DATABASE' => $data['step_2']['db_database'],
-            'DB_USERNAME' => $data['step_2']['db_username'],
-            'DB_PASSWORD' => $data['step_2']['db_password'] ?? '',
-        ]);
+            'DB_CONNECTION' => $dbDriver,
+        ];
 
-        // ─── 2. Reconnect with new DB config ───
-        config([
-            'database.connections.mysql.host' => $data['step_2']['db_host'],
-            'database.connections.mysql.port' => $data['step_2']['db_port'],
-            'database.connections.mysql.database' => $data['step_2']['db_database'],
-            'database.connections.mysql.username' => $data['step_2']['db_username'],
-            'database.connections.mysql.password' => $data['step_2']['db_password'] ?? '',
-        ]);
+        if ($dbDriver === 'sqlite') {
+            $dbConfig['DB_DATABASE'] = database_path('database.sqlite');
+            // Create SQLite file if it doesn't exist
+            if (! file_exists($dbConfig['DB_DATABASE'])) {
+                touch($dbConfig['DB_DATABASE']);
+                chmod($dbConfig['DB_DATABASE'], 0664);
+            }
+        } else {
+            $dbConfig['DB_HOST'] = $data['step_2']['db_host'];
+            $dbConfig['DB_PORT'] = (string) $data['step_2']['db_port'];
+            $dbConfig['DB_DATABASE'] = $data['step_2']['db_database'];
+            $dbConfig['DB_USERNAME'] = $data['step_2']['db_username'];
+            $dbConfig['DB_PASSWORD'] = $data['step_2']['db_password'] ?? '';
+        }
 
-        DB::purge('mysql');
-        DB::reconnect('mysql');
+        // ─── 2. Write configuration to .env ───
+        $envService->writeMultiple($dbConfig);
+
+        // ─── 3. Generate APP_KEY if missing or default ───
+        $currentKey = $envService->read('APP_KEY');
+        if (empty($currentKey) || $currentKey === 'SomeRandomString') {
+            $key = 'base64:' . base64_encode(random_bytes(32));
+            $envService->write('APP_KEY', $key);
+            config(['app.key' => $key]);
+        }
+
+        // ─── 4. Reconnect with new DB config ───
+        if ($dbDriver === 'mysql') {
+            config([
+                'database.connections.mysql.host' => $data['step_2']['db_host'],
+                'database.connections.mysql.port' => $data['step_2']['db_port'],
+                'database.connections.mysql.database' => $data['step_2']['db_database'],
+                'database.connections.mysql.username' => $data['step_2']['db_username'],
+                'database.connections.mysql.password' => $data['step_2']['db_password'] ?? '',
+            ]);
+            DB::purge('mysql');
+            DB::reconnect('mysql');
+            $connection = 'mysql';
+        } else {
+            config([
+                'database.connections.sqlite.database' => $dbConfig['DB_DATABASE'],
+            ]);
+            DB::purge('sqlite');
+            DB::reconnect('sqlite');
+            $connection = 'sqlite';
+        }
 
         try {
-            DB::connection('mysql')->getPdo();
+            DB::connection($connection)->getPdo();
         } catch (\Exception $e) {
             Log::error('InstallController: DB connection failed during finalize.', [
                 'error' => $e->getMessage(),
@@ -163,7 +194,7 @@ class InstallController extends Controller
             return back()->with('error', translate('Database connection failed: :error', ['error' => $e->getMessage()]));
         }
 
-        // ─── 3. Run migrations ───
+        // ─── 5. Run migrations ───
         try {
             Artisan::call('migrate', ['--force' => true]);
         } catch (\Exception $e) {
@@ -172,7 +203,7 @@ class InstallController extends Controller
             return back()->with('error', translate('Database migrations failed. Check the logs for details.'));
         }
 
-        // ─── 4. Seed roles + permissions + default admin + foundation settings ───
+        // ─── 6. Seed roles + permissions + default admin + foundation settings ───
         try {
             Artisan::call('db:seed', [
                 '--class' => 'AdminSeeder',
@@ -212,11 +243,11 @@ class InstallController extends Controller
             ]);
         }
 
-        // ─── 5. Store initial site settings ───
+        // ─── 7. Store initial site settings ───
         settings_set('site_name', $data['step_3']['site_name'], 'string', 'general');
         settings_set('site_url', rtrim($data['step_3']['site_url'], '/'), 'string', 'general');
 
-        // ─── 6. Store license (already verified in step 4) ───
+        // ─── 8. Store license (already verified in step 4) ───
         $license = $data['step_4']['license_result'] ?? null;
 
         if ($license) {
@@ -233,17 +264,19 @@ class InstallController extends Controller
             \Illuminate\Support\Facades\Cache::forget('license.status');
         }
 
-        // ─── 7. Import demo content (optional) ───
+        // ─── 9. Import demo content (optional) ───
         if ($data['step_6']['install_demo'] ?? false) {
             $this->importDemo($data['step_6']);
         }
 
-        // ─── 8. Mark installation complete ───
+        // ─── 10. Mark installation complete ───
         $envService->write('INSTALLED', 'true');
 
-        Artisan::call('optimize:clear');
+        // ─── 11. Cache configuration and routes ───
+        Artisan::call('config:cache');
+        Artisan::call('route:cache');
 
-        // ─── 9. Cleanup session ───
+        // ─── 12. Cleanup session ───
         $request->session()->forget(self::SESSION_KEY);
 
         return redirect()->route('login')
@@ -270,10 +303,11 @@ class InstallController extends Controller
                 'confirmed' => ['required', 'accepted'],
             ]),
             2 => $request->validate([
-                'db_host' => ['required', 'string', 'max:255'],
-                'db_port' => ['required', 'integer', 'between:1,65535'],
-                'db_database' => ['required', 'string', 'max:255'],
-                'db_username' => ['required', 'string', 'max:255'],
+                'db_driver' => ['required', 'in:mysql,sqlite'],
+                'db_host' => ['nullable', 'string', 'max:255'],
+                'db_port' => ['nullable', 'integer', 'between:1,65535'],
+                'db_database' => ['nullable', 'string', 'max:255'],
+                'db_username' => ['nullable', 'string', 'max:255'],
                 'db_password' => ['nullable', 'string', 'max:255'],
             ]),
             3 => $request->validate([
@@ -299,14 +333,18 @@ class InstallController extends Controller
 
     private function testDatabaseConnection(array $db): void
     {
+        if (($db['db_driver'] ?? 'mysql') !== 'mysql') {
+            return;
+        }
+
         $original = config('database.connections.mysql');
 
         config([
             'database.connections._install_test' => array_merge($original, [
-                'host' => $db['db_host'],
-                'port' => $db['db_port'],
-                'database' => $db['db_database'],
-                'username' => $db['db_username'],
+                'host' => $db['db_host'] ?? '127.0.0.1',
+                'port' => $db['db_port'] ?? '3306',
+                'database' => $db['db_database'] ?? '',
+                'username' => $db['db_username'] ?? '',
                 'password' => $db['db_password'] ?? '',
             ]),
         ]);

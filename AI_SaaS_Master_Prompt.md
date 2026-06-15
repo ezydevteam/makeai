@@ -1,7 +1,7 @@
 # MakeAI — Complete Development Master Prompt
 
-> **Version 4.1** — Reorganized & Deduplicated
-> Stack: PHP 8.3+ · Laravel 12+ · Laravel AI SDK Engine · Inertia SSR · Vue 3 · Tailwind v4 · MySQL · Redis · Horizon · **Laravel Reverb**
+> **Version 4.3** — Reorganized & Deduplicated
+> Stack: PHP 8.3+ · Laravel 13+ · Laravel AI SDK (`laravel/ai`) · Inertia SSR · Vue 3 · Tailwind v4 · MySQL · Redis · Horizon · **Laravel Reverb**
 
 ---
 
@@ -30,12 +30,6 @@
   `P14` AI TOOLS & TEMPLATES (255 Templates)
   `P14B` SITE TEMPLATES (Full-Page Experiences)
   `P14B.10` CHATBOT SITE TEMPLATE (claude.ai / ChatGPT-style)
-  `P14B.11` SOCIAL MEDIA MANAGER SITE TEMPLATE
-  `P14B.12` MARKETING SUITE SITE TEMPLATE
-  `P14B.13` CONTENT STUDIO SITE TEMPLATE
-  `P14B.14` ECOMMERCE TOOLKIT SITE TEMPLATE
-  `P14B.15` DEVELOPER ASSISTANT SITE TEMPLATE
-  `P14B.16` ACADEMIC WRITER SITE TEMPLATE
   `P15` AI TOOLS DEVELOPMENT GUIDELINES
 
 **🔷 LAYER 4 — CONTENT & CMS**
@@ -106,6 +100,9 @@
   `P61` SMART CREDIT TOP-UP ALERTS
   `P62` COMMAND PALETTE ENHANCEMENTS
   `P63` EXPORT CENTER (Excel & PDF)
+
+**🔷 LAYER 15 — DISTRIBUTION & DEPLOYMENT (ZERO-CONFIG)**
+  `P68` ZERO-CONFIG DISTRIBUTION PACKAGE & INSTALLATION WIZARD (SHARED HOSTING FIRST)
 
 **🔷 FINAL STATS**
   `P52` FINAL COMPLETE STATS
@@ -207,145 +204,37 @@ const { appName, appLogo, appTagline } = usePage().props.branding
 
 ## 🔷 LAYER 1 — FOUNDATION
 
-# P03 UPDATE — ENVATO LICENSE SYSTEM (Core MakeAI)
-
-> **Patch document for `AI_SaaS_Master_Prompt.md` → PART 03**
-> Replaces direct Envato API verification with the Author License Server architecture
-> (same model now used by the addon system — see Addon Guide § 4.1).
-
----
-
-## WHY THIS UPDATE IS REQUIRED
-
-The current P03 has `LicenseService::verify()` calling
-`https://api.envato.com/v3/market/author/sale` directly from the buyer's installation.
-**This is unimplementable:** that endpoint only accepts the **author's personal token**.
-The author token can never ship inside the distributed product (it exposes the author's
-full sales history), and a buyer's own token cannot query `author/sale` for the author's
-items. All verification must therefore proxy through the author-hosted License Server.
-
----
-
-## WHAT EXISTS (current P03) vs WHAT CHANGES
-
-| # | Current P03 (exists) | Updated P03 (should be) |
-|---|---------------------|------------------------|
-| 1 | `LicenseService::verify()` calls Envato API directly | `verify()` calls Author License Server `POST /api/v1/verify` with `product: 'core'` |
-| 2 | Buyer never specified who supplies the Envato token (implicitly impossible) | **No Envato token required from buyer** — author's server holds it |
-| 3 | No response authentication | **Ed25519 signature verification** on every License Server response; public key hardcoded as class constant in core |
-| 4 | License result stored encrypted in settings table + `.env` | Unchanged — stored encrypted in `settings` table (group `license`), NOT in `.env` (`.env` writes are fragile on shared hosting; settings table is the single source of truth) |
-| 5 | Re-verified against Envato API every 7 days | Re-verified against **License Server** every 7 days (`settings('license_recheck_days', 7)`) |
-| 6 | Verification failure → 72h grace → stop frontend | **Refined:** only a *signed* `valid:false` response starts grace. Network failure / License Server downtime NEVER punishes the buyer — silent retry next day |
-| 7 | Anti-nulling: license hash in settings, domain warning, `LicenseMiddleware` | Unchanged + signature check added; item ID enforcement moves server-side |
-| 8 | Installation wizard step 4: "purchase code input → Envato API verify" | Step 4: "purchase code input → **License Server** verify (signed response)" |
-| 9 | Helpers (`get_license_type()`, `isProAvailable()`, etc.) | **Unchanged** — all helpers, signatures, and gating logic stay identical. Nothing downstream of `LicenseService` changes |
-| 10 | License types 1=regular / 2=extended | **Unchanged** |
-
-**Blast radius: only `LicenseService` internals + wizard step 4 wording.**
-Every consumer (`isProAvailable()`, `get_license_type()`, `LicenseMiddleware`, subscription
-gating) is untouched.
-
----
-
-## ▼▼▼ READY-TO-PASTE REPLACEMENT — PART 03 ▼▼▼
-
-Replace the entire existing `## PART 03 — ENVATO LICENSE SYSTEM ✅` section with the following:
-
----
-
 ## PART 03 — ENVATO LICENSE SYSTEM ✅
 
-### 3.1 License Types
-
+### 1.1 License Types
 Envato issues two license types:
 - **Regular License** — single end product, end users not charged → enables all core features
-- **Extended License** — end users can be charged → enables subscription/billing system (gated via `isProAvailable()`)
+- **Extended License** — end users can be charged → enables subscription/billing system (handle using isProAvaiable())
 
-### 3.2 Verification Architecture — Author License Server
-
-> ⚠️ **All purchase-code verification proxies through the author-hosted License Server.**
-> The Envato endpoint that looks up a sale by purchase code (`/v3/market/author/sale`)
-> only works with the **author's personal token**, which must never ship inside the
-> product. Buyers therefore never need any Envato token — they only enter their
-> purchase code. See `MakeAI_License_Server_Spec.md` for the server build spec.
-
-```
-Buyer's MakeAI install                  Author's License Server              Envato API
-┌──────────────────────┐               ┌─────────────────────────┐         ┌──────────────┐
-│ LicenseService       │ POST /verify  │ license.yourdomain.com  │  GET    │ /v3/market/  │
-│ ::verify()           │ ────────────► │ • holds Envato token    │ ──────► │ author/sale  │
-│ product: 'core'      │               │ • slug→item_id mapping  │         │ ?code=...    │
-│                      │ ◄──────────── │ • signs every response  │ ◄────── │              │
-│ verifies Ed25519 sig │  signed JSON  │   (Ed25519 private key) │         │              │
-└──────────────────────┘               └─────────────────────────┘         └──────────────┘
-```
+### 1.2 License Verification Architecture
 
 **`app/Services/LicenseService.php`**
 
 ```php
-<?php
-
-namespace App\Services;
-
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Cache;
-
 class LicenseService
 {
-    // Public key shipped in core — pairs with the private key on the License Server.
-    // Class constant, NOT settings/DB/.env — settings can be edited by a nuller.
-    private const LICENSE_SERVER_PUBLIC_KEY = 'base64-ed25519-public-key';
-    private const LICENSE_SERVER_URL        = 'https://license.yourdomain.com/api/v1/verify';
-
-    /**
-     * Verify a purchase code via the Author License Server.
-     * Called during installation wizard step 4, manual re-entry, and scheduled re-verify.
-     */
     public function verify(string $purchaseCode): LicenseResult
-    // 1. Validate format locally: /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i → fail fast
-    // 2. POST LICENSE_SERVER_URL:
-    //    { product: 'core', slug: 'makeai', purchase_code, domain: request()->getHost(),
-    //      version: config('app.version') }
-    //    timeout 15s, 2 retries with backoff
-    // 3. Verify Ed25519 signature:
-    //    sodium_crypto_sign_verify_detached(
-    //        base64_decode($signature), json_encode($payload),
-    //        base64_decode(self::LICENSE_SERVER_PUBLIC_KEY))
-    //    → invalid/missing signature = hard fail ('Could not verify license server response')
-    // 4. Reject if payload.valid === false (map payload.error → user-facing message:
-    //    invalid_format | not_found | wrong_item | refunded | revoked)
-    // 5. Store encrypted in settings table, group 'license':
-    //    license_purchase_code (encrypted), license_type (1|2), license_buyer,
-    //    license_purchased_at, license_supported_until, license_verified_at,
-    //    license_domain, license_status ('valid'|'grace'|'invalid')
-    // 6. Clear cache key 'license.status'
-    // 7. Return LicenseResult { valid, type, buyer, supportedUntil, error }
+    // Calls Envato Market API: https://api.envato.com/v3/market/author/sale
+    // Stores: license_key, license_type (1=regular, 2=extended), buyer, purchase_date, item_id
+    // Encrypts and stores in settings table + .env
+    // Returns LicenseResult { valid, type, buyer, expires_at }
 
-    public function getLicenseType(): int  // 1 or 2 — from settings, cached
+    public function getLicenseType(): int  // 1 or 2
 
-    public function isExtended(): bool     // getLicenseType() === 2
+    public function isExtended(): bool     // type === 2
 
-    public function isValid(): bool        // cached check: license_status === 'valid' or 'grace'
+    public function isValid(): bool        // checks stored license + optional re-verify interval
 
-    public function reactivate(string $code): bool  // alias of verify() for the re-entry flow
-
-    /**
-     * Scheduled re-verification — daily job `license:reverify` (queue: low, 03:00),
-     * runs only when license_verified_at > settings('license_recheck_days', 7) days ago.
-     *
-     * Network failure / License Server unreachable: keep current status, retry next
-     *   day — NEVER punish buyers for author-side downtime.
-     * Signed valid:false (refunded/revoked): license_status = 'grace',
-     *   license_grace_started_at = now().
-     * After 72h grace: license_status = 'invalid' → frontend features stopped,
-     *   persistent banner shown, admin emailed.
-     */
-    public function reverify(): void
+    public function reactivate(string $code): bool
 }
 ```
 
-**Helper functions (`app/Helpers/license.php`) — UNCHANGED:**
+**Helper functions (`app/Helpers/license.php`):**
 
 ```php
 function get_license_type(): int            // returns 1 or 2
@@ -356,84 +245,35 @@ function isProAvailable(): bool
 // Logic: is_extended_license() AND settings('subscriptions_enabled') === true
 // Used everywhere to gate subscription features
 
-function license_verified(): bool           // quick check from cache ('license.status', TTL 3600)
-function get_license_buyer(): string        // buyer username from Envato (via License Server)
+function license_verified(): bool           // quick check from cache
+function get_license_buyer(): string        // buyer username from Envato
 ```
 
 **Anti-nulling protection:**
-- Purchase code + license result stored **encrypted** in `settings` table (group `license`), encrypted with APP_KEY. Never plaintext, never in `.env`, masked in admin UI as `xxxxxxxx-…-xxxx1234`
-- **Ed25519 signature verification on every License Server response** — public key is a hardcoded class constant. Hosts-file redirection to a fake server fails the signature check
-- Re-verified via License Server every 7 days (`settings('license_recheck_days', 7)`) — daily scheduled job, queue `low`
-- Only a **signed** `valid:false` response starts the 72h grace period (persistent banner, then frontend features stopped + admin emailed). Network failures never trigger grace
-- **No offline bypass** — License Server call mandatory on first install (wizard step 4 cannot be skipped)
-- Domain sent on every verify/re-verify; License Server flags one code on many domains (author-side abuse detection). Local domain change → admin warning banner prompting re-verification
-- License/item enforcement is **server-side** — the slug→item_id mapping lives on the License Server, not in editable shipped files
-- `LicenseMiddleware` applied on every admin and API route (checks cached `license_verified()`)
-- Demo mode: license entry blocked with tooltip "Disabled in demo"
+- License hash stored in `settings` table (encrypted with APP_KEY)
+- Re-verified against Envato API every 7 days (configurable)
+- If verification fails: grace period 72h, then show a banner in frontend to buy license / verify and stop frontend all functions/features
+- No offline bypass possible — API call is mandatory on first install
+- License tied to domain — domain mismatch triggers warning in admin
+- `LicenseMiddleware` applied on every admin and API route
 
-**Error states (wizard + re-entry modal, all inline):**
-
-| Machine code | User-facing message |
-|---|---|
-| `invalid_format` | "Invalid purchase code format" |
-| `not_found` | "Purchase code not found" |
-| `wrong_item` | "This code belongs to a different product" |
-| `refunded` | "This purchase was refunded" |
-| `revoked` | "This license has been revoked — contact support" |
-| (network) | "Could not reach the license server — try again" |
-| (bad signature) | "Could not verify license server response — try again" |
-
-### 3.3 Installation Wizard
+### 1.3 Installation Wizard
 
 ***Make a beautiful installation wizard with step indicators, main color scheme is royal blue***
 
 Route: `/install` — only accessible when `INSTALLED=false` in `.env`
 
 **Steps:**
-1. **System requirements check** — PHP version, extensions (curl, zip, gd, mbstring, sodium, redis, and other necessary...), writable dirs
+1. **System requirements check** — PHP version, extensions (curl, zip, gd, mbstring, redis, and other necessary...), writable dirs
 2. **Database configuration** — host, port, db name, user, password → test connection
 3. **Site setup** — site name, URL, timezone, mail driver
-4. **License activation** — purchase code input → **License Server verify (signed response)** → store result encrypted in settings. Inline error states per table above. UUID-format input mask + paste support + auto-trim
+4. **License activation** — purchase code input → Envato API verify → store result
 5. **Admin account creation** — name, email, password, confirm password
-6. **One click/manual demo install** — first try one click, if not success then manual upload demo.sql file. For one click demo, thumbnail with preview & install button shows via seed
-7. **Final setup** — run migrations (fix conflicts with demo.sql file if needed), generate APP_KEY, set `INSTALLED=true`
-8. **Done** — redirect to admin dashboard
+6. **One click/manual demo install** - first try one click, if not success then manual upload demo.sql file. for one click demo thumnail with preview & install button shows via seed.
+6. **Final setup** — run migrations (fix conflicts with demo.sql file if needed), generate APP_KEY, set `INSTALLED=true`
+7. **Done** — redirect to admin dashboard
 
 After installation, `/install` must return 404.
-
-### 3.4 Pest test cases (`tests/Feature/LicenseServiceTest.php`)
-
-```php
-it('rejects a purchase code with invalid uuid format without calling the license server')
-it('rejects a response with an invalid or missing ed25519 signature')
-it('rejects signed wrong_item / refunded / revoked responses with the correct messages')
-it('stores all license fields encrypted in settings and never returns the code in any response')
-it('activates with license_type 1 on a regular license and 2 on an extended license')
-it('isProAvailable returns true only when extended AND subscriptions_enabled')
-it('reverify keeps status on network failure and never starts grace')
-it('reverify starts 72h grace only on a signed invalid response')
-it('marks license invalid after 72h grace and stops frontend features')
-it('license middleware blocks admin routes when license is invalid')
-it('install wizard step 4 cannot be skipped or bypassed via direct POST')
-```
-
-## ▲▲▲ END OF REPLACEMENT — PART 03 ▲▲▲
-
----
-
-## ALSO UPDATE (small touch-ups elsewhere in the master prompt)
-
-1. **P04 / file structure references** — `LicenseService.php` description: change "Envato API verify" → "License Server verify (Ed25519-signed)". No path changes.
-2. **P44 Envato Submission Checklist** — add:
-   - `[ ]` License Server deployed and reachable over HTTPS before item goes live
-   - `[ ]` `LICENSE_SERVER_PUBLIC_KEY` constant matches the deployed server's keypair
-   - `[ ]` Core slug→item_id mapping row added on License Server after CodeCanyon upload
-3. **System requirements (wizard step 1 + docs)** — add PHP `sodium` extension (required for Ed25519; bundled by default in PHP 8.3 but must be verified — some shared hosts disable it).
-4. **Settings table** — license group keys listed in 3.2 step 5 must appear in the P40 seeder defaults (empty values, group `license`).
-
----
-
-*Patch version: 1.0 — pairs with MakeAI_License_Server_Spec.md and Addon Guide § 4.1*
 
 ---
 
@@ -676,6 +516,62 @@ class RateLimiterService
     }
 }
 ```
+
+---
+
+### 5.1.1 Database Fallback (Redis Absent)
+
+Per P65/P66 (Redis-Optional Architecture), when Redis is unavailable `RateLimiterService` falls back to a `rate_limit_hits` table using a fixed-window-bucket approach with an **upsert** (`ON CONFLICT` / `ON DUPLICATE KEY UPDATE`) on the `(key, window_start)` pair. This requires a **composite unique constraint** on those two columns — without it, the upsert throws a SQL error on every second hit within the same window.
+
+**Migration: `create_rate_limit_hits_table`**
+
+```php
+Schema::create('rate_limit_hits', function (Blueprint $table) {
+    $table->id();
+    $table->string('key');                       // e.g. "rl:auth:user@example.com|1.2.3.4"
+    $table->string('category', 100);              // e.g. "auth", "ai", "api"
+    $table->unsignedInteger('hits')->default(1);
+    $table->unsignedBigInteger('window_start');   // floor(now / window_seconds) * window_seconds
+    $table->unsignedInteger('window_seconds');
+    $table->timestamps();
+
+    $table->unique(['key', 'window_start']);      // REQUIRED for upsert/ON CONFLICT to work
+    $table->index(['key', 'category']);
+    $table->index('window_start');                // for cleanup job pruning old rows
+});
+```
+
+**`RateLimiterService` fallback methods (database driver):**
+
+```php
+public function attemptDb(string $key, string $category, int $maxAttempts, int $decaySeconds): bool
+{
+    $windowStart = intdiv((int) floor(microtime(true)), $decaySeconds) * $decaySeconds;
+
+    DB::table('rate_limit_hits')->upsert(
+        [[
+            'key'            => $key,
+            'category'       => $category,
+            'hits'           => 1,
+            'window_start'   => $windowStart,
+            'window_seconds' => $decaySeconds,
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ]],
+        ['key', 'window_start'],          // unique key columns — must match the migration's unique() above
+        ['hits' => DB::raw('hits + 1'), 'updated_at' => now()]
+    );
+
+    $hits = DB::table('rate_limit_hits')
+        ->where('key', $key)
+        ->where('window_start', $windowStart)
+        ->value('hits');
+
+    return $hits <= $maxAttempts;
+}
+```
+
+A scheduled job (`PruneRateLimitHits`, daily, `low` queue) deletes rows where `window_start < now() - 86400`.
 
 ---
 
@@ -964,6 +860,7 @@ Add to the end of the migrations list from Part 11:
 31. `contact_messages`
 32. `categories` + `ai_tool_category`
 33. `social_follow_counts`
+34. `rate_limit_hits` (see §5.1.1 — must include `unique(['key', 'window_start'])`)
 
 ---
 
@@ -3738,768 +3635,6 @@ resources/js/Components/Chat/
 - [ ] `chatbot_products` table: admin can edit name/icon/color/system_prompt via admin panel
 - [ ] Chat history: free users capped at last 30 conversations (older auto-archived, not deleted)
 - [ ] ULID used in all conversation URLs — never expose auto-increment `id`
-
----
-
-## PART 14B.11 — SOCIAL MEDIA MANAGER SITE TEMPLATE ✅
-
-> Slug: `social-media-manager` | Vue Component: `SocialMediaManagerTemplate.vue`
-> Layout: Dashboard with left platform filter sidebar + main tool grid area.
-> Header: site default. Footer: visible.
-
----
-
-### 14B.11.1 Layout Structure
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Site Default Header                                             │
-├──────────────────┬───────────────────────────────────────────────┤
-│  Platform Filter │  Tool Grid Area                               │
-│  200px · sticky  │  flex-1 · scrollable                          │
-│                  │                                               │
-│  [All Platforms] │  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
-│  [🟣 Instagram ] │  │  Tool   │ │  Tool   │ │  Tool   │        │
-│  [🐦 Twitter/X ] │  │  Card   │ │  Card   │ │  Card   │        │
-│  [🔵 LinkedIn  ] │  └─────────┘ └─────────┘ └─────────┘        │
-│  [🎵 TikTok    ] │  ┌─────────┐ ┌─────────┐ ┌─────────┐        │
-│  [🔴 YouTube   ] │  │  Tool   │ │  Tool   │ │  Tool   │        │
-│  [📘 Facebook  ] │  │  Card   │ │  Card   │ │  Card   │        │
-│                  │  └─────────┘ └─────────┘ └─────────┘        │
-│  ─────────────── │                                               │
-│  Quick Stats     │  Hero banner (admin-editable headline)        │
-│  Tools used: 12  │                                               │
-└──────────────────┴───────────────────────────────────────────────┘
-```
-
----
-
-### 14B.11.2 Unique Features
-
-**Platform Filter:**
-- Left sidebar lists platforms as clickable filter items
-- "All Platforms" selected by default (shows all bundled tools)
-- Clicking a platform filters tool grid to only that platform's tools
-- Active filter stored in URL query param: `?platform=instagram` (shareable, bookmarkable)
-- Each platform item shows: colored icon + name + tool count badge
-- Filter transition: smooth fade/slide of tool grid, no page reload (Vue reactive)
-
-**Tool Cards:**
-- Each card shows: platform icon badge (top-right corner), tool name, short description, "Generate →" CTA
-- Cards grouped visually by platform when "All Platforms" is selected (platform name as group header)
-- When filtered: group headers hidden, flat grid layout
-
-**Quick Stats (sidebar bottom):**
-- "Tools used today: X" — pulled from user's usage log
-- "Generations this week: X"
-- Shown only to logged-in users; hidden for guests
-
----
-
-### 14B.11.3 Bundled Tools
-
-| Platform | Slug | Tool Name |
-|----------|------|-----------|
-| Instagram | `instagram-caption` | Instagram Caption Generator |
-| Instagram | `instagram-bio` | Instagram Bio Writer |
-| Twitter/X | `twitter-thread` | Twitter Thread Generator |
-| Twitter/X | `twitter-bio` | Twitter Bio Writer |
-| LinkedIn | `linkedin-post` | LinkedIn Post Generator |
-| LinkedIn | `linkedin-headline` | LinkedIn Headline Writer |
-| TikTok | `tiktok-script` | TikTok Script Generator |
-| TikTok | `tiktok-hook` | TikTok Hook Writer |
-| All | `hashtag-strategy` | Hashtag Strategy Generator |
-| All | `content-calendar` | Social Media Content Calendar |
-| Facebook | `facebook-ad` | Facebook Ad Copy |
-| YouTube | `youtube-description` | YouTube Description Generator |
-
-Each tool's `fields` JSON includes a platform pre-selector where applicable, so the tool form auto-knows the target platform.
-
----
-
-### 14B.11.4 Admin Settings (Extra Tab: Platforms)
-
-**Admin → AI Management → Templates → Social Media Manager → Tab: Platforms**
-
-```
-Platform Visibility
-─────────────────────────────────────────────
-[✓] Instagram    Icon: [🟣]  Label: [Instagram __]
-[✓] Twitter/X   Icon: [🐦]  Label: [Twitter/X  __]
-[✓] LinkedIn    Icon: [🔵]  Label: [LinkedIn   __]
-[✓] TikTok      Icon: [🎵]  Label: [TikTok     __]
-[✓] Facebook    Icon: [📘]  Label: [Facebook   __]
-[✓] YouTube     Icon: [🔴]  Label: [YouTube    __]
-
-Admin can hide any platform — its tools are still accessible directly
-but won't appear in the filter sidebar.
-
-Default platform (pre-selected on load):
-  ( ) All Platforms   (●) Instagram   ( ) Twitter/X   ...
-```
-
-Platform config stored in `settings` table, group: `template_social`.
-
----
-
-### 14B.11.5 Welcome State
-
-First load (no filter active, "All Platforms" selected):
-1. Hero banner: editable headline ("Create content for every platform") + subheadline + optional CTA
-2. Platform chips row (horizontal scroll on mobile): quick-tap filter shortcuts
-3. Tool grid below — all tools, grouped by platform with colored section headers
-
----
-
-### 14B.11.6 Checklist
-
-- [ ] Platform filter updates URL query param (`?platform=slug`) on change
-- [ ] On page load, URL query param auto-applies the filter (deep link works)
-- [ ] "All Platforms" selected when no query param present
-- [ ] Tool count badge per platform reflects only `is_active = true` tools
-- [ ] Platform icons use Tabler Icons — no external image assets
-- [ ] Hidden platforms (admin toggle) removed from filter sidebar and tool grid
-- [ ] Quick stats panel hidden for guests — no API call made for guests
-- [ ] Tool cards show platform badge using the platform's `color_hex`
-- [ ] Mobile: platform filter sidebar becomes horizontal scrollable chip row at top
-
----
-
-## PART 14B.12 — MARKETING SUITE SITE TEMPLATE ✅
-
-> Slug: `marketing-suite` | Vue Component: `MarketingSuiteTemplate.vue`
-> Layout: Funnel-stage navigation at top + tool grid below.
-> Header: site default. Footer: visible.
-
----
-
-### 14B.12.1 Layout Structure
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Site Default Header                                             │
-├──────────────────────────────────────────────────────────────────┤
-│  Hero: editable headline + subheadline                           │
-├──────────────────────────────────────────────────────────────────┤
-│  Stage Nav (horizontal tabs):                                    │
-│  [Awareness]  [Consideration]  [Conversion]  [Retention]        │
-├──────────────────────────────────────────────────────────────────┤
-│  Tool Grid — filtered by active stage                            │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Tool    │  │  Tool    │  │  Tool    │  │  Tool    │        │
-│  │  Card    │  │  Card    │  │  Card    │  │  Card    │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-│  ┌──────────┐  ┌──────────┐                                     │
-│  │  Tool    │  │  Tool    │                                     │
-│  │  Card    │  │  Card    │                                     │
-│  └──────────┘  └──────────┘                                     │
-└──────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 14B.12.2 Unique Features
-
-**Stage Navigation:**
-- 4 horizontal tabs representing the marketing funnel stages
-- Each stage tab: label + tool count badge + optional emoji/icon
-- Active stage highlighted with primary color underline
-- Stage filter stored in URL query param: `?stage=awareness`
-- "All" is NOT an option — a stage is always selected (default: Awareness)
-
-**Tool Cards — Campaign Hint:**
-- Each tool card shows a small "→ pairs well with [Tool Name]" hint at the bottom
-- This hints at chaining (e.g. Value Proposition → Landing Page Copy → Facebook Ad)
-- Hint is static metadata stored in the tool's seeder data
-- Clicking the hint chip navigates to that paired tool
-
-**Stage Labels (admin-editable):**
-- Admin can rename "Awareness" → "Top of Funnel", "Conversion" → "Close", etc.
-- Labels stored in `settings` table, group: `template_marketing`
-
----
-
-### 14B.12.3 Bundled Tools by Stage
-
-| Stage | Slug | Tool Name |
-|-------|------|-----------|
-| Awareness | `value-proposition` | Value Proposition Generator |
-| Awareness | `brand-story` | Brand Story Writer |
-| Awareness | `press-release` | Press Release Generator |
-| Consideration | `competitor-analysis` | Competitor Analysis |
-| Consideration | `landing-page-copy` | Landing Page Copy |
-| Consideration | `case-study` | Case Study Generator |
-| Conversion | `facebook-ad` | Facebook Ad Copy |
-| Conversion | `google-ads-headline` | Google Ads Headline |
-| Conversion | `cta-generator` | CTA Button Text Generator |
-| Retention | `email-generator` | Email Campaign Generator |
-| Retention | `abandoned-cart-email` | Abandoned Cart Email |
-| Retention | `winback-email` | Win-Back Email |
-
-Stage assignment stored in each tool's `tags` JSON field as `{"stage": "awareness"}` — used by template component to filter.
-
----
-
-### 14B.12.4 Admin Settings (Extra Tab: Stages)
-
-**Admin → Appearance → Site Templates → Marketing Suite → Tab: Stages**
-
-```
-Stage Labels
-─────────────────────────────────────────────
-Stage 1 label:  [Awareness      __]  Icon: [ti-eye __]
-Stage 2 label:  [Consideration  __]  Icon: [ti-bulb __]
-Stage 3 label:  [Conversion     __]  Icon: [ti-currency-dollar __]
-Stage 4 label:  [Retention      __]  Icon: [ti-repeat __]
-
-Default stage on load:  (●) Stage 1  ( ) Stage 2  ( ) Stage 3  ( ) Stage 4
-```
-
----
-
-### 14B.12.5 Checklist
-
-- [ ] Stage filter stored in URL query param — deep links work
-- [ ] Stage labels pulled from `settings` — never hardcoded "Awareness" in Vue
-- [ ] Tool `tags` JSON `stage` key used for filtering — not a separate DB column
-- [ ] Campaign pairing hints shown on tool cards — null-safe (no hint = no chip shown)
-- [ ] Active stage tab visually indicated with primary underline + bold label
-- [ ] Mobile: stage tabs become horizontal scrollable row, no wrapping
-
----
-
-## PART 14B.13 — CONTENT STUDIO SITE TEMPLATE ✅
-
-> Slug: `content-studio` | Vue Component: `ContentStudioTemplate.vue`
-> Layout: Left content-type nav + main tool area + right recent-documents panel.
-> Header: site default. Footer: visible.
-
----
-
-### 14B.13.1 Layout Structure
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  Site Default Header                                                 │
-├─────────────────┬──────────────────────────────┬─────────────────────┤
-│  Content Types  │  Tool Area                   │  Recent Documents   │
-│  180px · sticky │  flex-1                      │  240px · sticky     │
-│                 │                              │                     │
-│  ✍️  Articles    │  Hero: headline + subhead    │  Recent             │
-│  🔍 SEO         │                              │  ──────────────     │
-│  ♻️  Rewriting   │  Tool cards for active type  │  📄 Blog post...    │
-│  📱 Social      │  (2-column grid)             │  📄 SEO article...  │
-│                 │                              │  📄 Rewritten...    │
-│  ─────────────  │                              │  📄 Meta tags...    │
-│  [Browse All]   │                              │  📄 Blog outline... │
-│                 │                              │                     │
-│                 │                              │  [View All Docs →]  │
-└─────────────────┴──────────────────────────────┴─────────────────────┘
-```
-
----
-
-### 14B.13.2 Unique Features
-
-**Content Type Navigation (left sidebar):**
-- 4 content type sections: Articles, SEO, Rewriting, Social
-- Each type: emoji + label + tool count
-- Clicking a type filters tool cards in the center area
-- "Browse All" link at bottom shows all bundled tools
-- Active type stored in URL query param: `?type=articles`
-
-**Recent Documents Panel (right sidebar):**
-- Shows the last 5 documents the user generated using any tool in this template
-- Each item: document icon + truncated title (first 40 chars of content) + tool name badge + relative timestamp
-- Clicking an item: navigates to `/documents/{ulid}` (the document detail page)
-- "View All Docs →" link: navigates to `/documents?tool_slugs=blog-article,blog-outline,...` (pre-filtered)
-- Only shown to logged-in users; for guests shows an upsell: "Sign up to save your generations"
-- Panel pulled via API: `GET /api/v1/documents?tool_slugs=...&per_page=5` (uses existing documents endpoint)
-
----
-
-### 14B.13.3 Bundled Tools by Content Type
-
-| Type | Slug | Tool Name |
-|------|------|-----------|
-| Articles | `blog-article` | Blog Article Generator |
-| Articles | `blog-outline` | Blog Post Outline |
-| Articles | `listicle-generator` | Listicle Generator |
-| SEO | `seo-blog` | SEO-Optimized Blog Post |
-| SEO | `meta-seo` | Meta Title & Description |
-| SEO | `faq-generator` | FAQ Generator |
-| Rewriting | `article-rewriter` | Article Rewriter |
-| Rewriting | `content-improver` | Content Improver |
-| Rewriting | `paraphrasing-tool` | Paraphrasing Tool |
-| Social | `linkedin-post` | LinkedIn Post |
-| Social | `twitter-thread` | Twitter Thread |
-| Social | `newsletter-intro` | Newsletter Intro |
-
-Content type assignment stored in each tool's `tags` JSON as `{"content_type": "articles"}`.
-
----
-
-### 14B.13.4 Admin Settings (Extra Tab: Content Types)
-
-**Admin → Appearance → Site Templates → Content Studio → Tab: Content Types**
-
-```
-Content Type Visibility
-─────────────────────────────────────────────
-[✓] Articles    Icon: [✍️ ]  Label: [Articles  __]
-[✓] SEO         Icon: [🔍]  Label: [SEO        __]
-[✓] Rewriting   Icon: [♻️ ]  Label: [Rewriting  __]
-[✓] Social      Icon: [📱]  Label: [Social     __]
-
-Default content type on load:  (●) Articles  ( ) SEO  ( ) Rewriting  ( ) Social
-
-Recent Documents Panel
-  [✓] Show recent documents panel (right sidebar)
-  [✓] Show for guests (upsell CTA)  [ ] Hide for guests
-```
-
----
-
-### 14B.13.5 Checklist
-
-- [ ] Content type filter in URL query param — deep links work
-- [ ] Tool `tags` JSON `content_type` key used for filtering
-- [ ] Recent documents panel calls `GET /api/v1/documents` filtered by template's tool slugs
-- [ ] Recent documents panel: null state "No documents yet — generate your first piece!"
-- [ ] Guest state: upsell panel replaces recent docs panel (no API call for guests)
-- [ ] "View All Docs" link passes tool slugs as query param to `/documents` page filter
-- [ ] Mobile: right panel hidden; recent docs accessible via floating "Recent" button
-- [ ] Left sidebar collapses to icon-only at tablet breakpoint (768px)
-
----
-
-## PART 14B.14 — ECOMMERCE TOOLKIT SITE TEMPLATE ✅
-
-> Slug: `ecommerce-toolkit` | Vue Component: `EcommerceToolkitTemplate.vue`
-> Layout: Top funnel-stage tabs + Store Context panel (collapsible) + tool grid.
-> Header: site default. Footer: visible.
-
----
-
-### 14B.14.1 Layout Structure
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Site Default Header                                             │
-├──────────────────────────────────────────────────────────────────┤
-│  Hero: headline ("Tools built for online stores") + subheadline  │
-├──────────────────────────────────────────────────────────────────┤
-│  Stage Tabs: [Product Listing]  [Email & Retention]  [Promotions]│
-├──────────────────────────────────────────────────────────────────┤
-│  ┌── Store Context (collapsible panel) ───────────────────────┐  │
-│  │  Store Name: [____________]  Product Category: [_________] │  │
-│  │  Brand Tone: [Professional ▾]   [Save Context]             │  │
-│  └──────────────────────────────────────────── [▲ Collapse] ──┘  │
-├──────────────────────────────────────────────────────────────────┤
-│  Tool Grid (filtered by active stage)                            │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Tool    │  │  Tool    │  │  Tool    │  │  Tool    │        │
-│  │  Card    │  │  Card    │  │  Card    │  │  Card    │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-└──────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 14B.14.2 Unique Features
-
-**Store Context Panel:**
-- A collapsible panel above the tool grid (expanded by default on first visit)
-- Fields: Store Name, Product Category (text input), Brand Tone (select: Professional / Friendly / Playful / Luxury)
-- "Save Context" button: saves values to `localStorage` (persisted across sessions on same device)
-- When context is saved, all tool forms pre-fill `{store_name}`, `{product_category}`, `{brand_tone}` variables automatically
-- Pre-fill mechanism: template component injects context values into Inertia page props before navigating to the tool page, so `ToolPage.vue` receives pre-filled default values
-- Panel collapsed state persisted in `localStorage` key: `makeai_ecom_context_collapsed`
-
-**Stage Tabs:**
-- 3 stages: Product Listing | Email & Retention | Promotions
-- Active stage in URL query param: `?stage=product-listing`
-- Stage labels admin-editable via settings
-
----
-
-### 14B.14.3 Bundled Tools by Stage
-
-| Stage | Slug | Tool Name |
-|-------|------|-----------|
-| Product Listing | `product-description` | Product Description Generator |
-| Product Listing | `amazon-listing` | Amazon Product Listing |
-| Product Listing | `product-title` | Product Title Optimizer |
-| Product Listing | `review-responder` | Review Response Generator |
-| Email & Retention | `abandoned-cart-email` | Abandoned Cart Email |
-| Email & Retention | `winback-email` | Win-Back Email |
-| Email & Retention | `order-confirmation-email` | Order Confirmation Email |
-| Email & Retention | `upsell-message` | Upsell Message Generator |
-| Promotions | `flash-sale-copy` | Flash Sale Copy |
-| Promotions | `promo-sms` | Promotional SMS |
-| Promotions | `discount-announcement` | Discount Announcement |
-| Promotions | `holiday-sale-copy` | Holiday Sale Copy |
-
----
-
-### 14B.14.4 Store Context — Pre-fill Implementation
-
-```typescript
-// EcommerceToolkitTemplate.vue
-// When user clicks a tool card:
-
-const storeContext = reactive({
-  store_name: localStorage.getItem('makeai_ecom_store_name') ?? '',
-  product_category: localStorage.getItem('makeai_ecom_product_category') ?? '',
-  brand_tone: localStorage.getItem('makeai_ecom_brand_tone') ?? 'Professional',
-})
-
-function navigateToTool(toolSlug: string) {
-  // Pass context as query params → ToolPage.vue reads them as default field values
-  router.visit(route('tools.show', toolSlug), {
-    data: {
-      prefill_store_name: storeContext.store_name,
-      prefill_product_category: storeContext.product_category,
-      prefill_brand_tone: storeContext.brand_tone,
-    }
-  })
-}
-```
-
-```typescript
-// ToolPage.vue — reads prefill params
-const route = usePage()
-const prefills = {
-  store_name: route.props.ziggy?.query?.prefill_store_name ?? '',
-  // etc.
-}
-// DynamicForm.vue uses prefills as initial field values
-```
-
----
-
-### 14B.14.5 Admin Settings (Extra Tab: Store Context)
-
-**Admin → Appearance → Site Templates → eCommerce Toolkit → Tab: Store Context**
-
-```
-Store Context Panel
-─────────────────────────────────────────────
-[✓] Enable Store Context panel
-Panel label: [Your Store Context  __________]
-Store name placeholder: [e.g. "My Shopify Store" __]
-Category placeholder:   [e.g. "Women's Clothing"  __]
-
-Stage Labels
-Stage 1: [Product Listing    __]
-Stage 2: [Email & Retention  __]
-Stage 3: [Promotions         __]
-```
-
----
-
-### 14B.14.6 Checklist
-
-- [ ] Store context values saved to `localStorage` — persist across page reloads
-- [ ] Context pre-fill passed as query params to `ToolPage.vue` — not via Pinia (avoids SSR issues)
-- [ ] `ToolPage.vue` reads prefill params only on initial mount — never overwrites user edits
-- [ ] Store Context panel label pulled from admin settings — never hardcoded
-- [ ] Stage labels pulled from `settings` table — never hardcoded
-- [ ] Stage filter in URL query param — deep links work
-- [ ] Mobile: Store Context panel collapsed by default on mobile (saves vertical space)
-- [ ] "Save Context" shows a brief success toast: "Store context saved"
-
----
-
-## PART 14B.15 — DEVELOPER ASSISTANT SITE TEMPLATE ✅
-
-> Slug: `developer-assistant` | Vue Component: `DeveloperAssistantTemplate.vue`
-> Layout: Dark-theme IDE style — top language selector + tool grid with code-focused cards.
-> Header: site default (dark variant). Footer: visible (dark).
-
----
-
-### 14B.15.1 Layout Structure
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Site Default Header (forced dark variant)                       │
-├──────────────────────────────────────────────────────────────────┤
-│  Hero: monospace heading + subheadline (dark bg)                 │
-├──────────────────────────────────────────────────────────────────┤
-│  Language Selector (horizontal chips):                           │
-│  [All]  [Python]  [JavaScript]  [TypeScript]  [PHP]  [Go]  [+5] │
-├──────────────────────────────────────────────────────────────────┤
-│  Category Tabs: [Generate]  [Debug]  [Optimize]  [Document]      │
-├──────────────────────────────────────────────────────────────────┤
-│  Tool Grid (dark cards, monospace labels, syntax-highlight icon) │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Tool    │  │  Tool    │  │  Tool    │  │  Tool    │        │
-│  │  Card    │  │  Card    │  │  Card    │  │  Card    │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-└──────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 14B.15.2 Unique Features
-
-**Forced Dark Mode (Scoped):**
-- This template ALWAYS renders in dark theme regardless of the user's global light/dark preference or global design system setting
-- Achieved via scoped CSS custom properties on the template wrapper:
-  ```vue
-  <div class="dev-template-wrapper" :style="devCssVars">
-  ```
-  ```typescript
-  const devCssVars = computed(() => ({
-    '--t-bg':      props.template.color_bg      ?? '#0d1117',  // GitHub dark
-    '--t-surface': props.template.color_surface ?? '#161b22',
-    '--t-text':    props.template.color_text    ?? '#e6edf3',
-    '--t-primary': props.template.color_primary ?? '#58a6ff',  // GitHub blue
-    '--t-border':  '#30363d',
-  }))
-  ```
-- Admin CAN override colors via Tab 1 → Appearance, but defaults are always dark
-- "Reset to defaults" resets to dark defaults — NOT global design system colors
-- Global light mode does NOT bleed into this template
-
-**Language Selector:**
-- Horizontal chip row above the category tabs
-- Default languages: All, Python, JavaScript, TypeScript, PHP, Go, Rust, SQL, Bash, C#
-- Admin can configure which languages appear (Tab: Languages in admin settings)
-- "All" chip = no language pre-fill
-- Selecting a language: stores in `localStorage` key `makeai_dev_language` AND passes as `prefill_language` query param when navigating to a tool (same mechanism as eCommerce Store Context)
-- `[+5]` overflow chip: click → expands full language list in a popover
-- Language chip selection stored in URL query param: `?lang=python`
-
-**Category Tabs:**
-- 4 tabs: Generate | Debug | Optimize | Document
-- Filter tools by their `tags.dev_category` JSON value
-- Active tab in URL query param: `?category=debug`
-
-**Code Output Enforcement:**
-- All tool cards in this template show a `</>` code badge
-- When navigating from this template to a tool, `prefill_output_format=code` is passed — `ToolPage.vue` renders output in a syntax-highlighted code block with copy button by default
-- This is a display preference only — the AI still generates based on the tool's `prompt_system`
-
-**Monospace UI:**
-- Template uses `font-family: 'JetBrains Mono', 'Fira Code', monospace` for all UI text
-- Tool card titles rendered in monospace
-- Hero heading in monospace with a blinking cursor animation
-
----
-
-### 14B.15.3 Bundled Tools by Category
-
-| Category | Slug | Tool Name |
-|----------|------|-----------|
-| Generate | `code-generator` | Code Generator |
-| Generate | `api-endpoint-generator` | API Endpoint Generator |
-| Generate | `regex-generator` | Regex Generator |
-| Generate | `sql-query-generator` | SQL Query Generator |
-| Debug | `bug-fixer` | Bug Fixer |
-| Debug | `code-explainer` | Code Explainer |
-| Debug | `error-message-explainer` | Error Message Explainer |
-| Optimize | `code-optimizer` | Code Optimizer |
-| Optimize | `code-reviewer` | Code Reviewer |
-| Optimize | `complexity-analyzer` | Complexity Analyzer |
-| Document | `api-docs` | API Documentation Generator |
-| Document | `unit-test` | Unit Test Generator |
-| Document | `git-commit` | Git Commit Message Generator |
-| Document | `readme-generator` | README Generator |
-
----
-
-### 14B.15.4 Admin Settings (Extra Tab: Languages)
-
-**Admin → Appearance → Site Templates → Developer Assistant → Tab: Languages**
-
-```
-Language Chips (shown in selector row)
-─────────────────────────────────────────────
-Drag to reorder. First 8 shown inline, rest behind [+N] chip.
-
-[≡] Python        [✓ visible]
-[≡] JavaScript    [✓ visible]
-[≡] TypeScript    [✓ visible]
-[≡] PHP           [✓ visible]
-[≡] Go            [✓ visible]
-[≡] Rust          [✓ visible]
-[≡] SQL           [✓ visible]
-[≡] Bash          [✓ visible]
-[≡] C#            [ visible]
-[≡] Swift         [ visible]
-[+ Add language]
-
-Dark Theme Defaults
-  Background:  [#0d1117 ██]  (admin can change, but default is always dark)
-  Surface:     [#161b22 ██]
-  Primary:     [#58a6ff ██]
-  Text:        [#e6edf3 ██]
-
-Category Tab Labels
-  Tab 1: [Generate  __]
-  Tab 2: [Debug     __]
-  Tab 3: [Optimize  __]
-  Tab 4: [Document  __]
-```
-
-Config stored in `settings` table, group: `template_developer`.
-
----
-
-### 14B.15.5 Checklist
-
-- [ ] Template wrapper always forces dark CSS vars — global light mode cannot override
-- [ ] "Reset to defaults" in Tab 1 → Appearance resets to dark defaults (`#0d1117`), NOT global vars
-- [ ] Language selector stores selection in `localStorage` AND URL query param
-- [ ] Language pre-fill passed as query param to `ToolPage.vue` on tool card click
-- [ ] `prefill_output_format=code` passed on navigation → `ToolPage.vue` defaults output to code block
-- [ ] Language chips: max 8 visible inline, overflow behind `[+N]` popover
-- [ ] Category tab filter in URL query param — deep links work
-- [ ] Monospace font loaded (JetBrains Mono via Google Fonts) scoped to template wrapper
-- [ ] Hero cursor blink animation: pure CSS `@keyframes blink` — no JS
-- [ ] Mobile: language chips become 2-row horizontal scroll, category tabs remain full-width
-- [ ] Admin language list uses `vue-draggable-plus` for reorder
-- [ ] Tools with `is_active = false` hidden from grid — no dead card links
-
----
-
-## PART 14B.16 — ACADEMIC WRITER SITE TEMPLATE ✅
-
-> Slug: `academic-writer` | Vue Component: `AcademicWriterTemplate.vue`
-> Layout: Clean editorial — top writing-stage flow + Academic Context panel + tool grid.
-> Header: site default. Footer: visible.
-
----
-
-### 14B.16.1 Layout Structure
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  Site Default Header                                             │
-├──────────────────────────────────────────────────────────────────┤
-│  Hero: clean headline ("Write smarter, not harder") + subhead   │
-├──────────────────────────────────────────────────────────────────┤
-│  Writing Stage Flow (horizontal steps — always visible):         │
-│  ① Research  ──→  ② Outline  ──→  ③ Write  ──→  ④ Polish        │
-│  (active stage highlighted; clicking a step filters tool grid)   │
-├──────────────────────────────────────────────────────────────────┤
-│  ┌── Academic Context (collapsible) ────────────────────────┐   │
-│  │  Subject: [__________]  Level: [Undergraduate ▾]         │   │
-│  │  Citation Style: [APA ▾]          [Save Context]         │   │
-│  └───────────────────────────────────── [▲ Collapse] ───────┘   │
-├──────────────────────────────────────────────────────────────────┤
-│  Tool Grid (filtered by active writing stage)                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                       │
-│  │  Tool    │  │  Tool    │  │  Tool    │                       │
-│  │  Card    │  │  Card    │  │  Card    │                       │
-│  └──────────┘  └──────────┘  └──────────┘                       │
-└──────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### 14B.16.2 Unique Features
-
-**Writing Stage Flow:**
-- 4 stages shown as a horizontal step indicator with connecting arrows: Research → Outline → Write → Polish
-- Always visible (not in a tab bar) — the visual flow communicates the academic writing process
-- Clicking a step filters the tool grid to that stage's tools
-- Active step has a filled circle + bold label; completed previous steps shown with check or muted style
-- Active stage in URL query param: `?stage=research`
-
-**Academic Context Panel:**
-- Fields: Subject (text input), Academic Level (select), Citation Style (select)
-- Academic Level options (admin-configurable): High School | Undergraduate | Graduate | PhD | Professional
-- Citation Style options (admin-configurable): APA | MLA | Chicago | Harvard | IEEE | Vancouver
-- "Save Context" saves to `localStorage` keys: `makeai_academic_subject`, `makeai_academic_level`, `makeai_academic_citation`
-- Context pre-filled into tool forms via same query param mechanism as eCommerce template
-- Panel collapsed state persisted in `localStorage`
-
-**Clean/Editorial Aesthetic:**
-- Template `color_bg` defaults to `#fafafa` (off-white) — a library/word-processor feel
-- `color_surface` defaults to `#ffffff`
-- `font_heading` defaults to `Georgia, serif` — editorial feel
-- `font_body` defaults to system-ui (readable, clean)
-- Admin CAN override all via Tab 1 → Appearance
-- Tool cards: minimal style, white cards, subtle shadow, generous whitespace
-
----
-
-### 14B.16.3 Bundled Tools by Writing Stage
-
-| Stage | Slug | Tool Name |
-|-------|------|-----------|
-| Research | `research-outline` | Research Outline Generator |
-| Research | `literature-review` | Literature Review Helper |
-| Research | `research-question` | Research Question Generator |
-| Outline | `essay-outline` | Essay Outline Generator |
-| Outline | `thesis-statement` | Thesis Statement Generator |
-| Outline | `argument-builder` | Argument Builder |
-| Write | `essay-writer` | Essay Writer |
-| Write | `paragraph-generator` | Paragraph Generator |
-| Write | `abstract-writer` | Abstract Writer |
-| Polish | `content-improver` | Content Improver |
-| Polish | `grammar-checker` | Grammar Checker |
-| Polish | `citation-generator` | Citation Generator |
-| Polish | `study-guide` | Study Guide Generator |
-
-Stage assignment stored in tool `tags` JSON as `{"writing_stage": "research"}`.
-
----
-
-### 14B.16.4 Admin Settings (Extra Tab: Academic Context)
-
-**Admin → Appearance → Site Templates → Academic Writer → Tab: Academic Context**
-
-```
-Academic Context Panel
-─────────────────────────────────────────────
-[✓] Enable Academic Context panel
-Panel label: [Academic Context  _______________]
-Subject placeholder: [e.g. "Environmental Science" __]
-
-Academic Levels (shown in dropdown — drag to reorder, toggle to hide)
-[≡] High School      [✓]
-[≡] Undergraduate    [✓]
-[≡] Graduate         [✓]
-[≡] PhD              [✓]
-[≡] Professional     [✓]
-Default level: [Undergraduate ▾]
-
-Citation Styles (shown in dropdown — drag to reorder, toggle to hide)
-[≡] APA        [✓]
-[≡] MLA        [✓]
-[≡] Chicago    [✓]
-[≡] Harvard    [✓]
-[≡] IEEE       [✓]
-[≡] Vancouver  [ ]
-Default style: [APA ▾]
-
-Writing Stage Labels
-Stage 1: [Research  __]   Stage 2: [Outline  __]
-Stage 3: [Write     __]   Stage 4: [Polish   __]
-```
-
-Config stored in `settings` table, group: `template_academic`.
-
----
-
-### 14B.16.5 Checklist
-
-- [ ] Writing stage flow shows as step indicator (not tabs) — arrows between steps always visible
-- [ ] Active stage stored in URL query param — deep links work
-- [ ] Academic context values saved to `localStorage` — persist across reloads
-- [ ] Context pre-fill passed as query params to `ToolPage.vue` on tool card click
-- [ ] Academic Level and Citation Style options loaded from settings — never hardcoded in Vue
-- [ ] Default color scheme is light/editorial (`#fafafa` bg, serif heading font) — overridable by admin
-- [ ] "Reset to defaults" in Appearance tab resets to editorial light defaults
-- [ ] Tool `tags` JSON `writing_stage` key used for stage filtering
-- [ ] Mobile: step indicator compresses to `①②③④` with labels on tap/hover
-- [ ] Academic Context panel label and all dropdown options pulled from admin settings
-- [ ] Admin level/style lists use `vue-draggable-plus` for reorder
-- [ ] Disabled levels/styles hidden from user dropdown — at least 1 must remain enabled (validated on save)
 
 ---
 
@@ -9344,7 +8479,8 @@ Inspired by Linear/Vercel command palette. Opens as centered modal with search i
 - User's recent documents (last 20)
 - User's recent conversations (last 10)
 - Navigation links (Settings, Dashboard, Documents, etc.)
-- Actions: New Document, New Chat, Dark Mode Toggle
+- Admin links (if admin — Settings, Users, etc.)
+- Actions: New Document, New Chat, Dark Mode Toggle, Clear Cache (admin)
 
 **UX:**
 - Opens instantly (< 50ms) — all items pre-indexed in Pinia store on app load
@@ -12587,467 +11723,521 @@ public function handle(): void
 
 ---
 
-# PART 67 — RAG TOOLS SUITE (Chat with PDF / Website / YouTube / KB Writer)
+## PART 68 — ZERO-CONFIG DISTRIBUTION PACKAGE & INSTALLATION WIZARD (SHARED HOSTING FIRST)
 
-> **Version note:** Adding this part bumps the master prompt to **v4.3 — 67 parts**.
-> Update the Final Stats table (P65/P52) and the Layer index:
-> add `P67 RAG TOOLS SUITE` under **LAYER 14 — CORE FEATURE ENHANCEMENTS**.
+### 68.0 Why This Part Exists
 
----
+CodeCanyon buyers are overwhelmingly non-technical: they have FTP/cPanel File Manager access only, cannot run `composer install`, cannot edit PHP files, cannot change a domain's document root, and frequently don't enable hidden files in their FTP client. The standard Laravel deployment pattern (point document root at `public/`, run composer/npm on server) produces a guaranteed wall of support tickets.
 
-## 67.1 Overview
+This PART defines the **build pipeline that produces the distributable zip** and the **installer wizard's Final Setup logic**, such that the buyer experience is exactly:
 
-A suite of user-facing RAG-powered tools built **entirely on top of the existing Knowledge Base
-infrastructure** (P11 Knowledge Base, `embeddings` queue, `IngestDocument`, `IngestUrl`,
-`ProcessRagQuery`, `DeleteDocumentEmbeddings`). No new vector pipeline is created — every RAG tool
-is a thin UX layer over an **ephemeral, auto-created knowledge base collection**.
+1. Extract zip contents directly into `public_html` (or any folder used as a domain's web root, including VPS).
+2. Visit the domain.
+3. Installation wizard runs entirely in-browser, including running migrations/seed/key generation — no SSH, no composer, no npm, no artisan commands typed by the buyer.
 
-**Tools shipped in this suite (8 tools):**
-
-| # | Name | Slug | Source type | Description |
-|---|------|------|-------------|-------------|
-| 1 | Chat with PDF | `chat-pdf` | file (pdf) | Upload PDF → chat with page-level citations |
-| 2 | Chat with Document | `chat-document` | file (docx/txt/md) | Same flow for Word/text/Markdown |
-| 3 | Chat with Spreadsheet | `chat-spreadsheet` | file (csv/xlsx) | Q&A over tabular data |
-| 4 | Chat with Website | `chat-website` | url | Enter URL → scrape → chat |
-| 5 | Chat with YouTube | `chat-youtube` | youtube | Transcript fetch → chat / summarize / chapters |
-| 6 | Long Document Summarizer | `long-doc-summarizer` | file | Map-reduce summary of docs too large for context |
-| 7 | Multi-Document Compare | `doc-compare` | files (2–3) | Side-by-side AI comparison with citations |
-| 8 | Write from Knowledge Base | `kb-writer` | existing collection | Generate content grounded ONLY in user's KB collection |
-
-**Core architectural rules (non-negotiable):**
-
-1. **Laravel AI SDK (`laravel/ai`) only** — embeddings + retrieval + completion all via `AiService`
-   and the SDK's RAG primitives. Never raw OpenAI SDK, never LLPhant.
-2. **Reuse the KB pipeline.** A RAG tool session = a hidden `knowledge_bases` row with
-   `is_ephemeral = true`. Ingestion dispatches the **existing** `IngestDocument` / `IngestUrl`
-   jobs on the `embeddings` queue. Deletion uses the **existing** `DeleteDocumentEmbeddings` job.
-3. **New tool type `rag`** in `ai_tools.type` enum — alongside existing types. RAG tools render a
-   different execution UI (source input → ingestion progress → chat) instead of the one-shot
-   form → output flow.
-4. **Streaming:** POST + `ReadableStream` (never `EventSource`), `X-Accel-Buffering: no` header,
-   `finally` block in every streaming controller method.
-5. **Citations are first-class:** standardized `sources` SSE event (see 67.7) rendered identically
-   across all 8 tools.
-6. `settings('app_name')` everywhere — never hardcode "MakeAI".
-7. `users.ulid` / session ULIDs in all public URLs.
+The same zip works unmodified on shared hosting AND VPS — VPS buyers get no special package, just optionally faster hardware and the ability to also run `composer install` later for patches (never required).
 
 ---
 
-## 67.2 Database
+### 68.1 Distributable Zip Structure
 
-```sql
--- Extend existing ai_tools.type enum:
-ALTER TABLE ai_tools MODIFY type ENUM('text','image','audio','video','code','rag') NOT NULL;
+This is the **exact structure inside `makeai-vX.X.X.zip`**. Buyers extract this directly into their web root (e.g., `public_html`).
 
--- Extend existing knowledge_bases table:
-ALTER TABLE knowledge_bases
-  ADD COLUMN is_ephemeral  BOOLEAN DEFAULT FALSE AFTER name,
-  ADD COLUMN source_tool   VARCHAR(100) NULL AFTER is_ephemeral,   -- 'chat-pdf', 'chat-website', etc.
-  ADD COLUMN expires_at    TIMESTAMP NULL AFTER source_tool;       -- ephemeral cleanup target
--- Ephemeral collections are HIDDEN from the user's Knowledge Base page
--- (WHERE is_ephemeral = false in all KB list queries).
-
--- New table: RAG tool sessions
-CREATE TABLE rag_sessions (
-  id                 CHAR(26) PRIMARY KEY,            -- ULID (public-facing)
-  user_id            BIGINT UNSIGNED NOT NULL,        -- FK → users.id
-  tool_slug          VARCHAR(100) NOT NULL,           -- FK → ai_tools.slug
-  knowledge_base_id  BIGINT UNSIGNED NOT NULL,        -- FK → knowledge_bases.id (ephemeral or user-picked)
-  title              VARCHAR(255) NULL,               -- auto: filename / page title / video title
-  source_meta        JSON NULL,                       -- { filename, pages, url, video_id, duration, file_size }
-  status             ENUM('ingesting','ready','failed') DEFAULT 'ingesting',
-  ingest_error       VARCHAR(500) NULL,
-  saved_to_kb        BOOLEAN DEFAULT FALSE,           -- user clicked "Save to Knowledge Base"
-  created_at         TIMESTAMP,
-  updated_at         TIMESTAMP,
-  INDEX (user_id, tool_slug),
-  INDEX (status, created_at)
-);
-
--- New table: RAG session messages (chat history per session)
-CREATE TABLE rag_messages (
-  id           CHAR(26) PRIMARY KEY,                  -- ULID
-  session_id   CHAR(26) NOT NULL,                     -- FK → rag_sessions.id
-  role         ENUM('user','assistant') NOT NULL,
-  content      LONGTEXT NOT NULL,
-  sources      JSON NULL,                             -- [{ doc, page?, chunk_index, score }]
-  input_tokens  INT NULL,
-  output_tokens INT NULL,
-  credits_used  DECIMAL(10,4) NULL,
-  created_at   TIMESTAMP,
-  INDEX (session_id, created_at)
-);
+```
+public_html/                          ← buyer extracts zip contents HERE (zip root = this)
+├── index.php                         ← FIXED, ships as-is, never edited by buyer
+├── .htaccess                         ← FIXED, ships as-is
+├── favicon.ico
+├── robots.txt
+├── build/                            ← PRE-BUILT Vite assets (npm run build output, base: '/build/')
+│   ├── manifest.json
+│   └── assets/
+│       ├── app-[hash].js
+│       └── app-[hash].css
+├── storage/                          ← EMPTY real directory, created by build script
+│   ├── app/
+│   │   └── public/
+│   │       └── .gitkeep
+│   ├── framework/
+│   │   └── .gitkeep
+│   └── .gitkeep
+└── app/                              ← entire Laravel application (folder name is FIXED: "app")
+    ├── app/                          ← Laravel's actual app/ (Models, Http, Services...)
+    ├── bootstrap/
+    │   └── cache/                    ← writable, empty except .gitkeep
+    ├── config/
+    ├── database/
+    │   ├── migrations/
+    │   ├── seeders/
+    │   └── database.sqlite           ← NOT included; created by installer if SQLite chosen
+    ├── public/                       ← Laravel's default public/ (kept for artisan compatibility)
+    │   └── build/                    ← SAME pre-built assets (mirrors root /build/)
+    ├── resources/
+    ├── routes/
+    ├── storage/                      ← Laravel's own storage/ (logs, framework cache, sessions)
+    │   ├── app/
+    │   ├── framework/
+    │   │   ├── cache/
+    │   │   ├── sessions/
+    │   │   ├── testing/
+    │   │   └── views/
+    │   └── logs/
+    ├── vendor/                       ← PRE-INSTALLED via `composer install --no-dev --optimize-autoloader`
+    ├── .env.example
+    ├── .env.testing                  ← excluded from production zip (dev-only)
+    ├── artisan
+    ├── composer.json
+    ├── composer.lock
+    └── package.json
 ```
 
-**Migration notes:**
-- `rag_sessions.id` and `rag_messages.id` are ULIDs (consistent with platform rule — never expose
-  auto-increment integers).
-- `kb-writer` sessions point `knowledge_base_id` at a **user-selected permanent** collection —
-  no ephemeral KB is created for that tool.
+**Naming rule (non-negotiable):** the inner application folder is ALWAYS named `app` at the zip root level. This is what `index.php` hardcodes. Internal Laravel app code refers to its own `app/` subdirectory normally (`app/app/Models/...` etc. from the zip root's perspective) — this is fine and does not require any path changes inside Laravel itself, since Laravel's `base_path()` resolves relative to `bootstrap/app.php`, which lives at `public_html/app/bootstrap/app.php`.
 
 ---
 
-## 67.3 Seeder — RAG Tools
-
-Add to the AI tools seeder. New category **📚 Document AI** (dynamic — created via the existing
-category system, never hardcoded in code):
+### 68.2 Fixed `index.php` (ships as-is, root of zip)
 
 ```php
-// Each tool row in ai_tools:
-[
-  'name'        => 'Chat with PDF',
-  'slug'        => 'chat-pdf',
-  'type'        => 'rag',
-  'description' => 'Upload any PDF and chat with it. Get instant answers with page citations.',
-  'icon'        => 'ti-file-type-pdf',
-  'fields'      => json_encode([
-      'source_type'   => 'file',
-      'accept'        => ['pdf'],
-      'max_file_mb'   => null,      // null = use settings('rag_max_file_mb')
-      'multi_file'    => false,
-  ]),
-  'is_active'   => true,
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+// Maintenance mode check
+if (file_exists($maintenance = __DIR__.'/app/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Composer autoloader (pre-installed, ships in zip)
+require __DIR__.'/app/vendor/autoload.php';
+
+// Bootstrap Laravel
+/** @var Application $app */
+$app = require_once __DIR__.'/app/bootstrap/app.php';
+
+$app->handleRequest(Request::capture());
+```
+
+---
+
+### 68.3 Fixed `.htaccess` (ships as-is, root of zip)
+
+```apache
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Block all direct access to the Laravel application directory
+    RewriteRule ^app/ - [F,L]
+
+    # Allow access to build assets and storage (public files) directories
+    RewriteCond %{REQUEST_URI} ^/(build|storage)/
+    RewriteRule .* - [L]
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Block listing and access to sensitive files inside app/ at any depth (defence in depth)
+<FilesMatch "\.(env|lock|json|lock|yml|yaml|dist|gitignore|gitattributes)$">
+    <If "%{REQUEST_URI} =~ m#^/app/#">
+        Require all denied
+    </If>
+</FilesMatch>
+```
+
+---
+
+### 68.4 Public Disk: No Symlink Dependency
+
+`php artisan storage:link` creates a symlink (`public/storage` → `storage/app/public`). Symlinks are unreliable across the split root used here (root `storage/` vs `app/storage/`) and some shared hosts disable `symlink()` entirely.
+
+**Config change in `config/filesystems.php`:**
+
+```php
+'disks' => [
+    // ... existing disks ...
+
+    'public' => [
+        'driver'     => 'local',
+        'root'       => base_path('../storage/app/public'), // root storage/, NOT app/storage/
+        'url'        => env('APP_URL').'/storage',
+        'visibility' => 'public',
+        'throw'      => false,
+    ],
 ],
-// ... repeat for all 8 tools with appropriate fields JSON:
-// chat-document:     source_type=file, accept=[docx,txt,md]
-// chat-spreadsheet:  source_type=file, accept=[csv,xlsx]
-// chat-website:      source_type=url
-// chat-youtube:      source_type=youtube
-// long-doc-summarizer: source_type=file, accept=[pdf,docx,txt,md], mode=summarize
-// doc-compare:       source_type=file, accept=[pdf,docx,txt,md], multi_file=true, min_files=2, max_files=3
-// kb-writer:         source_type=collection (picker of user's permanent KB collections), mode=generate
+```
+
+This makes the `public` disk write directly into the root-level `storage/app/public/` directory, which is web-accessible (per the `.htaccess` rule allowing `/storage/`). No symlink, no `artisan storage:link` call anywhere in the installer or documentation. Any reference to `artisan storage:link` elsewhere in this master prompt (e.g. P03 step list) is superseded by this config and must be removed from the installer flow.
+
+---
+
+### 68.5 Build Script (produces the distributable zip)
+
+This runs in CI / on the developer's machine — **never on buyer's server**.
+
+**`scripts/build-release.sh`:**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="${1:?Usage: build-release.sh <version>}"
+SRC_DIR="$(pwd)"
+BUILD_DIR="/tmp/makeai-release-build"
+ZIP_NAME="makeai-v${VERSION}.zip"
+
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR/public_html/app"
+
+echo "==> Installing PHP dependencies (production)"
+composer install --no-dev --optimize-autoloader --no-interaction
+
+echo "==> Installing JS dependencies & building frontend"
+npm ci
+npm run build   # vite.config.ts must set base: '/build/'
+
+echo "==> Copying application source into app/"
+rsync -a "$SRC_DIR"/ "$BUILD_DIR/public_html/app/" \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='tests' \
+    --exclude='.env' \
+    --exclude='.env.testing' \
+    --exclude='storage/framework/cache/*' \
+    --exclude='storage/framework/sessions/*' \
+    --exclude='storage/framework/views/*' \
+    --exclude='storage/logs/*' \
+    --exclude='database/database.sqlite' \
+    --exclude='scripts'
+
+echo "==> Placing pre-built Vite assets at root /build/"
+cp -r "$SRC_DIR/public/build" "$BUILD_DIR/public_html/build"
+
+echo "==> Writing fixed index.php and .htaccess"
+cp "$SRC_DIR/distribution/index.php"   "$BUILD_DIR/public_html/index.php"
+cp "$SRC_DIR/distribution/.htaccess"   "$BUILD_DIR/public_html/.htaccess"
+cp "$SRC_DIR/distribution/robots.txt"  "$BUILD_DIR/public_html/robots.txt"
+cp "$SRC_DIR/distribution/favicon.ico" "$BUILD_DIR/public_html/favicon.ico"
+
+echo "==> Creating empty root-level storage/ tree (web-accessible public disk)"
+mkdir -p "$BUILD_DIR/public_html/storage/app/public"
+mkdir -p "$BUILD_DIR/public_html/storage/framework"
+touch "$BUILD_DIR/public_html/storage/app/public/.gitkeep"
+touch "$BUILD_DIR/public_html/storage/framework/.gitkeep"
+touch "$BUILD_DIR/public_html/storage/.gitkeep"
+
+echo "==> Ensuring writable directories exist inside app/"
+mkdir -p "$BUILD_DIR/public_html/app/storage/framework/"{cache,sessions,testing,views}
+mkdir -p "$BUILD_DIR/public_html/app/storage/logs"
+mkdir -p "$BUILD_DIR/public_html/app/bootstrap/cache"
+find "$BUILD_DIR/public_html/app/storage" -type d -exec chmod 775 {} \;
+find "$BUILD_DIR/public_html/app/bootstrap/cache" -type d -exec chmod 775 {} \;
+
+echo "==> Removing files that must not ship"
+rm -f "$BUILD_DIR/public_html/app/.env"
+rm -f "$BUILD_DIR/public_html/app/.env.testing"
+
+echo "==> Sanity checks"
+test -f "$BUILD_DIR/public_html/app/vendor/autoload.php" || { echo "FATAL: vendor/ missing"; exit 1; }
+test -f "$BUILD_DIR/public_html/build/manifest.json"     || { echo "FATAL: build manifest missing"; exit 1; }
+test -f "$BUILD_DIR/public_html/app/.env.example"        || { echo "FATAL: .env.example missing"; exit 1; }
+
+echo "==> Zipping"
+cd "$BUILD_DIR/public_html"
+zip -r -q "/tmp/${ZIP_NAME}" .
+cd "$SRC_DIR"
+mv "/tmp/${ZIP_NAME}" "./dist/${ZIP_NAME}"
+
+echo "==> Done: ./dist/${ZIP_NAME}"
+```
+
+**`vite.config.ts` addition:**
+
+```typescript
+export default defineConfig({
+  base: '/build/',
+  build: {
+    manifest: true,
+    outDir: 'public/build',
+  },
+  // ...existing plugins
+})
 ```
 
 ---
 
-## 67.4 Service — `RagToolService`
+### 68.6 Installation Wizard — Revised Final Setup Step (No Shell Required)
 
-**`app/Services/RagToolService.php`** — the ONLY class that orchestrates RAG tool flows.
-Uses `AiService` (Laravel AI SDK) for embeddings, retrieval, and completion. Controllers never
-touch the SDK directly.
+Route: `app/routes/install.php`, only reachable while `INSTALLED` is absent/false in `app/.env`.
+
+**Wizard steps (revised P03 §1.3 list — supersedes prior version):**
+
+1. **Welcome & Requirements Check**
+   - PHP version >= 8.3
+   - Extensions: `pdo_mysql` or `pdo_sqlite`, `mbstring`, `curl`, `zip`, `gd`, `fileinfo`, `bcmath`, `ctype`, `tokenizer`, `xml`
+   - Writable check on (relative to zip root): `app/storage/`, `app/storage/framework/cache`, `app/storage/framework/sessions`, `app/storage/framework/views`, `app/storage/logs`, `app/bootstrap/cache`, `storage/app/public`
+   - **Critical sanity check:** `file_exists(base_path('vendor/autoload.php'))` — if false, show: *"vendor folder missing — please re-extract the zip, do not delete the app/vendor folder."*
+   - All checks must pass (or show clear red ✗ with fix instructions) before "Next" enables
+
+2. **Database Configuration**
+   - Driver choice: MySQL or SQLite (SQLite recommended default for shared hosting — zero setup)
+   - If MySQL: host, port, database, username, password → "Test Connection" button (AJAX, tries `new PDO(...)`)
+   - If SQLite: installer creates `app/database/database.sqlite` (empty file) and `chmod 664`
+
+3. **Site Setup**
+   - Site name, site URL (pre-filled from `$_SERVER['HTTP_HOST']`, editable), timezone, default language, admin email for system notifications
+
+4. **License Activation**
+   - Purchase code input → Envato API verify (per P03 §1.2) → store result in `.env` + `settings` table
+
+5. **Admin Account Creation**
+   - Name, email, password, confirm password
+
+6. **Demo Content (Optional/skippable)**
+   - One-click "Install demo content" toggle → runs seeders with demo dataset
+   - Skip option for blank install
+
+7. **Final Setup** (see logic below) — runs entirely via `Artisan::call()` in-process, shows live progress log via polling/SSE to the frontend
+
+8. **Done** — redirect to `/admin`, write `INSTALLED=true` to `.env`, `/install` returns 404 from this point forward (checked via middleware reading `.env`)
+
+**Final Setup step — controller logic (`app/app/Http/Controllers/Install/FinalizeController.php`):**
 
 ```php
-class RagToolService
+class FinalizeController extends Controller
 {
-    public function __construct(
-        private AiService $ai,
-        private CreditService $credits,
-    ) {}
+    public function run(Request $request)
+    {
+        $steps = [
+            'write_env'      => fn () => $this->writeEnvFile($request),
+            'generate_key'   => fn () => $this->generateAppKey(),
+            'migrate'        => fn () => Artisan::call('migrate', ['--force' => true]),
+            'seed_settings'  => fn () => Artisan::call('db:seed', ['--class' => 'SettingsSeeder', '--force' => true]),
+            'seed_demo'      => fn () => $request->boolean('install_demo')
+                ? Artisan::call('db:seed', ['--class' => 'DemoSeeder', '--force' => true])
+                : null,
+            'create_admin'   => fn () => $this->createAdminAccount($request),
+            'cache_config'   => fn () => Artisan::call('config:cache'),
+            'cache_route'    => fn () => Artisan::call('route:cache'),
+            'mark_installed' => fn () => $this->setInstalledFlag(true),
+        ];
 
-    // ── Session lifecycle ─────────────────────────────────────────────
+        $log = [];
+        foreach ($steps as $name => $step) {
+            try {
+                $step();
+                $log[] = ['step' => $name, 'status' => 'ok'];
+            } catch (\Throwable $e) {
+                $log[] = ['step' => $name, 'status' => 'error', 'message' => $e->getMessage()];
+                return response()->json(['success' => false, 'log' => $log], 500);
+            }
+        }
 
-    /**
-     * Create a session + ephemeral KB, dispatch ingestion.
-     * For source_type=file: store upload → dispatch IngestDocument (queue: embeddings)
-     * For source_type=url: dispatch IngestUrl (queue: embeddings)
-     * For source_type=youtube: dispatch IngestYoutubeTranscript (NEW job, queue: embeddings)
-     * For source_type=collection (kb-writer): no ingestion — bind to existing KB, status='ready'
-     */
-    public function createSession(User $user, AiTool $tool, array $input): RagSession;
+        return response()->json(['success' => true, 'log' => $log]);
+    }
 
-    /** Poll-able status for the ingestion progress UI (also broadcast via Reverb — see 67.9). */
-    public function sessionStatus(RagSession $session): array;
-        // ['status' => ..., 'progress' => 0-100, 'error' => ?, 'source_meta' => [...]]
+    private function writeEnvFile(Request $request): void
+    {
+        $env = file_get_contents(base_path('.env.example'));
 
-    /** Promote ephemeral KB → permanent (visible in Knowledge Base page). */
-    public function saveToKnowledgeBase(RagSession $session, string $name): KnowledgeBase;
-        // Sets knowledge_bases.is_ephemeral = false, expires_at = null, rag_sessions.saved_to_kb = true
+        $replacements = [
+            'APP_NAME'     => $request->input('site_name'),
+            'APP_URL'      => $request->input('site_url'),
+            'APP_TIMEZONE' => $request->input('timezone', 'UTC'),
+            'DB_CONNECTION'=> $request->input('db_driver'),
+            'DB_DATABASE'  => $request->input('db_driver') === 'sqlite'
+                ? database_path('database.sqlite')
+                : $request->input('db_database'),
+            'DB_HOST'      => $request->input('db_host'),
+            'DB_PORT'      => $request->input('db_port'),
+            'DB_USERNAME'  => $request->input('db_username'),
+            'DB_PASSWORD'  => $request->input('db_password'),
+        ];
 
-    /** Delete session: dispatch DeleteDocumentEmbeddings for ephemeral KBs, delete rows + files. */
-    public function deleteSession(RagSession $session): void;
+        foreach ($replacements as $key => $value) {
+            $env = preg_replace(
+                "/^{$key}=.*/m",
+                "{$key}=" . $this->envEscape((string) $value),
+                $env
+            );
+        }
 
-    // ── Query (streaming) ─────────────────────────────────────────────
+        if ($request->input('db_driver') === 'sqlite') {
+            touch(database_path('database.sqlite'));
+            chmod(database_path('database.sqlite'), 0664);
+        }
 
-    /**
-     * RAG chat turn:
-     *  1. Embed query (AiService → SDK embeddings, model from settings('rag_embedding_model'))
-     *  2. Retrieve top-K chunks from session's KB (K = settings('rag_top_k', 6))
-     *  3. Build grounded prompt: system instruction + retrieved chunks + chat history (last N turns)
-     *  4. Stream completion via AiService (CompletionRequest DTO)
-     *  5. Yield 'sources' event FIRST, then token events, then usage/done
-     *  6. Persist both messages to rag_messages with sources + token usage
-     *  7. Deduct credits via CreditService (completion tokens only — retrieval is free)
-     */
-    public function streamQuery(RagSession $session, string $message): \Generator;
+        file_put_contents(base_path('.env'), $env);
+    }
 
-    /** Long-doc summarizer: map-reduce. Chunk summaries (queued batches) → final merge summary. */
-    public function summarizeLong(RagSession $session, array $options): \Generator;
+    private function generateAppKey(): void
+    {
+        $key = 'base64:' . base64_encode(random_bytes(32));
+        $env = file_get_contents(base_path('.env'));
+        $env = preg_replace('/^APP_KEY=.*/m', "APP_KEY={$key}", $env);
+        file_put_contents(base_path('.env'), $env);
 
-    /** Doc-compare: retrieve per-document, prompt enforces per-doc citation tags [A]/[B]/[C]. */
-    public function streamCompare(RagSession $session, string $aspect): \Generator;
+        // Reload config so subsequent Artisan calls in this request see the new key
+        config(['app.key' => $key]);
+    }
 
-    /** KB-writer: retrieval-grounded long-form generation. System prompt HARD-constrains the model
-     *  to use ONLY retrieved context; instructs "say 'not found in your knowledge base' otherwise". */
-    public function streamKbWrite(RagSession $session, array $brief): \Generator;
+    private function setInstalledFlag(bool $value): void
+    {
+        $env = file_get_contents(base_path('.env'));
+        $flag = $value ? 'true' : 'false';
+        if (preg_match('/^INSTALLED=/m', $env)) {
+            $env = preg_replace('/^INSTALLED=.*/m', "INSTALLED={$flag}", $env);
+        } else {
+            $env .= "\nINSTALLED={$flag}\n";
+        }
+        file_put_contents(base_path('.env'), $env);
+    }
+
+    private function envEscape(string $value): string
+    {
+        return preg_match('/\s|#|"/', $value) ? '"' . str_replace('"', '\\"', $value) . '"' : $value;
+    }
 }
 ```
 
-**Grounding system prompt rule (all tools):** retrieved chunks injected as numbered context blocks
-`[1] … [2] …`; model instructed to reference chunk numbers; service maps chunk numbers back to
-`{doc, page, score}` for the `sources` event. The grounding system prompt is stored in
-`settings('rag_system_prompt')` (admin-editable) — **never exposed to frontend** (P-rule: no
-`system_prompt` in Inertia shared data).
-
----
-
-## 67.5 New Job — `IngestYoutubeTranscript` (queue: `embeddings`)
+**`InstallMiddleware`** (replaces any prior version):
 
 ```php
-// app/Jobs/IngestYoutubeTranscript.php
-// 1. Extract video ID from URL (supports youtube.com/watch, youtu.be, shorts)
-// 2. Fetch transcript: youtube captions endpoint (timedtext) — no API key needed for public CC;
-//    fallback: settings-configurable Whisper transcription of audio (admin toggle
-//    settings('rag_youtube_whisper_fallback'), default OFF — costs credits)
-// 3. Chunk transcript WITH timestamps preserved in chunk metadata: { start: 123.4, end: 156.2 }
-// 4. Generate embeddings via Laravel AI SDK → store in vector DB (same pipeline as IngestDocument)
-// 5. Update rag_sessions: status='ready', source_meta={ video_id, title, duration, channel }
-// failed(): rag_sessions.status='failed', ingest_error='No captions available for this video.'
-```
+class InstallMiddleware
+{
+    public function handle(Request $request, Closure $next)
+    {
+        $installed = filter_var(env('INSTALLED', false), FILTER_VALIDATE_BOOLEAN);
 
-YouTube citations render as **clickable timestamps** (`12:34`) that link to
-`https://youtube.com/watch?v={id}&t={seconds}`.
+        if ($request->is('install') || $request->is('install/*')) {
+            if ($installed) {
+                abort(404);
+            }
+            return $next($request);
+        }
 
----
+        if (! $installed && ! file_exists(base_path('.env'))) {
+            return redirect('/install');
+        }
 
-## 67.6 Controllers & Routes
+        if (! $installed) {
+            return redirect('/install');
+        }
 
-**`app/Http/Controllers/RagToolController.php`**
-
-```php
-// GET /tools/rag/{slug} — render RAG tool page (Inertia: Tools/RagTool.vue)
-public function show(string $slug): Response
-    // Tool must exist, type='rag', is_active. Pass: tool config (fields JSON),
-    // user's recent sessions for THIS tool (last 10), settings: rag_max_file_mb, allowed types.
-
-// POST /tools/rag/{slug}/sessions — create session (multipart for files)
-public function store(Request $request, string $slug): JsonResponse
-    // Validate per fields JSON (mimes, max size from settings('rag_max_file_mb', 25)).
-    // Rate limited (sliding window — P rate-limit system, key: rag-ingest).
-    // Returns: { session: { id, status: 'ingesting' } }
-
-// GET /tools/rag/sessions/{ulid}/status — ingestion progress (polling fallback per P66)
-public function status(string $ulid): JsonResponse
-
-// POST /tools/rag/sessions/{ulid}/chat — streaming RAG chat
-public function chat(Request $request, string $ulid): StreamedResponse
-    // Guard: session belongs to auth user, status='ready'.
-    // Pre-check credits (CreditService::canAfford estimate) → 402-style JSON if insufficient.
-    // StreamedResponse with headers:
-    //   Content-Type: text/event-stream
-    //   X-Accel-Buffering: no
-    //   Cache-Control: no-cache
-    // try { foreach ($ragToolService->streamQuery(...) as $event) { echo ...; flush(); } }
-    // finally { /* persist partial output, close stream, release lock */ }   ← MANDATORY
-
-// POST /tools/rag/sessions/{ulid}/save-to-kb   { name }
-// DELETE /tools/rag/sessions/{ulid}
-// GET /tools/rag/sessions/{ulid}               — session + messages (reopen past session)
-```
-
-```php
-// routes/web.php
-Route::middleware(['auth', 'verified'])->prefix('tools/rag')->name('rag.')->group(function () {
-    Route::get('/{slug}',                    [RagToolController::class, 'show'])->name('show');
-    Route::post('/{slug}/sessions',          [RagToolController::class, 'store'])->name('sessions.store');
-    Route::get('/sessions/{ulid}',           [RagToolController::class, 'session'])->name('sessions.show');
-    Route::get('/sessions/{ulid}/status',    [RagToolController::class, 'status'])->name('sessions.status');
-    Route::post('/sessions/{ulid}/chat',     [RagToolController::class, 'chat'])->name('sessions.chat');
-    Route::post('/sessions/{ulid}/save-to-kb', [RagToolController::class, 'saveToKb'])->name('sessions.save');
-    Route::delete('/sessions/{ulid}',        [RagToolController::class, 'destroy'])->name('sessions.destroy');
-});
-```
-
-**Mobile API (extend P44.7):**
-
-```
-POST   /api/v1/rag-tools/{slug}/sessions          -- create session (multipart)
-GET    /api/v1/rag-tools/sessions/{ulid}/status
-POST   /api/v1/rag-tools/sessions/{ulid}/chat     -- SSE stream
-POST   /api/v1/rag-tools/sessions/{ulid}/save-to-kb
-DELETE /api/v1/rag-tools/sessions/{ulid}
-GET    /api/v1/rag-tools/sessions                 -- list user's sessions { tool_slug? }
+        return $next($request);
+    }
+}
 ```
 
 ---
 
-## 67.7 SSE Event Contract (standard across ALL RAG tools)
+### 68.7 Documentation (Buyer-Facing — replaces all prior installation docs)
 
-```
-data: {"type":"sources","items":[{"doc":"report.pdf","page":12,"chunk":4,"score":0.89},{"doc":"report.pdf","page":31,"chunk":11,"score":0.84}]}
-data: {"type":"token","content":"According"}
-data: {"type":"token","content":" to"}
-...
-data: {"type":"usage","input_tokens":1450,"output_tokens":230,"credits":1.2,"model":"gpt-4o"}
-data: {"type":"done"}
+**`docs/installation.md`:**
 
--- on error mid-stream:
-data: {"type":"error","message":"Generation failed. You were not charged."}
-```
-
-- `sources` is ALWAYS emitted before the first token (retrieval completes before generation).
-- For `chat-youtube`, source items carry `{"start":754}` instead of `page`.
-- For `doc-compare`, source items carry `{"doc_label":"A"}`.
-- Frontend renders source chips under each assistant message; identical component everywhere.
-
----
-
-## 67.8 Vue Pages & Components
-
-```
-resources/js/Pages/Tools/
-  RagTool.vue                 → GET /tools/rag/{slug} — orchestrates the 3 states below
-
-resources/js/Components/Rag/
-  RagSourceInput.vue          → state 1: dropzone (file) / URL input / YouTube input / KB picker
-                                 - drag-drop + click upload, file type + size validation client-side
-                                 - shows settings-driven limits: "PDF up to 25 MB"
-  RagIngestProgress.vue       → state 2: progress card
-                                 - listens on Reverb private channel rag.session.{ulid}
-                                 - P66 fallback: polls /status every 2.5s when broadcasting = polling driver
-                                 - stages: Uploading → Extracting text → Embedding (n/m chunks) → Ready
-                                 - failed state: error message + [Try again]
-  RagChat.vue                 → state 3: chat interface
-                                 - POST + ReadableStream consumption (NEVER EventSource)
-                                 - message list with streaming tokens, stop button (AbortController)
-                                 - suggested starter questions (3 chips, generated from doc title/type)
-  RagSourceChips.vue          → citation chips under assistant messages
-                                 - PDF: "report.pdf · p.12" → opens PdfPreviewDrawer at that page
-                                 - YouTube: "12:34" → external link with &t=
-                                 - hover: chunk text preview tooltip (first 200 chars)
-  RagSessionList.vue          → recent sessions sidebar (last 10 for this tool, reopen/delete)
-  SaveToKbModal.vue           → name input → POST save-to-kb → success toast + link to KB page
-```
-
-**Layout (Chat with PDF — reference for all):**
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  ← Tools     📄 Chat with PDF                    [Recent ▾]      │
-├──────────────────────┬───────────────────────────────────────────┤
-│                      │  annual-report-2025.pdf · 48 pages        │
-│   PDF PREVIEW        │  ───────────────────────────────────────  │
-│   (pdf.js viewer,    │  💬 What was the total revenue in Q3?     │
-│    desktop only —    │                                           │
-│    hidden < lg)      │  🤖 According to the report, Q3 revenue   │
-│                      │     was $4.2M, up 18% YoY...              │
-│   citation click →   │     [📄 p.12] [📄 p.31]                   │
-│   scrolls to page    │  ───────────────────────────────────────  │
-│                      │  [Ask anything about this document…] [→]  │
-│                      │  [💾 Save to Knowledge Base]  [🗑 Delete]  │
-└──────────────────────┴───────────────────────────────────────────┘
-```
-
-- Mobile: preview pane hidden; citation chips open a bottom-sheet text preview instead.
-- `kb-writer` replaces chat UI with a brief form (topic, content type, tone, length) + streaming
-  long-form output with the standard sources panel + [Save to Documents] (existing documents flow).
+> ## Installing MakeAI (2 steps, no technical knowledge required)
+>
+> **Step 1 — Upload**
+> 1. Log in to your hosting control panel (cPanel) and open **File Manager**.
+> 2. Navigate to `public_html` (or your domain's web folder — if you're installing on a subdomain or addon domain, use that folder instead).
+> 3. If `public_html` already contains files from a previous installation or default hosting page, remove them first.
+> 4. Upload `makeai-vX.X.X.zip`.
+> 5. Right-click the uploaded zip → **Extract**. Wait for extraction to complete, then you may delete the zip file.
+>
+> **Step 2 — Install**
+> 1. Visit your domain in a browser (e.g., `https://yourdomain.com`).
+> 2. The installation wizard appears automatically.
+> 3. Follow the on-screen steps: requirements check → database → site details → license → admin account → (optional) demo content → finish.
+> 4. When complete, you'll be redirected to your admin dashboard.
+>
+> **That's it.** No SSH, no command line, no composer, no npm.
+>
+> ### Recommended: Choose SQLite during installation
+> If you're not sure what database to use, choose **SQLite** — it requires no separate database setup and works immediately. You can switch to MySQL later from Admin → Settings → Advanced if needed.
+>
+> ### Troubleshooting
+> - **Blank page or 500 error immediately after extracting:** Re-extract the zip — the `app/vendor` folder may not have extracted completely (it's large). Check that `public_html/app/vendor/autoload.php` exists.
+> - **"Index of /" page instead of the wizard:** Your FTP client may not have uploaded the hidden `.htaccess` file. Enable "Show Hidden Files" in your FTP client/File Manager and re-upload `.htaccess` to `public_html`.
+> - **Requirements check fails on an extension:** Go to cPanel → Select PHP Version → Extensions, enable the missing extension, then refresh the wizard page.
 
 ---
 
-## 67.9 Broadcasting (per P66)
+### 68.8 VPS Buyers — No Separate Package
 
-```php
-// Event: RagIngestProgressEvent — broadcast on PrivateChannel("rag.session.{ulid}")
-// Payload: { status, progress, stage, error? }
-// Driver resolved by BroadcastingService (P66): Reverb → polling fallback → Pusher override.
-// RagIngestProgress.vue uses the useNotifications/useEcho composable pattern from P66;
-// when frontendConfig().driver === 'polling', component polls the /status endpoint (2.5s interval).
+VPS buyers extract the **same zip** into their chosen web root (e.g., `/var/www/yourdomain/public_html`) and configure Nginx/Apache to serve from that folder directly (root = the extracted `public_html`, not a `public/` subfolder — because `index.php` is now at the zip root). Example Nginx snippet for documentation appendix:
+
+```nginx
+server {
+    root /var/www/yourdomain/public_html;
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+
+    location ~ ^/app/ {
+        deny all;
+    }
+}
 ```
 
----
-
-## 67.10 Credits Model
-
-| Action | Cost |
-|--------|------|
-| Ingestion (file/url/youtube) | `ceil(chunks / settings('rag_chunks_per_credit', 50))` credits, charged ONCE on successful ingest. Failed ingest = 0 charge. |
-| Retrieval (vector search) | Free |
-| Chat completion | Standard token-based credit calc (existing CreditService logic) |
-| Whisper fallback (YouTube) | Charged per audio minute (existing STT pricing) — only if admin enabled |
-
-- Pre-flight check before ingestion: estimate chunks from file size, block with friendly error if
-  insufficient credits ("This document needs ~4 credits to process. You have 2.").
-- All charges logged to `ai_usage_logs` with `tool_slug` so RAG tools appear in the Usage
-  Dashboard (P56) and admin analytics like every other tool.
+VPS buyers may optionally run `cd public_html/app && composer install --no-dev` to apply hotfix patches between full releases — never required for initial install.
 
 ---
 
-## 67.11 Cleanup — Scheduled Task
+### 68.9 Changes to Existing Parts (Supersession Notes)
 
-```php
-// routes/console.php — add scheduled task #14:
-Schedule::command('rag:cleanup-ephemeral')->daily();
-
-// app/Console/Commands/CleanupEphemeralRag.php
-// 1. Find knowledge_bases WHERE is_ephemeral = true AND expires_at < now()
-//    (expires_at = created_at + settings('rag_ephemeral_retention_days', 7))
-// 2. For each: dispatch DeleteDocumentEmbeddings (existing job), delete uploaded source files,
-//    delete rag_sessions + rag_messages rows (cascade), delete knowledge_bases row.
-// 3. Sessions with saved_to_kb = true: KB is permanent — only the source file in temp storage
-//    is removed; session chat history retained.
-```
+- **P03 §1.3 Installation Wizard:** step list replaced by §68.6 above. Step naming "System requirements check" through "Done" is retained conceptually but the underlying mechanics (no shell, no symlinks, fixed zip-root paths) per this PART take precedence.
+- **Any reference to `php artisan storage:link`** anywhere in this master prompt (installer steps, deployment checklists, addon guides) is removed/superseded by §68.4 (`filesystems.php` public disk pointing directly at root `storage/app/public`).
+- **P06 migrations:** `rate_limit_hits` migration must include `$table->unique(['key', 'window_start'])` — see fix tracked separately; this PART does not redefine that migration but flags it as a dependency of a clean `migrate --force` run during §68.6 Final Setup.
 
 ---
 
-## 67.12 Admin Settings (Admin → Settings → AI → RAG Tools)
+### 68.10 Checklist: Distribution Package & Installer
 
-| Setting key | Default | Description |
-|-------------|---------|-------------|
-| `rag_max_file_mb` | 25 | Max upload size per file |
-| `rag_max_pages` | 300 | Max PDF pages (reject larger with clear error) |
-| `rag_top_k` | 6 | Retrieved chunks per query |
-| `rag_chunk_size` | 800 | Tokens per chunk |
-| `rag_chunk_overlap` | 100 | Token overlap |
-| `rag_embedding_model` | text-embedding-3-small | SDK embedding model (provider dropdown) |
-| `rag_system_prompt` | (grounding prompt) | Editable, never sent to frontend |
-| `rag_ephemeral_retention_days` | 7 | Auto-delete window for unsaved sessions |
-| `rag_chunks_per_credit` | 50 | Ingestion pricing knob |
-| `rag_youtube_whisper_fallback` | off | Whisper transcription when no captions |
-
-Plus per-tool enable/disable via the standard `ai_tools.is_active` toggle (already exists).
-Each RAG tool can be plan-gated via the existing plan→tools mapping; subscription gating respects
-`isProAvailable()` — **hidden, not disabled**, when false.
+- [ ] `scripts/build-release.sh` produces a zip whose root contains `index.php`, `.htaccess`, `build/`, `storage/`, `app/` exactly per §68.1
+- [ ] `app/vendor/` present and complete in the zip (composer install --no-dev run before zipping)
+- [ ] `build/manifest.json` present at zip root AND at `app/public/build/manifest.json`
+- [ ] Fresh extraction into a clean `public_html` + visiting domain shows install wizard (no 500, no Index of)
+- [ ] Requirements check correctly fails with actionable message when an extension is missing
+- [ ] SQLite path: wizard creates `database.sqlite`, runs migrations, completes without DB server
+- [ ] MySQL path: "Test Connection" correctly validates and reports bad credentials before proceeding
+- [ ] `rate_limit_hits` migration includes composite unique constraint (no ON CONFLICT errors post-install)
+- [ ] No `artisan storage:link` call anywhere in installer; uploaded files via `Storage::disk('public')` are immediately web-accessible at `/storage/...`
+- [ ] After Final Setup, `INSTALLED=true` written to `.env` and `/install` returns 404
+- [ ] Re-running Final Setup twice (e.g. user refreshes mid-process) does not duplicate admin account or crash on re-migration
+- [ ] VPS Nginx config (§68.8) tested: app/ directory returns 403/404, root serves wizard/app correctly
+- [ ] Full install tested on a real cPanel shared hosting account with no SSH access used at any point
 
 ---
-
-## 67.13 Tests (PestPHP)
-
-- Session create validates mimes + size from settings (not hardcoded)
-- Ingestion job failure sets `status='failed'` + `ingest_error`, charges 0 credits
-- Chat endpoint rejects sessions not owned by auth user (404 — never 403 to avoid ULID probing)
-- Chat endpoint rejects `status != 'ready'` with 422
-- `sources` SSE event emitted before first `token` event
-- Credits: ingestion charged once; retry after failure does not double-charge
-- `saveToKnowledgeBase` flips `is_ephemeral`, clears `expires_at`, KB appears in user's KB list
-- Cleanup command deletes expired ephemeral KBs + dispatches `DeleteDocumentEmbeddings`
-- `kb-writer` only lists the user's own permanent collections in picker
-
----
-
-## 67.14 Implementation Checklist
-
-- [ ] `ai_tools.type` enum extended with `rag`; existing tool queries unaffected
-- [ ] `knowledge_bases` gains `is_ephemeral`, `source_tool`, `expires_at`; KB page queries filter `is_ephemeral = false`
-- [ ] `rag_sessions` + `rag_messages` migrations with ULID primary keys
-- [ ] 8 tools seeded under dynamic "Document AI" category (category created via category system, NOT hardcoded)
-- [ ] `RagToolService` is the only orchestrator; all SDK calls go through `AiService` + `CompletionRequest` DTO
-- [ ] Ingestion reuses existing `IngestDocument` / `IngestUrl` jobs on `embeddings` queue — no duplicate pipeline
-- [ ] New `IngestYoutubeTranscript` job on `embeddings` queue with timestamp-preserving chunks
-- [ ] Streaming: POST + `ReadableStream`, `X-Accel-Buffering: no`, `finally` block in chat controller
-- [ ] `sources` SSE event standardized and emitted before first token in all 8 tools
-- [ ] Citation chips component reused everywhere (page / timestamp / doc-label variants)
-- [ ] Ingest progress: Reverb private channel + P66 polling fallback (2.5s) — works without Redis
-- [ ] Credits: ingestion charged once on success, retrieval free, completion standard; pre-flight estimate blocks insufficient balance
-- [ ] All usage logged to `ai_usage_logs` with `tool_slug` (appears in P56 dashboard + admin analytics)
-- [ ] "Save to Knowledge Base" promotes ephemeral KB; unsaved sessions auto-deleted after retention window
-- [ ] `rag:cleanup-ephemeral` registered in scheduler (scheduled task count: 13 → 14)
-- [ ] All 10 admin settings live in `settings` table, editable without deployment
-- [ ] `settings('app_name')` in all UI strings — zero "MakeAI" hardcoding
-- [ ] Plan gating uses existing plan→tools mapping; `isProAvailable()` hides (not disables) gated tools
-- [ ] `system_prompt` (`rag_system_prompt`) never reaches frontend via Inertia shared data
-- [ ] Rate limiting: `rag-ingest` + `rag-chat` sliding-window limits in settings table
-- [ ] Mobile API endpoints added (P44.7 extension) with standard response envelope + rate-limit headers
-- [ ] PestPHP tests from 67.13 all passing
 
 ---
 
@@ -13061,8 +12251,8 @@ Each RAG tool can be plan-gated via the existing plan→tools mapping; subscript
 
 | Metric | Count |
 |--------|-------|
-| Version | 4.1 |
-| Total Parts | 63 |
+| Version | 4.3 |
+| Total Parts | 64 |
 | AI Templates | 255 |
 | Mail Templates | 23 |
 | API Endpoints | 80+ |

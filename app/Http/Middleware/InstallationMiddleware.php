@@ -11,19 +11,26 @@ class InstallationMiddleware
     /**
      * Gating middleware for the installation wizard.
      *
-     * - When INSTALLED=true:  /install/* returns 404.
-     * - When INSTALLED=false: all requests pass through
-     *   (the wizard handles its own step logic).
+     * - When INSTALLED=true: /install/* returns 404.
+     * - When INSTALLED=false: redirects to /install.
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $installed = env('INSTALLED', false);
+        $installed = filter_var(env('INSTALLED', false), FILTER_VALIDATE_BOOLEAN);
 
-        // String 'true'/'1' from .env is truthy; handle it explicitly
-        if ($installed && $installed !== 'false' && $installed !== '0') {
-            if ($request->is('install', 'install/*')) {
+        if ($request->is('install') || $request->is('install/*')) {
+            if ($installed) {
                 abort(404);
             }
+            return $next($request);
+        }
+
+        if (! $installed && ! file_exists(base_path('.env'))) {
+            return redirect('/install');
+        }
+
+        if (! $installed) {
+            return redirect('/install');
         }
 
         return $next($request);
