@@ -19,7 +19,16 @@ class LicenseService
     // Public key shipped in core — pairs with the private key on the License Server.
     // Class constant, NOT settings/DB/.env — settings can be edited by a nuller.
     private const LICENSE_SERVER_PUBLIC_KEY = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
-    private const LICENSE_SERVER_URL        = 'https://license.yourdomain.com/api/v1/verify';
+    private const LICENSE_SERVER_URL        = 'https://license.ezydev.net/api/v1/verify';
+
+    /**
+     * SHA-256 hashes of fake purchase codes recognized only when LICENSE_TEST_MODE=true.
+     * These never reach the Envato API / License Server.
+     */
+    private const TEST_CODE_HASHES = [
+        'a826f24604f457de266d6db6d77ee0ef4ab0c0fd2b0a00b918022b57de79f5a2' => 1, // Regular: hash('sha256', 'TEST-LICENSE-0000-REGULAR')
+        '3faeb2cbd383b0c0eb4d7ebcc72312ba1c2b0d3448afba0b653b9249b392cc5d' => 2, // Extended: hash('sha256', 'TEST-LICENSE-0000-EXTENDED')
+    ];
 
     /**
      * Verify a purchase code via the Author License Server.
@@ -35,8 +44,15 @@ class LicenseService
             );
         }
 
-        // 1. Validate format locally: /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i → fail fast
         $purchaseCode = trim($purchaseCode);
+        $purchaseCodeUpper = strtoupper($purchaseCode);
+
+        $hashedCode = hash('sha256', $purchaseCodeUpper);
+
+        if ($this->testModeActive() && array_key_exists($hashedCode, self::TEST_CODE_HASHES)) {
+            return $this->buildTestResult($purchaseCodeUpper, $hashedCode, $store);
+        }
+
         if (! preg_match('/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i', $purchaseCode)) {
             return LicenseResult::failure(
                 translate('Invalid purchase code format. It should look like: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'),
@@ -227,6 +243,16 @@ class LicenseService
         } catch (\Throwable) {
             $this->markInvalid();
             return false;
+        }
+
+        $purchaseCodeUpper = strtoupper($purchaseCode);
+        if ($this->testModeActive() && array_key_exists($purchaseCodeUpper, self::TEST_CODES)) {
+            settings_set('license_verified_at', now()->toDateTimeString(), 'string', 'license');
+            settings_set('license_status', 'valid', 'string', 'license');
+            settings_set('license_grace_started_at', null, 'string', 'license');
+            Cache::forget('license.status');
+            Log::info('License re-verified via TEST MODE');
+            return true;
         }
 
         if (! $force) {
@@ -520,5 +546,46 @@ class LicenseService
             return app('test.license_public_key');
         }
         return self::LICENSE_SERVER_PUBLIC_KEY;
+    }
+
+    /**
+     * Build mock test results for local development/testing.
+     */
+    private function buildTestResult(string $purchaseCode, string $hashedCode, bool $store = true): LicenseResult
+    {
+        $type = self::TEST_CODE_HASHES[$hashedCode];
+        $supportedUntil = now()->addYears(10)->toDateTimeString();
+
+        if ($store) {
+            settings_set('license_purchase_code', Crypt::encryptString($purchaseCode), 'encrypted', 'license');
+            settings_set('license_type', $type, 'integer', 'license');
+            settings_set('license_buyer', 'test-buyer', 'string', 'license');
+            settings_set('license_purchased_at', now()->toDateString(), 'string', 'license');
+            settings_set('license_supported_until', $supportedUntil, 'string', 'license');
+            settings_set('license_verified_at', now()->toDateTimeString(), 'string', 'license');
+            settings_set('license_domain', request()->getHost(), 'string', 'license');
+            settings_set('license_status', 'valid', 'string', 'license');
+            settings_set('license_grace_started_at', null, 'string', 'license');
+            settings_set('license_is_test_mode', true, 'boolean', 'license');
+
+            Cache::forget('license.status');
+        }
+
+        Log::info('License verified via TEST MODE', [
+            'type' => $type,
+        ]);
+
+        return LicenseResult::success([
+            'type' => $type,
+            'buyer' => 'test-buyer',
+            'purchase_date' => now()->toDateString(),
+            'license' => $type === 2 ? 'Extended License' : 'Regular License',
+            'supported_until' => $supportedUntil,
+        ]);
+    }
+
+    private function testModeActive(): bool
+    {
+        return filter_var(config('app.license_test_mode', false), FILTER_VALIDATE_BOOLEAN);
     }
 }

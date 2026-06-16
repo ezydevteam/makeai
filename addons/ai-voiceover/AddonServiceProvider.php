@@ -50,7 +50,13 @@ class AddonServiceProvider extends ServiceProvider
                 ->daily()
                 ->when(fn () => addon_setting('ai-voiceover', 'auto_delete_days', 0) > 0);
 
-            $schedule->job(new \Addons\AiVoiceover\Jobs\SyncVoices)
+            $provider = addon_setting('ai-voiceover', 'default_provider', 'openai');
+
+            if (! in_array($provider, ['elevenlabs', 'openai', 'murf', 'playht'], true)) {
+                $provider = 'openai';
+            }
+
+            $schedule->job(new \Addons\AiVoiceover\Jobs\SyncVoices($provider))
                 ->weekly();
         });
     }

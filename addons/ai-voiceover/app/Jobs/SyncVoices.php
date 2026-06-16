@@ -16,23 +16,19 @@ class SyncVoices implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct()
+    public function __construct(private readonly string $provider = 'openai')
     {
         $this->onQueue('low');
     }
 
     public function handle(VoiceoverService $service): void
     {
-        $providers = ['elevenlabs', 'openai', 'murf', 'playht'];
-
-        foreach ($providers as $provider) {
-            try {
-                $service->syncVoices($provider);
-            } catch (\Throwable $e) {
-                Log::warning("Voiceover: Failed to sync voices for {$provider}", [
-                    'error' => $e->getMessage(),
-                ]);
-            }
+        try {
+            $service->syncVoices($this->provider);
+        } catch (\Throwable $e) {
+            Log::warning("Voiceover: Failed to sync voices for {$this->provider}", [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

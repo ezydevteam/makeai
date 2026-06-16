@@ -26,14 +26,16 @@ class User extends Authenticatable implements MustVerifyEmail
     use HasFactory, Notifiable, SoftDeletes, Billable;
 
     protected $fillable = [
-        'name', 'email', 'password', 'ulid', 'avatar',
+        'name', 'email', 'password', 'password_changed_at', 'ulid', 'avatar',
         'credits', 'credits_used_today', 'credits_used_month',
         'daily_limit', 'monthly_limit',
         'plan_id', 'subscription_status', 'subscription_ends_at',
+        'email_verified_at', 'trial_ends_at',
         'referral_code', 'affiliate_custom_slug', 'referred_by', 'referral_earnings', 'referral_count',
         'theme_preference', 'locale', 'timezone',
-        'brand_voice',
-        'is_active', 'is_banned', 'ban_reason',
+        'preferences', 'personal_api_keys', 'brand_voice',
+        'stripe_id', 'pm_type', 'pm_last_four',
+        'is_active', 'has_trialed', 'is_banned', 'ban_reason',
         'otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until',
         'two_factor_secret', 'two_factor_enabled', 'two_factor_confirmed_at', 'two_factor_recovery_codes',
         'login_attempts', 'locked_until',
@@ -52,6 +54,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'password_changed_at' => 'datetime',
             'credits' => 'decimal:4',
             'credits_used_today' => 'decimal:4',
             'credits_used_month' => 'decimal:4',
@@ -59,6 +62,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'monthly_limit' => 'decimal:4',
             'referral_earnings' => 'decimal:4',
             'is_active' => 'boolean',
+            'has_trialed' => 'boolean',
             'is_banned' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_recovery_codes' => 'array',
@@ -463,5 +467,10 @@ class User extends Authenticatable implements MustVerifyEmail
     public function ragSessions()
     {
         return $this->hasMany(RagSession::class);
+    }
+
+    public function passwordHistory()
+    {
+        return $this->morphMany(PasswordHistory::class, 'user');
     }
 }

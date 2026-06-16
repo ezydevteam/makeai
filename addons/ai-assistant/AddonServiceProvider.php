@@ -3,6 +3,8 @@
 namespace Addons\AiAssistant;
 
 use Addons\AiAssistant\Services\AiAssistantService;
+use App\Models\AiKey;
+use App\Models\AiModel;
 use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -55,13 +57,41 @@ class AddonServiceProvider extends ServiceProvider
                 return [];
             }
 
-            return \App\Models\AiKey::available()
+            $configuredProviders = AiKey::available()->pluck('provider')->unique();
+            $providers = config('ai.providers', []);
+
+            return AiModel::active()
+                ->where('type', 'chat')
+                ->whereIn('provider', $configuredProviders)
+                ->select('provider')
+                ->distinct()
+                ->orderBy('provider')
                 ->pluck('provider')
-                ->unique()
+                ->map(fn (string $provider) => [
+                    'value' => $provider,
+                    'label' => $providers[$provider]['name'] ?? ucfirst($provider),
+                ])
                 ->values()
-                ->map(fn ($p) => [
-                    'value' => $p,
-                    'label' => ucfirst($p),
+                ->toArray();
+        });
+
+        Inertia::share('aiModels', function () {
+            if (! is_addon_active('ai-assistant')) {
+                return [];
+            }
+
+            $configuredProviders = AiKey::available()->pluck('provider')->unique();
+
+            return AiModel::active()
+                ->where('type', 'chat')
+                ->whereIn('provider', $configuredProviders)
+                ->orderBy('provider')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'provider'])
+                ->map(fn (AiModel $model) => [
+                    'value' => $model->slug,
+                    'label' => $model->name,
+                    'provider' => $model->provider,
                 ])
                 ->toArray();
         });

@@ -46,3 +46,6 @@
 - For long-running queue jobs, use `public int $timeout` (e.g., 600-1800) instead of `$tries = 1` to prevent silent failures on timeout. Confidence: 0.70
 - When opening file handles with `fopen()`, wrap the write/read logic in `try/finally` to guarantee `fclose()` always runs. Confidence: 0.70
 - Log warnings when database `increment()`/`decrement()` returns 0, indicating the target row may not exist. Confidence: 0.65
+
+# workflow
+- When presenting multiple improvement recommendations, implement all identified fixes rather than asking for selection. Confidence: 0.80

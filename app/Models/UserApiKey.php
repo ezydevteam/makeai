@@ -13,6 +13,10 @@ class UserApiKey extends Model
         'user_id', 'provider', 'api_key', 'is_active',
     ];
 
+    protected $appends = [
+        'masked_api_key',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -46,5 +50,28 @@ class UserApiKey extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Get a masked version of the API key for safe frontend display.
+     */
+    public function getMaskedApiKeyAttribute(): ?string
+    {
+        $rawKey = $this->api_key;
+
+        if (! $rawKey) {
+            return null;
+        }
+
+        $length = strlen($rawKey);
+
+        if ($length <= 8) {
+            return str_repeat('*', $length);
+        }
+
+        $prefix = substr($rawKey, 0, 4);
+        $suffix = substr($rawKey, -4);
+
+        return $prefix . str_repeat('*', $length - 8) . $suffix;
     }
 }

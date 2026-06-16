@@ -319,8 +319,8 @@ const openConfirmModal = (config: Omit<ConfirmModalState, 'open' | 'processing'>
     }
 }
 
-const closeConfirmModal = () => {
-    if (confirmModal.value.processing) {
+const closeConfirmModal = (force = false) => {
+    if (confirmModal.value.processing && !force) {
         return
     }
 
@@ -368,7 +368,7 @@ const applyBulkUpdate = () => {
                     bulkAction.value = ''
                 },
                 onFinish: () => {
-                    closeConfirmModal()
+                    closeConfirmModal(true)
                 },
             })
         },

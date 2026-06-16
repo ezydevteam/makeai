@@ -9,6 +9,7 @@ import AppSelect from '@/Components/AppSelect.vue'
 import IconClassSelect from '@/Components/IconClassSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 
 defineOptions({ layout: AdminLayout })
 
@@ -92,9 +93,12 @@ const props = defineProps<{
     config: HeaderConfig
     menus: MenuOption[]
     defaults: DefaultSectionConfig
+    themeSlug?: string
+    embed?: boolean
 }>()
 
 const { t } = useTranslate()
+const { error: toastError } = useToastr()
 
 const activeSection = ref<HeaderSectionKey>('main')
 const selectedBlockIndex = ref<number | null>(null)
@@ -349,7 +353,7 @@ const importConfig = () => {
         showImportModal.value = false
         importJsonText.value = ''
     } catch {
-        alert(t('Invalid JSON format.'))
+        toastError(t('Invalid JSON format.'))
     }
 }
 
@@ -372,11 +376,11 @@ const submit = () => {
         config.downscroll_offset = Number(config.downscroll_offset || 0)
     })
 
-    form.post(route('admin.header.update'), { preserveScroll: true })
+    form.post(route('admin.header.update', { slug: props.themeSlug || 'default' }), { preserveScroll: true })
 }
 
 const resetSection = () => {
-    router.post(route('admin.header.reset', activeSection.value), {}, {
+    router.post(route('admin.header.reset', { slug: props.themeSlug || 'default', section: activeSection.value }), {}, {
         preserveScroll: true,
         onSuccess: () => {
             // Reload page to get fresh config
@@ -502,7 +506,7 @@ const handleBackgroundUpload = async (event: Event, section: HeaderSectionKey = 
     formData.append('directory', 'header-backgrounds')
 
     try {
-        const response = await fetch('/admin/builder/header/upload-logo', {
+        const response = await fetch(route('admin.header.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             body: formData,
             headers: {
@@ -541,7 +545,7 @@ const toggleMobileBottomBooleanField = (key: 'shadow' | 'progressbar') => {
 </script>
 
 <template>
-    <Head :title="t('Header Builder - Admin')" />
+    <Head v-if="!props.embed" :title="t('Header Builder - Admin')" />
 
     <div class="mx-auto max-w-7xl px-6 py-8">
         <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

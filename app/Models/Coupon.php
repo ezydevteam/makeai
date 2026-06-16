@@ -57,12 +57,28 @@ class Coupon extends Model
     public function isEligibleForUser(User $user): bool
     {
         return match ($this->user_limit) {
-            'active' => $user->is_active,
+            'active' => $user->is_active, // Note: 'is_active' means non-banned in this codebase
             'inactive' => ! $user->is_active,
             'free' => ! $user->isPro(),
             'pro' => $user->isPro(),
             'recent_30_days' => $user->created_at?->greaterThanOrEqualTo(now()->subDays(30)) ?? false,
             default => true,
+        };
+    }
+
+    /**
+     * Get a clear, user-friendly label for the user_limit option.
+     * Resolves ambiguity (e.g., 'active' means 'non-banned', not 'has active subscription').
+     */
+    public function getUserLimitLabelAttribute(): string
+    {
+        return match ($this->user_limit) {
+            'active' => 'Non-banned users',
+            'inactive' => 'Banned/Suspended users',
+            'free' => 'Free tier users',
+            'pro' => 'Pro/Paid users',
+            'recent_30_days' => 'Users registered in last 30 days',
+            default => 'All users',
         };
     }
 

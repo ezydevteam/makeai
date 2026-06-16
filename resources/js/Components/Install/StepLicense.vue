@@ -1,15 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 
 const props = defineProps<{
     formData: Record<string, any>
 }>()
 
+const page = usePage()
+const licenseTestMode = computed(() => !!page.props.licenseTestMode)
+
 const purchaseCode = ref(props.formData?.step_4?.purchase_code ?? '')
 const { t } = useTranslate()
 
 function applyMask(value: string) {
+    if (licenseTestMode.value) {
+        return value.replace(/[^a-z0-9-]/gi, '').slice(0, 50).toUpperCase()
+    }
     return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
 }
 
@@ -40,6 +47,15 @@ defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })
                     class="mt-1.5 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                 />
             </label>
+
+            <div v-if="licenseTestMode" class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                <p class="font-semibold">{{ t('Developer test mode active') }}</p>
+                <p class="mt-1 text-xs">{{ t('Use one of these fake codes to test license-gated features without contacting Envato:') }}</p>
+                <ul class="mt-2 list-disc list-inside space-y-1 text-xs font-mono">
+                    <li>TEST-LICENSE-0000-REGULAR</li>
+                    <li>TEST-LICENSE-0000-EXTENDED</li>
+                </ul>
+            </div>
 
             <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
                 <p class="font-semibold">{{ t('Why activate?') }}</p>

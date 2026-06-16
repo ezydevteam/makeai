@@ -34,6 +34,10 @@ class AiAssistantService
                 if (mb_strpos($messageLower, $triggerLower) !== false) {
                     return $rule;
                 }
+            } elseif ($rule->match_type === 'fuzzy') {
+                if (levenshtein($messageLower, $triggerLower) <= 2) {
+                    return $rule;
+                }
             }
         }
 

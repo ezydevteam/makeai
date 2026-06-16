@@ -109,7 +109,6 @@ class TokenGuard
         array $metadata = [],
         bool $deductCredits = true,
         bool $success = true,
-        ?string $requestId = null,
         ?int $responseTimeMs = null
     ): float {
         // Fetch model config from DB for pricing
@@ -161,7 +160,6 @@ class TokenGuard
             'output_tokens' => $outputTokens,
             'cost_usd' => $costUsd,
             'credits_used' => ($success && $deductCredits && $deducted) ? $credits : 0,
-            'request_id' => $requestId,
             'response_time_ms' => $responseTimeMs,
             'status' => $billingFailed ? 'failed' : $status,
             'metadata' => $billingFailed

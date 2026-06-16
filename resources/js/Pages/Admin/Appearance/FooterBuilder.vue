@@ -9,6 +9,7 @@ import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import IconClassSelect from '@/Components/IconClassSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 
 declare const route: (name: string, params?: unknown) => string
 
@@ -101,9 +102,12 @@ const props = defineProps<{
     menus: MenuOption[]
     pages: PageOption[]
     aiCategories: AiCategoryOption[]
+    themeSlug?: string
+    embed?: boolean
 }>()
 
 const { t } = useTranslate()
+const { error: toastError } = useToastr()
 
 let blockIdSequence = 0
 const selectedColumnIndex = ref<number | null>(null)
@@ -482,7 +486,7 @@ const moveColumn = (columnIndex: number, direction: -1 | 1) => {
 const submit = () => {
     form.bottom_blocks = form.bottom_columns.flatMap((column) => column.blocks)
 
-    form.post(route('admin.footer.update'), {
+    form.post(route('admin.footer.update', { slug: props.themeSlug || 'default' }), {
         preserveScroll: true,
     })
 }
@@ -509,7 +513,7 @@ const handleBackgroundUpload = async (event: Event) => {
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
 
     try {
-        const response = await fetch('/admin/appearance/header/upload-logo', {
+        const response = await fetch(route('admin.header.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': csrf,
@@ -542,7 +546,7 @@ const handlePaymentIconUpload = async (event: Event) => {
         payload.append('directory', 'footer-payments')
 
         const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
-        const response = await fetch('/admin/appearance/header/upload-logo', {
+        const response = await fetch(route('admin.header.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': csrf,
@@ -575,7 +579,7 @@ const handleFooterImageUpload = async (event: Event) => {
     payload.append('directory', 'footer-images')
 
     const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? ''
-    const response = await fetch('/admin/appearance/header/upload-logo', {
+    const response = await fetch(route('admin.header.upload', { slug: props.themeSlug || 'default' }), {
         method: 'POST',
         headers: {
             'X-CSRF-TOKEN': csrf,
@@ -611,7 +615,7 @@ const importConfig = () => {
         showImportModal.value = false
         importJsonText.value = ''
     } catch {
-        alert(t('Invalid JSON format.'))
+        toastError(t('Invalid JSON format.'))
     }
 }
 
@@ -622,9 +626,9 @@ const resetFooter = () => {
 </script>
 
 <template>
-    <Head :title="t('Footer Builder')" />
+    <Head v-if="!props.embed" :title="t('Footer Builder')" />
 
-    <AdminLayout>
+    <component :is="props.embed ? 'div' : AdminLayout">
         <div class="space-y-6">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -1320,7 +1324,7 @@ const resetFooter = () => {
                 </div>
             </div>
         </Teleport>
-    </AdminLayout>
+    </component>
 </template>
 
 <style scoped>

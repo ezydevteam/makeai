@@ -68,6 +68,8 @@ const props = defineProps<{
     activeHomepageTemplate: string
     availableTemplates: Array<{ slug: string; name: string; requires_pro: boolean }>
     gridTemplates: Array<{ slug: string; name: string; requires_pro: boolean }>
+    themeSlug?: string
+    embed?: boolean
 }>()
 
 const { t } = useTranslate()
@@ -740,7 +742,7 @@ const resolveStoredMediaUrl = (path?: string | null): string => {
 const cloneSection = (section: HomepageSection): HomepageSection => JSON.parse(JSON.stringify(section)) as HomepageSection
 
 const submit = () => {
-    form.post(route('admin.homepage.update'), {
+    form.post(route('admin.homepage.update', { slug: props.themeSlug || 'default' }), {
         preserveScroll: true,
     })
 }
@@ -1559,7 +1561,7 @@ const handleItemImageUpload = async (item: SectionItem, event: Event) => {
         payload.append('directory', 'homepage')
 
         const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
-        const response = await fetch(route('admin.homepage.upload'), {
+        const response = await fetch(route('admin.homepage.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
@@ -1608,7 +1610,7 @@ const handleHeroBackgroundUpload = async (event: Event) => {
         payload.append('directory', 'homepage')
 
         const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
-        const response = await fetch(route('admin.homepage.upload'), {
+        const response = await fetch(route('admin.homepage.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
@@ -1665,7 +1667,7 @@ const handleCtaBannerBackgroundUpload = async (event: Event) => {
         payload.append('directory', 'homepage')
 
         const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
-        const response = await fetch(route('admin.homepage.upload'), {
+        const response = await fetch(route('admin.homepage.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
@@ -1719,7 +1721,7 @@ const handleToolsShowcaseBackgroundUpload = async (event: Event) => {
         payload.append('directory', 'homepage')
 
         const csrf = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
-        const response = await fetch(route('admin.homepage.upload'), {
+        const response = await fetch(route('admin.homepage.upload', { slug: props.themeSlug || 'default' }), {
             method: 'POST',
             headers: {
                 Accept: 'application/json',
@@ -1762,14 +1764,14 @@ const normalizePhrases = () => {
 
 const setHomepageTemplate = (slug: string) => {
     homepageTemplateForm.homepage_template = slug
-    homepageTemplateForm.post(route('admin.homepage.set'), { preserveScroll: true })
+    homepageTemplateForm.post(route('admin.homepage.set', { slug: props.themeSlug || 'default' }), { preserveScroll: true })
 }
 </script>
 
 <template>
-    <Head :title="t('Homepage Builder - Admin')" />
+    <Head v-if="!props.embed" :title="t('Homepage Builder - Admin')" />
 
-    <AdminLayout>
+    <component :is="props.embed ? 'div' : AdminLayout">
         <div class="max-w-7xl mx-auto px-6 py-8">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-8">
                 <div>
@@ -3789,5 +3791,5 @@ const setHomepageTemplate = (slug: string) => {
                 </div>
             </div>
         </div>
-    </AdminLayout>
+    </component>
 </template>

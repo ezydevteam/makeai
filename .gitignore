@@ -75,3 +75,6 @@ caveman/
 
 # Export files
 storage/app/exports/
+
+# Distribution build output
+/dist/

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
+use App\Models\Payment;
 use App\Models\Plan;
 use App\Services\Pricing\PlanPriceResolver;
 use Illuminate\Http\RedirectResponse;
@@ -28,6 +29,23 @@ class StripeController extends Controller
         $cycle = $pricing[$validated['billing']];
         $billing = $validated['billing'];
 
+        // Create pending payment record for unified lifecycle tracking (bridges Cashier and custom GatewaySubscription)
+        $payment = Payment::create([
+            'user_id' => $user->id,
+            'plan_id' => $plan->id,
+            'gateway' => 'stripe',
+            'amount' => (float) $cycle['amount'],
+            'currency' => $pricing['currency_code'],
+            'status' => 'pending',
+            'type' => 'subscription',
+            'metadata' => [
+                'billing_cycle' => $billing,
+                'pricing_country' => $pricing['country_code'],
+                'pricing_source' => $pricing['source'],
+                'is_trial' => ! empty($cycle['is_trial']),
+            ],
+        ]);
+
         $stripePriceId = $billing === 'monthly' ? $plan->stripe_price_monthly_id : $plan->stripe_price_yearly_id;
 
         if ($billing === 'lifetime' || ! $stripePriceId) {
@@ -36,7 +54,11 @@ class StripeController extends Controller
                 [
                     'success_url' => route('user.dashboard').'?checkout=success',
                     'cancel_url' => route('pricing').'?billing='.$billing,
-                    'metadata' => ['plan_slug' => $plan->slug, 'billing_cycle' => $billing],
+                    'metadata' => [
+                        'plan_slug' => $plan->slug, 
+                        'billing_cycle' => $billing,
+                        'payment_id' => $payment->ulid,
+                    ],
                 ],
             );
         }
@@ -46,7 +68,11 @@ class StripeController extends Controller
             [
                 'success_url' => route('user.dashboard').'?checkout=success',
                 'cancel_url' => route('pricing').'?billing='.$billing,
-                'metadata' => ['plan_slug' => $plan->slug, 'billing_cycle' => $billing],
+                'metadata' => [
+                    'plan_slug' => $plan->slug, 
+                    'billing_cycle' => $billing,
+                    'payment_id' => $payment->ulid,
+                ],
             ],
         );
     }

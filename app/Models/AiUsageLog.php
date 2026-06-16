@@ -6,11 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class AiUsageLog extends Model
 {
+    protected $appends = [
+        'total_tokens',
+    ];
+
     protected $fillable = [
         'user_id', 'provider', 'model', 'type', 'tool_slug',
         'input_tokens', 'output_tokens', 'cost_usd',
-        'credits_used', 'request_id', 'response_time_ms',
-        'status', 'metadata',
+        'credits_used', 'response_time_ms',
+        'aggregated_at', 'status', 'metadata',
     ];
 
     protected function casts(): array
@@ -18,6 +22,7 @@ class AiUsageLog extends Model
         return [
             'cost_usd' => 'decimal:6',
             'credits_used' => 'decimal:2',
+            'aggregated_at' => 'datetime',
             'metadata' => 'array',
         ];
     }

@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
+    base: '/build/',
     plugins: [
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
@@ -24,6 +25,11 @@ export default defineConfig({
         alias: {
             '@': fileURLToPath(new URL('./resources/js', import.meta.url))
         },
+    },
+    build: {
+        manifest: true,
+        outDir: 'public/build',
+        chunkSizeWarningLimit: 1000, // Increase limit to 1MB to suppress expected warnings for large admin components
     },
     server: {
         fs: {

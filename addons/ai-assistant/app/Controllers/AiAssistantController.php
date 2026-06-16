@@ -319,7 +319,7 @@ class AiAssistantController extends Controller
     public function extractText(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => 'required|file|max:10240', // 10MB limit
+            'file' => 'required|file|max:' . (int) addon_setting('ai-assistant', 'max_upload_size_kb', 10240), // Configurable limit
         ]);
 
         $file = $request->file('file');

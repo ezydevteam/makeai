@@ -56,7 +56,7 @@ class ProcessRepurposeJob implements ShouldQueue
                 'source_title'      => $data['title'] ?? $job->source_title,
                 'duration_seconds'  => $data['duration'] ?? null,
                 'chapters'          => $data['chapters'] ?? [],
-                'word_count'        => str_word_count($data['transcript']),
+                'word_count'        => count(preg_split('/\s+/u', trim($data['transcript']), -1, PREG_SPLIT_NO_EMPTY)),
                 'transcript_source' => $job->source_type === 'youtube_url' ? 'youtube' : ($data['provider'] ?? 'whisper'),
             ]);
         } catch (\Throwable $e) {

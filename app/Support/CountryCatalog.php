@@ -25,7 +25,7 @@ class CountryCatalog
     {
         $countries = [];
 
-        if (class_exists(\ResourceBundle::class)) {
+        if (extension_loaded('intl') && class_exists(\ResourceBundle::class) && function_exists('locale_get_region') && function_exists('locale_get_display_region')) {
             foreach (\ResourceBundle::getLocales('') ?: [] as $availableLocale) {
                 $countryCode = locale_get_region($availableLocale);
 
@@ -52,6 +52,29 @@ class CountryCatalog
                 'GB' => ['code' => 'GB', 'name' => 'United Kingdom'],
                 'CA' => ['code' => 'CA', 'name' => 'Canada'],
                 'AU' => ['code' => 'AU', 'name' => 'Australia'],
+                'DE' => ['code' => 'DE', 'name' => 'Germany'],
+                'FR' => ['code' => 'FR', 'name' => 'France'],
+                'IT' => ['code' => 'IT', 'name' => 'Italy'],
+                'ES' => ['code' => 'ES', 'name' => 'Spain'],
+                'NL' => ['code' => 'NL', 'name' => 'Netherlands'],
+                'PK' => ['code' => 'PK', 'name' => 'Pakistan'],
+                'NP' => ['code' => 'NP', 'name' => 'Nepal'],
+                'LK' => ['code' => 'LK', 'name' => 'Sri Lanka'],
+                'NZ' => ['code' => 'NZ', 'name' => 'New Zealand'],
+                'SG' => ['code' => 'SG', 'name' => 'Singapore'],
+                'MY' => ['code' => 'MY', 'name' => 'Malaysia'],
+                'ID' => ['code' => 'ID', 'name' => 'Indonesia'],
+                'PH' => ['code' => 'PH', 'name' => 'Philippines'],
+                'TH' => ['code' => 'TH', 'name' => 'Thailand'],
+                'VN' => ['code' => 'VN', 'name' => 'Vietnam'],
+                'JP' => ['code' => 'JP', 'name' => 'Japan'],
+                'KR' => ['code' => 'KR', 'name' => 'South Korea'],
+                'CN' => ['code' => 'CN', 'name' => 'China'],
+                'TR' => ['code' => 'TR', 'name' => 'Turkey'],
+                'ZA' => ['code' => 'ZA', 'name' => 'South Africa'],
+                'BR' => ['code' => 'BR', 'name' => 'Brazil'],
+                'MX' => ['code' => 'MX', 'name' => 'Mexico'],
+                'AR' => ['code' => 'AR', 'name' => 'Argentina'],
             ];
         }
 
@@ -77,9 +100,27 @@ class CountryCatalog
             return null;
         }
 
-        $name = locale_get_display_region('-'.strtoupper($countryCode), $locale);
+        $countryCode = strtoupper($countryCode);
 
-        return is_string($name) && $name !== '' ? $name : strtoupper($countryCode);
+        if (extension_loaded('intl') && function_exists('locale_get_display_region')) {
+            try {
+                $name = locale_get_display_region('-'.$countryCode, $locale);
+                if (is_string($name) && $name !== '') {
+                    return $name;
+                }
+            } catch (\Throwable) {
+                // Fall back
+            }
+        }
+
+        // Fallback: search in our countries list
+        foreach (self::countries($locale) as $country) {
+            if ($country['code'] === $countryCode) {
+                return $country['name'];
+            }
+        }
+
+        return $countryCode;
     }
 
     public static function formatMoney(float|int|string|null $amount, string $currencyCode): string
@@ -94,15 +135,19 @@ class CountryCatalog
 
     private static function formatNumber(float $amount, int $decimals): string
     {
-        if (class_exists(NumberFormatter::class)) {
-            $formatter = new NumberFormatter(app()->getLocale() ?: 'en', NumberFormatter::DECIMAL);
-            $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, $decimals);
-            $formatter->setAttribute(NumberFormatter::MIN_FRACTION_DIGITS, $decimals);
-            $formatter->setAttribute(NumberFormatter::MAX_FRACTION_DIGITS, $decimals);
-            $formatted = $formatter->format($amount);
+        if (extension_loaded('intl') && class_exists(NumberFormatter::class)) {
+            try {
+                $formatter = new NumberFormatter(app()->getLocale() ?: 'en', NumberFormatter::DECIMAL);
+                $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, $decimals);
+                $formatter->setAttribute(NumberFormatter::MIN_FRACTION_DIGITS, $decimals);
+                $formatter->setAttribute(NumberFormatter::MAX_FRACTION_DIGITS, $decimals);
+                $formatted = $formatter->format($amount);
 
-            if (is_string($formatted)) {
-                return $formatted;
+                if (is_string($formatted)) {
+                    return $formatted;
+                }
+            } catch (\Throwable) {
+                // Fall back
             }
         }
 
@@ -130,13 +175,17 @@ class CountryCatalog
 
     private static function intlCurrencySymbol(string $currencyCode): string
     {
-        if (class_exists(NumberFormatter::class)) {
-            $formatter = new NumberFormatter(app()->getLocale() ?: 'en', NumberFormatter::CURRENCY);
-            $formatter->setTextAttribute(NumberFormatter::CURRENCY_CODE, $currencyCode);
-            $symbol = $formatter->getSymbol(NumberFormatter::CURRENCY_SYMBOL);
+        if (extension_loaded('intl') && class_exists(NumberFormatter::class)) {
+            try {
+                $formatter = new NumberFormatter(app()->getLocale() ?: 'en', NumberFormatter::CURRENCY);
+                $formatter->setTextAttribute(NumberFormatter::CURRENCY_CODE, $currencyCode);
+                $symbol = $formatter->getSymbol(NumberFormatter::CURRENCY_SYMBOL);
 
-            if (is_string($symbol) && $symbol !== '') {
-                return $symbol;
+                if (is_string($symbol) && $symbol !== '') {
+                    return $symbol;
+                }
+            } catch (\Throwable) {
+                // Fall back
             }
         }
 

@@ -2,6 +2,8 @@
 
 namespace Addons\SocialScheduler\Http\Controllers\Admin;
 
+use App\Models\AiKey;
+use App\Models\AiModel;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -24,6 +26,7 @@ class SsAdminSettingsController extends Controller
                 'first_comment_enabled' => addon_setting('social-scheduler', 'first_comment_enabled', true),
                 'provider' => addon_setting('social-scheduler', 'provider', ''),
             ],
+            'providers' => $this->configuredProviders(),
         ]);
     }
 
@@ -48,5 +51,47 @@ class SsAdminSettingsController extends Controller
         }
 
         return back()->with('flash', 'Settings saved.');
+    }
+
+    /**
+     * Build configured AI providers with active models only.
+     *
+     * @return array<string, array{name: string, models: array<int, array{slug: string, name: string}>}>
+     */
+    private function configuredProviders(): array
+    {
+        $providers = config('ai.providers', []);
+        $activeProviders = AiKey::available()->get()->pluck('provider')->unique()->values();
+
+        $result = [];
+
+        foreach ($providers as $slug => $info) {
+            if (! $activeProviders->contains($slug)) {
+                continue;
+            }
+
+            $models = AiModel::query()
+                ->active()
+                ->where('provider', $slug)
+                ->orderBy('name')
+                ->get(['slug', 'name'])
+                ->map(fn (AiModel $model) => [
+                    'slug' => $model->slug,
+                    'name' => $model->name,
+                ])
+                ->values()
+                ->all();
+
+            if (empty($models)) {
+                continue;
+            }
+
+            $result[$slug] = [
+                'name' => $info['name'] ?? $slug,
+                'models' => $models,
+            ];
+        }
+
+        return $result;
     }
 }

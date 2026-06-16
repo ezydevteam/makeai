@@ -39,11 +39,8 @@ class LoginController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if ($user && $user->isLocked()) {
-            $minutes = (int) ceil(now()->diffInMinutes($user->locked_until));
             throw ValidationException::withMessages([
-                'email' => [translate('Account locked for :minutes minutes due to too many attempts.', [
-                    'minutes' => $minutes,
-                ])],
+                'email' => [translate('Invalid credentials or account locked.')],
             ]);
         }
 
@@ -55,7 +52,7 @@ class LoginController extends Controller
 
                 if ($user->fresh()->isLocked()) {
                     throw ValidationException::withMessages([
-                        'email' => [translate('Account locked for 15 minutes due to too many failed attempts.')],
+                        'email' => [translate('Invalid credentials or account locked.')],
                     ]);
                 }
             }

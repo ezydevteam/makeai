@@ -2,6 +2,9 @@
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useFlashToasts } from '@/Composables/useToastr'
+
+useFlashToasts()
 
 interface SocialLoginProvider {
     provider: string

@@ -15,7 +15,7 @@ use Inertia\Response;
 
 class HomepageBuilderController extends Controller
 {
-    private const SECTION_TYPES = [
+    public const SECTION_TYPES = [
         'hero',
         'features',
         'tools_showcase',
@@ -37,7 +37,7 @@ class HomepageBuilderController extends Controller
         'all_tools',
     ];
 
-    public function index(): Response
+    public function index(string $slug): Response
     {
         $savedConfig = Setting::getValue('homepage_config');
         $savedConfig = is_array($savedConfig) ? $this->normalizeStoredHomepageConfig($savedConfig) : null;
@@ -68,10 +68,11 @@ class HomepageBuilderController extends Controller
                 ->orderBy('name')
                 ->get(['slug', 'name', 'requires_pro'])
                 ->values(),
+            'themeSlug' => $slug,
         ]);
     }
 
-    public function setHomepage(Request $request)
+    public function setHomepage(Request $request, string $slug)
     {
         $validated = $request->validate([
             'homepage_template' => ['required', 'string', 'max:100'],
@@ -82,7 +83,7 @@ class HomepageBuilderController extends Controller
         return back()->with('success', translate('Homepage setting updated.'));
     }
 
-    public function update(HomepageBuilderRequest $request)
+    public function update(HomepageBuilderRequest $request, string $slug)
     {
         $validated = $this->normalizeStoredHomepageConfig($request->validated());
 
@@ -91,7 +92,7 @@ class HomepageBuilderController extends Controller
         return back()->with('success', translate('Homepage configuration saved successfully.'));
     }
 
-    public function upload(Request $request): JsonResponse
+    public function upload(Request $request, string $slug): JsonResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'mimetypes:image/jpeg,image/png,image/webp,image/gif,image/svg+xml,video/mp4,video/webm,video/ogg,video/quicktime', 'max:51200'],
@@ -111,7 +112,7 @@ class HomepageBuilderController extends Controller
         return response()->json(['url' => $url, 'path' => $path]);
     }
 
-    private function normalizeStoredHomepageConfig(array $config): array
+    public function normalizeStoredHomepageConfig(array $config): array
     {
         $changed = false;
 
@@ -932,7 +933,7 @@ class HomepageBuilderController extends Controller
         return $path;
     }
 
-    private function getDefaults(): array
+    public function getDefaults(): array
     {
         return [
             'sections' => [

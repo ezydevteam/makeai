@@ -13,7 +13,18 @@ class ImageEditorSettingsRequest extends FormRequest
         $this->merge([
             'enabled' => $this->boolean('enabled', false),
             'auto_save_to_library' => $this->boolean('auto_save_to_library', false),
+            'stability_api_key' => $this->normalizeSecretInput('stability_api_key'),
+            'replicate_api_key' => $this->normalizeSecretInput('replicate_api_key'),
+            'remove_bg_api_key' => $this->normalizeSecretInput('remove_bg_api_key'),
+            'clipdrop_api_key' => $this->normalizeSecretInput('clipdrop_api_key'),
         ]);
+    }
+
+    private function normalizeSecretInput(string $key): ?string
+    {
+        $value = trim((string) $this->input($key, ''));
+
+        return $value === '' ? null : $value;
     }
 
     public function rules(): array

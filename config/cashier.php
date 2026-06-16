@@ -30,7 +30,7 @@ return [
     */
 
     'webhook' => [
-        'secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'secret' => env('STRIPE_WEBHOOK_SECRET', function_exists('settings') ? settings('stripe_webhook_secret') : null),
         'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
         'events' => WebhookCommand::DEFAULT_EVENTS,
     ],

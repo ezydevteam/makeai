@@ -83,6 +83,14 @@ class ThemeCssController extends Controller
 
             $lines[] = '}';
 
+            $customCss = $settings['custom_css'] ?? '';
+            if ($customCss) {
+                $lines[] = '';
+                $lines[] = '/* Custom CSS start */';
+                $lines[] = $customCss;
+                $lines[] = '/* Custom CSS end */';
+            }
+
             return implode("\n", $lines);
         });
 

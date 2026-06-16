@@ -13,7 +13,7 @@ use Inertia\Inertia;
 
 class HeaderBuilderController extends Controller
 {
-    private function getDefaults(): array
+    public function getDefaults(): array
     {
         $defaults = [
             'layout' => 'classic',
@@ -76,7 +76,7 @@ class HeaderBuilderController extends Controller
         ];
     }
 
-    private function normalizeBlockIds(array $config): array
+    public function normalizeBlockIds(array $config): array
     {
         $usedIds = [];
 
@@ -133,7 +133,7 @@ class HeaderBuilderController extends Controller
         return $config;
     }
 
-    private function migrateLegacyStickyConfig(array $config): array
+    public function migrateLegacyStickyConfig(array $config): array
     {
         foreach (['top', 'main', 'mobile', 'mobile_bottom'] as $section) {
             if (!isset($config[$section]) || isset($config[$section]['sticky_behavior'])) continue;
@@ -142,7 +142,7 @@ class HeaderBuilderController extends Controller
         return $config;
     }
 
-    public function index()
+    public function index(string $slug)
     {
         $config = Setting::getValue('header_config');
         $defaults = $this->getDefaults();
@@ -154,10 +154,11 @@ class HeaderBuilderController extends Controller
             'config' => $config,
             'menus' => Menu::orderBy('name')->get(['id', 'name', 'slug']),
             'defaults' => $defaults,
+            'themeSlug' => $slug,
         ]);
     }
 
-    public function update(Request $request)
+    public function update(Request $request, string $slug)
     {
         $rules = [];
 
@@ -187,7 +188,7 @@ class HeaderBuilderController extends Controller
         return back()->with('success', translate('Header configuration saved successfully.'));
     }
 
-    public function resetSection(string $section): JsonResponse
+    public function resetSection(string $slug, string $section): JsonResponse
     {
         $allowed = ['top', 'main', 'mobile', 'mobile_bottom'];
         if (!in_array($section, $allowed, true)) {
@@ -207,14 +208,14 @@ class HeaderBuilderController extends Controller
         return response()->json(['success' => true, 'section' => $savedConfig[$section]]);
     }
 
-    public function export(): JsonResponse
+    public function export(string $slug): JsonResponse
     {
         $config = Setting::getValue('header_config');
         $savedConfig = $config ? (is_array($config) ? $config : json_decode($config, true) ?? []) : [];
         return response()->json($savedConfig, 200, [], JSON_PRETTY_PRINT);
     }
 
-    public function upload(Request $request): JsonResponse
+    public function upload(Request $request, string $slug): JsonResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'image', 'max:5120'],

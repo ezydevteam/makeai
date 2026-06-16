@@ -12130,7 +12130,7 @@ class InstallMiddleware
     {
         $installed = filter_var(env('INSTALLED', false), FILTER_VALIDATE_BOOLEAN);
 
-        if ($request->is('install') || $request->is('install/*')) {
+        if ($request->is('install') || $request->is('install/')) {
             if ($installed) {
                 abort(404);
             }
@@ -12238,6 +12238,383 @@ VPS buyers may optionally run `cd public_html/app && composer install --no-dev` 
 - [ ] Full install tested on a real cPanel shared hosting account with no SSH access used at any point
 
 ---
+
+# Implement PART 68 (Zero-Config Distribution Package) - IMPROVED AND ENHANCED
+
+## Context
+
+MakeAI master prompt v4.3 added **PART 68 — Zero-Config Distribution Package & Installation Wizard**. This prompt lists the concrete file/code changes needed in the codebase to support it. Reference: `AI_SaaS_Master_Prompt.md` §68.1–§68.10.
+
+**Do not touch** `public/index.php` or `public/.htaccess` as used in local development — these stay as Laravel's stock files and continue working normally for `php artisan serve` / Laragon / Valet dev environments. The changes below are for a **separate `distribution/` folder** used only by the release build script, plus one config change and one migration fix that apply to the actual codebase.
+
+---
+
+## 1. New folder: `distribution/`
+
+Create at project root (sibling to `app/`, `public/`, etc.). This folder is **never deployed as-is** — its contents are copied into the release zip root by `scripts/build-release.sh` (see item 5).
+
+### 1.1 `distribution/index.php`
+
+```php
+<?php
+
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
+
+define('LARAVEL_START', microtime(true));
+
+// Maintenance mode check
+if (file_exists($maintenance = __DIR__.'/app/storage/framework/maintenance.php')) {
+    require $maintenance;
+}
+
+// Composer autoloader (pre-installed, ships in zip)
+require __DIR__.'/app/vendor/autoload.php';
+
+// Bootstrap Laravel
+/** @var Application $app */
+$app = require_once __DIR__.'/app/bootstrap/app.php';
+
+$app->handleRequest(Request::capture());
+```
+
+This is Laravel's stock `public/index.php` with every `__DIR__.'/../'` replaced by `__DIR__.'/app/'`, because in the release zip, the Laravel project root is relocated to `app/` (sibling of this file), while this file itself occupies the position of `public/index.php`.
+
+### 1.2 `distribution/.htaccess`
+
+```apache
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Block all direct access to the Laravel application directory
+    RewriteRule ^app/ - [F,L]
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+```
+
+This is Laravel's stock `public/.htaccess` plus one added rule (`RewriteRule ^app/ - [F,L]`) that returns 403 for any direct URL request under `/app/`, since `app/` will sit inside the web root in the release zip but must never be directly browsable (it contains `.env`, `vendor/`, source code, etc.).
+
+### 1.3 `distribution/robots.txt` and `distribution/favicon.ico`
+
+Copy the existing `public/robots.txt` and `public/favicon.ico` into `distribution/` unchanged (placeholders if they don't exist yet).
+
+---
+
+## 2. Config change: `config/filesystems.php`
+
+Update the `public` disk so uploaded files (avatars, generated images, exports, etc.) are written to and served from a location that is web-accessible **without requiring `php artisan storage:link`** (symlinks are unreliable on shared hosting and across the split root/`app` structure used in the release zip).
+
+```php
+'disks' => [
+
+    // ... keep existing 'local' and other disks unchanged ...
+
+    'public' => [
+        'driver'     => 'local',
+        'root'       => base_path('../storage/app/public'),
+        'url'        => env('APP_URL').'/storage',
+        'visibility' => 'public',
+        'throw'      => false,
+    ],
+
+],
+```
+
+`base_path()` resolves to the Laravel project root. In the release zip this is `public_html/app/`, so `base_path('../storage/app/public')` resolves to `public_html/storage/app/public` — a directory that sits at the zip root (web-accessible, sibling of `app/`) and is created empty by the build script.
+
+In local dev (Laragon, where `app/` is not used and Laravel root = project root), `base_path('../storage/app/public')` resolves to a `storage/` folder one level above the project root. **To keep local dev working identically**, also update `.env.example` and `.env` (dev) with:
+
+```env
+FILESYSTEM_DISK=public
+```
+
+and ensure the local dev setup script (or a one-time note in `README.md`) creates that sibling `storage/app/public` folder, OR — simpler — make the path environment-aware:
+
+```php
+'public' => [
+    'driver'     => 'local',
+    'root'       => env('PUBLIC_DISK_ROOT', storage_path('app/public')),
+    'url'        => env('APP_URL').'/storage',
+    'visibility' => 'public',
+    'throw'      => false,
+],
+```
+
+Then:
+- **Local dev `.env`**: omit `PUBLIC_DISK_ROOT` (defaults to Laravel's normal `storage_path('app/public')`, used via the standard `php artisan storage:link` symlink in `public/storage`).
+- **Release zip `.env`** (written by the installer in §68.6): set `PUBLIC_DISK_ROOT=` to the absolute path of `public_html/storage/app/public` (computed at install time via `dirname(base_path()) . '/storage/app/public'`).
+
+This second approach (env-aware) is **preferred** — it means zero special-casing in code, dev environments keep using the standard symlink approach, and only the release installer's `.env` differs. Update the Installer's `writeEnvFile()` method (per §68.6) to additionally compute and write `PUBLIC_DISK_ROOT`.
+
+**Remove any existing call to `Artisan::call('storage:link', ...)`** from the installer's Final Setup step list if present — it is not needed under either path (dev uses the standard symlink set up once via `composer.json` post-install scripts as Laravel normally does; release zip uses `PUBLIC_DISK_ROOT` directly).
+
+---
+
+## 3. Migration fix: `rate_limit_hits`
+
+### 3.1 Locate and edit existing migration
+
+File: `database/migrations/2026_06_10_000001_create_rate_limit_hits_table.php`
+
+Add the missing composite unique constraint inside the `Schema::create('rate_limit_hits', ...)` closure:
+
+```php
+Schema::create('rate_limit_hits', function (Blueprint $table) {
+    $table->id();
+    $table->string('key');
+    $table->string('category', 100);
+    $table->unsignedInteger('hits')->default(1);
+    $table->unsignedBigInteger('window_start');
+    $table->unsignedInteger('window_seconds');
+    $table->timestamps();
+
+    $table->unique(['key', 'window_start']);   // ADD THIS LINE
+    $table->index(['key', 'category']);
+    $table->index('window_start');
+});
+```
+
+### 3.2 Verify `RateLimiterService::attemptDb()` upsert call
+
+File: `app/Services/RateLimiterService.php`
+
+Confirm the database-fallback method matches §5.1.1 of the master prompt — specifically that the `upsert()` call's second argument (unique-by columns) is exactly `['key', 'window_start']`, matching the migration's unique constraint:
+
+```php
+DB::table('rate_limit_hits')->upsert(
+    [[
+        'key'            => $key,
+        'category'       => $category,
+        'hits'           => 1,
+        'window_start'   => $windowStart,
+        'window_seconds' => $decaySeconds,
+        'created_at'     => now(),
+        'updated_at'     => now(),
+    ]],
+    ['key', 'window_start'],
+    ['hits' => DB::raw('hits + 1'), 'updated_at' => now()]
+);
+```
+
+If `RateLimiterService.php` or this migration doesn't exist yet in the codebase, create both per master prompt §5.1.1.
+
+### 3.3 Add pruning job
+
+Create `app/Jobs/PruneRateLimitHits.php` (queue: `low`) that deletes rows where `window_start < now()->subDay()->timestamp`. Register it in the scheduler (`routes/console.php` or `app/Console/Kernel.php`) to run daily.
+
+---
+
+## 4. New: `scripts/build-release.sh`
+
+Create at project root, executable (`chmod +x`):
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="${1:?Usage: build-release.sh <version>}"
+SRC_DIR="$(pwd)"
+BUILD_DIR="/tmp/makeai-release-build"
+ZIP_NAME="makeai-v${VERSION}.zip"
+
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR/public_html/app"
+
+echo "==> Installing PHP dependencies (production)"
+composer install --no-dev --optimize-autoloader --no-interaction
+
+echo "==> Installing JS dependencies & building frontend"
+npm ci
+npm run build   # vite.config.ts must set base: '/build/', outDir: 'public/build'
+
+echo "==> Copying application source (everything) into app/"
+rsync -a "$SRC_DIR"/ "$BUILD_DIR/public_html/app/" \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='tests' \
+    --exclude='.env' \
+    --exclude='.env.testing' \
+    --exclude='distribution' \
+    --exclude='scripts' \
+    --exclude='storage/framework/cache/*' \
+    --exclude='storage/framework/sessions/*' \
+    --exclude='storage/framework/views/*' \
+    --exclude='storage/logs/*' \
+    --exclude='database/database.sqlite' \
+    --exclude='public'
+
+echo "==> Moving public/ contents to zip root"
+rsync -a "$SRC_DIR/public/" "$BUILD_DIR/public_html/" --exclude='index.php' --exclude='.htaccess'
+
+echo "==> Writing fixed index.php, .htaccess, robots.txt, favicon.ico from distribution/"
+cp "$SRC_DIR/distribution/index.php"   "$BUILD_DIR/public_html/index.php"
+cp "$SRC_DIR/distribution/.htaccess"   "$BUILD_DIR/public_html/.htaccess"
+cp "$SRC_DIR/distribution/robots.txt"  "$BUILD_DIR/public_html/robots.txt"
+cp "$SRC_DIR/distribution/favicon.ico" "$BUILD_DIR/public_html/favicon.ico"
+
+echo "==> Creating empty root-level storage/ tree (web-accessible public disk)"
+mkdir -p "$BUILD_DIR/public_html/storage/app/public"
+mkdir -p "$BUILD_DIR/public_html/storage/framework"
+touch "$BUILD_DIR/public_html/storage/app/public/.gitkeep"
+touch "$BUILD_DIR/public_html/storage/framework/.gitkeep"
+touch "$BUILD_DIR/public_html/storage/.gitkeep"
+
+echo "==> Ensuring writable directories exist inside app/"
+mkdir -p "$BUILD_DIR/public_html/app/storage/framework/"{cache,sessions,testing,views}
+mkdir -p "$BUILD_DIR/public_html/app/storage/logs"
+mkdir -p "$BUILD_DIR/public_html/app/bootstrap/cache"
+find "$BUILD_DIR/public_html/app/storage" -type d -exec chmod 775 {} \;
+find "$BUILD_DIR/public_html/app/bootstrap/cache" -type d -exec chmod 775 {} \;
+
+echo "==> Removing files that must not ship"
+rm -f "$BUILD_DIR/public_html/app/.env"
+rm -f "$BUILD_DIR/public_html/app/.env.testing"
+rm -rf "$BUILD_DIR/public_html/app/public"   # Laravel's public/ already moved to zip root, avoid duplication
+
+echo "==> Sanity checks"
+test -f "$BUILD_DIR/public_html/app/vendor/autoload.php" || { echo "FATAL: vendor/ missing"; exit 1; }
+test -f "$BUILD_DIR/public_html/build/manifest.json"     || { echo "FATAL: build manifest missing"; exit 1; }
+test -f "$BUILD_DIR/public_html/app/.env.example"        || { echo "FATAL: .env.example missing"; exit 1; }
+test -f "$BUILD_DIR/public_html/index.php"               || { echo "FATAL: index.php missing"; exit 1; }
+
+echo "==> Zipping"
+mkdir -p "$SRC_DIR/dist"
+cd "$BUILD_DIR/public_html"
+zip -r -q "/tmp/${ZIP_NAME}" .
+cd "$SRC_DIR"
+mv "/tmp/${ZIP_NAME}" "./dist/${ZIP_NAME}"
+
+echo "==> Done: ./dist/${ZIP_NAME}"
+```
+
+Note: since `public/` contents are moved to the zip root (item "Moving public/ contents to zip root"), and `app/` already excludes `public/` from the rsync (last line of the first rsync's excludes), there's no duplication — `app/public/` won't exist in the final tree. Laravel's `bootstrap/app.php` and config don't require `public/` to exist relative to the app root for CLI/artisan operations (migrations, queue workers run from `app/` still work fine without `app/public/`).
+
+---
+
+## 5. `vite.config.ts` change
+
+Ensure these are set (add if missing):
+
+```typescript
+export default defineConfig({
+  base: '/build/',
+  build: {
+    manifest: true,
+    outDir: 'public/build',
+  },
+  // ...keep existing plugins/config
+})
+```
+
+---
+
+## 6. Installer Final Setup — `.env` writer update
+
+File: `app/Http/Controllers/Install/FinalizeController.php` (create if it doesn't exist yet, per master prompt §68.6).
+
+In `writeEnvFile()`, after writing standard DB/site values, also compute and write `PUBLIC_DISK_ROOT` and `FILESYSTEM_DISK`:
+
+```php
+private function writeEnvFile(Request $request): void
+{
+    $env = file_get_contents(base_path('.env.example'));
+
+    // Detect release-zip layout: Laravel root is "<zip_root>/app", so
+    // dirname(base_path()) === zip root, and the sibling storage/ folder is web-accessible.
+    $zipRootStorage = dirname(base_path()) . '/storage/app/public';
+    $isReleaseLayout = is_dir(dirname(base_path()) . '/storage') && basename(base_path()) === 'app';
+
+    $replacements = [
+        'APP_NAME'         => $request->input('site_name'),
+        'APP_URL'          => $request->input('site_url'),
+        'APP_TIMEZONE'     => $request->input('timezone', 'UTC'),
+        'DB_CONNECTION'    => $request->input('db_driver'),
+        'DB_DATABASE'      => $request->input('db_driver') === 'sqlite'
+            ? database_path('database.sqlite')
+            : $request->input('db_database'),
+        'DB_HOST'          => $request->input('db_host'),
+        'DB_PORT'          => $request->input('db_port'),
+        'DB_USERNAME'      => $request->input('db_username'),
+        'DB_PASSWORD'      => $request->input('db_password'),
+        'FILESYSTEM_DISK'  => 'public',
+    ];
+
+    if ($isReleaseLayout) {
+        $replacements['PUBLIC_DISK_ROOT'] = $zipRootStorage;
+    }
+
+    foreach ($replacements as $key => $value) {
+        if (preg_match("/^{$key}=.*/m", $env)) {
+            $env = preg_replace("/^{$key}=.*/m", "{$key}=" . $this->envEscape((string) $value), $env);
+        } else {
+            $env .= "\n{$key}=" . $this->envEscape((string) $value);
+        }
+    }
+
+    if ($request->input('db_driver') === 'sqlite') {
+        touch(database_path('database.sqlite'));
+        chmod(database_path('database.sqlite'), 0664);
+    }
+
+    file_put_contents(base_path('.env'), $env);
+}
+```
+
+Also add `PUBLIC_DISK_ROOT=` (empty, commented) to `.env.example` with a comment explaining it's auto-set by the installer in release deployments and should be left blank for local development.
+
+---
+
+## 7. `.gitignore` update
+
+Add:
+
+```
+/distribution/.htaccess
+/dist/
+```
+
+(Keep `distribution/index.php` etc. tracked — they're source files for the build, not generated. Only `/dist/` zip output is ignored. Remove the `.htaccess` ignore if your global gitignore already excludes `.htaccess` files broadly and is causing `distribution/.htaccess` to not be tracked — verify it's committed.)
+
+---
+
+## Summary of files touched/created
+
+- `distribution/index.php` (new)
+- `distribution/.htaccess` (new)
+- `distribution/robots.txt`, `distribution/favicon.ico` (new, copied from `public/`)
+- `config/filesystems.php` (edit `public` disk)
+- `.env.example` (add `PUBLIC_DISK_ROOT`, `FILESYSTEM_DISK=public`)
+- `database/migrations/2026_06_10_000001_create_rate_limit_hits_table.php` (add unique constraint)
+- `app/Services/RateLimiterService.php` (verify/add `attemptDb()`)
+- `app/Jobs/PruneRateLimitHits.php` (new)
+- scheduler registration for the prune job
+- `scripts/build-release.sh` (new)
+- `vite.config.ts` (confirm `base` and `outDir`)
+- `app/Http/Controllers/Install/FinalizeController.php` (new or update `writeEnvFile()`)
+- `.gitignore` (add `/dist/`)
+
+None of these changes affect `public/index.php` or `public/.htaccess` used in local development — those remain Laravel's stock files, untouched.
 
 ---
 

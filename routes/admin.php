@@ -105,15 +105,15 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('appearance/themes/{slug}/settings', [ThemeAddonController::class, 'saveThemeSettings'])->name('admin.themes.settings.save');
 
         // Addons
-        Route::get('appearance/addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
-        Route::get('appearance/addons/{slug}/logo', [ThemeAddonController::class, 'addonLogo'])->name('admin.addons.logo');
-        Route::post('appearance/addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:public,5,60');
-        Route::post('appearance/addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
-        Route::post('appearance/addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
-        Route::delete('appearance/addons/{slug}', [ThemeAddonController::class, 'deleteAddon'])->name('admin.addons.delete');
-        Route::post('appearance/addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
-        Route::get('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
-        Route::post('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
+        Route::get('addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
+        Route::get('addons/{slug}/logo', [ThemeAddonController::class, 'addonLogo'])->name('admin.addons.logo');
+        Route::post('addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:public,5,60');
+        Route::post('addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
+        Route::post('addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
+        Route::delete('addons/{slug}', [ThemeAddonController::class, 'deleteAddon'])->name('admin.addons.delete');
+        Route::post('addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
+        Route::get('addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
+        Route::post('addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
     });
 
     // Users Management
@@ -295,21 +295,21 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('system/style', [AppearanceController::class, 'update'])->name('admin.appearance.update');
 
         // Appearance: Homepage Builder
-        Route::get('builder/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
-        Route::post('builder/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
-        Route::post('builder/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
-        Route::post('builder/homepage/upload-media', [HomepageBuilderController::class, 'upload'])->name('admin.homepage.upload');
+        Route::get('appearance/themes/{slug}/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
+        Route::post('appearance/themes/{slug}/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
+        Route::post('appearance/themes/{slug}/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
+        Route::post('appearance/themes/{slug}/homepage/upload-media', [HomepageBuilderController::class, 'upload'])->name('admin.homepage.upload');
 
         // Appearance: Header Builder
-        Route::get('builder/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
-        Route::post('builder/header', [HeaderBuilderController::class, 'update'])->name('admin.header.update');
-        Route::post('builder/header/reset/{section}', [HeaderBuilderController::class, 'resetSection'])->name('admin.header.reset');
-        Route::get('builder/header/export', [HeaderBuilderController::class, 'export'])->name('admin.header.export');
-        Route::post('builder/header/upload-logo', [HeaderBuilderController::class, 'upload'])->name('admin.header.upload');
+        Route::get('appearance/themes/{slug}/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
+        Route::post('appearance/themes/{slug}/header', [HeaderBuilderController::class, 'update'])->name('admin.header.update');
+        Route::post('appearance/themes/{slug}/header/reset/{section}', [HeaderBuilderController::class, 'resetSection'])->name('admin.header.reset');
+        Route::get('appearance/themes/{slug}/header/export', [HeaderBuilderController::class, 'export'])->name('admin.header.export');
+        Route::post('appearance/themes/{slug}/header/upload-logo', [HeaderBuilderController::class, 'upload'])->name('admin.header.upload');
 
         // Appearance: Footer Builder
-        Route::get('builder/footer', [FooterBuilderController::class, 'index'])->name('admin.footer.index');
-        Route::post('builder/footer', [FooterBuilderController::class, 'update'])->name('admin.footer.update');
+        Route::get('appearance/themes/{slug}/footer', [FooterBuilderController::class, 'index'])->name('admin.footer.index');
+        Route::post('appearance/themes/{slug}/footer', [FooterBuilderController::class, 'update'])->name('admin.footer.update');
 
         // Appearance: Sidebar Builder
         Route::get('appearance/sidebar', [SidebarBuilderController::class, 'index'])->name('admin.sidebar.index');

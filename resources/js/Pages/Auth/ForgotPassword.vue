@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
+import { useFlashToasts } from '@/Composables/useToastr'
+
+useFlashToasts()
 
 const form = useForm({ email: '' })
 const submit = () => form.post(route('password.email'))

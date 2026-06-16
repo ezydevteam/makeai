@@ -162,7 +162,23 @@ class PasswordResetController extends Controller
             ]);
         }
 
-        $user->forceFill(['password' => (string) $data['password']])->save();
+        // Check password history (prevent reuse of last 3 passwords)
+        $recentPasswords = $user->passwordHistory()->latest()->limit(3)->pluck('password')->toArray();
+        foreach ($recentPasswords as $hashedPassword) {
+            if (Hash::check($data['password'], $hashedPassword)) {
+                throw ValidationException::withMessages([
+                    'password' => [translate('You cannot reuse a recent password.')],
+                ]);
+            }
+        }
+
+        // Save current password to history before updating
+        $user->passwordHistory()->create(['password' => $user->password]);
+
+        $user->forceFill([
+            'password' => (string) $data['password'],
+            'password_changed_at' => now(),
+        ])->save();
         $user->clearOtp();
         $request->session()->forget('password_reset_email');
         $request->session()->forget('password_reset_verified');

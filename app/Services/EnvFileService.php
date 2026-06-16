@@ -75,6 +75,13 @@ class EnvFileService
             return;
         }
 
+        // Normalize null values to empty strings to prevent type errors
+        foreach ($pairs as $key => $value) {
+            if ($value === null) {
+                $pairs[$key] = '';
+            }
+        }
+
         $lines = file($this->path, FILE_IGNORE_NEW_LINES);
         $foundKeys = [];
         $newLines = [];
@@ -89,12 +96,12 @@ class EnvFileService
                 continue;
             }
 
-            // Check if this line is a key=value pair
-            if (preg_match('/^([A-Z_][A-Z0-9_]*)\s*=\s*(.*)$/', $trimmed, $matches)) {
+            // Check if this line is a key=value pair (case-insensitive match)
+            if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/', $trimmed, $matches)) {
                 $existingKey = $matches[1];
 
                 if (array_key_exists($existingKey, $pairs)) {
-                    $newValue = $this->formatValue($pairs[$existingKey]);
+                    $newValue = $this->formatValue((string) $pairs[$existingKey]);
                     $newLines[] = $existingKey . '=' . $newValue;
                     $foundKeys[$existingKey] = true;
 
@@ -109,11 +116,22 @@ class EnvFileService
         foreach ($pairs as $key => $value) {
             if (! isset($foundKeys[$key])) {
                 $newLines[] = '';
-                $newLines[] = $key . '=' . $this->formatValue($value);
+                $newLines[] = $key . '=' . $this->formatValue((string) $value);
             }
         }
 
-        file_put_contents($this->path, implode("\n", $newLines) . "\n");
+        $content = implode("\n", $newLines) . "\n";
+        $result = @file_put_contents($this->path, $content, LOCK_EX);
+        if ($result === false) {
+            throw new \RuntimeException(translate('Failed to write to the .env file. Please check file permissions of: :path', ['path' => $this->path]));
+        }
+
+        // Clear PHP's file stat cache so subsequent reads see the new content
+        clearstatcache(true, $this->path);
+
+        Log::debug('EnvFileService: Wrote ' . count($pairs) . ' key(s) to .env', [
+            'keys' => array_keys($pairs),
+        ]);
     }
 
     /**

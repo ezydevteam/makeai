@@ -115,6 +115,10 @@ Schedule::command('system:cleanup-temp-files')
     ->dailyAt('05:00')
     ->withoutOverlapping();
 
+Schedule::job(new \App\Jobs\PruneRateLimitHits())
+    ->dailyAt('02:00')
+    ->withoutOverlapping();
+
 Schedule::call(function (): void {
     $timestamp = now()->toDateTimeString();
 

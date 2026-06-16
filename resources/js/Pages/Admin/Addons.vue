@@ -5,6 +5,7 @@ import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 
 defineOptions({ layout: AdminLayout })
 
@@ -31,6 +32,7 @@ interface AddonConfig {
 
 const props = defineProps<{ addons: AddonConfig[] }>()
 const { t } = useTranslate()
+const { error: toastError } = useToastr()
 const activate = (slug: string) => router.post(route('admin.addons.activate', { slug }))
 const deactivate = (slug: string) => router.post(route('admin.addons.deactivate', { slug }))
 
@@ -160,7 +162,7 @@ async function handleUpload() {
             window.location.reload()
         } else {
             const data = await response.json()
-            alert(data.message ?? t('Upload failed.'))
+            toastError(data.message ?? t('Upload failed.'))
         }
     } finally {
         uploading.value = false

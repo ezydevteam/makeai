@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('rate_limit_hits', function (Blueprint $table) {
-            $table->unique(['key', 'window_start']);
-        });
+        // Unique constraint is already created in the original table creation migration,
+        // so we do nothing here to avoid duplicate index errors.
     }
 
     /**
@@ -21,8 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('rate_limit_hits', function (Blueprint $table) {
-            $table->dropUnique(['rate_limit_hits_key_window_start_unique']);
-        });
+        // Do nothing
     }
 };

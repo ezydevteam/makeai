@@ -28,7 +28,19 @@ class VoSettingsController extends \App\Http\Controllers\Controller
 
         return Inertia::render('Addons/ai-voiceover/Admin/Settings', [
             'voiceSyncStatus' => $voiceSyncStatus,
+            'systemStatus' => [
+                'ffmpeg' => $this->checkBinary('ffmpeg'),
+                'ffprobe' => $this->checkBinary('ffprobe'),
+            ]
         ]);
+    }
+
+    private function checkBinary(string $binary): bool
+    {
+        $custom = addon_setting('ai-voiceover', "{$binary}_path", '');
+        if (!empty($custom) && is_executable($custom)) return true;
+
+        return !empty(trim(shell_exec(PHP_OS_FAMILY === 'Windows' ? "where {$binary}" : "command -v {$binary}") ?? ''));
     }
 
     public function update(UpdateSettingsRequest $request)
@@ -44,7 +56,13 @@ class VoSettingsController extends \App\Http\Controllers\Controller
 
     public function syncVoices()
     {
-        SyncVoices::dispatch();
+        $provider = addon_setting('ai-voiceover', 'default_provider', 'openai');
+
+        if (! in_array($provider, ['elevenlabs', 'openai', 'murf', 'playht'], true)) {
+            $provider = 'openai';
+        }
+
+        SyncVoices::dispatch($provider);
 
         return back()->with('flash', 'Voice sync dispatched.');
     }

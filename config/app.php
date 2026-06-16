@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'MakeAI'),
 
     /*
     |--------------------------------------------------------------------------
@@ -97,7 +97,7 @@ return [
 
     'cipher' => 'AES-256-CBC',
 
-    'key' => env('APP_KEY'),
+    'key' => env('APP_KEY', 'base64:XYdmUqHYRdzO52osH7aIn2vpj8jso7YiN9ICOumiSpQ='),
 
     'previous_keys' => [
         ...array_filter(
@@ -122,5 +122,9 @@ return [
         'driver' => env('APP_MAINTENANCE_DRIVER', 'file'),
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
+
+    'license_test_mode' => env('LICENSE_TEST_MODE', false),
+
+    'installed' => env('INSTALLED', false),
 
 ];

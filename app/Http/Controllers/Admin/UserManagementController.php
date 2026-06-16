@@ -148,7 +148,19 @@ class UserManagementController extends Controller
         $data = $request->only(['name', 'email', 'credits', 'plan_id', 'is_active']);
 
         if ($request->filled('password')) {
+            // Check password history (prevent reuse of last 3 passwords)
+            $recentPasswords = $user->passwordHistory()->latest()->limit(3)->pluck('password')->toArray();
+            foreach ($recentPasswords as $hashedPassword) {
+                if (Hash::check($request->password, $hashedPassword)) {
+                    return back()->with('error', translate('You cannot reuse a recent password.'));
+                }
+            }
+
+            // Save current password to history before updating
+            $user->passwordHistory()->create(['password' => $user->password]);
+
             $data['password'] = Hash::make($request->password);
+            $data['password_changed_at'] = now();
         }
 
         $user->update($data);
@@ -329,8 +341,22 @@ class UserManagementController extends Controller
      */
     public function stopImpersonating()
     {
+        $adminId = session('admin_impersonator_id');
         session()->forget('admin_impersonator_id');
+        
+        // Log out the web guard (user)
         Auth::guard('web')->logout();
+        
+        // Regenerate session to prevent session fixation and clear residual user data
+        session()->regenerate();
+
+        // Log the admin back in if we have their ID
+        if ($adminId) {
+            $admin = \App\Models\Admin::find($adminId);
+            if ($admin) {
+                Auth::guard('admin')->login($admin);
+            }
+        }
 
         return redirect()->route('admin.dashboard')->with('success', translate('Stopped impersonation.'));
     }

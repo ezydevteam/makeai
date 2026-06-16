@@ -3,16 +3,24 @@
 namespace Database\Seeders;
 
 use App\Models\Ad;
+use App\Models\AffiliateReferral;
 use App\Models\Admin;
+use App\Models\AdminRole;
 use App\Models\AiChat;
 use App\Models\AiChatMessage;
 use App\Models\AiUsageLog;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Models\BlogTag;
+use App\Models\Comment;
+use App\Models\LoginHistory;
+use App\Models\Menu;
+use App\Models\Payment;
 use App\Models\MenuItem;
 use App\Models\Page;
 use App\Models\Plan;
+use App\Models\SupportDepartment;
+use App\Models\SupportTicket;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
@@ -28,16 +36,17 @@ class DemoSeeder extends Seeder
         User::updateOrCreate(['email' => 'admin@demo.com'], [
             'name' => 'Demo Administrator',
             'password' => Hash::make('demo12345'),
-            'role' => 'admin',
             'credits' => 9999,
             'is_active' => true,
             'email_verified_at' => now(),
         ]);
 
         // Also ensure admin account exists in admins table for blog posts
+        $superAdminRoleId = AdminRole::where('slug', 'super-admin')->value('id');
         Admin::updateOrCreate(['email' => 'admin@demo.com'], [
             'name' => 'Demo Administrator',
             'password' => Hash::make('demo12345'),
+            'role_id' => $superAdminRoleId,
             'is_active' => true,
         ]);
 
@@ -45,7 +54,6 @@ class DemoSeeder extends Seeder
         User::updateOrCreate(['email' => 'user@demo.com'], [
             'name' => 'Demo User',
             'password' => Hash::make('demo12345'),
-            'role' => 'user',
             'credits' => 500,
             'is_active' => true,
             'email_verified_at' => now(),
@@ -110,14 +118,13 @@ class DemoSeeder extends Seeder
             $user = User::updateOrCreate(['email' => $email], [
                 'name' => $name . ' Demo',
                 'password' => Hash::make('demo12345'),
-                'role' => 'user',
                 'credits' => match ($planNames[$planIdx]) {
                     'free' => random_int(10, 100),
                     'pro' => random_int(1000, 5000),
                     'unlimited' => 99999,
                 },
                 'plan_id' => $planId,
-                'subscription_status' => $planNames[$planIdx] === 'free' ? 'inactive' : 'active',
+                'subscription_status' => $planNames[$planIdx] === 'free' ? 'none' : 'active',
                 'subscription_ends_at' => $planNames[$planIdx] === 'free' ? null : now()->addMonths(random_int(1, 12)),
                 'credits_used_month' => random_int(0, 5000),
                 'is_active' => true,
@@ -129,6 +136,23 @@ class DemoSeeder extends Seeder
         }
 
         $adminUser = User::where('email', 'admin@demo.com')->first();
+        $toolSlugs = DB::table('ai_tools')
+            ->whereNotNull('slug')
+            ->pluck('slug')
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($toolSlugs === []) {
+            $toolSlugs = [
+                'blog-article-generator',
+                'seo-meta-description-generator',
+                'email-subject-line-generator',
+                'ai-chat',
+                'code-explainer',
+                'product-description-writer',
+            ];
+        }
 
         // ─── 5. AI Usage Logs (200 entries) ─────────────────────────────
         $providers = ['openai', 'anthropic', 'google', 'deepseek', 'meta'];
@@ -146,19 +170,28 @@ class DemoSeeder extends Seeder
             $provider = $providers[array_rand($providers)];
             $model = $models[$provider][array_rand($models[$provider])];
             $type = $types[array_rand($types)];
+            $toolSlug = $toolSlugs[array_rand($toolSlugs)];
             $inputTokens = random_int(50, 4000);
             $outputTokens = random_int(20, 2000);
             $creditsUsed = round(($inputTokens * 0.001) + ($outputTokens * 0.003), 2);
+            $costUsd = round(($inputTokens * 0.00001) + ($outputTokens * 0.00002), 6);
 
             AiUsageLog::create([
                 'user_id' => $user->id,
                 'provider' => $provider,
                 'model' => $model,
                 'type' => $type,
+                'tool_slug' => $toolSlug,
                 'input_tokens' => $inputTokens,
                 'output_tokens' => $outputTokens,
+                'cost_usd' => $costUsd,
                 'credits_used' => max(1, $creditsUsed),
+                'response_time_ms' => random_int(750, 9500),
                 'status' => 'completed',
+                'metadata' => [
+                    'demo' => true,
+                    'topic' => $toolSlug,
+                ],
                 'created_at' => now()->subDays(random_int(0, 180))->subHours(random_int(0, 23)),
             ]);
         }
@@ -294,7 +327,199 @@ class DemoSeeder extends Seeder
             $post->tags()->sync([$tagModels[array_rand($tagModels)]->id, $tagModels[array_rand($tagModels)]->id, $tagModels[array_rand($tagModels)]->id]);
         }
 
-        // ─── 9. Revenue / Subscription Data (last 12 months) ────────────
+        // ─── 9. Dashboard Demo Data ───────────────────────────────────
+        $generalDepartment = SupportDepartment::where('slug', 'general')->first();
+        $technicalDepartment = SupportDepartment::where('slug', 'technical')->first();
+        $billingDepartment = SupportDepartment::where('slug', 'billing')->first();
+        $blogPosts = BlogPost::published()->latest('published_at')->take(6)->get();
+
+        $recentOauthUsers = collect([$demoUsers[0], $demoUsers[1], $demoUsers[2], $demoUsers[3], $demoUsers[4], $demoUsers[5]])
+            ->filter()
+            ->values();
+
+        $oauthProviders = ['google', 'github', 'linkedin', 'facebook'];
+        foreach ($recentOauthUsers as $index => $user) {
+            $provider = $oauthProviders[$index % count($oauthProviders)];
+            $user->forceFill([
+                'oauth_provider' => $provider,
+                'oauth_id' => $provider . '-demo-' . $user->id,
+                'created_at' => now()->subDays(random_int(2, 24)),
+            ])->save();
+        }
+
+        $referralUsers = collect([$demoUsers[6], $demoUsers[7], $demoUsers[8], $demoUsers[9], $demoUsers[10], $demoUsers[11]])
+            ->filter()
+            ->values();
+        foreach ($referralUsers as $index => $user) {
+            $referrer = $recentOauthUsers[$index % max(1, $recentOauthUsers->count())] ?? $adminUser;
+            $user->forceFill([
+                'referred_by' => $referrer?->id,
+                'created_at' => now()->subDays(random_int(3, 28)),
+            ])->save();
+        }
+
+        $paymentRows = [
+            ['user' => $adminUser, 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 199.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Pro annual renewal', 'days' => 1],
+            ['user' => $demoUsers[2], 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly subscription', 'days' => 2],
+            ['user' => $demoUsers[4], 'plan' => $freePlan, 'gateway' => 'paypal', 'amount' => 49.00, 'type' => 'credit_topup', 'status' => 'completed', 'label' => 'Credit top-up', 'days' => 0],
+            ['user' => $demoUsers[7], 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 29.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'One-time tool bundle', 'days' => 4],
+            ['user' => $demoUsers[9], 'plan' => $unlimitedPlan, 'gateway' => 'stripe', 'amount' => 499.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Unlimited annual plan', 'days' => 9],
+            ['user' => $demoUsers[12], 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 99.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly renewal', 'days' => 17],
+            ['user' => $demoUsers[15], 'plan' => null, 'gateway' => 'manual', 'amount' => 24.00, 'type' => 'credit_topup', 'status' => 'completed', 'label' => 'Wallet refill', 'days' => 21],
+            ['user' => $demoUsers[18], 'plan' => $freePlan, 'gateway' => 'stripe', 'amount' => 39.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'Premium export pack', 'days' => 26],
+            ['user' => $demoUsers[21], 'plan' => $proPlan, 'gateway' => 'paypal', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'failed', 'label' => 'Failed monthly charge', 'days' => 3],
+        ];
+
+        foreach ($paymentRows as $index => $row) {
+            Payment::updateOrCreate(
+                ['gateway_payment_id' => 'demo-pay-' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT)],
+                [
+                    'user_id' => $row['user']->id,
+                    'plan_id' => $row['plan']?->id,
+                    'gateway' => $row['gateway'],
+                    'amount' => $row['amount'],
+                    'currency' => 'USD',
+                    'status' => $row['status'],
+                    'type' => $row['type'],
+                    'metadata' => ['demo' => true, 'label' => $row['label']],
+                    'created_at' => now()->subDays($row['days'])->setTime(random_int(9, 19), random_int(0, 59)),
+                ]
+            );
+        }
+
+        $loginCountries = [
+            ['country' => 'Bangladesh', 'city' => 'Dhaka'],
+            ['country' => 'United States', 'city' => 'New York'],
+            ['country' => 'United Kingdom', 'city' => 'London'],
+            ['country' => 'India', 'city' => 'Bengaluru'],
+            ['country' => 'Singapore', 'city' => 'Singapore'],
+        ];
+
+        $loginUsers = collect([$adminUser, ...array_slice($demoUsers, 0, 12)])->filter()->values();
+        foreach ($loginUsers as $index => $user) {
+            $geo = $loginCountries[$index % count($loginCountries)];
+            $provider = $user->oauth_provider ?? 'email';
+            $createdAt = now()->subDays(random_int(0, 29))->subHours(random_int(0, 23));
+
+            LoginHistory::create([
+                'user_id' => $user->id,
+                'ip' => '192.168.' . random_int(10, 250) . '.' . random_int(10, 250),
+                'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) DemoBrowser/1.0',
+                'country' => $geo['country'],
+                'city' => $geo['city'],
+                'success' => true,
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ]);
+
+            if ($provider !== 'email') {
+                LoginHistory::create([
+                    'user_id' => $user->id,
+                    'ip' => '10.0.' . random_int(10, 250) . '.' . random_int(10, 250),
+                    'user_agent' => 'Mozilla/5.0 Demo OAuth Login',
+                    'country' => $geo['country'],
+                    'city' => $geo['city'],
+                    'success' => true,
+                    'created_at' => $createdAt->copy()->addHours(1),
+                    'updated_at' => $createdAt->copy()->addHours(1),
+                ]);
+            }
+        }
+
+        $ticketStatuses = ['open', 'in_progress', 'resolved', 'closed'];
+        $ticketPriorities = ['low', 'medium', 'high'];
+        $ticketSources = ['email', 'web', 'api'];
+        $ticketUsers = collect(array_slice($demoUsers, 0, 10))->values();
+        $departments = collect([$generalDepartment, $technicalDepartment, $billingDepartment])->filter()->values();
+
+        for ($i = 0; $i < 12; $i++) {
+            $user = $ticketUsers[$i % max(1, $ticketUsers->count())] ?? $demoUsers[0];
+            $department = $departments[$i % max(1, $departments->count())] ?? null;
+            $status = $ticketStatuses[$i % count($ticketStatuses)];
+            $createdAt = now()->subDays(14 - $i);
+
+            SupportTicket::updateOrCreate(
+                ['ticket_number' => 'DEMO-TKT-' . str_pad((string) ($i + 1), 4, '0', STR_PAD_LEFT)],
+                [
+                    'user_id' => $user->id,
+                    'department_id' => $department?->id,
+                    'assigned_to' => $adminUser?->id,
+                    'subject' => [
+                        'Billing question about invoice timing',
+                        'AI response is slower than expected',
+                        'Need help with plan upgrade',
+                        'Login issue on mobile device',
+                    ][$i % 4],
+                    'status' => $status,
+                    'priority' => $ticketPriorities[$i % count($ticketPriorities)],
+                    'source' => $ticketSources[$i % count($ticketSources)],
+                    'first_response_at' => in_array($status, ['in_progress', 'resolved', 'closed'], true) ? $createdAt->copy()->addHours(2) : null,
+                    'resolved_at' => in_array($status, ['resolved', 'closed'], true) ? $createdAt->copy()->addDays(1) : null,
+                    'closed_at' => $status === 'closed' ? $createdAt->copy()->addDays(2) : null,
+                    'last_reply_at' => $createdAt->copy()->addHours(5),
+                    'last_reply_by' => 'admin',
+                    'satisfaction_rating' => in_array($status, ['resolved', 'closed'], true) ? random_int(4, 5) : null,
+                    'satisfaction_comment' => in_array($status, ['resolved', 'closed'], true) ? 'Issue was resolved quickly.' : null,
+                    'user_last_read_at' => $createdAt->copy()->addHours(6),
+                    'admin_last_read_at' => $createdAt->copy()->addHours(4),
+                    'created_at' => $createdAt,
+                    'updated_at' => $createdAt,
+                ]
+            );
+        }
+
+        if ($blogPosts->isNotEmpty()) {
+            $commentStatuses = ['approved', 'pending', 'approved', 'spam'];
+            foreach ($blogPosts as $index => $post) {
+                $user = $demoUsers[$index % count($demoUsers)];
+                $createdAt = now()->subDays(random_int(1, 20))->subHours(random_int(0, 18));
+
+                Comment::create([
+                    'commentable_type' => BlogPost::class,
+                    'commentable_id' => $post->id,
+                    'user_id' => $user->id,
+                    'content' => [
+                        'This looks polished and useful.',
+                        'Great breakdown, thanks for sharing.',
+                        'Would love to see more examples like this.',
+                        'The workflow is clear and actionable.',
+                    ][$index % 4],
+                    'status' => $commentStatuses[$index % count($commentStatuses)],
+                    'likes_count' => random_int(0, 24),
+                    'created_at' => $createdAt,
+                    'updated_at' => $createdAt,
+                ]);
+            }
+        }
+
+        $affiliatePairs = [
+            [$recentOauthUsers[0] ?? $adminUser, $demoUsers[13] ?? null, 'AFF-DEMO-001'],
+            [$recentOauthUsers[1] ?? $adminUser, $demoUsers[14] ?? null, 'AFF-DEMO-002'],
+            [$recentOauthUsers[2] ?? $adminUser, $demoUsers[15] ?? null, 'AFF-DEMO-003'],
+            [$recentOauthUsers[3] ?? $adminUser, $demoUsers[16] ?? null, 'AFF-DEMO-004'],
+        ];
+
+        foreach ($affiliatePairs as [$referrer, $referred, $code]) {
+            if (! $referrer || ! $referred) {
+                continue;
+            }
+
+            $landedAt = now()->subDays(random_int(2, 24));
+            AffiliateReferral::updateOrCreate(
+                ['referral_code' => $code],
+                [
+                    'referrer_id' => $referrer->id,
+                    'referred_id' => $referred->id,
+                    'ip_address' => '172.16.' . random_int(10, 250) . '.' . random_int(10, 250),
+                    'landed_at' => $landedAt,
+                    'converted_at' => $landedAt->copy()->addHours(random_int(1, 48)),
+                    'created_at' => $landedAt,
+                    'updated_at' => $landedAt,
+                ]
+            );
+        }
+
+        // ─── 10. Revenue / Subscription Data (last 12 months) ───────────
         for ($m = 0; $m < 12; $m++) {
             $month = now()->subMonths(11 - $m);
             DB::table('settings')->updateOrInsert(
@@ -315,7 +540,7 @@ class DemoSeeder extends Seeder
             );
         }
 
-        // ─── 10. Newsletter Campaigns (5 sample) ────────────────────────
+        // ─── 11. Newsletter Campaigns (5 sample) ────────────────────────
         $campaigns = [
             ['subject' => 'Welcome to MakeAI — Start Creating with AI', 'status' => 'sent'],
             ['subject' => 'New Feature: Advanced Chat Mode Is Here', 'status' => 'sent'],
@@ -344,58 +569,176 @@ class DemoSeeder extends Seeder
             );
         }
 
-        // ─── 11. Sample Pages ───────────────────────────────────────────
+        // ─── 12. Sample Pages ───────────────────────────────────────────
         Page::updateOrCreate(['slug' => 'about-us'], [
             'title' => 'About MakeAI',
             'content' => '<h1>Empowering Creativity with AI</h1>'
                 . '<p>MakeAI is the next generation platform for content creators. We provide cutting-edge AI tools that help businesses, developers, and creators produce high-quality content effortlessly.</p>'
                 . '<h2>Our Mission</h2>'
                 . '<p>To democratize access to advanced AI technology and enable everyone to create amazing content.</p>',
-            'is_active' => true,
+            'excerpt' => 'Learn more about the MakeAI platform and mission.',
+            'meta_title' => 'About MakeAI',
+            'meta_description' => 'Learn more about the MakeAI platform and mission.',
+            'status' => 'published',
+            'published_at' => now()->subDays(30),
+            'show_title' => true,
+            'show_breadcrumbs' => true,
+            'show_featured_image' => false,
+            'show_sidebar' => false,
+            'container_width' => 'default',
+            'is_system' => true,
         ]);
 
         Page::updateOrCreate(['slug' => 'privacy'], [
             'title' => 'Privacy Policy',
             'content' => '<h1>Privacy Policy</h1><p>We take your privacy seriously. This policy describes how we collect, use, and protect your personal information.</p>',
-            'is_active' => true,
+            'excerpt' => 'How we collect, use, and protect your information.',
+            'meta_title' => 'Privacy Policy',
+            'meta_description' => 'How we collect, use, and protect your information.',
+            'status' => 'published',
+            'published_at' => now()->subDays(30),
+            'show_title' => true,
+            'show_breadcrumbs' => true,
+            'show_featured_image' => false,
+            'show_sidebar' => false,
+            'container_width' => 'default',
+            'is_system' => true,
         ]);
 
         Page::updateOrCreate(['slug' => 'terms'], [
             'title' => 'Terms of Service',
             'content' => '<h1>Terms of Service</h1><p>By using MakeAI, you agree to these terms. Please read them carefully.</p>',
-            'is_active' => true,
+            'excerpt' => 'The terms that govern platform usage.',
+            'meta_title' => 'Terms of Service',
+            'meta_description' => 'The terms that govern platform usage.',
+            'status' => 'published',
+            'published_at' => now()->subDays(30),
+            'show_title' => true,
+            'show_breadcrumbs' => true,
+            'show_featured_image' => false,
+            'show_sidebar' => false,
+            'container_width' => 'default',
+            'is_system' => true,
         ]);
 
-        // ─── 12. Sample Ads ─────────────────────────────────────────────
-        Ad::updateOrCreate(['zone' => 'sidebar_top', 'title' => 'Demo Banner'], [
-            'type' => 'image_link',
-            'image_url' => 'https://via.placeholder.com/300x250',
-            'link_url' => 'https://envato.com',
-            'link_target' => '_blank',
-            'show_to' => 'all',
-            'is_active' => true,
-            'sort_order' => 0,
+        // ─── 13. Sample Ads ─────────────────────────────────────────────
+        DB::table('ads')->updateOrInsert(
+            ['zone' => 'sidebar_top', 'title' => 'Demo Sidebar Banner'],
+            [
+                'type' => 'image_link',
+                'custom_html' => null,
+                'image_url' => 'https://via.placeholder.com/300x250',
+                'link_url' => 'https://envato.com',
+                'link_target' => '_blank',
+                'show_to' => 'all',
+                'is_active' => true,
+                'start_at' => now()->subDays(7),
+                'end_at' => now()->addDays(30),
+                'impressions' => random_int(500, 2500),
+                'clicks' => random_int(20, 140),
+                'sort_order' => 0,
+                'created_at' => now()->subDays(7),
+                'updated_at' => now()->subDays(7),
+            ]
+        );
+
+        DB::table('ads')->updateOrInsert(
+            ['zone' => 'between_posts', 'title' => 'Demo Feed Script Ad'],
+            [
+                'type' => 'custom_html',
+                'custom_html' => '<div style="text-align:center;padding:1rem;background:#f3f4f6;border-radius:8px">Sponsored content</div>',
+                'image_url' => null,
+                'link_url' => null,
+                'link_target' => '_self',
+                'show_to' => 'all',
+                'is_active' => true,
+                'start_at' => now()->subDays(14),
+                'end_at' => now()->addDays(45),
+                'impressions' => random_int(1000, 5000),
+                'clicks' => random_int(30, 200),
+                'sort_order' => 0,
+                'created_at' => now()->subDays(14),
+                'updated_at' => now()->subDays(14),
+            ]
+        );
+
+        // ─── 14. Sample Menu Items ──────────────────────────────────────
+        $mainMenu = Menu::firstOrCreate(['slug' => 'main'], [
+            'name' => 'Main Menu',
         ]);
 
-        Ad::updateOrCreate(['zone' => 'content_top', 'title' => 'Demo HTML Ad'], [
-            'type' => 'custom_html',
-            'custom_html' => '<div style="text-align:center;padding:1rem;background:#f3f4f6;border-radius:8px">Sponsored content</div>',
-            'show_to' => 'all',
-            'is_active' => true,
-            'sort_order' => 0,
+        $footerMenu = Menu::firstOrCreate(['slug' => 'footer'], [
+            'name' => 'Footer Menu',
         ]);
 
-        // ─── 13. Sample Menu Items ──────────────────────────────────────
-        MenuItem::updateOrCreate(['label' => 'Home'], [
+        $aboutPage = Page::where('slug', 'about-us')->first();
+
+        MenuItem::updateOrCreate(['menu_id' => $mainMenu->id, 'label' => 'Home'], [
+            'parent_id' => null,
             'type' => 'route',
-            'value' => 'home',
-            'order' => 1,
+            'route_name' => 'home',
+            'url' => null,
+            'page_id' => null,
+            'target' => '_self',
+            'icon' => 'ti ti-home',
+            'badge_text' => null,
+            'badge_color' => null,
+            'is_active' => true,
+            'requires_auth' => 'none',
+            'mega_menu' => false,
+            'mega_menu_content' => null,
+            'sort_order' => 1,
         ]);
 
-        MenuItem::updateOrCreate(['label' => 'About'], [
+        MenuItem::updateOrCreate(['menu_id' => $mainMenu->id, 'label' => 'About'], [
+            'parent_id' => null,
             'type' => 'page',
-            'value' => 'about-us',
-            'order' => 2,
+            'url' => null,
+            'page_id' => $aboutPage?->id,
+            'route_name' => null,
+            'target' => '_self',
+            'icon' => 'ti ti-info-circle',
+            'badge_text' => 'New',
+            'badge_color' => 'green',
+            'is_active' => true,
+            'requires_auth' => 'none',
+            'mega_menu' => false,
+            'mega_menu_content' => null,
+            'sort_order' => 2,
+        ]);
+
+        MenuItem::updateOrCreate(['menu_id' => $footerMenu->id, 'label' => 'Privacy'], [
+            'parent_id' => null,
+            'type' => 'page',
+            'url' => null,
+            'page_id' => Page::where('slug', 'privacy')->value('id'),
+            'route_name' => null,
+            'target' => '_self',
+            'icon' => null,
+            'badge_text' => null,
+            'badge_color' => null,
+            'is_active' => true,
+            'requires_auth' => 'none',
+            'mega_menu' => false,
+            'mega_menu_content' => null,
+            'sort_order' => 1,
+        ]);
+
+        MenuItem::updateOrCreate(['menu_id' => $footerMenu->id, 'label' => 'Terms'], [
+            'parent_id' => null,
+            'type' => 'page',
+            'url' => null,
+            'page_id' => Page::where('slug', 'terms')->value('id'),
+            'route_name' => null,
+            'target' => '_self',
+            'icon' => null,
+            'badge_text' => null,
+            'badge_color' => null,
+            'is_active' => true,
+            'requires_auth' => 'none',
+            'mega_menu' => false,
+            'mega_menu_content' => null,
+            'sort_order' => 2,
         ]);
     }
 

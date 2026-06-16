@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useFlashToasts } from '@/Composables/useToastr'
+
+useFlashToasts()
 
 const props = defineProps<{
     email?: string

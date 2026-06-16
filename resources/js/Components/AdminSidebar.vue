@@ -107,10 +107,13 @@ autoExpandOnRoute('users', ['admin.users.*', 'admin.admins.*', 'admin.roles.*'])
 autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
 autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.coupons.*'])
 autoExpandOnRoute('blog', ['admin.blog.posts.*', 'admin.blog.categories.*', 'admin.blog.tags.*', 'admin.blog.settings.*', 'admin.comments.*'])
-autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*'])
-autoExpandOnRoute('sitebuilder', ['admin.header.*', 'admin.footer.*', 'admin.homepage.*'])
+autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*', 'admin.header.*', 'admin.footer.*', 'admin.homepage.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.appearance.*', 'admin.license.*'])
 autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.features.settings*', 'admin.gdpr.settings*', 'admin.ai.integrations.*', 'admin.oauth.settings.*'])
+
+if (route().current('admin.themes.settings')) {
+    menuGroups.value['appearance'] = true
+}
 
 // Auto-expand addon groups when on their pages
 for (const item of addonMenuItems.value) {
@@ -271,22 +274,6 @@ for (const item of addonMenuItems.value) {
           <Link v-if="can('addons.view')" :href="route('admin.addons')" class="sidebar-subitem" :class="{ active: isActive('admin.addons*') }">{{ t('Addons') }}</Link>
           <Link v-if="can('settings.manage')" :href="route('admin.menus.index')" class="sidebar-subitem" :class="{ active: isActive('admin.menus.*') }">{{ t('Menus') }}</Link>
           <Link v-if="can('settings.manage')" :href="route('admin.sidebar.index')" class="sidebar-subitem" :class="{ active: isActive('admin.sidebar.*') }">{{ t('Sidebar') }}</Link>
-        </div>
-      </div>
-
-      <!-- === Site Builder === -->
-      <div v-if="can('settings.manage')">
-        <Tooltip :content="t('Site Builder')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('sitebuilder')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('sitebuilder') || isActive('admin.header.*') || isActive('admin.footer.*') || isActive('admin.homepage.*'), 'open': isGroupOpen('sitebuilder') }">
-            <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
-            <span v-show="!collapsed" class="flex-1 text-left">{{ t('Site Builder') }}</span>
-            <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-          </button>
-        </Tooltip>
-        <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('sitebuilder') }">
-          <Link :href="route('admin.header.index')" class="sidebar-subitem" :class="{ active: isActive('admin.header.*') }">{{ t('Header') }}</Link>
-          <Link :href="route('admin.footer.index')" class="sidebar-subitem" :class="{ active: isActive('admin.footer.*') }">{{ t('Footer') }}</Link>
-          <Link :href="route('admin.homepage.index')" class="sidebar-subitem" :class="{ active: isActive('admin.homepage.*') }">{{ t('Homepage') }}</Link>
         </div>
       </div>
 
@@ -563,6 +550,11 @@ html.dark .sidebar-item:hover {
 .sidebar-icon {
   width: 18px;
   height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
   flex-shrink: 0;
   opacity: 0.8;
 }

@@ -1,107 +1,313 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+
+interface TopQueryItem {
+  query: string
+  count: number
+}
+
+interface TopArticleItem {
+  id: number
+  title: string
+  views: number
+  helpful_count: number
+  not_helpful_count: number
+}
+
+interface EmbedSummaryItem {
+  key: string
+  label: string
+  count: number
+}
 
 const { t } = useTranslate()
 
 const props = defineProps<{
-  searches_today: number
-  searches_7d: number
-  answer_rate: number
-  published_count: number
-  unanswered: string[]
-  top_queries: { query: string; count: number }[]
-  top_articles: {
-    id: number
-    title: string
-    views: number
-    helpful_count: number
-    not_helpful_count: number
-  }[]
-  embed_summary: Record<string, number>
+    searches_today: number
+    searches_7d: number
+    answer_rate: number
+    published_count: number
+    unanswered: string[]
+    top_queries: TopQueryItem[]
+    top_articles: TopArticleItem[]
+    embed_summary: Record<string, number>
 }>()
+
+const embedSummaryItems = computed<EmbedSummaryItem[]>(() => {
+    const labels: Record<string, string> = {
+        pending: t('Pending'),
+        processing: t('Processing'),
+        completed: t('Completed'),
+        failed: t('Failed'),
+    }
+
+    return Object.entries(props.embed_summary)
+        .map(([key, count]) => ({
+            key,
+            label: labels[key] ?? key,
+            count,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+})
+
+const helpfulRate = (article: TopArticleItem) => {
+    const total = article.helpful_count + article.not_helpful_count
+    if (total === 0) {
+        return null
+    }
+
+    return Math.round((article.helpful_count / total) * 100)
+}
 </script>
 
 <template>
-  <AdminLayout :title="t('KB Analytics')">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="card text-center">
-        <p class="text-3xl font-bold text-emerald-500">{{ props.searches_today }}</p>
-        <p class="text-sm text-gray-500">{{ t('Searches Today') }}</p>
-      </div>
-      <div class="card text-center">
-        <p class="text-3xl font-bold">{{ props.searches_7d }}</p>
-        <p class="text-sm text-gray-500">{{ t('Searches (7d)') }}</p>
-      </div>
-      <div class="card text-center">
-        <p class="text-3xl font-bold text-emerald-500">{{ props.answer_rate }}%</p>
-        <p class="text-sm text-gray-500">{{ t('Answer Rate') }}</p>
-      </div>
-      <div class="card text-center">
-        <p class="text-3xl font-bold">{{ props.published_count }}</p>
-        <p class="text-sm text-gray-500">{{ t('Published Articles') }}</p>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div>
-        <div class="card mb-6">
-          <h3 class="font-semibold mb-3">{{ t('Unanswered Queries') }}</h3>
-          <ul class="space-y-1">
-            <li v-for="(q, i) in props.unanswered" :key="i" class="text-sm text-gray-600 dark:text-gray-300 py-1 border-b border-gray-100 dark:border-gray-700 last:border-0">
-              {{ q }}
-            </li>
-          </ul>
-          <p v-if="!props.unanswered.length" class="text-sm text-gray-400">{{ t('No unanswered queries') }}</p>
-        </div>
-
-        <div class="card">
-          <h3 class="font-semibold mb-3">{{ t('Top Search Queries') }}</h3>
-          <table class="w-full">
-            <thead>
-              <tr><th>{{ t('Query') }}</th><th class="text-right">{{ t('Count') }}</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="r in props.top_queries" :key="r.query">
-                <td class="text-sm">{{ r.query }}</td>
-                <td class="text-sm text-right font-medium">{{ r.count }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div>
-        <div class="card mb-6">
-          <h3 class="font-semibold mb-3">{{ t('Top Articles') }}</h3>
-          <table class="w-full">
-            <thead>
-              <tr><th>{{ t('Title') }}</th><th class="text-right">{{ t('Views') }}</th><th class="text-right">{{ t('Helpful') }}</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in props.top_articles" :key="a.id">
-                <td class="text-sm">{{ a.title }}</td>
-                <td class="text-sm text-right">{{ a.views }}</td>
-                <td class="text-sm text-right">
-                  <span v-if="(a.helpful_count + a.not_helpful_count) > 0">
-                    {{ Math.round(a.helpful_count / (a.helpful_count + a.not_helpful_count) * 100) }}%
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="card">
-          <h3 class="font-semibold mb-3">{{ t('Embed Status') }}</h3>
-          <div class="flex gap-4 flex-wrap">
-            <div v-for="(count, status) in props.embed_summary" :key="status" class="text-center">
-              <p class="text-xl font-bold">{{ count }}</p>
-              <p class="text-xs text-gray-500">{{ status }}</p>
+    <AdminLayout :title="t('KB Analytics')">
+        <div class="mx-auto max-w-7xl px-6 py-8">
+            <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                        {{ t('Knowledge Base Analytics') }}
+                    </h1>
+                    <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                        {{ t('Track how visitors search, which articles help most, and what content still needs better answers.') }}
+                    </p>
+                </div>
             </div>
-          </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                                {{ t('Searches Today') }}
+                            </p>
+                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                                {{ props.searches_today }}
+                            </p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                            <i class="ti ti-search text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                                {{ t('Searches in 7 Days') }}
+                            </p>
+                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                                {{ props.searches_7d }}
+                            </p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                            <i class="ti ti-history text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                                {{ t('Answer Rate') }}
+                            </p>
+                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                                {{ props.answer_rate }}%
+                            </p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
+                            <i class="ti ti-badge-check text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                                {{ t('Published Articles') }}
+                            </p>
+                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
+                                {{ props.published_count }}
+                            </p>
+                        </div>
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
+                            <i class="ti ti-article text-lg"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 grid gap-6 lg:grid-cols-2">
+                <div class="space-y-6">
+                    <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+                                {{ t('Unanswered Queries') }}
+                            </h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('Recent search terms that did not return a useful answer.') }}
+                            </p>
+                        </div>
+
+                        <div v-if="props.unanswered.length" class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <div
+                                v-for="(query, index) in props.unanswered"
+                                :key="`${query}-${index}`"
+                                class="px-5 py-3 text-sm text-gray-700 dark:text-gray-300"
+                            >
+                                {{ query }}
+                            </div>
+                        </div>
+
+                        <div v-else class="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('No unanswered queries yet.') }}
+                        </div>
+                    </section>
+
+                    <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+                                {{ t('Top Search Queries') }}
+                            </h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('Queries with the highest request volume.') }}
+                            </p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-100 dark:divide-surface-800">
+                                <thead class="bg-gray-50/80 dark:bg-surface-950">
+                                    <tr>
+                                        <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                                            {{ t('Query') }}
+                                        </th>
+                                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                                            {{ t('Count') }}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                                    <tr v-if="props.top_queries.length === 0">
+                                        <td colspan="2" class="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                                            {{ t('No search data yet.') }}
+                                        </td>
+                                    </tr>
+                                    <tr
+                                        v-for="item in props.top_queries"
+                                        :key="item.query"
+                                        class="transition hover:bg-primary-50/60 dark:hover:bg-surface-800/70"
+                                    >
+                                        <td class="px-5 py-3 text-sm text-gray-700 dark:text-gray-300">
+                                            {{ item.query }}
+                                        </td>
+                                        <td class="px-5 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                                            {{ item.count }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="space-y-6">
+                    <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+                                {{ t('Top Articles') }}
+                            </h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('The most viewed articles and their feedback rate.') }}
+                            </p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-100 dark:divide-surface-800">
+                                <thead class="bg-gray-50/80 dark:bg-surface-950">
+                                    <tr>
+                                        <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                                            {{ t('Title') }}
+                                        </th>
+                                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                                            {{ t('Views') }}
+                                        </th>
+                                        <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-[0.08em] text-gray-500">
+                                            {{ t('Helpful') }}
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                                    <tr v-if="props.top_articles.length === 0">
+                                        <td colspan="3" class="px-5 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                                            {{ t('No articles published yet.') }}
+                                        </td>
+                                    </tr>
+                                    <tr
+                                        v-for="article in props.top_articles"
+                                        :key="article.id"
+                                        class="transition hover:bg-primary-50/60 dark:hover:bg-surface-800/70"
+                                    >
+                                        <td class="px-5 py-3 text-sm text-gray-700 dark:text-gray-300">
+                                            {{ article.title }}
+                                        </td>
+                                        <td class="px-5 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">
+                                            {{ article.views }}
+                                        </td>
+                                        <td class="px-5 py-3 text-right text-sm text-gray-700 dark:text-gray-300">
+                                            <span
+                                                v-if="helpfulRate(article) !== null"
+                                                class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                                            >
+                                                {{ helpfulRate(article) }}%
+                                            </span>
+                                            <span v-else class="text-gray-400">
+                                                {{ t('No votes') }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+
+                    <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+                                {{ t('Embed Status') }}
+                            </h2>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('Current article embedding progress by status.') }}
+                            </p>
+                        </div>
+
+                        <div class="px-5 py-5">
+                            <div v-if="embedSummaryItems.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                                <div
+                                    v-for="item in embedSummaryItems"
+                                    :key="item.key"
+                                    class="rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-surface-700 dark:bg-surface-800/60"
+                                >
+                                    <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
+                                        {{ item.label }}
+                                    </p>
+                                    <p class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                                        {{ item.count }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div v-else class="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('No embed status data yet.') }}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  </AdminLayout>
+    </AdminLayout>
 </template>

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
 import { ref, onMounted } from 'vue'
+import { useFlashToasts } from '@/Composables/useToastr'
+
+useFlashToasts()
 
 const form = useForm({ code: '' })
 const digits = ref(['', '', '', '', '', ''])

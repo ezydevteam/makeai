@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
+import { useFlashToasts } from '@/Composables/useToastr'
+
+useFlashToasts()
 
 interface PageProps {
     twoFactorMethod?: string

@@ -80,21 +80,37 @@ class SlideshowBuilderService
 
         // Build ffmpeg command
         $cmd = escapeshellarg($ffmpeg)
-            . ' -f concat -safe 0 -i ' . escapeshellarg($concatFile)
-            . ' -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p"'
-            . ' -r 25';
+            . ' -f concat -safe 0 -i ' . escapeshellarg($concatFile);
+
+        // Watermark overlay
+        $watermarkPath = addon_setting('ai-video-creator', 'watermark_path', '');
+        $enableWatermark = addon_setting('ai-video-creator', 'enable_watermark', false);
+        
+        $vf = 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,format=yuv420p';
+        
+        if ($enableWatermark && !empty($watermarkPath)) {
+            $absWatermark = storage_path('app/' . $watermarkPath);
+            if (file_exists($absWatermark)) {
+                $cmd .= ' -i ' . escapeshellarg($absWatermark);
+                $vf .= ',overlay=10:10';
+            }
+        }
+
+        $cmd .= ' -vf "' . $vf . '" -r 25';
 
         if ($voicePath && file_exists($voicePath)) {
             $cmd .= ' -i ' . escapeshellarg($voicePath) . ' -shortest';
+            
+            $voiceIdx = $mapIdx++;
 
             if (! empty($params['background_music_path'])) {
                 $musicPath = storage_path('app/' . $params['background_music_path']);
                 $vol = (float) ($params['music_volume'] ?? 0.3);
                 $cmd .= ' -i ' . escapeshellarg($musicPath)
-                    . ' -filter_complex "[1:a]volume=1[voice];[2:a]volume=' . $vol . '[music];[voice][music]amix=inputs=2:duration=first[aout]"'
+                    . ' -filter_complex "[' . $voiceIdx . ':a]volume=1[voice];[' . $mapIdx . ':a]volume=' . $vol . '[music];[voice][music]amix=inputs=2:duration=first[aout]"'
                     . ' -map 0:v -map "[aout]"';
             } else {
-                $cmd .= ' -map 0:v -map 1:a';
+                $cmd .= ' -map 0:v -map ' . $voiceIdx . ':a';
             }
         }
 

@@ -16,7 +16,7 @@ class InstallationMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $installed = filter_var(env('INSTALLED', false), FILTER_VALIDATE_BOOLEAN);
+        $installed = filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN);
 
         if ($request->is('install') || $request->is('install/*')) {
             if ($installed) {

@@ -7,10 +7,12 @@
         "dev": "vite"
     },
     "devDependencies": {
+        "@inertiajs/server": "^0.1.0",
         "@tailwindcss/vite": "^4.0.0",
         "@types/node": "^25.7.0",
         "@types/qrcode": "^1.5.6",
-        "concurrently": "^9.0.1",
+        "concurrently": "^10.0.3",
+        "fabric": "^7.4.0",
         "laravel-vite-plugin": "^3.1",
         "tailwindcss": "^4.0.0",
         "typescript": "^6.0.3",
@@ -18,17 +20,16 @@
         "vue-tsc": "^3.2.8"
     },
     "dependencies": {
-        "@inertiajs/core": "^3.1.1",
-        "@inertiajs/server": "^0.1.0",
-        "@inertiajs/vue3": "^3.1.1",
+        "@inertiajs/core": "^2.0.0",
+        "@inertiajs/vue3": "^2.0.0",
         "@tabler/icons-webfont": "^3.44.0",
         "@tiptap/extension-bubble-menu": "^3.23.4",
-        "@tiptap/extension-code-block-lowlight": "^3.26.0",
+        "@tiptap/extension-code-block-lowlight": "^3.23.4",
         "@tiptap/extension-color": "^3.23.4",
         "@tiptap/extension-highlight": "^3.23.4",
         "@tiptap/extension-image": "^3.23.4",
         "@tiptap/extension-link": "^3.23.4",
-        "@tiptap/extension-placeholder": "^3.26.0",
+        "@tiptap/extension-placeholder": "^3.23.4",
         "@tiptap/extension-table": "^3.23.4",
         "@tiptap/extension-table-cell": "^3.23.4",
         "@tiptap/extension-table-header": "^3.23.4",
@@ -42,7 +43,7 @@
         "@tiptap/vue-3": "^3.23.4",
         "@vitejs/plugin-vue": "^6.0.6",
         "@vueuse/core": "^14.3.0",
-        "axios": "^1.17.0",
+        "axios": "^1.7.9",
         "chart.js": "^4.5.1",
         "docx": "^9.7.1",
         "fuse.js": "^7.4.2",
@@ -60,6 +61,7 @@
         "ziggy-js": "^2.6.2"
     },
     "overrides": {
-        "ws": "^8.20.1"
+        "ws": "^8.20.1",
+        "axios": "^1.7.9"
     }
 }

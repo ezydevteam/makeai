@@ -4,7 +4,7 @@ namespace Addons\PublicKnowledgeBase\Database\Seeders;
 
 use Addons\PublicKnowledgeBase\Models\KbArticle;
 use Addons\PublicKnowledgeBase\Models\KbCategory;
-use App\Models\User;
+use App\Models\Admin;
 use Illuminate\Database\Seeder;
 
 class KbSeeder extends Seeder
@@ -15,7 +15,7 @@ class KbSeeder extends Seeder
             return;
         }
 
-        $adminId = User::where('is_admin', true)->first()?->id;
+        $adminId = Admin::query()->first()?->id;
 
         $categories = [
             ['slug' => 'getting-started', 'name' => 'Getting Started', 'icon' => 'ti ti-rocket', 'sort_order' => 1, 'is_active' => true],

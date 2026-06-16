@@ -3,15 +3,15 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
-use App\Models\Plan;
-use App\Models\User;
+use App\Models\Payment;
+use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class StripeWebhookController extends Controller
 {
-    public function handleWebhook(Request $request): JsonResponse
+    public function handleWebhook(Request $request, SubscriptionLifecycleService $lifecycle): JsonResponse
     {
         $payload = $request->getContent();
         $signature = (string) $request->header('Stripe-Signature');
@@ -26,89 +26,74 @@ class StripeWebhookController extends Controller
         $object = $event['data']['object'] ?? [];
 
         match ($type) {
-            'checkout.session.completed' => $this->handleCheckoutCompleted($object),
-            'customer.subscription.updated' => $this->handleSubscriptionUpdated($object),
-            'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
+            'checkout.session.completed' => $this->handleCheckoutCompleted($object, $lifecycle),
+            'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $lifecycle),
+            'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object, $lifecycle),
             default => null,
         };
 
         return response()->json(['success' => true]);
     }
 
-    private function handleCheckoutCompleted(array $session): void
+    private function handleCheckoutCompleted(array $session, SubscriptionLifecycleService $lifecycle): void
     {
-        $metadata = $session['metadata'] ?? [];
-        $planSlug = $metadata['plan_slug'] ?? null;
-        $billingCycle = $metadata['billing_cycle'] ?? 'monthly';
-        $customerEmail = $session['customer_details']['email'] ?? $session['customer_email'] ?? null;
+        $paymentId = $session['metadata']['payment_id'] ?? null;
+        $subscriptionId = $session['subscription'] ?? null;
 
-        if (! $planSlug || ! $customerEmail) {
+        if (! $paymentId) {
+            Log::warning('Stripe checkout completed but payment_id missing in metadata.');
             return;
         }
 
-        $plan = Plan::where('slug', $planSlug)->first();
-        $user = User::where('email', $customerEmail)->first();
+        $payment = Payment::where('ulid', $paymentId)->first();
 
-        if (! $user || ! $plan) {
-            Log::warning('Stripe checkout completed but user or plan not found.', [
-                'email' => $customerEmail,
-                'plan_slug' => $planSlug,
-            ]);
-
+        if (! $payment) {
+            Log::warning('Stripe checkout completed but payment not found.', ['payment_id' => $paymentId]);
             return;
         }
 
-        $user->update([
-            'plan_id' => $plan->id,
-            'subscription_status' => 'active',
-            'subscription_ends_at' => $billingCycle === 'monthly' ? now()->addMonth() : now()->addYear(),
-        ]);
+        // Idempotency check
+        if ($payment->status === 'completed') {
+            return;
+        }
 
-        Log::info('Stripe checkout activated.', [
-            'user_id' => $user->id,
-            'plan_slug' => $planSlug,
-        ]);
+        $lifecycle->activateFromPayment($payment, $session['id'], $subscriptionId);
     }
 
-    private function handleSubscriptionUpdated(array $subscription): void
+    private function handleSubscriptionUpdated(array $subscription, SubscriptionLifecycleService $lifecycle): void
     {
-        $stripeCustomerId = $subscription['customer'] ?? null;
+        $stripeSubscriptionId = $subscription['id'] ?? null;
 
-        if (! $stripeCustomerId) {
+        if (! $stripeSubscriptionId) {
             return;
         }
 
-        $user = User::where('stripe_id', $stripeCustomerId)->first();
+        $payment = Payment::where('gateway_payment_id', $stripeSubscriptionId)->first();
 
-        if (! $user) {
-            return;
-        }
-
-        $status = $subscription['status'] ?? 'active';
-
-        $user->update([
-            'subscription_status' => match ($status) {
+        if ($payment) {
+            $status = $subscription['status'] ?? 'active';
+            $mappedStatus = match ($status) {
                 'active', 'trialing' => 'active',
                 'past_due' => 'past_due',
                 default => 'canceled',
-            },
-        ]);
+            };
+
+            $payment->subscription?->update(['status' => $mappedStatus]);
+        }
     }
 
-    private function handleSubscriptionDeleted(array $subscription): void
+    private function handleSubscriptionDeleted(array $subscription, SubscriptionLifecycleService $lifecycle): void
     {
-        $stripeCustomerId = $subscription['customer'] ?? null;
+        $stripeSubscriptionId = $subscription['id'] ?? null;
 
-        if (! $stripeCustomerId) {
+        if (! $stripeSubscriptionId) {
             return;
         }
 
-        $user = User::where('stripe_id', $stripeCustomerId)->first();
+        $payment = Payment::where('gateway_payment_id', $stripeSubscriptionId)->first();
 
-        if ($user) {
-            $user->update([
-                'subscription_status' => 'canceled',
-            ]);
+        if ($payment && $payment->subscription) {
+            $lifecycle->cancelAtPeriodEnd($payment->subscription);
         }
     }
 

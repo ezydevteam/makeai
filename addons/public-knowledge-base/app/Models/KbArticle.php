@@ -2,7 +2,7 @@
 
 namespace Addons\PublicKnowledgeBase\Models;
 
-use App\Models\User;
+use App\Models\Admin;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -81,7 +81,7 @@ class KbArticle extends Model
 
     public function creator()
     {
-        return $this->belongsTo(User::class, 'created_by');
+        return $this->belongsTo(Admin::class, 'created_by');
     }
 
     public function scopePublished($query)

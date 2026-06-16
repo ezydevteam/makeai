@@ -16,14 +16,18 @@ class KbArticleController extends Controller
     {
         $filters = request()->only(['search', 'status', 'category_id', 'embed_status']);
 
-        $articles = KbArticle::with(['category', 'creator'])
+        $baseQuery = KbArticle::with(['category', 'creator'])
             ->when($filters['search'] ?? null, fn ($q, $v) => $q->where('title', 'like', "%{$v}%"))
             ->when($filters['status'] ?? null, fn ($q, $v) => $q->where('status', $v))
             ->when($filters['category_id'] ?? null, fn ($q, $v) => $q->where('kb_category_id', $v))
-            ->when($filters['embed_status'] ?? null, fn ($q, $v) => $q->where('embed_status', $v))
+            ->when($filters['embed_status'] ?? null, fn ($q, $v) => $q->where('embed_status', $v));
+
+        $articles = (clone $baseQuery)
             ->latest()
             ->paginate(20)
             ->withQueryString();
+
+        $statsQuery = (clone $baseQuery)->getQuery();
 
         $categories = KbCategory::orderBy('name')->get(['id', 'name']);
 
@@ -31,6 +35,13 @@ class KbArticleController extends Controller
             'articles' => $articles,
             'categories' => $categories,
             'filters' => $filters,
+            'stats' => [
+                'total' => (clone $statsQuery)->count(),
+                'published' => (clone $statsQuery)->where('status', 'published')->count(),
+                'draft' => (clone $statsQuery)->where('status', 'draft')->count(),
+                'embedded_done' => (clone $statsQuery)->where('embed_status', 'done')->count(),
+                'embed_failed' => (clone $statsQuery)->where('embed_status', 'failed')->count(),
+            ],
         ]);
     }
 

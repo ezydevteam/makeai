@@ -319,6 +319,7 @@ watch(searchQuery, () => {
                     class="absolute z-50 w-full rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900 overflow-hidden"
                     :class="placement === 'top' ? 'bottom-full' : 'top-full mt-1'"
                     @click.stop
+                    @mousedown.stop.prevent
                 >
                     <div v-if="showSearch && placement === 'bottom'" class="border-b border-gray-100 dark:border-surface-700 p-2">
                         <input
@@ -362,6 +363,7 @@ watch(searchQuery, () => {
                                             ? 'bg-gray-100 dark:bg-surface-700'
                                             : '',
                                     ]"
+                                    @mousedown.stop.prevent
                                     @click.stop="select(option)"
                                     @mouseenter="highlightedIndex = startIndex + index"
                                     @mouseleave="highlightedIndex = -1"
@@ -405,6 +407,7 @@ watch(searchQuery, () => {
                                     ? 'bg-gray-100 dark:bg-surface-700'
                                     : '',
                             ]"
+                            @mousedown.stop.prevent
                             @click.stop="select(option)"
                             @mouseenter="highlightedIndex = index"
                             @mouseleave="highlightedIndex = -1"

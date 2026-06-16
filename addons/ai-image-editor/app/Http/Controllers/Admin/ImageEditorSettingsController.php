@@ -27,10 +27,6 @@ class ImageEditorSettingsController extends \App\Http\Controllers\Controller
             'upscale_provider' => addon_setting('ai-image-editor', 'upscale_provider', 'replicate'),
             'style_provider' => addon_setting('ai-image-editor', 'style_provider', 'stability'),
             'object_remove_provider' => addon_setting('ai-image-editor', 'object_remove_provider', 'stability'),
-            'stability_api_key' => addon_setting('ai-image-editor', 'stability_api_key'),
-            'replicate_api_key' => addon_setting('ai-image-editor', 'replicate_api_key'),
-            'remove_bg_api_key' => addon_setting('ai-image-editor', 'remove_bg_api_key'),
-            'clipdrop_api_key' => addon_setting('ai-image-editor', 'clipdrop_api_key'),
             'credits_inpaint' => (int) addon_setting('ai-image-editor', 'credits_inpaint', 15),
             'credits_outpaint' => (int) addon_setting('ai-image-editor', 'credits_outpaint', 15),
             'credits_bg_remove' => (int) addon_setting('ai-image-editor', 'credits_bg_remove', 5),
@@ -45,15 +41,27 @@ class ImageEditorSettingsController extends \App\Http\Controllers\Controller
             'auto_save_to_library' => (bool) addon_setting('ai-image-editor', 'auto_save_to_library', true),
         ];
 
+        $apiKeyStatus = [
+            'stability_api_key' => $this->maskedSecret(addon_setting('ai-image-editor', 'stability_api_key')),
+            'replicate_api_key' => $this->maskedSecret(addon_setting('ai-image-editor', 'replicate_api_key')),
+            'remove_bg_api_key' => $this->maskedSecret(addon_setting('ai-image-editor', 'remove_bg_api_key')),
+            'clipdrop_api_key' => $this->maskedSecret(addon_setting('ai-image-editor', 'clipdrop_api_key')),
+        ];
+
         return Inertia::render('Addons/ai-image-editor/Admin/Settings', [
             'settings' => $settings,
             'operationsStatus' => $operationsStatus,
+            'apiKeyStatus' => $apiKeyStatus,
         ]);
     }
 
     public function update(ImageEditorSettingsRequest $request)
     {
         foreach ($request->validated() as $key => $value) {
+            if ($this->isEncryptedKey($key) && ($value === null || $value === '')) {
+                continue;
+            }
+
             $type = $this->getSettingType($key);
             addon_setting_set('ai-image-editor', $key, $value, $type);
         }
@@ -73,5 +81,20 @@ class ImageEditorSettingsController extends \App\Http\Controllers\Controller
             'stability_api_key', 'replicate_api_key', 'remove_bg_api_key', 'clipdrop_api_key' => 'encrypted',
             default => 'string',
         };
+    }
+
+    private function isEncryptedKey(string $key): bool
+    {
+        return in_array($key, [
+            'stability_api_key',
+            'replicate_api_key',
+            'remove_bg_api_key',
+            'clipdrop_api_key',
+        ], true);
+    }
+
+    private function maskedSecret(mixed $value): string
+    {
+        return is_string($value) && $value !== '' ? str_repeat('•', 12) : '';
     }
 }

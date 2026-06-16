@@ -119,7 +119,19 @@ class AdminController extends Controller
         ]);
 
         if (! empty($validated['password'])) {
+            // Check password history (prevent reuse of last 3 passwords)
+            $recentPasswords = $admin->passwordHistory()->latest()->limit(3)->pluck('password')->toArray();
+            foreach ($recentPasswords as $hashedPassword) {
+                if (Hash::check($validated['password'], $hashedPassword)) {
+                    return back()->with('error', translate('You cannot reuse a recent password.'));
+                }
+            }
+
+            // Save current password to history before updating
+            $admin->passwordHistory()->create(['password' => $admin->password]);
+
             $validated['password'] = Hash::make($validated['password']);
+            $validated['password_changed_at'] = now();
         } else {
             unset($validated['password']);
         }

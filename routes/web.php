@@ -60,7 +60,7 @@ use Inertia\Inertia;
 */
 
 // ─── Installation Wizard ────────────────────
-require __DIR__.'/install.php';
+// require __DIR__.'/install.php';
 
 // ─── Broadcasting Auth ──────────────────────
 Broadcast::routes(['middleware' => ['web']]);
@@ -267,6 +267,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/api-keys', [UserSettingsController::class, 'storeApiKey'])->name('api-keys.store');
             Route::delete('/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('api-keys.destroy');
 
+            // Account Deletion
+            Route::post('/account/delete', [UserSettingsController::class, 'requestAccountDeletion'])->name('account.delete');
+            Route::post('/account/delete/cancel', [UserSettingsController::class, 'cancelAccountDeletion'])->name('account.delete.cancel');
+
             // Affiliate
             Route::get('/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate');
             Route::post('/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
@@ -428,13 +432,13 @@ Route::post('/contact', [ContactController::class, 'store'])->middleware('thrott
 
 // ─── Payment Webhooks ───────────────────────
 Route::post('/webhooks/stripe', [App\Http\Controllers\Billing\StripeWebhookController::class, 'handleWebhook'])->name('webhooks.stripe');
-Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'paypal'])->name('webhooks.paypal');
-Route::match(['get', 'post'], '/webhooks/paddle', [PaymentWebhookController::class, 'paddle'])->name('webhooks.paddle');
-Route::post('/webhooks/razorpay', [PaymentWebhookController::class, 'razorpay'])->name('webhooks.razorpay');
-Route::match(['get', 'post'], '/webhooks/sslcommerz', [PaymentWebhookController::class, 'sslcommerz'])->name('webhooks.sslcommerz');
-Route::post('/webhooks/coingate', [PaymentWebhookController::class, 'coingate'])->name('webhooks.coingate');
-Route::post('/webhooks/paystack', [PaymentWebhookController::class, 'paystack'])->name('webhooks.paystack');
-Route::match(['get', 'post'], '/webhooks/2checkout', [PaymentWebhookController::class, 'twoCheckout'])->name('webhooks.2checkout');
+Route::post('/webhooks/paypal', [PaymentWebhookController::class, 'handle'])->name('webhooks.paypal')->defaults('gateway', 'paypal');
+Route::match(['get', 'post'], '/webhooks/paddle', [PaymentWebhookController::class, 'handle'])->name('webhooks.paddle')->defaults('gateway', 'paddle');
+Route::post('/webhooks/razorpay', [PaymentWebhookController::class, 'handle'])->name('webhooks.razorpay')->defaults('gateway', 'razorpay');
+Route::match(['get', 'post'], '/webhooks/sslcommerz', [PaymentWebhookController::class, 'handle'])->name('webhooks.sslcommerz')->defaults('gateway', 'sslcommerz');
+Route::post('/webhooks/coingate', [PaymentWebhookController::class, 'handle'])->name('webhooks.coingate')->defaults('gateway', 'coingate');
+Route::post('/webhooks/paystack', [PaymentWebhookController::class, 'handle'])->name('webhooks.paystack')->defaults('gateway', 'paystack');
+Route::match(['get', 'post'], '/webhooks/2checkout', [PaymentWebhookController::class, 'handle'])->name('webhooks.2checkout')->defaults('gateway', '2checkout');
 
 // ─── Chat Routes ────────────────────────────
 Route::get('/chat/{ulid?}', function (?string $ulid = null) {

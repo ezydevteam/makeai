@@ -14,6 +14,11 @@ class SubscriptionLifecycleService
     public function activateFromPayment(Payment $payment, string $gatewayPaymentId, ?string $gatewaySubscriptionId = null): GatewaySubscription
     {
         return DB::transaction(function () use ($payment, $gatewayPaymentId, $gatewaySubscriptionId) {
+            // Idempotency check
+            if ($payment->status === 'completed') {
+                return $payment->subscription ?? GatewaySubscription::where('user_id', $payment->user_id)->latest()->first();
+            }
+
             $metadata = $payment->metadata ?: [];
             $billingCycle = $metadata['billing_cycle'] ?? 'monthly';
             $periodEnd = $billingCycle === 'monthly' ? now()->addMonth() : now()->addYear();
@@ -36,6 +41,30 @@ class SubscriptionLifecycleService
                 'gateway_payment_id' => $gatewayPaymentId,
                 'subscription_id' => $subscription->id,
             ]);
+
+            // Atomic coupon usage increment
+            if (! empty($metadata['coupon_code'])) {
+                $coupon = \App\Models\Coupon::where('code', $metadata['coupon_code'])->first();
+                if ($coupon) {
+                    $incremented = \App\Models\Coupon::where('id', $coupon->id)
+                        ->where(function ($q) {
+                            $q->whereNull('max_uses')->orWhereColumn('used_count', '<', 'max_uses');
+                        })
+                        ->increment('used_count');
+
+                    if (! $incremented) {
+                        Log::warning('Coupon usage limit reached during activation', [
+                            'coupon_code' => $coupon->code,
+                            'payment_id' => $payment->id,
+                        ]);
+                    }
+                }
+            }
+
+            // Mark user as having trialed if this was a trial
+            if (! empty($metadata['is_trial'])) {
+                $payment->user()->update(['has_trialed' => true]);
+            }
 
             $payment->user()->update([
                 'plan_id' => $payment->plan_id,
@@ -68,11 +97,41 @@ class SubscriptionLifecycleService
         $billingCycle = $subscription->billing_cycle ?? 'monthly';
         $periodEnd = $billingCycle === 'monthly' ? now()->addMonth() : now()->addYear();
 
+        // Find the original payment to check for recurring coupons
+        $originalPayment = Payment::where('subscription_id', $subscription->id)
+            ->where('status', 'completed')
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        $finalAmount = $amount;
+        $renewalMetadata = [
+            'billing_cycle' => $billingCycle,
+            'created_from' => 'gateway_renewal_webhook',
+        ];
+
+        if ($originalPayment && ! empty($originalPayment->metadata['coupon_code'])) {
+            $coupon = \App\Models\Coupon::where('code', $originalPayment->metadata['coupon_code'])->first();
+            
+            if ($coupon && $coupon->is_recurring) {
+                $discountAmount = $coupon->type === 'percent' 
+                    ? ($amount * ($coupon->value / 100)) 
+                    : $coupon->value;
+
+                if ($coupon->max_discount && $discountAmount > $coupon->max_discount) {
+                    $discountAmount = $coupon->max_discount;
+                }
+
+                $finalAmount = max(0, $amount - $discountAmount);
+                $renewalMetadata['coupon_code'] = $coupon->code;
+                $renewalMetadata['discount_applied'] = $discountAmount;
+            }
+        }
+
         $subscription->update([
             'status' => 'active',
             'current_period_start' => now(),
             'current_period_end' => $periodEnd,
-            'amount' => $amount,
+            'amount' => $finalAmount,
             'currency' => $currency,
         ]);
 
@@ -82,14 +141,11 @@ class SubscriptionLifecycleService
             'subscription_id' => $subscription->id,
             'gateway' => $gateway,
             'gateway_payment_id' => $gatewayPaymentId,
-            'amount' => $amount,
+            'amount' => $finalAmount,
             'currency' => $currency,
             'status' => 'completed',
             'type' => 'subscription',
-            'metadata' => [
-                'billing_cycle' => $billingCycle,
-                'created_from' => 'gateway_renewal_webhook',
-            ],
+            'metadata' => $renewalMetadata,
         ]);
 
         $subscription->user()->update([

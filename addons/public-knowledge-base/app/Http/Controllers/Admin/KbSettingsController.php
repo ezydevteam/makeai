@@ -3,6 +3,8 @@
 namespace Addons\PublicKnowledgeBase\Http\Controllers\Admin;
 
 use Addons\PublicKnowledgeBase\Http\Requests\Admin\KbSettingsRequest;
+use App\Models\AiKey;
+use App\Models\AiModel;
 use Illuminate\Routing\Controller;
 use Inertia\Inertia;
 
@@ -26,14 +28,36 @@ class KbSettingsController extends Controller
             'provider' => addon_setting('public-knowledge-base', 'provider', ''),
         ];
 
+        $providers = $this->configuredProviders();
+
         return Inertia::render('Addons/public-knowledge-base/Admin/Settings', [
             'settings' => $settings,
+            'providers' => $providers,
         ]);
     }
 
     public function update(KbSettingsRequest $request)
     {
         $validated = $request->validated();
+        $providers = $this->configuredProviders();
+
+        $provider = $validated['provider'] ?? '';
+        if ($provider !== '' && ! isset($providers[$provider])) {
+            return back()->withErrors([
+                'provider' => translate('Selected provider is not configured or has no active models.'),
+            ]);
+        }
+
+        if ($provider !== '') {
+            $models = $providers[$provider]['models'] ?? [];
+            $selectedModel = $validated['ai_model'] ?? '';
+
+            if ($selectedModel !== '' && ! collect($models)->contains('slug', $selectedModel)) {
+                return back()->withErrors([
+                    'ai_model' => translate('Selected model is not available for this provider.'),
+                ]);
+            }
+        }
 
         unset($validated['_method'], $validated['_token']);
 
@@ -41,6 +65,48 @@ class KbSettingsController extends Controller
             addon_setting_set('public-knowledge-base', $key, $value);
         }
 
-        return back()->with('success', 'Settings saved.');
+        return back()->with('success', translate('Settings saved.'));
+    }
+
+    /**
+     * Build configured AI providers with active models only.
+     *
+     * @return array<string, array{name: string, models: array<int, array{slug: string, name: string}>}>
+     */
+    private function configuredProviders(): array
+    {
+        $providers = config('ai.providers', []);
+        $activeProviders = AiKey::available()->get()->pluck('provider')->unique()->values();
+
+        $result = [];
+
+        foreach ($providers as $slug => $info) {
+            if (! $activeProviders->contains($slug)) {
+                continue;
+            }
+
+            $models = AiModel::query()
+                ->active()
+                ->where('provider', $slug)
+                ->orderBy('name')
+                ->get(['slug', 'name'])
+                ->map(fn (AiModel $model) => [
+                    'slug' => $model->slug,
+                    'name' => $model->name,
+                ])
+                ->values()
+                ->all();
+
+            if (empty($models)) {
+                continue;
+            }
+
+            $result[$slug] = [
+                'name' => $info['name'] ?? $slug,
+                'models' => $models,
+            ];
+        }
+
+        return $result;
     }
 }

@@ -32,7 +32,7 @@ class DemoReset extends Command
         Artisan::call('db:seed', ['--force' => true]);
 
         $this->warn('Seeding demo data...');
-        Artisan::call('db:seed', ['--class' => 'DemoSeeder', '--force' => true]);
+        Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\DemoSeeder', '--force' => true]);
 
         DB::statement('SET FOREIGN_KEY_CHECKS=1');
 

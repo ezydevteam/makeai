@@ -15,7 +15,7 @@ class FooterBuilderController extends Controller
 {
     private const BOTTOM_ONLY_TYPES = ['copyright_text', 'payment_icons', 'back_to_top', 'social_icons', 'legal_links', 'custom_html', 'divider'];
 
-    private function getDefaults(): array
+    public function getDefaults(): array
     {
         $appName = settings('app_name', translate('Application'));
 
@@ -102,7 +102,7 @@ class FooterBuilderController extends Controller
         ];
     }
 
-    private function normalizeConfig(array $config): array
+    public function normalizeConfig(array $config): array
     {
         $defaults = $this->getDefaults();
         $hasSavedBottomColumns = isset($config['bottom_columns']) && is_array($config['bottom_columns']) && count($config['bottom_columns']) === 2;
@@ -241,7 +241,7 @@ class FooterBuilderController extends Controller
         return Str::of($prefix)->lower()->replaceMatches('/[^a-z0-9_]+/', '_')->trim('_').'_'.Str::ulid();
     }
 
-    public function index()
+    public function index(string $slug)
     {
         $config = Setting::getValue('footer_config');
 
@@ -267,10 +267,11 @@ class FooterBuilderController extends Controller
             'menus' => $menus,
             'pages' => $pages,
             'aiCategories' => $aiCategories,
+            'themeSlug' => $slug,
         ]);
     }
 
-    public function update(FooterBuilderRequest $request)
+    public function update(FooterBuilderRequest $request, string $slug)
     {
         Setting::setValue('footer_config', $this->normalizeConfig($request->footerConfig()), 'json', 'appearance');
 

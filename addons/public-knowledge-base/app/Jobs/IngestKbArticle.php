@@ -101,18 +101,18 @@ class IngestKbArticle implements ShouldQueue
     {
         $maxChars = 1600;
 
-        $paragraphs = preg_split('/\n\s*\n/', $text);
-        $paragraphs = array_filter($paragraphs, fn ($p) => trim($p) !== '');
-
+        // Split by sentence while keeping the delimiter
+        $sentences = preg_split('/(?<=[.!?])\s+(?=[A-Z])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+        
         $chunks = [];
         $current = '';
 
-        foreach ($paragraphs as $para) {
-            if (strlen($current . $para) > $maxChars && strlen($current) > 100) {
+        foreach ($sentences as $sentence) {
+            if (strlen($current . ' ' . $sentence) > $maxChars && strlen($current) > 100) {
                 $chunks[] = trim($current);
-                $current = $para;
+                $current = $sentence;
             } else {
-                $current .= ($current ? "\n\n" : '') . $para;
+                $current .= ($current ? ' ' : '') . $sentence;
             }
         }
 
@@ -126,11 +126,7 @@ class IngestKbArticle implements ShouldQueue
 
         $final = [];
         foreach ($chunks as $i => $chunk) {
-            if ($i === 0) {
-                $final[] = "Title: {$title}\n\n{$chunk}";
-            } else {
-                $final[] = "From article: {$title}\n\n{$chunk}";
-            }
+            $final[] = ($i === 0 ? "Title: {$title}\n\n" : "From article: {$title}\n\n") . $chunk;
         }
 
         return $final;

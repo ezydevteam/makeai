@@ -10,14 +10,16 @@ return new class extends Migration
     {
         Schema::create('rate_limit_hits', function (Blueprint $table) {
             $table->id();
-            $table->string('key', 255)->index();
+            $table->string('key');
             $table->string('category', 100);
             $table->unsignedInteger('hits')->default(1);
-            $table->unsignedInteger('window_start');
+            $table->unsignedBigInteger('window_start');
             $table->unsignedInteger('window_seconds');
             $table->timestamps();
 
             $table->unique(['key', 'window_start']);
+            $table->index(['key', 'category']);
+            $table->index('window_start');
         });
     }
 

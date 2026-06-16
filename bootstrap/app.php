@@ -18,7 +18,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Foundation\Http\Middleware\PreventRequestsDuringMaintenance;
 
-return Application::configure(basePath: dirname(__DIR__))
+$appConfigurator = Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -26,7 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
         channels: __DIR__.'/../routes/channels.php',
         health: '/up',
         then: function () {
-            require __DIR__.'/../routes/install.php';
+            \Illuminate\Support\Facades\Route::middleware('web')
+                ->group(__DIR__.'/../routes/install.php');
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -84,4 +85,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 'integration' => $e->integration,
             ], 503);
         });
-    })->create();
+    });
+
+$app = $appConfigurator->create();
+
+// Bind the public path to the root directory dynamically when running in the distribution package
+if (isset($_SERVER['SCRIPT_FILENAME']) && basename($_SERVER['SCRIPT_FILENAME']) === 'index.php') {
+    $app->usePublicPath(dirname($_SERVER['SCRIPT_FILENAME']));
+} elseif (file_exists(base_path('../index.php')) && basename(base_path()) === 'makeai') {
+    $app->usePublicPath(dirname(base_path()));
+}
+
+return $app;

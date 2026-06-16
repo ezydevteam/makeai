@@ -19,7 +19,7 @@ class Admin extends Authenticatable
     protected $guard = 'admin';
 
     protected $fillable = [
-        'name', 'email', 'password', 'avatar', 'role_id',
+        'name', 'email', 'password', 'password_changed_at', 'avatar', 'role_id',
         'is_active', 'must_change_password',
         'two_factor_secret', 'two_factor_enabled',
         'two_factor_confirmed_at', 'two_factor_recovery_codes',
@@ -36,6 +36,7 @@ class Admin extends Authenticatable
     {
         return [
             'password' => 'hashed',
+            'password_changed_at' => 'datetime',
             'is_active' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
@@ -201,11 +202,33 @@ class Admin extends Authenticatable
     /**
      * Record a login event.
      */
-    public function recordLogin(string $ip): void
+    public function recordLogin(string $ip, ?string $userAgent = null): void
     {
         $this->update([
             'last_login_at' => now(),
             'last_login_ip' => $ip,
         ]);
+
+        $this->loginHistory()->create([
+            'ip' => $ip,
+            'user_agent' => $userAgent,
+            'success' => true,
+        ]);
+    }
+
+    /**
+     * Get the admin's login history.
+     */
+    public function loginHistory()
+    {
+        return $this->hasMany(AdminLoginHistory::class);
+    }
+
+    /**
+     * Get the admin's password history.
+     */
+    public function passwordHistory()
+    {
+        return $this->morphMany(PasswordHistory::class, 'user');
     }
 }

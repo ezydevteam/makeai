@@ -27,7 +27,7 @@ return new class extends Migration
             $table->timestamp('embedded_at')->nullable();
             $table->string('meta_title', 160)->nullable();
             $table->string('meta_desc', 320)->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('admins')->nullOnDelete();
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
 

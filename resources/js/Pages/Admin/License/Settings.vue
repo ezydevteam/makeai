@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
@@ -26,6 +26,7 @@ const props = defineProps<{
     item_id: string | null
 }>()
 
+const page = usePage()
 const { t } = useTranslate()
 
 const activateForm = useForm({
@@ -67,6 +68,9 @@ function formatGraceTime(hours: number): string {
 }
 
 function applyMask(value: string) {
+    if (page.props.licenseTestMode) {
+        return value.replace(/[^a-z0-9-]/gi, '').slice(0, 50).toUpperCase()
+    }
     return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
 }
 
@@ -79,6 +83,24 @@ function onPurchaseCodeInput(e: Event) {
     <Head :title="t('License Settings')" />
 
     <div class="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <!-- Developer test mode warning banner -->
+        <div
+            v-if="page.props.licenseTestMode"
+            class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-700 dark:bg-red-950/20 dark:text-red-300"
+        >
+            <div class="flex items-start gap-3">
+                <svg class="mt-0.5 h-5 w-5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                    <p class="font-semibold">{{ t('Developer license test mode is active') }}</p>
+                    <p class="mt-1 text-xs">
+                        {{ t('This must NEVER be true in a production environment. Remove the LICENSE_TEST_MODE flag from your .env file immediately if this is a live customer site.') }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
         <!-- Page Header -->
         <div class="flex items-center justify-between">
             <div>

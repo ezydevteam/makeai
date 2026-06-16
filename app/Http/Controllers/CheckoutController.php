@@ -308,6 +308,11 @@ class CheckoutController extends Controller
     private function createTrialSubscription(Request $request, Plan $plan, string $billing, PaymentGateway $gateway, array $cycle, array $pricing): GatewaySubscription
     {
         return DB::transaction(function () use ($request, $plan, $billing, $gateway, $cycle, $pricing) {
+            // Prevent trial abuse
+            if ($request->user()->has_trialed) {
+                throw new \Exception(translate('You have already used your free trial.'));
+            }
+
             $trialEndsAt = now()->addDays((int) ($cycle['trial_days'] ?: 30));
 
             $subscription = GatewaySubscription::create([
@@ -328,6 +333,7 @@ class CheckoutController extends Controller
                 'subscription_status' => 'trialing',
                 'trial_ends_at' => $trialEndsAt,
                 'subscription_ends_at' => $trialEndsAt,
+                'has_trialed' => true,
             ]);
 
             return $subscription;

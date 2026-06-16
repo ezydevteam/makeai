@@ -113,7 +113,23 @@ class SettingsController extends Controller
             ]);
         }
 
-        $user->update(['password' => $validated['password']]);
+        // Check password history (prevent reuse of last 3 passwords)
+        $recentPasswords = $user->passwordHistory()->latest()->limit(3)->pluck('password')->toArray();
+        foreach ($recentPasswords as $hashedPassword) {
+            if (Hash::check($validated['password'], $hashedPassword)) {
+                throw ValidationException::withMessages([
+                    'password' => [translate('You cannot reuse a recent password.')],
+                ]);
+            }
+        }
+
+        // Save current password to history before updating
+        $user->passwordHistory()->create(['password' => $user->password]);
+
+        $user->update([
+            'password' => $validated['password'],
+            'password_changed_at' => now(),
+        ]);
 
         return redirect()->route('user.dashboard.profile')
             ->with('success', translate('Password changed successfully.'));
@@ -259,5 +275,41 @@ class SettingsController extends Controller
         throw ValidationException::withMessages([
             'code' => [translate('Invalid authenticator or recovery code.')],
         ]);
+    }
+
+    // ─── Account Deletion ──────────────────────
+
+    public function requestAccountDeletion(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        if (! Hash::check($validated['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'password' => [translate('The provided password is incorrect.')],
+            ]);
+        }
+
+        $user->update([
+            'scheduled_deletion_at' => now()->addDays(30),
+        ]);
+
+        return back()->with('success', translate('Account deletion scheduled. Your account will be permanently deleted in 30 days.'));
+    }
+
+    public function cancelAccountDeletion(Request $request): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $user->update([
+            'scheduled_deletion_at' => null,
+        ]);
+
+        return back()->with('success', translate('Account deletion request cancelled.'));
     }
 }

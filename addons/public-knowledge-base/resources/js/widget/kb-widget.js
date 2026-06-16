@@ -136,14 +136,20 @@
             const event = JSON.parse(line)
             if (event.type === 'sources' && event.articles && event.articles.length > 0) {
               results.innerHTML = ''
+              const sourcesDiv = document.createElement('div')
+              sourcesDiv.className = 'kb-sources-list'
+              sourcesDiv.innerHTML = '<div style="margin-bottom:8px;font-weight:600;font-size:12px;color:#9ca3af">Sources:</div>'
+              results.appendChild(sourcesDiv)
+
               for (const a of event.articles) {
                 const link = document.createElement('a')
                 link.className = 'kb-source'
-                link.href = a.slug ? '/' + a.slug : '#'
-                link.target = '_blank'
-                link.innerHTML = `<strong>${escapeHtml(a.title)}</strong><br><span style="color:#6b7280">${escapeHtml(a.excerpt || '')}</span>`
-                results.appendChild(link)
+                // ...
+                sourcesDiv.appendChild(link)
               }
+              const answerDiv = document.createElement('div')
+              answerDiv.className = 'kb-answer'
+              results.appendChild(answerDiv)
             } else if (event.type === 'delta') {
               answerText += event.text
               const ansEl = results.querySelector('.kb-answer')

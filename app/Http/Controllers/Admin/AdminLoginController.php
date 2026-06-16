@@ -84,7 +84,7 @@ class AdminLoginController extends Controller
             return redirect()->route('admin.2fa.show');
         }
 
-        $admin->recordLogin($request->ip());
+        $admin->recordLogin($request->ip(), (string) $request->userAgent());
 
         $request->session()->regenerate();
 
@@ -152,7 +152,7 @@ class AdminLoginController extends Controller
         $request->session()->forget('admin_2fa_method');
 
         Auth::guard('admin')->login($admin);
-        $admin->recordLogin($request->ip());
+        $admin->recordLogin($request->ip(), (string) $request->userAgent());
 
         $request->session()->regenerate();
 

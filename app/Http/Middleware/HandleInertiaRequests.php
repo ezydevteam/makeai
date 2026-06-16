@@ -64,6 +64,7 @@ class HandleInertiaRequests extends Middleware
                 'locale' => ['code' => 'en', 'name' => 'English', 'flag' => null, 'is_rtl' => false],
                 'translations' => [],
                 'languages' => [],
+                'licenseTestMode' => config('app.license_test_mode', false),
                 'flash' => [
                     'success' => fn () => $request->session()->get('success'),
                     'error' => fn () => $request->session()->get('error'),
@@ -92,6 +93,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
 
             'appName' => $siteName,
+            'licenseTestMode' => config('app.license_test_mode', false),
 
             'branding' => [
                 'site_name'          => $siteName,

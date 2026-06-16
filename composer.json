@@ -45,8 +45,8 @@
             "Addons\\AiImageEditor\\": "addons/ai-image-editor/app/",
             "Addons\\AiImageEditor\\Database\\Seeders\\": "addons/ai-image-editor/database/seeders/",
             "Addons\\AiVideoCreator\\Database\\Seeders\\": "addons/ai-video-creator/database/seeders/",
-        "Addons\\AiVoiceover\\": "addons/ai-voiceover/app/",
-        "Addons\\AiVoiceover\\Database\\Seeders\\": "addons/ai-voiceover/database/seeders/",
+            "Addons\\AiVoiceover\\": "addons/ai-voiceover/app/",
+            "Addons\\AiVoiceover\\Database\\Seeders\\": "addons/ai-voiceover/database/seeders/",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         },

@@ -39,7 +39,7 @@ class SystemCheckService
     {
         foreach ($this->check() as $category => $checks) {
             foreach ($checks as $check) {
-                if (! ($check['pass'] ?? false)) {
+                if (($check['severity'] ?? 'error') === 'error' && ! ($check['pass'] ?? false)) {
                     return false;
                 }
             }

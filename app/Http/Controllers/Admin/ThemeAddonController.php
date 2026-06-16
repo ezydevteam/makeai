@@ -12,8 +12,11 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use ZipArchive;
-
 use Illuminate\Support\Facades\Storage;
+use App\Models\Setting;
+use App\Http\Controllers\Admin\HeaderBuilderController;
+use App\Http\Controllers\Admin\HomepageBuilderController;
+use App\Http\Controllers\Admin\FooterBuilderController;
 
 /**
  * Admin Theme & Addon Management Controller.
@@ -63,9 +66,73 @@ class ThemeAddonController extends Controller
         }
 
         if ($slug === 'default') {
+            // Header Builder props
+            $headerBuilder = app(HeaderBuilderController::class);
+            $headerConfigRaw = Setting::getValue('header_config');
+            $headerSavedConfig = $headerConfigRaw ? (is_array($headerConfigRaw) ? $headerConfigRaw : json_decode($headerConfigRaw, true) ?? []) : [];
+            $headerSavedConfig = $headerBuilder->migrateLegacyStickyConfig($headerSavedConfig);
+            $headerDefaults = $headerBuilder->getDefaults();
+            $headerConfig = $headerBuilder->normalizeBlockIds($headerSavedConfig ? array_replace_recursive($headerDefaults, $headerSavedConfig) : $headerDefaults);
+
+            // Homepage Builder props
+            $homepageBuilder = app(HomepageBuilderController::class);
+            $homepageConfigRaw = Setting::getValue('homepage_config');
+            $homepageSavedConfig = is_array($homepageConfigRaw) ? $homepageBuilder->normalizeStoredHomepageConfig($homepageConfigRaw) : null;
+            $homepageConfig = is_array($homepageSavedConfig) ? array_replace_recursive($homepageBuilder->getDefaults(), $homepageSavedConfig) : $homepageBuilder->getDefaults();
+            $activeHomepageTemplate = settings('homepage_template', 'default');
+            $availableTemplates = \App\Models\SiteTemplate::active()
+                ->where('slug', 'ai-chatbot')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'requires_pro'])
+                ->map(fn ($t) => [
+                    'slug' => $t->slug,
+                    'name' => $t->name,
+                    'requires_pro' => (bool) $t->requires_pro,
+                ])
+                ->values();
+            $gridTemplates = \App\Models\SiteTemplate::active()
+                ->where('slug', '!=', 'ai-chatbot')
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['slug', 'name', 'requires_pro'])
+                ->values();
+
+            // Footer Builder props
+            $footerBuilder = app(FooterBuilderController::class);
+            $footerConfigRaw = Setting::getValue('footer_config');
+            if ($footerConfigRaw) {
+                $footerSavedConfig = is_array($footerConfigRaw) ? $footerConfigRaw : json_decode($footerConfigRaw, true) ?? [];
+                $footerConfig = $footerBuilder->normalizeConfig($footerSavedConfig);
+            } else {
+                $footerConfig = $footerBuilder->normalizeConfig($footerBuilder->getDefaults());
+            }
+
+            // Shared builders metadata
+            $menus = \App\Models\Menu::orderBy('name')->get(['id', 'name', 'slug']);
+            $pages = \App\Models\Page::query()
+                ->published()
+                ->orderBy('title')
+                ->get(['id', 'title', 'slug']);
+            $aiCategories = \App\Models\Category::active()->aiTools()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'tools_count']);
+
             return Inertia::render('Admin/Appearance/DefaultThemeSettings', [
                 'theme' => $config,
                 'settings' => AppearanceSetting::getForScope('theme_default'),
+                'headerConfig' => $headerConfig,
+                'headerDefaults' => $headerDefaults,
+                'homepageConfig' => $homepageConfig,
+                'sectionTypes' => HomepageBuilderController::SECTION_TYPES,
+                'activeHomepageTemplate' => $activeHomepageTemplate,
+                'availableTemplates' => $availableTemplates,
+                'gridTemplates' => $gridTemplates,
+                'footerConfig' => $footerConfig,
+                'menus' => $menus,
+                'pages' => $pages,
+                'aiCategories' => $aiCategories,
             ]);
         }
 
@@ -88,7 +155,7 @@ class ThemeAddonController extends Controller
         if ($slug === 'default') {
             $validated = $request->validate([
                 'settings' => ['required', 'array'],
-                'settings.*' => ['nullable', 'string', 'max:500'],
+                'settings.*' => ['nullable', 'max:50000'],
             ]);
 
             $this->saveAppearanceScopeSettings('theme_default', $validated['settings']);

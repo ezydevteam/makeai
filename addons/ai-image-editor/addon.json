@@ -13,7 +13,7 @@
       "parent": "Settings",
       "label": "AI Image Editor",
       "route": "addon.ie.admin.settings",
-      "icon": "ti-photo-edit",
+      "icon": "ti ti-photo-edit",
       "permission": "addon.ie.settings"
     }
   ],

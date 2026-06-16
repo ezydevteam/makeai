@@ -5,14 +5,25 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
 import AdminNotesModal from '@/Pages/Admin/Dashboard/AdminNotesModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 import { usePage } from '@inertiajs/vue3'
 
 defineOptions({ layout: AdminLayout })
 
 const { t } = useTranslate()
+const toast = useToastr()
 const page = usePage()
 
-const isDemo = computed(() => (page.props.app as any)?.demo ?? false)
+interface AppProps {
+    demo?: boolean
+}
+
+interface AdminProps {
+    isSuperAdmin?: boolean
+    permissions?: string[]
+}
+
+const isDemo = computed(() => (page.props.app as AppProps | undefined)?.demo ?? false)
 
 interface DashboardStats {
     totalUsers: number; newUsersToday: number; newUsersThisMonth: number; newUsersLastMonth: number
@@ -27,6 +38,13 @@ interface DashboardStats {
 interface TimeSeriesPoint { date: string; value: number }
 interface DualSeriesPoint { date: string; revenue: number; cost: number }
 interface LabelValue { label: string; credits?: number; cost?: number; tokens?: number; logins?: number; count?: number; country?: string }
+interface DashboardMetricItem {
+    label: string
+    count?: number
+    cost?: number
+    tokens?: number
+    credits?: number
+}
 
 type ChartPeriod = 'today' | '7d' | '30d' | '90d' | 'lifetime'
 
@@ -39,12 +57,12 @@ const props = defineProps<{
     revenueVsCost: Record<ChartPeriod, DualSeriesPoint[]>
     proSubs: Record<ChartPeriod, TimeSeriesPoint[]>
     geoUsage: { country: string; logins: number }[]
-    topToolsByUsage: Record<string, any>[]
-    topToolsByCost: Record<string, any>[]
-    topToolsByTokens: Record<string, any>[]
-    topModelsByUsage: Record<string, any>[]
-    topModelsByCost: Record<string, any>[]
-    topModelsByTokens: Record<string, any>[]
+    topToolsByUsage: DashboardMetricItem[]
+    topToolsByCost: DashboardMetricItem[]
+    topToolsByTokens: DashboardMetricItem[]
+    topModelsByUsage: DashboardMetricItem[]
+    topModelsByCost: DashboardMetricItem[]
+    topModelsByTokens: DashboardMetricItem[]
     recentUsers: { ulid: string; name: string; email: string; created_at: string }[]
     trafficSources: LabelValue[]
     activity: { type: string; icon: string; title: string; detail: string; time: string }[]
@@ -54,7 +72,7 @@ const s = computed(() => props.stats)
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
 function can(perm: string): boolean {
-    const admin = (page.props.admin as any) ?? {}
+    const admin = (page.props.admin as AdminProps | undefined) ?? {}
     return admin.isSuperAdmin || (admin.permissions ?? []).includes(perm)
 }
 
@@ -107,7 +125,9 @@ async function doDashboardExport(type: string, format: string) {
 
         if (res.headers.get('content-type')?.includes('application/json')) {
             const json = await res.json()
-            if (json.queued) alert(json.message)
+            if (json.queued) {
+                toast.info(json.message ?? t('Export queued.'))
+            }
         } else {
             const blob = await res.blob()
             const url = URL.createObjectURL(blob)
@@ -115,7 +135,9 @@ async function doDashboardExport(type: string, format: string) {
             a.href = url; a.download = 'export.' + format; a.click()
             URL.revokeObjectURL(url)
         }
-    } catch { alert(t('Export failed')) }
+    } catch {
+        toast.error(t('Export failed'))
+    }
     finally { exporting.value = false }
 }
 
@@ -149,7 +171,7 @@ async function deleteDashboardNote(noteId: number) {
     fetchReminders()
 }
 
-const hasCostData = computed(() => props.costByProvider.length > 0 && props.costByProvider.some((p: any) => (p.cost || 0) > 0))
+const hasCostData = computed(() => props.costByProvider.length > 0 && props.costByProvider.some((p) => (p.cost || 0) > 0))
 
 const periodLabels: Record<ChartPeriod, string> = { today: 'Today', '7d': '7 days', '30d': '30 days', '90d': '90 days', lifetime: 'Lifetime' }
 const periodOptions: ChartPeriod[] = ['today', '7d', '30d', '90d', 'lifetime']
@@ -189,7 +211,7 @@ const chartRefs: Record<string, Ref<HTMLCanvasElement | null>> = {
     signups: signupsCanvas, revenue: revenueCanvas, aiByTool: aiByToolCanvas,
     costByProvider: costByProviderCanvas, revenueVsCost: revenueVsCostCanvas, proSubs: proSubsCanvas,
 }
-const chartInstances: Record<string, any> = {}
+const chartInstances: Record<string, { destroy: () => void } | null> = {}
 
 async function loadChartJs() {
     const { Chart, LineController, BarController, DoughnutController, ArcElement, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Filler, Legend } = await import('chart.js')
@@ -198,10 +220,10 @@ async function loadChartJs() {
 }
 
 function destroyChart(key: string) {
-    if (chartInstances[key]) { chartInstances[key].destroy(); chartInstances[key] = null }
+    if (chartInstances[key]) { chartInstances[key]?.destroy(); chartInstances[key] = null }
 }
 
-async function drawChart(key: string, canvasRef: Ref<HTMLCanvasElement | null>, configFn: () => any) {
+async function drawChart(key: string, canvasRef: Ref<HTMLCanvasElement | null>, configFn: () => unknown) {
     await nextTick()
     const canvas = canvasRef.value
     if (!canvas) return
@@ -210,21 +232,21 @@ async function drawChart(key: string, canvasRef: Ref<HTMLCanvasElement | null>, 
     destroyChart(key)
     const Chart = await loadChartJs()
     try {
-        chartInstances[key] = new Chart(ctx, configFn())
+        chartInstances[key] = new Chart(ctx, configFn() as never)
     } catch (e) {
         console.error(`Chart ${key} failed:`, e)
     }
 }
 
-function timeLabels(data: TimeSeriesPoint[] | DualSeriesPoint[] | undefined | null): string[] {
+function timeLabels(data: Array<TimeSeriesPoint | DualSeriesPoint> | undefined | null): string[] {
     if (!data || !data.length) return []
     if (chartPeriod.value === 'lifetime') {
-        return (data as any[]).map((d: any) => d.date) // "Mar 2025" from backend
+        return data.map((point) => point.date)
     }
-    return (data as any[]).map((d: any) => {
-        if (d.date.includes(':')) return d.date // hourly: "14:00"
+    return data.map((point) => {
+        if (point.date.includes(':')) return point.date
         // Parse as local date to avoid UTC timezone shift
-        const [y, m, day] = d.date.split('-').map(Number)
+        const [y, m, day] = point.date.split('-').map(Number)
         const dt = new Date(y, m - 1, day)
         if (chartPeriod.value === '7d') {
             return dt.toLocaleDateString('en', { weekday: 'short' })
@@ -235,7 +257,7 @@ function timeLabels(data: TimeSeriesPoint[] | DualSeriesPoint[] | undefined | nu
 
 function isEmptySeries(data: TimeSeriesPoint[] | DualSeriesPoint[] | undefined | null): boolean {
     if (!data || !data.length) return true
-    return data.every((d: any) => (d.value ?? d.revenue ?? 0) === 0)
+    return data.every((point) => ('value' in point ? point.value : point.revenue) === 0)
 }
 
 async function drawAllCharts() {
@@ -243,7 +265,7 @@ async function drawAllCharts() {
 
     await drawChart('signups', chartRefs.signups, () => ({
         type: 'bar', data: { labels: timeLabels(props.signupsChart[period]), datasets: [{ data: props.signupsChart[period].map(d => d.value), backgroundColor: '#a5b4fc', borderColor: '#818cf8', borderWidth: 1, borderRadius: 4, barPercentage: 0.6 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (v: any) => v % 1 === 0 ? v : '', stepSize: 1 } }, x: { border: { display: false }, grid: { display: false } } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: (value) => (typeof value === 'number' && value % 1 === 0 ? value : ''), stepSize: 1 } }, x: { border: { display: false }, grid: { display: false } } } },
     }))
 
     await drawChart('revenue', chartRefs.revenue, () => ({
@@ -374,7 +396,7 @@ const activityTypeLabels: Record<string, string> = {
                 <button v-for="opt in periodOptions" :key="opt" @click="chartPeriod = opt"
                     class="px-3 py-1 text-xs rounded-lg border transition-colors"
                     :class="chartPeriod === opt ? 'btn-primary border-primary-600' : 'bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-surface-700 hover:border-primary-300'">
-                    {{ (periodLabels as any)[opt] }}
+                    {{ periodLabels[opt] }}
                 </button>
             </div>
             <div ref="exportEl" class="relative">

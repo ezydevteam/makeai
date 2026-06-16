@@ -17,7 +17,31 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (! file_exists(base_path('.env')) && file_exists(base_path('.env.example'))) {
+            try {
+                $content = file_get_contents(base_path('.env.example'));
+                $key = 'base64:' . base64_encode(random_bytes(32));
+                
+                // Replace APP_KEY= or APP_KEY=SomeRandomString
+                if (preg_match('/^APP_KEY=/m', $content)) {
+                    $content = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . $key, $content);
+                } else {
+                    $content .= "\nAPP_KEY=" . $key . "\n";
+                }
+                
+                file_put_contents(base_path('.env'), $content);
+                config(['app.key' => $key]);
+
+                if (str_contains($content, 'LICENSE_TEST_MODE=true') || str_contains($content, 'LICENSE_TEST_MODE="true"')) {
+                    config(['app.license_test_mode' => true]);
+                }
+            } catch (\Throwable $e) {
+                // Safe fallback if random_bytes or file writing fails
+                if (file_exists(base_path('.env.example'))) {
+                    @copy(base_path('.env.example'), base_path('.env'));
+                }
+            }
+        }
     }
 
     /**
@@ -36,6 +60,10 @@ class AppServiceProvider extends ServiceProvider
         Blade::directive('ads', function ($zone) {
             return "<?php echo app(\\App\\Services\\AdsService::class)->render($zone); ?>";
         });
+
+        if (config('app.license_test_mode') && app()->environment('production')) {
+            \Illuminate\Support\Facades\Log::critical('LICENSE_TEST_MODE is enabled in a production environment! This must be disabled immediately.');
+        }
     }
 
     /**
@@ -44,6 +72,16 @@ class AppServiceProvider extends ServiceProvider
      */
     private function configureInfrastructureFallbacks(): void
     {
+        // During installation, always force file cache and session drivers
+        // to avoid database queries before the DB is configured and migrated.
+        if (! filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN)) {
+            config([
+                'session.driver' => 'file',
+                'cache.default' => 'file',
+            ]);
+            return;
+        }
+
         try {
             $broadcasting = app(\App\Services\BroadcastingService::class);
             $redisAvailable = $broadcasting->isRedisAvailable();

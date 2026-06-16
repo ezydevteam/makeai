@@ -37,9 +37,11 @@
         }
     @endphp
     @vite($viteEntries)
+    {!! theme_setting('custom_header_code') !!}
     @inertiaHead
 </head>
 <body class="font-sans antialiased">
     @inertia
+    {!! theme_setting('custom_footer_code') !!}
 </body>
 </html>

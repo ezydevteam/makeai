@@ -24,9 +24,9 @@ class ApplyImageEdit implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $timeout = 300;
-    public int $tries = 2;
-    public array $backoff = [30, 120];
+    public int $timeout = 600;
+    public int $tries = 3;
+    public array $backoff = [60, 300, 600];
     public string $queue = 'media';
 
     public function __construct(public readonly int $editId)
