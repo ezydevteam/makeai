@@ -17,7 +17,7 @@ class VectorStoreService
 
     public function __construct()
     {
-        $this->driver = settings('ai_vector_store_driver') ?: config('ai.rag.vector_store_driver', 'database');
+        $this->driver = settings('rag_vector_store_driver') ?: config('ai.rag.vector_store_driver', 'database');
     }
 
     /**

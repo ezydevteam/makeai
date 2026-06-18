@@ -22,11 +22,11 @@ function onResume(id: number) {
             move-class="toast-move"
         >
             <div
-                v-for="t in toastStore.toasts"
-                :key="t.id"
+                v-for="toast in toastStore.toasts"
+                :key="toast.id"
                 class="pointer-events-auto"
             >
-                <Toast :toast="t" @close="removeToast" @pause="onPause" @resume="onResume" />
+                <Toast :toast="toast" @close="removeToast" @pause="onPause" @resume="onResume" />
             </div>
         </TransitionGroup>
     </Teleport>

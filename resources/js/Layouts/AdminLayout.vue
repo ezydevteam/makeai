@@ -185,7 +185,7 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div v-if="showCronBanner" class="border-b border-amber-200 bg-amber-50 px-6 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
+            <div v-if="showCronBanner" class="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
                 <div class="flex flex-col gap-3 text-sm font-medium lg:flex-row lg:items-center lg:justify-between">
                     <span>{{ t('Cron job is not configured. Scheduled tasks, renewals, and automation may not run.') }}</span>
                     <Link :href="cronStatus?.setup_url || route('admin.system.index')" class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">
@@ -195,8 +195,8 @@ onUnmounted(() => {
             </div>
 
             <!-- Header -->
-            <header class="sticky top-0 z-30 h-[60px] flex items-center justify-between px-4 lg:px-6 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-[#161b22]/95 backdrop-blur-sm shrink-0 transition-colors duration-300">
-                <div class="flex items-center gap-3">
+            <header class="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-gray-200 bg-white/95 px-4 backdrop-blur-sm shrink-0 transition-colors duration-300 dark:border-gray-700 dark:bg-[#161b22]/95 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+                <div class="flex min-w-0 items-center gap-3">
                     <!-- Mobile hamburger -->
                     <button class="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-surface-800 transition-colors" @click="mobileSidebarOpen = true">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
@@ -205,14 +205,14 @@ onUnmounted(() => {
                     <slot name="header">
                         <h2 class="text-lg font-semibold text-gray-900 dark:text-white"><slot name="title" /></h2>
                     </slot>
+
+                    <div class="hidden min-w-0 flex-1 lg:block lg:max-w-xl xl:max-w-2xl">
+                        <LiveSearch context="admin" />
+                    </div>
                 </div>
 
                 <!-- Profile -->
                 <div class="flex items-center gap-2 lg:gap-4">
-                    <div class="hidden lg:block">
-                        <LiveSearch context="admin" />
-                    </div>
-
                     <NotificationBell context="admin" />
 
                     <div class="relative" @click.stop>

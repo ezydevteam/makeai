@@ -182,6 +182,126 @@ input[type="radio"]:disabled,
     outline-offset: 2px;
 }
 
+/* Form controls */
+input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    border: 1.5px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #ffffff;
+    display: inline-grid;
+    place-content: center;
+    transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+input[type="checkbox"]::after {
+    content: '';
+    width: 0.55rem;
+    height: 0.55rem;
+    transform: scale(0);
+    transition: transform 0.14s ease;
+    clip-path: polygon(14% 44%, 0 59%, 42% 100%, 100% 20%, 84% 6%, 42% 74%);
+    background: #ffffff;
+}
+
+input[type="checkbox"]:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-primary-500) 45%, #d1d5db);
+}
+
+input[type="checkbox"]:checked {
+    border-color: var(--color-primary-500);
+    background: var(--color-primary-500);
+}
+
+input[type="checkbox"]:checked::after {
+    transform: scale(1);
+}
+
+input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+}
+
+input[type="checkbox"]:disabled {
+    opacity: 0.6;
+}
+
+.dark input[type="checkbox"] {
+    border-color: #52525b !important;
+    background: var(--color-surface-800) !important;
+    color: var(--color-primary-500) !important;
+}
+
+.dark input[type="checkbox"]:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--color-primary-400) 38%, #71717a) !important;
+}
+
+.dark input[type="checkbox"]:checked {
+    border-color: var(--color-primary-500) !important;
+    background: var(--color-primary-500) !important;
+}
+
+.app-switch {
+    position: relative;
+    display: inline-flex;
+    height: 1.5rem;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    flex: 0 0 2.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    border: 1px solid #d1d5db;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    padding: 0.125rem;
+    transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.app-switch:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+}
+
+.app-switch[aria-checked="true"] {
+    border-color: var(--color-primary-500);
+    background: var(--color-primary-500);
+}
+
+.app-switch:disabled,
+.app-switch[aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.app-switch__thumb {
+    display: inline-block;
+    height: 1rem;
+    width: 1rem;
+    border-radius: 9999px;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.18);
+    transform: translateX(0);
+    transition: transform 0.18s ease;
+}
+
+.app-switch[aria-checked="true"] .app-switch__thumb {
+    transform: translateX(1.25rem);
+}
+
+.dark .app-switch {
+    border-color: var(--color-surface-700) !important;
+    background: var(--color-surface-800) !important;
+}
+
+.dark .app-switch[aria-checked="true"] {
+    border-color: var(--color-primary-500) !important;
+    background: var(--color-primary-500) !important;
+}
+
 /* =============================================
    Admin Panel — Global Dark Mode Overrides
    ============================================= */
@@ -437,6 +557,40 @@ input[type="radio"]:disabled,
     font-size: 0.8125rem;
     color: var(--color-danger-500);
 }
+
+/* Variable-backed color helpers */
+.bg-primary {
+  background-color: var(--color-primary-500);
+}
+
+.bg-primary-500 {
+  background-color: var(--color-primary-500);
+}
+
+.bg-primary-600 {
+  background-color: var(--color-primary-600);
+}
+
+.bg-secondary {
+  background-color: var(--color-secondary-500);
+}
+
+.bg-secondary-500 {
+  background-color: var(--color-secondary-500);
+}
+
+.bg-secondary-600 {
+  background-color: var(--color-secondary-600);
+}
+
+.hover\:bg-primary-600:hover {
+  background-color: var(--color-primary-600);
+}
+
+.hover\:bg-secondary-600:hover {
+  background-color: var(--color-secondary-600);
+}
+
 /* Button utilities */
 .btn-primary,
 .btn-secondary,

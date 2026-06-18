@@ -183,7 +183,10 @@ class SettingsController extends Controller
             'api_key' => ['required', 'string', 'max:1000'],
         ]);
 
-        $user->apiKeys()->create($validated);
+        $user->apiKeys()->create([
+            'provider' => $validated['provider'],
+            'api_key' => encrypt($validated['api_key']),
+        ]);
 
         return back()->with('success', translate('API key added successfully.'));
     }

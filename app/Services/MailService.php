@@ -5,10 +5,31 @@ namespace App\Services;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\MailLog;
 use App\Models\MailTemplate;
+use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 
 class MailService
 {
+    /**
+     * Auth-related template slugs that should always be sent (never opted out).
+     */
+    private const AUTH_SLUGS = [
+        'email_verify_otp',
+        'reset_password_otp',
+        'password_changed',
+        'two_factor_otp',
+    ];
+
+    /**
+     * Map template slugs to notification preference groups.
+     */
+    private const SLUG_TO_GROUP_MAP = [
+        'credits_low' => 'billing',
+        'admin_notification' => 'admin',
+        'newsletter_confirm' => 'updates',
+        'newsletter_campaign' => 'updates',
+    ];
+
     /**
      * Send a templated email (Dispatches to queue by default)
      */
@@ -35,6 +56,11 @@ class MailService
         }
 
         if ($template->requires_pro && ! isProAvailable()) {
+            return;
+        }
+
+        // Check email preferences (skip for auth emails)
+        if (! $this->shouldSendEmail($slug, $to)) {
             return;
         }
 
@@ -66,6 +92,62 @@ class MailService
 
             throw $e;
         }
+    }
+
+    /**
+     * Check if an email should be sent based on user preferences.
+     * Auth emails always pass through.
+     */
+    public function shouldSendEmail(string $slug, string $to): bool
+    {
+        // Auth emails are always sent
+        if (in_array($slug, self::AUTH_SLUGS, true)) {
+            return true;
+        }
+
+        // Find user by email to check preferences
+        $user = User::where('email', $to)->first();
+
+        if (! $user) {
+            // No user found — allow sending (could be a non-user recipient)
+            return true;
+        }
+
+        // Map slug to group and check preference
+        $group = $this->getGroupForSlug($slug);
+
+        if (! $group) {
+            // Unknown slug — allow sending (e.g., subscription templates, custom templates)
+            return true;
+        }
+
+        return $user->wantsEmailNotification($group);
+    }
+
+    /**
+     * Get the notification preference group for a template slug.
+     */
+    public function getGroupForSlug(string $slug): ?string
+    {
+        // Check explicit mapping first
+        if (isset(self::SLUG_TO_GROUP_MAP[$slug])) {
+            return self::SLUG_TO_GROUP_MAP[$slug];
+        }
+
+        // Check template category as fallback
+        $template = MailTemplate::where('slug', $slug)->first();
+
+        if ($template) {
+            return match ($template->category) {
+                'auth' => null, // Auth emails always sent
+                'subscription' => 'billing',
+                'newsletter' => 'updates',
+                'account' => 'admin',
+                default => null,
+            };
+        }
+
+        return null;
     }
 
     public function preview(string $slug, array $data = []): string

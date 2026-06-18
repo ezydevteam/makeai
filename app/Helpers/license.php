@@ -43,9 +43,6 @@ if (! function_exists('isProAvailable')) {
      */
     function isProAvailable(): bool
     {
-        if (app()->environment('local')) {
-            return true;
-        }
         return is_extended_license() && (bool) settings('subscriptions_enabled', false);
     }
 }

@@ -92,20 +92,5 @@ class PlanSeeder extends Seeder
                 ])
             );
         }
-
-        // Credit top-up packs
-        $packs = [
-            ['name' => 'Starter Pack', 'credits' => 500, 'price' => 4.99, 'sort_order' => 1],
-            ['name' => 'Growth Pack', 'credits' => 2000, 'price' => 14.99, 'is_popular' => true, 'sort_order' => 2],
-            ['name' => 'Power Pack', 'credits' => 5000, 'price' => 29.99, 'sort_order' => 3],
-            ['name' => 'Mega Pack', 'credits' => 15000, 'price' => 79.99, 'sort_order' => 4],
-        ];
-
-        foreach ($packs as $pack) {
-            CreditPack::firstOrCreate(
-                ['name' => $pack['name']],
-                $pack
-            );
-        }
     }
 }

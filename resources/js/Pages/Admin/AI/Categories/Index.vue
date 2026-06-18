@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
@@ -61,6 +61,8 @@ const deleteProcessing = ref(false)
 const searchQuery = ref(props.filters.search || '')
 const statusFilter = ref(props.filters.status || '')
 const actionMenuOpen = ref<number | null>(null)
+const searchInput = ref<HTMLInputElement | null>(null)
+const searchFocused = ref(false)
 
 const form = useForm({
     name: '',
@@ -211,11 +213,6 @@ const filteredCategories = computed(() => {
 
 const hasActiveFilters = computed(() => Boolean(searchQuery.value || statusFilter.value))
 
-const resetTableFilters = () => {
-    searchQuery.value = ''
-    statusFilter.value = ''
-}
-
 const clearSearchQuery = () => {
     if (!searchQuery.value) {
         return
@@ -227,6 +224,58 @@ const clearSearchQuery = () => {
 const closeAllMenus = () => {
     actionMenuOpen.value = null
 }
+
+const clearTableFilters = () => {
+    searchQuery.value = ''
+    statusFilter.value = ''
+}
+
+const isTypingTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+        return false
+    }
+
+    const tagName = target.tagName.toLowerCase()
+
+    return tagName === 'input'
+        || tagName === 'textarea'
+        || tagName === 'select'
+        || target.isContentEditable
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+    if (formModalOpen.value || deleteTarget.value) {
+        return
+    }
+
+    if (event.key === '/') {
+        if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
+            return
+        }
+
+        event.preventDefault()
+        searchInput.value?.focus()
+        searchInput.value?.select()
+        return
+    }
+
+    if (event.key === 'Escape' && hasActiveFilters.value) {
+        if (isTypingTarget(event.target) && event.target !== searchInput.value) {
+            return
+        }
+
+        clearTableFilters()
+        actionMenuOpen.value = null
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
@@ -259,7 +308,7 @@ const closeAllMenus = () => {
                         v-if="formModalOpen"
                         class="flex max-h-[90vh] w-full sm:max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900"
                     >
-                        <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-3 dark:border-surface-800">
+                        <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                             <div>
                                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">
                                     {{ editingId ? t('Edit Category') : t('Create Category') }}
@@ -272,7 +321,7 @@ const closeAllMenus = () => {
                             </div>
                             <button
                                 type="button"
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800"
                                 @click="resetForm"
                             >
                                 <i class="ti ti-x text-base"></i>
@@ -280,7 +329,7 @@ const closeAllMenus = () => {
                         </div>
 
                         <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
-                            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
+                            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <div>
                                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Name') }}</label>
@@ -413,24 +462,24 @@ const closeAllMenus = () => {
                                 </div>
                             </div>
 
-                            <div class="shrink-0 border-t border-gray-100 bg-gray-50/80 px-5 py-2 dark:border-surface-800 dark:bg-surface-950">
+                            <div class="shrink-0 border-t border-gray-100 bg-gray-50/80 px-6 py-3 dark:border-surface-800 dark:bg-surface-950">
                                 <div class="flex items-center justify-end gap-3">
-                            <button
-                                type="button"
-                                class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                @click="resetForm"
-                            >
-                                {{ t('Cancel') }}
-                            </button>
-                            <button
-                                :disabled="form.processing"
-                                type="submit"
-                                class="rounded-lg btn-primary px-5 disabled:opacity-50"
-                            >
-                                {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Create Category') }}
-                            </button>
-                        </div>
-                    </div>
+                                    <button
+                                        type="button"
+                                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                        @click="resetForm"
+                                    >
+                                        {{ t('Cancel') }}
+                                    </button>
+                                    <button
+                                        :disabled="form.processing"
+                                        type="submit"
+                                        class="rounded-lg btn-primary px-5 disabled:opacity-50"
+                                    >
+                                        {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Create Category') }}
+                                    </button>
+                                </div>
+                            </div>
                         </form>
                     </section>
                 </Transition>
@@ -450,7 +499,7 @@ const closeAllMenus = () => {
         @confirm="executeDelete"
     />
 
-    <div class="mx-auto w-full sm:max-w-7xl px-6 py-8" @click="closeAllMenus">
+    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10" @click="closeAllMenus">
         <div class="mb-6 flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tool Categories') }}</h1>
@@ -481,11 +530,20 @@ const closeAllMenus = () => {
                     <div class="relative min-w-[240px] flex-1">
                         <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
                         <input
+                            ref="searchInput"
                             v-model="searchQuery"
                             :placeholder="t('Search tool category...')"
                             type="text"
                             class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            @focus="searchFocused = true"
+                            @blur="searchFocused = false"
                         />
+                        <span
+                            v-if="!searchQuery && !searchFocused"
+                            class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                        >
+                            /
+                        </span>
                         <button
                             v-if="searchQuery"
                             type="button"
@@ -525,7 +583,7 @@ const closeAllMenus = () => {
                             v-if="hasActiveFilters"
                             type="button"
                             class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                            @click="resetTableFilters"
+                            @click="clearTableFilters"
                         >
                             {{ t('Clear filters') }}
                         </button>

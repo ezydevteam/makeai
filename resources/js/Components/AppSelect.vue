@@ -6,6 +6,8 @@ export interface SelectOption {
     label: string
     icon?: string
     color?: string
+    tone?: 'default' | 'success' | 'warning' | 'danger'
+    dividerBefore?: boolean
     disabled?: boolean
 }
 
@@ -87,6 +89,19 @@ const showSearch = computed(() => props.liveSearch && (props.options.length > pr
 const selectedOptions = computed(() =>
     props.options.filter((o) => isSelected(o.value)),
 )
+
+const optionToneClass = (option: SelectOption) => {
+    switch (option.tone) {
+        case 'success':
+            return 'text-green-700 dark:text-green-300'
+        case 'warning':
+            return 'text-amber-700 dark:text-amber-300'
+        case 'danger':
+            return 'text-red-700 dark:text-red-300'
+        default:
+            return 'text-gray-700 dark:text-gray-200'
+    }
+}
 
 const displayText = computed(() => {
     if (props.multiple && props.compactMultiple && selectedOptions.value.length > 0) {
@@ -346,40 +361,41 @@ watch(searchQuery, () => {
                     >
                         <div :style="{ height: `${totalVirtualHeight}px`, position: 'relative' }">
                             <div :style="{ transform: `translateY(${virtualOffsetY}px)` }">
-                                <div
-                                    v-for="(option, index) in visibleItems"
-                                    :key="String(option.value)"
-                                    :data-highlighted="(startIndex + index) === highlightedIndex ? '' : undefined"
-                                    class="flex items-center gap-2 px-3 text-sm cursor-pointer transition-colors"
-                                    :style="{ height: `${ITEM_HEIGHT}px` }"
-                                    :class="[
-                                        option.disabled
-                                            ? 'opacity-40 cursor-not-allowed'
-                                            : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
-                                        isSelected(option.value)
-                                            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
-                                            : 'text-gray-700 dark:text-gray-200',
-                                        (startIndex + index) === highlightedIndex && !option.disabled && !isSelected(option.value)
-                                            ? 'bg-gray-100 dark:bg-surface-700'
-                                            : '',
-                                    ]"
-                                    @mousedown.stop.prevent
-                                    @click.stop="select(option)"
-                                    @mouseenter="highlightedIndex = startIndex + index"
-                                    @mouseleave="highlightedIndex = -1"
-                                >
-                                    <span
-                                        v-if="option.color"
-                                        class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
-                                        :style="{ backgroundColor: option.color }"
-                                    ></span>
-                                    <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
-                                    <span class="truncate">{{ option.label }}</span>
-                                    <i
-                                        v-if="isSelected(option.value)"
-                                        class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
-                                        aria-hidden="true"
-                                    ></i>
+                                <div v-for="(option, index) in visibleItems" :key="String(option.value)">
+                                    <div v-if="option.dividerBefore" class="mx-3 border-t border-gray-200 dark:border-surface-700"></div>
+                                    <div
+                                        :data-highlighted="(startIndex + index) === highlightedIndex ? '' : undefined"
+                                        class="flex items-center gap-2 px-3 text-sm cursor-pointer transition-colors"
+                                        :style="{ height: `${ITEM_HEIGHT}px` }"
+                                        :class="[
+                                            option.disabled
+                                                ? 'opacity-40 cursor-not-allowed'
+                                                : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                                            isSelected(option.value)
+                                                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                                                : optionToneClass(option),
+                                            (startIndex + index) === highlightedIndex && !option.disabled && !isSelected(option.value)
+                                                ? 'bg-gray-100 dark:bg-surface-700'
+                                                : '',
+                                        ]"
+                                        @mousedown.stop.prevent
+                                        @click.stop="select(option)"
+                                        @mouseenter="highlightedIndex = startIndex + index"
+                                        @mouseleave="highlightedIndex = -1"
+                                    >
+                                        <span
+                                            v-if="option.color"
+                                            class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                                            :style="{ backgroundColor: option.color }"
+                                        ></span>
+                                        <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
+                                        <span class="truncate">{{ option.label }}</span>
+                                        <i
+                                            v-if="isSelected(option.value)"
+                                            class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
+                                            aria-hidden="true"
+                                        ></i>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -391,39 +407,40 @@ watch(searchQuery, () => {
                         class="overflow-y-auto"
                         :style="{ maxHeight: `${size * ITEM_HEIGHT}px` }"
                     >
-                        <div
-                            v-for="(option, index) in filtered"
-                            :key="String(option.value)"
-                            :data-highlighted="highlightedIndex === index ? '' : undefined"
-                            class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors"
-                            :class="[
-                                option.disabled
-                                    ? 'opacity-40 cursor-not-allowed'
-                                    : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
-                                isSelected(option.value)
-                                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
-                                    : 'text-gray-700 dark:text-gray-200',
-                                highlightedIndex === index && !option.disabled && !isSelected(option.value)
-                                    ? 'bg-gray-100 dark:bg-surface-700'
-                                    : '',
-                            ]"
-                            @mousedown.stop.prevent
-                            @click.stop="select(option)"
-                            @mouseenter="highlightedIndex = index"
-                            @mouseleave="highlightedIndex = -1"
-                        >
-                            <span
-                                v-if="option.color"
-                                class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
-                                :style="{ backgroundColor: option.color }"
-                            ></span>
-                            <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
-                            <span class="truncate">{{ option.label }}</span>
-                            <i
-                                v-if="isSelected(option.value)"
-                                class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
-                                aria-hidden="true"
-                            ></i>
+                        <div v-for="(option, index) in filtered" :key="String(option.value)">
+                            <div v-if="option.dividerBefore" class="mx-3 border-t border-gray-200 dark:border-surface-700"></div>
+                            <div
+                                :data-highlighted="highlightedIndex === index ? '' : undefined"
+                                class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors"
+                                :class="[
+                                    option.disabled
+                                        ? 'opacity-40 cursor-not-allowed'
+                                        : 'hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                                    isSelected(option.value)
+                                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 font-semibold'
+                                        : optionToneClass(option),
+                                    highlightedIndex === index && !option.disabled && !isSelected(option.value)
+                                        ? 'bg-gray-100 dark:bg-surface-700'
+                                        : '',
+                                ]"
+                                @mousedown.stop.prevent
+                                @click.stop="select(option)"
+                                @mouseenter="highlightedIndex = index"
+                                @mouseleave="highlightedIndex = -1"
+                            >
+                                <span
+                                    v-if="option.color"
+                                    class="h-2.5 w-2.5 shrink-0 rounded-full border border-white/70 dark:border-surface-700"
+                                    :style="{ backgroundColor: option.color }"
+                                ></span>
+                                <i v-if="!multiple && option.icon" :class="option.icon" class="text-base shrink-0" aria-hidden="true" />
+                                <span class="truncate">{{ option.label }}</span>
+                                <i
+                                    v-if="isSelected(option.value)"
+                                    class="ti ti-check ml-auto shrink-0 text-base text-primary-600 dark:text-primary-400"
+                                    aria-hidden="true"
+                                ></i>
+                            </div>
                         </div>
 
                         <div

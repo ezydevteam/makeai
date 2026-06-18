@@ -31,6 +31,7 @@ return [
             'service' => 'ImageGenerationService',
             'tab' => 'image_media',
             'doc_url' => 'https://platform.openai.com/docs/guides/images',
+            'ai_fallback' => false,
             'providers' => [
                 'openai_dalle' => [
                     'name' => 'DALL·E 3',
@@ -134,6 +135,7 @@ return [
             'service' => 'TextToSpeechService',
             'tab' => 'voice_audio',
             'doc_url' => 'https://elevenlabs.io/docs/api-reference',
+            'ai_fallback' => false,
             'providers' => [
                 'elevenlabs' => [
                     'name' => 'ElevenLabs',
@@ -178,6 +180,7 @@ return [
             'service' => 'SpeechToTextService',
             'tab' => 'voice_audio',
             'doc_url' => 'https://platform.openai.com/docs/guides/speech-to-text',
+            'ai_fallback' => false,
             'providers' => [
                 'openai_whisper' => [
                     'name' => 'Whisper (OpenAI)',
@@ -202,6 +205,7 @@ return [
             'service' => 'AiMusicService',
             'tab' => 'voice_audio',
             'doc_url' => 'https://suno.ai',
+            'ai_fallback' => false,
             'providers' => [
                 'suno' => [
                     'name' => 'Suno AI',
@@ -240,6 +244,7 @@ return [
             'service' => 'VideoGenerationService',
             'tab' => 'video',
             'doc_url' => 'https://www.klingai.com/',
+            'ai_fallback' => false,
             'providers' => [
                 'kling' => [
                     'name' => 'Kling AI',
@@ -279,6 +284,7 @@ return [
             'service' => 'AvatarVideoService',
             'tab' => 'video',
             'doc_url' => 'https://docs.d-id.com/',
+            'ai_fallback' => false,
             'providers' => [
                 'did' => [
                     'name' => 'D-ID',

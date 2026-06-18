@@ -4,20 +4,44 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AffiliateReferral;
+use App\Models\AiTool;
+use App\Models\AiModel;
 use App\Models\AiUsageLog;
+use App\Models\BlogPost;
+use App\Models\NewsletterSubscriber;
+use App\Models\GatewaySubscription;
 use App\Models\Comment;
 use App\Models\LoginHistory;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\SupportTicket;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
     public function index()
     {
+        $period = request('period', '7d');
+        $cacheKey = 'admin_dashboard_' . $period;
+        $cacheTtl = now()->addMinutes(10);
+
+        $data = Cache::remember($cacheKey, $cacheTtl, function () use ($period) {
+            return $this->buildDashboardData($period);
+        });
+
+        return Inertia::render('Admin/Dashboard', $data);
+    }
+
+    private function buildDashboardData(string $period): array
+    {
         $now = now();
+        $dashboardPeriod = $this->dashboardPeriod($period);
+        $selectedPeriodStart = null;
         $monthStart = $now->copy()->startOfMonth();
         $lastMonthStart = $now->copy()->subMonth()->startOfMonth();
         $lastMonthEnd = $now->copy()->subMonth()->endOfMonth();
@@ -36,7 +60,14 @@ class DashboardController extends Controller
         $revenueToday = Payment::where('status', 'completed')->whereDate('created_at', $today)->sum('amount');
         $revenueThisMonth = Payment::where('status', 'completed')->where('created_at', '>=', $monthStart)->sum('amount');
         $revenueLastMonth = Payment::where('status', 'completed')->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->sum('amount');
-        $mrr = Payment::where('status', 'completed')->where('type', 'subscription')->where('created_at', '>=', $monthStart)->sum('amount');
+        
+        // MRR: Monthly Recurring Revenue from active subscriptions
+        $mrr = User::where('subscription_status', 'active')
+            ->where('subscription_ends_at', '>=', $now)
+            ->whereHas('plan')
+            ->with('plan:id,price_monthly')
+            ->get()
+            ->sum(fn($user) => $user->plan->price_monthly ?? 0);
 
         // ─── 3. AI Usage stats ───
         $totalAiRequests = AiUsageLog::count();
@@ -47,10 +78,22 @@ class DashboardController extends Controller
         $totalCost = AiUsageLog::sum('cost_usd');
         $costToday = AiUsageLog::whereDate('created_at', $today)->sum('cost_usd');
         $tokensUsedToday = AiUsageLog::whereDate('created_at', $today)->sum(\DB::raw('input_tokens + output_tokens'));
+        $totalOutputTokens = AiUsageLog::sum('output_tokens');
+        $outputTokensToday = AiUsageLog::whereDate('created_at', $today)->sum('output_tokens');
+
+        // ─── 3b. Internal AI Usage stats (System User) ───
+        $systemUser = User::where('email', User::internalAiEmail())->first();
+        $internalAiRequests = $systemUser ? AiUsageLog::where('user_id', $systemUser->id)->count() : 0;
+        $internalAiThisMonth = $systemUser ? AiUsageLog::where('user_id', $systemUser->id)->where('created_at', '>=', $monthStart)->count() : 0;
+        $internalAiCost = $systemUser ? round((float) AiUsageLog::where('user_id', $systemUser->id)->sum('cost_usd'), 4) : 0;
 
         // ─── 4. Subscription stats ───
-        $activeSubscriptions = User::where('subscription_status', 'active')->count();
-        $trialingSubscriptions = User::where('subscription_status', 'trialing')->count();
+        $activeSubscriptions = User::where('subscription_status', 'active')
+            ->where('subscription_ends_at', '>=', $now)
+            ->count();
+        $trialingSubscriptions = User::where('subscription_status', 'trialing')
+            ->where('subscription_ends_at', '>=', $now)
+            ->count();
         $pastDueSubscriptions = User::where('subscription_status', 'past_due')->count();
         $activePlans = Plan::where('is_active', true)->count();
 
@@ -61,97 +104,329 @@ class DashboardController extends Controller
         // ─── 0. Earliest data point for lifetime charts ───
         $earliestUser = User::min('created_at') ?? $now->copy()->subYear();
         $lifetimeStart = now()->parse($earliestUser)->startOfMonth();
+        [$selectedPeriodStart, $selectedPeriodEnd] = $this->dashboardPeriodRange($now, $dashboardPeriod, $lifetimeStart);
+
+        $cardComparisonPeriods = [
+            'today' => 1,
+            '7d' => 7,
+            '30d' => $now->daysInMonth,
+            '90d' => 90,
+        ];
+
+        $cardComparisons = [];
+        foreach ($cardComparisonPeriods as $period => $days) {
+            $currentStart = $now->copy()->subDays($days - 1)->startOfDay();
+            $currentEnd = $now->copy()->endOfDay();
+            $previousStart = $now->copy()->subDays($days * 2 - 1)->startOfDay();
+            $previousEnd = $now->copy()->subDays($days)->endOfDay();
+
+            // Batch User queries
+            $signupsCurrent = User::whereBetween('created_at', [$currentStart, $currentEnd])->count();
+            $signupsPrevious = User::whereBetween('created_at', [$previousStart, $previousEnd])->count();
+
+            // Batch Payment queries
+            $revenueData = Payment::where('status', 'completed')
+                ->selectRaw("
+                    SUM(CASE WHEN created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as current_revenue,
+                    SUM(CASE WHEN created_at BETWEEN ? AND ? THEN amount ELSE 0 END) as previous_revenue
+                ", [$currentStart, $currentEnd, $previousStart, $previousEnd])
+                ->first();
+
+            // Batch AiUsageLog queries
+            $aiData = AiUsageLog::selectRaw("
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as current_requests,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as previous_requests,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN output_tokens ELSE 0 END) as current_tokens,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN output_tokens ELSE 0 END) as previous_tokens,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN credits_used ELSE 0 END) as current_credits,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN credits_used ELSE 0 END) as previous_credits,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN cost_usd ELSE 0 END) as current_cost,
+                SUM(CASE WHEN created_at BETWEEN ? AND ? THEN cost_usd ELSE 0 END) as previous_cost
+            ", [
+                $currentStart, $currentEnd, $previousStart, $previousEnd,
+                $currentStart, $currentEnd, $previousStart, $previousEnd,
+                $currentStart, $currentEnd, $previousStart, $previousEnd,
+                $currentStart, $currentEnd, $previousStart, $previousEnd,
+            ])->first();
+
+            // Internal AI queries
+            $internalAiCurrent = $systemUser ? AiUsageLog::where('user_id', $systemUser->id)->whereBetween('created_at', [$currentStart, $currentEnd])->count() : 0;
+            $internalAiPrevious = $systemUser ? AiUsageLog::where('user_id', $systemUser->id)->whereBetween('created_at', [$previousStart, $previousEnd])->count() : 0;
+            $internalAiCostCurrent = $systemUser ? (float) AiUsageLog::where('user_id', $systemUser->id)->whereBetween('created_at', [$currentStart, $currentEnd])->sum('cost_usd') : 0;
+            $internalAiCostPrevious = $systemUser ? (float) AiUsageLog::where('user_id', $systemUser->id)->whereBetween('created_at', [$previousStart, $previousEnd])->sum('cost_usd') : 0;
+
+            // Ticket queries
+            $ticketsCurrent = SupportTicket::whereIn('status', ['open', 'in_progress'])->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+            $ticketsPrevious = SupportTicket::whereIn('status', ['open', 'in_progress'])->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+
+            $cardComparisons[$period] = [
+                'signups' => [
+                    'current' => $signupsCurrent,
+                    'previous' => $signupsPrevious,
+                ],
+                'revenue' => [
+                    'current' => (float) ($revenueData->current_revenue ?? 0),
+                    'previous' => (float) ($revenueData->previous_revenue ?? 0),
+                ],
+                'aiRequests' => [
+                    'current' => (int) ($aiData->current_requests ?? 0),
+                    'previous' => (int) ($aiData->previous_requests ?? 0),
+                ],
+                'outputTokens' => [
+                    'current' => (int) ($aiData->current_tokens ?? 0),
+                    'previous' => (int) ($aiData->previous_tokens ?? 0),
+                ],
+                'internalAiRequests' => [
+                    'current' => $internalAiCurrent,
+                    'previous' => $internalAiPrevious,
+                ],
+                'internalAiCost' => [
+                    'current' => $internalAiCostCurrent,
+                    'previous' => $internalAiCostPrevious,
+                ],
+                'creditsUsed' => [
+                    'current' => (float) ($aiData->current_credits ?? 0),
+                    'previous' => (float) ($aiData->previous_credits ?? 0),
+                ],
+                'totalCost' => [
+                    'current' => (float) ($aiData->current_cost ?? 0),
+                    'previous' => (float) ($aiData->previous_cost ?? 0),
+                ],
+                'openTickets' => [
+                    'current' => $ticketsCurrent,
+                    'previous' => $ticketsPrevious,
+                ],
+            ];
+        }
 
         // ─── 6. Chart: User signups (today / 7d / 30d / 90d / lifetime) ───
-        $signupsChart = $this->timeSeries(function ($date, $hour, $endDate = null) {
-            if ($endDate !== null) {
-                return User::whereBetween('created_at', [$date, $endDate])->count();
-            }
-            if ($hour !== null) {
-                return User::whereDate('created_at', $date)->whereRaw('HOUR(created_at) = ?', [$hour])->count();
-            }
-            return User::whereDate('created_at', $date)->count();
-        }, $now, $lifetimeStart);
+        $signupsChart = $this->buildSeriesFromQuery(
+            User::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'count'
+        );
 
         // ─── 7. Chart: Revenue (today / 7d / 30d / 90d / lifetime) ───
-        $revenueChart = $this->timeSeries(function ($date, $hour, $endDate = null) {
-            $q = Payment::where('status', 'completed');
-            if ($endDate !== null) {
-                $q->whereBetween('created_at', [$date, $endDate]);
-            } else {
-                $q->whereDate('created_at', $date);
-                if ($hour !== null) { $q->whereRaw('HOUR(created_at) = ?', [$hour]); }
-            }
-            return (float) $q->sum('amount');
-        }, $now, $lifetimeStart);
+        $revenueChart = $this->buildSeriesFromQuery(
+            Payment::where('status', 'completed'),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'sum',
+            'amount'
+        );
 
-        // ─── 8. Chart: AI usage by tool (top 8 tools, 30 days) ───
-        $aiByTool = AiUsageLog::where('created_at', '>=', $now->copy()->subDays(30))
+        // ─── 8. Chart: AI usage by tool (selected dashboard range) ───
+        $aiByToolRows = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
             ->whereNotNull('tool_slug')
             ->selectRaw('tool_slug, SUM(credits_used) as total_credits')
             ->groupBy('tool_slug')
             ->orderByDesc('total_credits')
             ->limit(8)
-            ->get()
+            ->get();
+
+        $aiToolNames = AiTool::whereIn('slug', $aiByToolRows->pluck('tool_slug')->filter()->unique())
+            ->pluck('name', 'slug');
+
+        $aiByTool = $aiByToolRows
             ->map(fn ($row) => [
-                'label' => $row->tool_slug,
+                'label' => $aiToolNames[$row->tool_slug] ?? $row->tool_slug,
                 'credits' => (float) $row->total_credits,
             ])
             ->values()
             ->toArray();
 
-        // ─── 9. Chart: Token cost by provider (30 days) ───
-        $costByProvider = AiUsageLog::where('created_at', '>=', $now->copy()->subDays(30))
+        // ─── 9. Chart: Token cost by provider (selected dashboard range) ───
+        $costByProvider = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
             ->selectRaw('provider, SUM(cost_usd) as total_cost')
             ->groupBy('provider')
             ->orderByDesc('total_cost')
             ->get()
             ->map(fn ($row) => [
-                'label' => $row->provider,
+                'label' => $this->formatProviderLabel($row->provider),
                 'cost' => round((float) $row->total_cost, 4),
             ])
             ->values()
             ->toArray();
 
+        $providerUsageByCount = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->selectRaw('provider, COUNT(*) as total_requests')
+            ->groupBy('provider')
+            ->orderByDesc('total_requests')
+            ->get()
+            ->map(fn ($row) => [
+                'label' => $this->formatProviderLabel($row->provider),
+                'count' => (int) $row->total_requests,
+            ])
+            ->values()
+            ->toArray();
+
         // ─── 10. Chart: Revenue vs Cost (today / 7d / 30d / 90d / lifetime) ───
-        $revenueVsCost = $this->timeSeriesDual(
-            function ($date, $hour, $endDate = null) {
-                $q = Payment::where('status', 'completed');
-                if ($endDate !== null) {
-                    $q->whereBetween('created_at', [$date, $endDate]);
-                } else {
-                    $q->whereDate('created_at', $date);
-                    if ($hour !== null) { $q->whereRaw('HOUR(created_at) = ?', [$hour]); }
-                }
-                return (float) $q->sum('amount');
-            },
-            function ($date, $hour, $endDate = null) {
-                $q = AiUsageLog::query();
-                if ($endDate !== null) {
-                    $q->whereBetween('created_at', [$date, $endDate]);
-                } else {
-                    $q->whereDate('created_at', $date);
-                    if ($hour !== null) { $q->whereRaw('HOUR(created_at) = ?', [$hour]); }
-                }
-                return round((float) $q->sum('cost_usd'), 4);
-            },
+        $revenueVsCost = $this->buildDualSeriesFromQuery(
+            Payment::where('status', 'completed'),
+            'created_at',
+            AiUsageLog::query(),
+            'created_at',
             $now,
             $lifetimeStart,
+            'sum',
+            'amount',
+            'sum',
+            'cost_usd'
         );
 
-        // ─── 11. Chart: Pro subscriptions (today / 7d / 30d / 90d / lifetime) ───
-        $proSubs = $this->timeSeries(function ($date, $hour, $endDate = null) use ($now) {
-            if ($endDate !== null) {
-                return User::where('subscription_status', 'active')
-                    ->where('created_at', '<=', $endDate)
-                    ->whereDate('subscription_ends_at', '>=', $date)
-                    ->count();
-            }
-            return User::where('subscription_status', 'active')
-                ->whereDate('created_at', '<=', $date)
-                ->whereDate('subscription_ends_at', '>=', $date)
-                ->count();
-        }, $now, $lifetimeStart);
+        // ─── 10b. Growth / health series for the selected dashboard range ───
+        $subscriptionRevenueChart = $this->buildSeriesFromQuery(
+            Payment::where('status', 'completed')->where('type', 'subscription'),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'sum',
+            'amount'
+        );
+
+        $totalCostChart = $this->buildSeriesFromQuery(
+            AiUsageLog::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'sum',
+            'cost_usd'
+        );
+
+        $outputTokensChart = $this->buildSeriesFromQuery(
+            AiUsageLog::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'sum',
+            'output_tokens'
+        );
+
+        $newsletterSubscribersChart = $this->buildSeriesFromQuery(
+            NewsletterSubscriber::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'count'
+        );
+
+        $subscriptionConversionsChart = $this->buildSeriesFromQuery(
+            Payment::where('status', 'completed')->where('type', 'subscription'),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'count'
+        );
+
+        // Special case: subscriptionRetainedChart - cumulative count of active subscribers
+        $subscriptionRetainedChart = $this->buildCumulativeSeries(
+            User::whereIn('subscription_status', ['active', 'trialing']),
+            'created_at',
+            $now,
+            $lifetimeStart
+        );
+
+        // Special case: subscriptionChurnedChart - uses cancelled_at or current_period_end
+        $subscriptionChurnedChart = $this->buildChurnedSeries(
+            GatewaySubscription::query(),
+            $now,
+            $lifetimeStart
+        );
+
+        // Dual series: referral chart
+        $referralChart = $this->buildDualSeriesFromQuery(
+            AffiliateReferral::whereNotNull('landed_at'),
+            'landed_at',
+            AffiliateReferral::whereNotNull('converted_at'),
+            'converted_at',
+            $now,
+            $lifetimeStart,
+            'count',
+            null,
+            'count',
+            null
+        );
+
+        $aiRequestsTotalChart = $this->buildSeriesFromQuery(
+            AiUsageLog::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'count'
+        );
+
+        $aiFailedRequestsChart = $this->buildSeriesFromQuery(
+            AiUsageLog::whereIn('status', ['failed', 'cancelled']),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'count'
+        );
+
+        $aiRequestsChart = $this->buildSeriesFromQuery(
+            AiUsageLog::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'count'
+        );
+
+        $creditsUsedChart = $this->buildSeriesFromQuery(
+            AiUsageLog::query(),
+            'created_at',
+            $now,
+            $lifetimeStart,
+            'sum',
+            'credits_used'
+        );
+
+        // Special case: internal AI charts need user_id filter
+        $internalAiRequestsChart = $systemUser 
+            ? $this->buildSeriesFromQuery(
+                AiUsageLog::where('user_id', $systemUser->id),
+                'created_at',
+                $now,
+                $lifetimeStart,
+                'count'
+            )
+            : $this->buildEmptySeries($now, $lifetimeStart);
+
+        $internalAiCostChart = $systemUser
+            ? $this->buildSeriesFromQuery(
+                AiUsageLog::where('user_id', $systemUser->id),
+                'created_at',
+                $now,
+                $lifetimeStart,
+                'sum',
+                'cost_usd'
+            )
+            : $this->buildEmptySeries($now, $lifetimeStart);
+
+        // Special case: openTicketsChart - cumulative count
+        $openTicketsChart = $this->buildCumulativeSeries(
+            SupportTicket::whereIn('status', ['open', 'in_progress']),
+            'created_at',
+            $now,
+            $lifetimeStart
+        );
+
+        // Special case: pendingCommentsChart - cumulative count
+        $pendingCommentsChart = $this->buildCumulativeSeries(
+            Comment::where('status', 'pending'),
+            'created_at',
+            $now,
+            $lifetimeStart
+        );
+
+        // Special case: proSubs - active subscriptions at each point in time
+        $proSubs = $this->buildActiveSubscriptionsSeries(
+            User::where('subscription_status', 'active'),
+            $now,
+            $lifetimeStart
+        );
 
         // ─── 12. Chart: Geo usage by country (LoginHistory, 90 days) ───
         $geoUsage = LoginHistory::where('created_at', '>=', $now->copy()->subDays(90))
@@ -170,15 +445,28 @@ class DashboardController extends Controller
             ->toArray();
 
         // ─── 13. Lists: top AI tools (by usage count, cost, tokens) ───
-        $topToolsByUsage = AiUsageLog::whereNotNull('tool_slug')
+        $topToolsByUsageRows = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->whereNotNull('tool_slug')
             ->selectRaw('tool_slug, COUNT(*) as count')
             ->groupBy('tool_slug')
             ->orderByDesc('count')
-            ->limit(6)
-            ->get()
+            ->limit(9)
+            ->get();
+
+        $topToolNames = AiTool::whereIn('slug', $topToolsByUsageRows->pluck('tool_slug')->filter()->unique())
+            ->pluck('name', 'slug');
+
+        $topToolsByUsage = $topToolsByUsageRows
+            ->map(fn ($row) => [
+                'tool_slug' => $row->tool_slug,
+                'tool_name' => $topToolNames[$row->tool_slug] ?? $row->tool_slug,
+                'count' => (int) $row->count,
+            ])
+            ->values()
             ->toArray();
 
-        $topToolsByCost = AiUsageLog::whereNotNull('tool_slug')
+        $topToolsByCost = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->whereNotNull('tool_slug')
             ->selectRaw('tool_slug, SUM(cost_usd) as cost')
             ->groupBy('tool_slug')
             ->orderByDesc('cost')
@@ -186,7 +474,8 @@ class DashboardController extends Controller
             ->get()
             ->toArray();
 
-        $topToolsByTokens = AiUsageLog::whereNotNull('tool_slug')
+        $topToolsByTokens = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->whereNotNull('tool_slug')
             ->selectRaw(\DB::raw('tool_slug, SUM(input_tokens + output_tokens) as tokens'))
             ->groupBy('tool_slug')
             ->orderByDesc('tokens')
@@ -195,38 +484,115 @@ class DashboardController extends Controller
             ->toArray();
 
         // ─── 14. Lists: top AI models (by usage count, cost, tokens) ───
-        $topModelsByUsage = AiUsageLog::selectRaw('model, COUNT(*) as count')
+        $topModelsByUsageRows = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->selectRaw('model, COUNT(*) as count')
             ->groupBy('model')
             ->orderByDesc('count')
-            ->limit(6)
-            ->get()
+            ->limit(9)
+            ->get();
+
+        $topModelNames = AiModel::whereIn('slug', $topModelsByUsageRows->pluck('model')->filter()->unique())
+            ->pluck('name', 'slug');
+
+        $topModelsByUsage = $topModelsByUsageRows
+            ->map(fn ($row) => [
+                'model' => $row->model,
+                'model_name' => $topModelNames[$row->model] ?? $row->model,
+                'count' => (int) $row->count,
+            ])
+            ->values()
             ->toArray();
 
-        $topModelsByCost = AiUsageLog::selectRaw('model, SUM(cost_usd) as cost')
+        $topModelsByCostRows = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->selectRaw('model, SUM(cost_usd) as cost')
             ->groupBy('model')
             ->orderByDesc('cost')
             ->limit(6)
-            ->get()
+            ->get();
+
+        $topModelsByCost = $topModelsByCostRows
+            ->map(fn ($row) => [
+                'model' => $row->model,
+                'model_name' => $topModelNames[$row->model] ?? $row->model,
+                'cost' => (float) $row->cost,
+            ])
+            ->values()
             ->toArray();
 
-        $topModelsByTokens = AiUsageLog::selectRaw(\DB::raw('model, SUM(input_tokens + output_tokens) as tokens'))
+        $topModelsByTokensRows = AiUsageLog::whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->selectRaw(\DB::raw('model, SUM(input_tokens + output_tokens) as tokens'))
             ->groupBy('model')
             ->orderByDesc('tokens')
+            ->limit(6)
+            ->get();
+
+        $topModelsByTokens = $topModelsByTokensRows
+            ->map(fn ($row) => [
+                'model' => $row->model,
+                'model_name' => $topModelNames[$row->model] ?? $row->model,
+                'tokens' => (int) $row->tokens,
+            ])
+            ->values()
+            ->toArray();
+
+        // ─── 15. Lists: recently registered users (6) ───
+        $recentUsers = User::select(['ulid', 'name', 'email', 'created_at'])
+            ->whereBetween('created_at', [$selectedPeriodStart, $selectedPeriodEnd])
+            ->latest()
             ->limit(6)
             ->get()
             ->toArray();
 
-        // ─── 15. Lists: recently registered users (6) ───
-        $recentUsers = User::select(['ulid', 'name', 'email', 'created_at'])->latest()->limit(6)->get()->toArray();
+        // ─── 16. Lists: popular blog posts (6) ───
+        $popularBlogPosts = BlogPost::query()
+            ->published()
+            ->orderByDesc('views_count')
+            ->latest('published_at')
+            ->limit(5)
+            ->get(['ulid', 'title', 'views_count', 'published_at'])
+            ->map(fn (BlogPost $post) => [
+                'ulid' => $post->ulid,
+                'title' => $post->title,
+                'views_count' => (int) $post->views_count,
+                'published_at' => optional($post->published_at)?->toISOString(),
+            ])
+            ->toArray();
 
-        // ─── 16. Lists: traffic sources (derived from login + social providers) ───
-        $trafficSources = $this->trafficSources($now);
+        // ─── 17. Lists: recent pro subscriptions (5) ───
+        $recentProSubscriptions = User::query()
+            ->with('plan:id,name')
+            ->whereIn('subscription_status', ['active', 'trialing'])
+            ->latest('updated_at')
+            ->limit(5)
+            ->get()
+            ->map(fn (User $user) => [
+                'id' => $user->id,
+                'status' => $user->subscription_status,
+                'gateway' => null,
+                'billing_cycle' => null,
+                'created_at' => optional($user->updated_at ?? $user->created_at)?->toISOString(),
+                'user' => [
+                    'ulid' => $user->ulid,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                ],
+                'plan' => $user->plan ? [
+                    'name' => $user->plan->name,
+                ] : null,
+            ])
+            ->toArray();
 
-        // ─── 17. Activity feed ───
-        $activity = $this->getRecentActivity();
+        // ─── 18. Lists: traffic sources (derived from login + social providers) ───
+        $trafficSources = $this->trafficSources($now, $dashboardPeriod, $lifetimeStart);
 
-        return Inertia::render('Admin/Dashboard', [
-            'stats' => [
+        // ─── 19. Activity feed ───
+        $activity = $this->getRecentActivity(5);
+
+        // ─── 20. Addon stats ───
+        $addonStats = $this->getAddonStats();
+
+        return [
+            'dashboardStats' => [
                 'totalUsers' => $totalUsers,
                 'newUsersToday' => $newUsersToday,
                 'newUsersThisMonth' => $newUsersThisMonth,
@@ -246,6 +612,11 @@ class DashboardController extends Controller
                 'totalCost' => round((float) $totalCost, 4),
                 'costToday' => round((float) $costToday, 4),
                 'tokensUsedToday' => (int) $tokensUsedToday,
+                'totalOutputTokens' => (int) $totalOutputTokens,
+                'outputTokensToday' => (int) $outputTokensToday,
+                'internalAiRequests' => (int) $internalAiRequests,
+                'internalAiThisMonth' => (int) $internalAiThisMonth,
+                'internalAiCost' => (float) $internalAiCost,
                 'activeSubscriptions' => $activeSubscriptions,
                 'trialingSubscriptions' => $trialingSubscriptions,
                 'pastDueSubscriptions' => $pastDueSubscriptions,
@@ -253,12 +624,33 @@ class DashboardController extends Controller
                 'openTickets' => $openTickets,
                 'pendingComments' => $pendingComments,
             ],
-            'signupsChart' => $signupsChart,
-            'revenueChart' => $revenueChart,
+            'dashboardCharts' => [
+                'signupsChart' => $signupsChart,
+                'revenueChart' => $revenueChart,
+                'subscriptionRevenueChart' => $subscriptionRevenueChart,
+                'totalCostChart' => $totalCostChart,
+                'outputTokensChart' => $outputTokensChart,
+                'newsletterSubscribersChart' => $newsletterSubscribersChart,
+                'subscriptionConversionsChart' => $subscriptionConversionsChart,
+                'subscriptionRetainedChart' => $subscriptionRetainedChart,
+                'subscriptionChurnedChart' => $subscriptionChurnedChart,
+                'referralChart' => $referralChart,
+                'aiRequestsTotalChart' => $aiRequestsTotalChart,
+                'aiFailedRequestsChart' => $aiFailedRequestsChart,
+                'aiRequestsChart' => $aiRequestsChart,
+                'creditsUsedChart' => $creditsUsedChart,
+                'internalAiRequestsChart' => $internalAiRequestsChart,
+                'internalAiCostChart' => $internalAiCostChart,
+                'openTicketsChart' => $openTicketsChart,
+                'pendingCommentsChart' => $pendingCommentsChart,
+                'revenueVsCost' => $revenueVsCost,
+                'proSubs' => $proSubs,
+                'cardComparisons' => $cardComparisons,
+            ],
+            'dashboardPeriod' => $dashboardPeriod,
             'aiByTool' => $aiByTool,
             'costByProvider' => $costByProvider,
-            'revenueVsCost' => $revenueVsCost,
-            'proSubs' => $proSubs,
+            'providerUsageByCount' => $providerUsageByCount,
             'geoUsage' => $geoUsage,
             'topToolsByUsage' => $topToolsByUsage,
             'topToolsByCost' => $topToolsByCost,
@@ -267,141 +659,446 @@ class DashboardController extends Controller
             'topModelsByCost' => $topModelsByCost,
             'topModelsByTokens' => $topModelsByTokens,
             'recentUsers' => $recentUsers,
+            'popularBlogPosts' => $popularBlogPosts,
+            'recentProSubscriptions' => $recentProSubscriptions,
             'trafficSources' => $trafficSources,
             'activity' => $activity,
+            'addonStats' => $addonStats,
+        ];
+    }
+
+    public function activity()
+    {
+        $now = now();
+        $start = $now->copy()->subDays(29)->startOfDay();
+        $activities = $this->getRecentActivityCollection($start, $now);
+        $paginated = $this->paginateActivityCollection($activities, 20);
+
+        return Inertia::render('Admin/Activity/Index', [
+            'activity' => $paginated,
+            'rangeLabel' => translate('Last 30 days'),
         ]);
     }
 
-    private function timeSeries(callable $callback, $now, string $startDate): array
-    {
+    private function buildSeriesFromQuery(
+        $baseQuery,
+        string $dateColumn,
+        $now,
+        string $startDate,
+        string $aggregation = 'count',
+        ?string $sumColumn = null
+    ): array {
         $ranges = [
-            'today' => ['start' => $now->copy()->startOfDay(), 'interval' => 'hour', 'count' => 24],
-            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'interval' => 'day', 'count' => 7],
-            '30d' => ['start' => $now->copy()->subDays(29)->startOfDay(), 'interval' => 'day', 'count' => 30],
-            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'interval' => 'day', 'count' => 90],
-            'lifetime' => ['start' => $startDate, 'interval' => 'month', 'count' => null],
+            'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
+            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
 
         $result = [];
         foreach ($ranges as $key => $cfg) {
-            if ($key === 'lifetime') {
-                $result[$key] = $this->buildLifetimeSeries($callback, $cfg['start'], $now);
-            } elseif ($key === 'today') {
-                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($now, $callback) {
-                    $slot = $now->copy()->startOfDay()->addHours($hour);
+            $query = clone $baseQuery;
+            $query->whereBetween($dateColumn, [$cfg['start'], $cfg['end']]);
 
+            if ($cfg['interval'] === 'hour') {
+                $query->selectRaw('HOUR(' . $dateColumn . ') as period, ' . 
+                    ($aggregation === 'sum' ? "SUM({$sumColumn}) as total" : 'COUNT(*) as total'));
+                $query->groupByRaw('HOUR(' . $dateColumn . ')');
+                $data = $query->pluck('total', 'period');
+                
+                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($data, $now) {
+                    $slot = $now->copy()->startOfDay()->addHours($hour);
                     return [
                         'date' => $slot->format('H:00'),
-                        'value' => $callback($slot->toDateString(), $slot->format('H')),
+                        'value' => (int) ($data[$hour] ?? 0),
                     ];
                 })->values()->toArray();
-            } else {
-                $result[$key] = collect(range($cfg['count'] - 1, 0))->map(function ($daysAgo) use ($now, $callback) {
-                    $date = $now->copy()->subDays($daysAgo)->toDateString();
-
+            } elseif ($cfg['interval'] === 'day') {
+                $query->selectRaw('DATE(' . $dateColumn . ') as period, ' . 
+                    ($aggregation === 'sum' ? "SUM({$sumColumn}) as total" : 'COUNT(*) as total'));
+                $query->groupByRaw('DATE(' . $dateColumn . ')');
+                $data = $query->pluck('total', 'period');
+                
+                $days = $cfg['start']->diffInDays($cfg['end']);
+                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($data, $cfg) {
+                    $date = $cfg['end']->copy()->subDays($daysAgo)->toDateString();
                     return [
                         'date' => $date,
-                        'value' => $callback($date, null),
+                        'value' => (int) ($data[$date] ?? 0),
                     ];
                 })->values()->toArray();
+            } else { // month
+                $query->selectRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m") as period, ' . 
+                    ($aggregation === 'sum' ? "SUM({$sumColumn}) as total" : 'COUNT(*) as total'));
+                $query->groupByRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m")');
+                $data = $query->pluck('total', 'period');
+                
+                $cursor = now()->parse($startDate)->copy()->startOfMonth();
+                $result[$key] = [];
+                while ($cursor->lte($now)) {
+                    $monthKey = $cursor->format('Y-m');
+                    $result[$key][] = [
+                        'date' => $cursor->format('M Y'),
+                        'value' => (int) ($data[$monthKey] ?? 0),
+                    ];
+                    $cursor->addMonth();
+                }
             }
         }
 
         return $result;
     }
 
-    private function buildLifetimeSeries(callable $callback, $startDate, $now): array
-    {
-        $result = [];
-        $cursor = now()->parse($startDate)->copy()->startOfMonth();
+    private function buildDualSeriesFromQuery(
+        $baseQueryA,
+        string $dateColumnA,
+        $baseQueryB,
+        string $dateColumnB,
+        $now,
+        string $startDate,
+        string $aggregationA = 'count',
+        ?string $sumColumnA = null,
+        string $aggregationB = 'count',
+        ?string $sumColumnB = null
+    ): array {
+        $seriesA = $this->buildSeriesFromQuery($baseQueryA, $dateColumnA, $now, $startDate, $aggregationA, $sumColumnA);
+        $seriesB = $this->buildSeriesFromQuery($baseQueryB, $dateColumnB, $now, $startDate, $aggregationB, $sumColumnB);
 
-        while ($cursor->lte($now)) {
-            $monthStart = $cursor->toDateString();
-            $monthEnd = $cursor->copy()->endOfMonth()->toDateString();
-            $result[] = [
-                'date' => $cursor->format('M Y'),
-                'value' => $callback($monthStart, null, $monthEnd),
-            ];
-            $cursor->addMonth();
+        $result = [];
+        foreach ($seriesA as $key => $points) {
+            $result[$key] = collect($points)->map(function ($pointA, $index) use ($seriesB, $key) {
+                $pointB = $seriesB[$key][$index] ?? ['date' => $pointA['date'], 'value' => 0];
+                return [
+                    'date' => $pointA['date'],
+                    'revenue' => $pointA['value'],
+                    'cost' => $pointB['value'],
+                ];
+            })->values()->toArray();
         }
 
         return $result;
     }
 
-    private function timeSeriesDual(callable $callbackA, callable $callbackB, $now, string $startDate): array
+    private function buildCumulativeSeries($baseQuery, string $dateColumn, $now, string $startDate): array
     {
         $ranges = [
-            'today' => ['start' => $now->copy()->startOfDay(), 'interval' => 'hour', 'count' => 24],
-            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'interval' => 'day', 'count' => 7],
-            '30d' => ['start' => $now->copy()->subDays(29)->startOfDay(), 'interval' => 'day', 'count' => 30],
-            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'interval' => 'day', 'count' => 90],
-            'lifetime' => ['start' => $startDate, 'interval' => 'month'],
+            'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
+            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
         ];
 
         $result = [];
         foreach ($ranges as $key => $cfg) {
-            if ($key === 'lifetime') {
-                $result[$key] = $this->buildLifetimeDual($callbackA, $callbackB, $cfg['start'], $now);
-            } elseif ($key === 'today') {
-                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($now, $callbackA, $callbackB) {
+            // Get total count before the period starts
+            $baseCount = (clone $baseQuery)->where($dateColumn, '<', $cfg['start'])->count();
+            
+            // Get counts within the period
+            $query = clone $baseQuery;
+            $query->whereBetween($dateColumn, [$cfg['start'], $cfg['end']]);
+
+            if ($cfg['interval'] === 'hour') {
+                $query->selectRaw('HOUR(' . $dateColumn . ') as period, COUNT(*) as total');
+                $query->groupByRaw('HOUR(' . $dateColumn . ')');
+                $data = $query->pluck('total', 'period');
+                
+                $cumulative = $baseCount;
+                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($data, $now, &$cumulative) {
                     $slot = $now->copy()->startOfDay()->addHours($hour);
-                    $dateStr = $slot->toDateString();
-                    $hourStr = $slot->format('H');
+                    $cumulative += (int) ($data[$hour] ?? 0);
                     return [
                         'date' => $slot->format('H:00'),
-                        'revenue' => $callbackA($dateStr, $hourStr),
-                        'cost' => $callbackB($dateStr, $hourStr),
+                        'value' => $cumulative,
                     ];
                 })->values()->toArray();
-            } else {
-                $result[$key] = collect(range($cfg['count'] - 1, 0))->map(function ($daysAgo) use ($now, $callbackA, $callbackB) {
-                    $date = $now->copy()->subDays($daysAgo)->toDateString();
+            } elseif ($cfg['interval'] === 'day') {
+                $query->selectRaw('DATE(' . $dateColumn . ') as period, COUNT(*) as total');
+                $query->groupByRaw('DATE(' . $dateColumn . ')');
+                $data = $query->pluck('total', 'period');
+                
+                $days = $cfg['start']->diffInDays($cfg['end']);
+                $cumulative = $baseCount;
+                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($data, $cfg, &$cumulative) {
+                    $date = $cfg['end']->copy()->subDays($daysAgo)->toDateString();
+                    $cumulative += (int) ($data[$date] ?? 0);
                     return [
                         'date' => $date,
-                        'revenue' => $callbackA($date, null),
-                        'cost' => $callbackB($date, null),
+                        'value' => $cumulative,
                     ];
                 })->values()->toArray();
+            } else { // month
+                $query->selectRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m") as period, COUNT(*) as total');
+                $query->groupByRaw('DATE_FORMAT(' . $dateColumn . ', "%Y-%m")');
+                $data = $query->pluck('total', 'period');
+                
+                $cursor = now()->parse($startDate)->copy()->startOfMonth();
+                $result[$key] = [];
+                $cumulative = $baseCount;
+                while ($cursor->lte($now)) {
+                    $monthKey = $cursor->format('Y-m');
+                    $cumulative += (int) ($data[$monthKey] ?? 0);
+                    $result[$key][] = [
+                        'date' => $cursor->format('M Y'),
+                        'value' => $cumulative,
+                    ];
+                    $cursor->addMonth();
+                }
             }
         }
 
         return $result;
     }
 
-    private function buildLifetimeDual(callable $callbackA, callable $callbackB, $startDate, $now): array
+    private function buildChurnedSeries($baseQuery, $now, string $startDate): array
     {
+        $ranges = [
+            'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
+            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
+        ];
+
         $result = [];
-        $cursor = now()->parse($startDate)->copy()->startOfMonth();
-        while ($cursor->lte($now)) {
-            $monthStart = $cursor->toDateString();
-            $monthEnd = $cursor->copy()->endOfMonth()->toDateString();
-            $result[] = [
-                'date' => $cursor->format('M Y'),
-                'revenue' => $callbackA($monthStart, null, $monthEnd),
-                'cost' => $callbackB($monthStart, null, $monthEnd),
-            ];
-            $cursor->addMonth();
+        foreach ($ranges as $key => $cfg) {
+            $query = clone $baseQuery;
+            $query->where(function ($subQuery) {
+                $subQuery->whereNotNull('cancelled_at')
+                    ->orWhereIn('status', ['expired', 'past_due']);
+            });
+
+            if ($cfg['interval'] === 'hour') {
+                $query->where(function ($q) use ($cfg) {
+                    $q->whereBetween('cancelled_at', [$cfg['start'], $cfg['end']])
+                      ->orWhereBetween('current_period_end', [$cfg['start'], $cfg['end']]);
+                });
+                $query->selectRaw('COALESCE(HOUR(cancelled_at), HOUR(current_period_end)) as period, COUNT(*) as total');
+                $query->groupByRaw('period');
+                $data = $query->pluck('total', 'period');
+                
+                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($data, $now) {
+                    $slot = $now->copy()->startOfDay()->addHours($hour);
+                    return [
+                        'date' => $slot->format('H:00'),
+                        'value' => (int) ($data[$hour] ?? 0),
+                    ];
+                })->values()->toArray();
+            } elseif ($cfg['interval'] === 'day') {
+                $query->where(function ($q) use ($cfg) {
+                    $q->whereBetween('cancelled_at', [$cfg['start'], $cfg['end']])
+                      ->orWhereBetween('current_period_end', [$cfg['start'], $cfg['end']]);
+                });
+                $query->selectRaw('COALESCE(DATE(cancelled_at), DATE(current_period_end)) as period, COUNT(*) as total');
+                $query->groupByRaw('period');
+                $data = $query->pluck('total', 'period');
+                
+                $days = $cfg['start']->diffInDays($cfg['end']);
+                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($data, $cfg) {
+                    $date = $cfg['end']->copy()->subDays($daysAgo)->toDateString();
+                    return [
+                        'date' => $date,
+                        'value' => (int) ($data[$date] ?? 0),
+                    ];
+                })->values()->toArray();
+            } else { // month
+                $query->where(function ($q) use ($cfg) {
+                    $q->whereBetween('cancelled_at', [$cfg['start'], $cfg['end']])
+                      ->orWhereBetween('current_period_end', [$cfg['start'], $cfg['end']]);
+                });
+                $query->selectRaw('COALESCE(DATE_FORMAT(cancelled_at, "%Y-%m"), DATE_FORMAT(current_period_end, "%Y-%m")) as period, COUNT(*) as total');
+                $query->groupByRaw('period');
+                $data = $query->pluck('total', 'period');
+                
+                $cursor = now()->parse($startDate)->copy()->startOfMonth();
+                $result[$key] = [];
+                while ($cursor->lte($now)) {
+                    $monthKey = $cursor->format('Y-m');
+                    $result[$key][] = [
+                        'date' => $cursor->format('M Y'),
+                        'value' => (int) ($data[$monthKey] ?? 0),
+                    ];
+                    $cursor->addMonth();
+                }
+            }
         }
+
         return $result;
     }
 
-    private function trafficSources($now): array
+    private function buildActiveSubscriptionsSeries($baseQuery, $now, string $startDate): array
     {
-        $thirtyDaysAgo = $now->copy()->subDays(30);
+        $ranges = [
+            'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
+            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
+        ];
+
+        $result = [];
+        foreach ($ranges as $key => $cfg) {
+            // Get base count of users who subscribed before the period
+            $baseCount = (clone $baseQuery)
+                ->where('created_at', '<', $cfg['start'])
+                ->where('subscription_ends_at', '>=', $cfg['start'])
+                ->count();
+
+            // Get new subscriptions in the period
+            $newQuery = clone $baseQuery;
+            $newQuery->whereBetween('created_at', [$cfg['start'], $cfg['end']]);
+
+            if ($cfg['interval'] === 'hour') {
+                $newQuery->selectRaw('HOUR(created_at) as period, COUNT(*) as total');
+                $newQuery->groupByRaw('HOUR(created_at)');
+                $newData = $newQuery->pluck('total', 'period');
+
+                // Get cancellations in the period
+                $cancelQuery = $baseQuery->newQuery()
+                    ->where('subscription_status', '!=', 'active')
+                    ->whereBetween('subscription_ends_at', [$cfg['start'], $cfg['end']]);
+                $cancelQuery->selectRaw('HOUR(subscription_ends_at) as period, COUNT(*) as total');
+                $cancelQuery->groupByRaw('HOUR(subscription_ends_at)');
+                $cancelData = $cancelQuery->pluck('total', 'period');
+
+                $cumulative = $baseCount;
+                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($newData, $cancelData, $now, &$cumulative) {
+                    $slot = $now->copy()->startOfDay()->addHours($hour);
+                    $cumulative += (int) ($newData[$hour] ?? 0);
+                    $cumulative -= (int) ($cancelData[$hour] ?? 0);
+                    $cumulative = max(0, $cumulative);
+                    return [
+                        'date' => $slot->format('H:00'),
+                        'value' => $cumulative,
+                    ];
+                })->values()->toArray();
+            } elseif ($cfg['interval'] === 'day') {
+                $newQuery->selectRaw('DATE(created_at) as period, COUNT(*) as total');
+                $newQuery->groupByRaw('DATE(created_at)');
+                $newData = $newQuery->pluck('total', 'period');
+
+                $cancelQuery = $baseQuery->newQuery()
+                    ->where('subscription_status', '!=', 'active')
+                    ->whereBetween('subscription_ends_at', [$cfg['start'], $cfg['end']]);
+                $cancelQuery->selectRaw('DATE(subscription_ends_at) as period, COUNT(*) as total');
+                $cancelQuery->groupByRaw('DATE(subscription_ends_at)');
+                $cancelData = $cancelQuery->pluck('total', 'period');
+
+                $days = $cfg['start']->diffInDays($cfg['end']);
+                $cumulative = $baseCount;
+                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($newData, $cancelData, $cfg, &$cumulative) {
+                    $date = $cfg['end']->copy()->subDays($daysAgo)->toDateString();
+                    $cumulative += (int) ($newData[$date] ?? 0);
+                    $cumulative -= (int) ($cancelData[$date] ?? 0);
+                    $cumulative = max(0, $cumulative);
+                    return [
+                        'date' => $date,
+                        'value' => $cumulative,
+                    ];
+                })->values()->toArray();
+            } else { // month
+                $newQuery->selectRaw('DATE_FORMAT(created_at, "%Y-%m") as period, COUNT(*) as total');
+                $newQuery->groupByRaw('DATE_FORMAT(created_at, "%Y-%m")');
+                $newData = $newQuery->pluck('total', 'period');
+
+                $cancelQuery = $baseQuery->newQuery()
+                    ->where('subscription_status', '!=', 'active')
+                    ->whereBetween('subscription_ends_at', [$cfg['start'], $cfg['end']]);
+                $cancelQuery->selectRaw('DATE_FORMAT(subscription_ends_at, "%Y-%m") as period, COUNT(*) as total');
+                $cancelQuery->groupByRaw('DATE_FORMAT(subscription_ends_at, "%Y-%m")');
+                $cancelData = $cancelQuery->pluck('total', 'period');
+
+                $cursor = now()->parse($startDate)->copy()->startOfMonth();
+                $result[$key] = [];
+                $cumulative = $baseCount;
+                while ($cursor->lte($now)) {
+                    $monthKey = $cursor->format('Y-m');
+                    $cumulative += (int) ($newData[$monthKey] ?? 0);
+                    $cumulative -= (int) ($cancelData[$monthKey] ?? 0);
+                    $cumulative = max(0, $cumulative);
+                    $result[$key][] = [
+                        'date' => $cursor->format('M Y'),
+                        'value' => $cumulative,
+                    ];
+                    $cursor->addMonth();
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function buildEmptySeries($now, string $startDate): array
+    {
+        $ranges = [
+            'today' => ['start' => $now->copy()->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'hour'],
+            '7d' => ['start' => $now->copy()->subDays(6)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '30d' => ['start' => $now->copy()->startOfMonth(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            '90d' => ['start' => $now->copy()->subDays(89)->startOfDay(), 'end' => $now->copy()->endOfDay(), 'interval' => 'day'],
+            'lifetime' => ['start' => $startDate, 'end' => $now->copy()->endOfDay(), 'interval' => 'month'],
+        ];
+
+        $result = [];
+        foreach ($ranges as $key => $cfg) {
+            if ($cfg['interval'] === 'hour') {
+                $result[$key] = collect(range(0, 23))->map(function ($hour) use ($now) {
+                    $slot = $now->copy()->startOfDay()->addHours($hour);
+                    return ['date' => $slot->format('H:00'), 'value' => 0];
+                })->values()->toArray();
+            } elseif ($cfg['interval'] === 'day') {
+                $days = $cfg['start']->diffInDays($cfg['end']);
+                $result[$key] = collect(range(0, $days))->map(function ($daysAgo) use ($cfg) {
+                    $date = $cfg['end']->copy()->subDays($daysAgo)->toDateString();
+                    return ['date' => $date, 'value' => 0];
+                })->values()->toArray();
+            } else {
+                $cursor = now()->parse($startDate)->copy()->startOfMonth();
+                $result[$key] = [];
+                while ($cursor->lte($now)) {
+                    $result[$key][] = ['date' => $cursor->format('M Y'), 'value' => 0];
+                    $cursor->addMonth();
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    private function dashboardPeriod(string $period): string
+    {
+        return in_array($period, ['today', '7d', '30d', '90d', 'lifetime'], true) ? $period : '7d';
+    }
+
+    private function dashboardPeriodRange($now, string $period, ?string $lifetimeStart = null): array
+    {
+        return match ($period) {
+            'today' => [$now->copy()->startOfDay(), $now->copy()->endOfDay()],
+            '7d' => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
+            '30d' => [$now->copy()->startOfMonth(), $now->copy()->endOfDay()],
+            '90d' => [$now->copy()->subDays(89)->startOfDay(), $now->copy()->endOfDay()],
+            'lifetime' => [$lifetimeStart ? now()->parse($lifetimeStart)->startOfMonth() : $now->copy()->subYear(), $now->copy()->endOfDay()],
+            default => [$now->copy()->subDays(6)->startOfDay(), $now->copy()->endOfDay()],
+        };
+    }
+
+    private function trafficSources($now, string $period = '30d', ?string $lifetimeStart = null): array
+    {
+        [$start, $end] = $this->dashboardPeriodRange($now, $period, $lifetimeStart);
 
         $socialProviders = User::whereNotNull('oauth_provider')
-            ->whereBetween('created_at', [$thirtyDaysAgo, $now])
+            ->whereBetween('created_at', [$start, $end])
             ->selectRaw('oauth_provider, COUNT(*) as count')
             ->groupBy('oauth_provider')
             ->orderByDesc('count')
             ->get();
 
         $referred = User::whereNotNull('referred_by')
-            ->whereBetween('created_at', [$thirtyDaysAgo, $now])
+            ->whereBetween('created_at', [$start, $end])
             ->count();
 
         $emailLogin = LoginHistory::where('success', true)
-            ->whereBetween('created_at', [$thirtyDaysAgo, $now])
+            ->whereBetween('created_at', [$start, $end])
             ->count();
 
         // social logins already counted via login_history
@@ -423,11 +1120,61 @@ class DashboardController extends Controller
         return $sources;
     }
 
-    private function getRecentActivity(): array
+    private function getAddonStats(): array
+    {
+        $addonPath = base_path('addons');
+        $totalAddons = 0;
+        $activeAddons = 0;
+
+        if (is_dir($addonPath)) {
+            $dirs = glob($addonPath . '/*', GLOB_ONLYDIR);
+            $totalAddons = count($dirs);
+
+            foreach ($dirs as $dir) {
+                $jsonFile = $dir . '/addon.json';
+                if (file_exists($jsonFile)) {
+                    $config = json_decode(file_get_contents($jsonFile), true);
+                    if (isset($config['is_active']) && $config['is_active']) {
+                        $activeAddons++;
+                    }
+                }
+            }
+        }
+
+        $recentlyActivated = \DB::table('admin_audit_logs')
+            ->where('action', 'like', '%addon%activat%')
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+
+        return [
+            'total' => $totalAddons,
+            'active' => $activeAddons,
+            'recently_activated' => $recentlyActivated,
+        ];
+    }
+
+    private function getRecentActivity(int $limit = 20, $start = null, $end = null): array
+    {
+        return $this->getRecentActivityCollection($start, $end)
+            ->take($limit)
+            ->values()
+            ->toArray();
+    }
+
+    private function getRecentActivityCollection($start = null, $end = null): Collection
     {
         $activities = collect();
+        $toolNames = AiTool::pluck('name', 'slug');
+        $modelNames = AiModel::pluck('name', 'slug');
 
-        User::latest()->take(8)->get()->each(function ($user) use (&$activities) {
+        $userQuery = User::query()->latest();
+        if ($start && $end) {
+            $userQuery->whereBetween('created_at', [$start, $end]);
+        }
+        if (! ($start && $end)) {
+            $userQuery->take(8);
+        }
+        $userQuery->get()->each(function ($user) use (&$activities) {
             $activities->push([
                 'type' => 'user_registered',
                 'icon' => 'user',
@@ -437,7 +1184,14 @@ class DashboardController extends Controller
             ]);
         });
 
-        Payment::with('user')->where('status', 'completed')->latest()->take(8)->get()->each(function ($payment) use (&$activities) {
+        $paymentQuery = Payment::with('user')->where('status', 'completed')->latest();
+        if ($start && $end) {
+            $paymentQuery->whereBetween('created_at', [$start, $end]);
+        }
+        if (! ($start && $end)) {
+            $paymentQuery->take(8);
+        }
+        $paymentQuery->get()->each(function ($payment) use (&$activities) {
             $activities->push([
                 'type' => $payment->type === 'subscription' ? 'subscription' : 'payment',
                 'icon' => 'dollar',
@@ -447,17 +1201,36 @@ class DashboardController extends Controller
             ]);
         });
 
-        AiUsageLog::with('user')->latest()->take(8)->get()->each(function ($log) use (&$activities) {
+        $usageQuery = AiUsageLog::with('user')->latest();
+        if ($start && $end) {
+            $usageQuery->whereBetween('created_at', [$start, $end]);
+        }
+        if (! ($start && $end)) {
+            $usageQuery->take(8);
+        }
+        $usageQuery->get()->each(function ($log) use (&$activities, $toolNames, $modelNames) {
+            $toolLabel = $log->tool_slug ? ($toolNames[$log->tool_slug] ?? $log->tool_slug) : null;
+            $modelLabel = $log->model ? ($modelNames[$log->model] ?? $log->model) : null;
+            $providerLabel = $this->formatProviderLabel($log->provider);
+            $fallbackModelLabel = $this->formatModelLabel($log->model, $log->provider);
+
             $activities->push([
                 'type' => 'ai_request',
                 'icon' => 'spark',
                 'title' => $log->user?->name ?? translate('Unknown'),
-                'detail' => ($log->tool_slug ?? $log->provider.' / '.$log->model).' — '.number_format($log->credits_used, 2).' credits',
+                'detail' => ($toolLabel ?? $providerLabel.' / '.($modelLabel ?? $fallbackModelLabel)).' — '.number_format($log->credits_used, 2).' credits',
                 'time' => $log->created_at,
             ]);
         });
 
-        AffiliateReferral::with(['referrer', 'referred'])->whereNotNull('converted_at')->latest('converted_at')->take(8)->get()->each(function ($ref) use (&$activities) {
+        $referralQuery = AffiliateReferral::with(['referrer', 'referred'])->whereNotNull('converted_at')->latest('converted_at');
+        if ($start && $end) {
+            $referralQuery->whereBetween('converted_at', [$start, $end]);
+        }
+        if (! ($start && $end)) {
+            $referralQuery->take(8);
+        }
+        $referralQuery->get()->each(function ($ref) use (&$activities) {
             $activities->push([
                 'type' => 'referral',
                 'icon' => 'user',
@@ -467,6 +1240,49 @@ class DashboardController extends Controller
             ]);
         });
 
-        return $activities->sortByDesc('time')->take(20)->values()->toArray();
+        return $activities->sortByDesc('time')->values();
+    }
+
+    private function paginateActivityCollection(Collection $activities, int $perPage = 20): LengthAwarePaginator
+    {
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $items = $activities->values();
+        $results = $items->slice(($page - 1) * $perPage, $perPage)->values();
+
+        return new LengthAwarePaginator($results, $items->count(), $perPage, $page, [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ]);
+    }
+
+    private function formatProviderLabel(?string $provider): string
+    {
+        if (! $provider) {
+            return translate('Unknown');
+        }
+
+        return match (strtolower($provider)) {
+            'openrouter' => 'OpenRouter',
+            'openai' => 'OpenAI',
+            'anthropic' => 'Anthropic',
+            'google' => 'Google',
+            default => Str::headline($provider),
+        };
+    }
+
+    private function formatModelLabel(?string $model, ?string $provider = null): string
+    {
+        if (! $model) {
+            return translate('Unknown');
+        }
+
+        $cleaned = Str::afterLast($model, '/');
+        $cleaned = preg_replace('/-\d{8}$/', '', $cleaned) ?? $cleaned;
+
+        return Str::of($cleaned)
+            ->replace(['_', '.'], ' ')
+            ->replace('-', ' ')
+            ->headline()
+            ->toString();
     }
 }

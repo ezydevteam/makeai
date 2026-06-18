@@ -38,9 +38,6 @@ class PromptBuilder
             $system .= "\n\nBrand voice context:\n".$user->brand_voice;
         }
 
-        // 3. Apply length instruction
-        $system .= $this->getLengthInstruction($fields['length'] ?? 'medium');
-
         // 4. Resolve model — respects default_ai_provider setting
         $model = $template->model_override
             ?? ($fields['model'] ?? null)
@@ -52,6 +49,9 @@ class PromptBuilder
         // 6. Max tokens
         $maxTokens = $template->max_tokens_override
             ?? (int) settings('default_max_tokens', 2000);
+
+        // 3. Apply dynamic length instruction based on max tokens
+        $system .= $this->getLengthInstruction($fields['length'] ?? 'medium', $maxTokens);
 
         // 7. Temperature
         $temperature = isset($fields['creativity'])
@@ -87,6 +87,7 @@ class PromptBuilder
 
     /**
      * Replace {field_name} placeholders in a prompt string.
+     * Unresolved placeholders are replaced with a visible marker to aid debugging.
      */
     private function interpolate(string $prompt, array $fields): string
     {
@@ -101,25 +102,35 @@ class PromptBuilder
             $prompt = str_replace('{{'.$key.'}}', (string) $value, $prompt);
         }
 
-        // Clean up any remaining unresolved placeholders
-        $prompt = preg_replace('/\{[a-z_]+\}/i', '', $prompt);
-        $prompt = preg_replace('/\{\{[a-z_]+\}\}/i', '', $prompt);
+        // Replace unresolved placeholders with visible markers instead of silently removing them
+        // This helps admins identify missing field configurations
+        $prompt = preg_replace_callback('/\{\{([a-z_]+)\}\}/i', function ($matches) {
+            \Log::warning('PromptBuilder: unresolved placeholder', ['key' => $matches[1]]);
+            return "[MISSING: {$matches[1]}]";
+        }, $prompt);
+
+        $prompt = preg_replace_callback('/\{([a-z_]+)\}/i', function ($matches) {
+            \Log::warning('PromptBuilder: unresolved placeholder', ['key' => $matches[1]]);
+            return "[MISSING: {$matches[1]}]";
+        }, $prompt);
 
         return trim($prompt);
     }
 
     /**
-     * Map length setting to token instruction.
+     * Map length setting to dynamic token instruction based on max tokens.
      */
-    private function getLengthInstruction(string $length): string
+    private function getLengthInstruction(string $length, int $maxTokens): string
     {
-        return match (strtolower($length)) {
-            'short' => "\nOutput length: approximately 100 words.",
-            'medium' => "\nOutput length: approximately 300 words.",
-            'long' => "\nOutput length: approximately 600 words.",
-            'very_long', 'very long' => "\nOutput length: approximately 1200 words.",
-            default => '',
+        $words = match (strtolower($length)) {
+            'short' => max(10, (int) round(($maxTokens * 0.07) / 1.3, -1)),
+            'medium' => max(10, (int) round(($maxTokens * 0.20) / 1.3, -1)),
+            'long' => max(10, (int) round(($maxTokens * 0.40) / 1.3, -1)),
+            'very_long', 'very long' => max(10, (int) round(($maxTokens * 0.80) / 1.3, -1)),
+            default => max(10, (int) round(($maxTokens * 0.20) / 1.3, -1)),
         };
+        
+        return "\nOutput length: approximately {$words} words.";
     }
 
     /**

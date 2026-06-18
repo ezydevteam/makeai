@@ -95,7 +95,7 @@ class KnowledgeBaseSearchService
         // 3. Generate answer
         $adapter = ProviderRegistry::resolve($provider);
 
-        $maxContextChunks = (int) (settings('ai_max_context_chunks') ?: config('ai.rag.max_context_chunks', 10));
+        $maxContextChunks = (int) (settings('rag_max_context_chunks') ?: config('ai.rag.max_context_chunks', 10));
 
         $result = $adapter->chatCompletion([
             ['role' => 'system', 'content' => $systemPrompt],

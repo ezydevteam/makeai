@@ -165,20 +165,6 @@ class UsageDashboardController extends Controller
             return $slug;
         };
 
-        // Friendly name resolver
-        $resolveName = function (?string $slug) use ($toolNames, $templates): string {
-            if (! $slug) {
-                return 'Direct';
-            }
-            if (isset($toolNames[$slug])) {
-                return $toolNames[$slug];
-            }
-            if (isset($templates[$slug])) {
-                return $templates[$slug];
-            }
-            return $slug;
-        };
-
         // Build shared strings + data
         $stringIndex = [];
         $sharedStrings = [];

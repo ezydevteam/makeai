@@ -44,15 +44,6 @@ interface Plan {
     }
 }
 
-interface CreditPack {
-    id: number
-    name: string
-    credits: number
-    price: number
-    formatted_price: string
-    is_popular: boolean
-}
-
 interface PricingSettings {
     pricing_show_monthly: boolean
     pricing_show_yearly: boolean
@@ -65,7 +56,6 @@ interface PricingSettings {
 
 const props = defineProps<{
     plans: Plan[]
-    creditPacks: CreditPack[]
     pricingCountry: string | null
     settings: PricingSettings
 }>()
@@ -301,3 +291,4 @@ const planButtonClass = (plan: Plan) => [
         </div>
     </Layout>
 </template>
+ate>

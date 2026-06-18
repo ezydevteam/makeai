@@ -139,6 +139,7 @@ class HandleInertiaRequests extends Middleware
                 'decimals' => (int) settings('currency_decimals', 2),
             ],
             'isProAvailable' => fn () => isProAvailable(),
+            'isExtendedLicense' => fn () => is_extended_license(),
             'licenseBlocked' => fn () => $this->isLicenseBlocked(),
             'socialLoginProviders' => fn () => $this->getSocialLoginProviders(),
 

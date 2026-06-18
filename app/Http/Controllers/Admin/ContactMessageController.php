@@ -46,6 +46,9 @@ class ContactMessageController extends Controller
                 'unread' => ContactMessage::where('is_read', false)->count(),
                 'replied' => ContactMessage::whereNotNull('replied_at')->count(),
             ],
+            'settings' => $this->getSettingsPayload(),
+            'canManageSettings' => auth('admin')->user()?->hasPermission('content.pages') ?? false,
+            'openSettings' => $request->boolean('settings'),
         ]);
     }
 
@@ -92,29 +95,48 @@ class ContactMessageController extends Controller
 
         return response()->streamDownload(function () {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['name', 'email', 'subject', 'message', 'ip_address', 'is_read', 'replied_at', 'created_at']);
+            
+            try {
+                fputcsv($handle, ['name', 'email', 'subject', 'message', 'ip_address', 'is_read', 'replied_at', 'created_at']);
 
-            ContactMessage::orderByDesc('created_at')->chunk(200, function ($messages) use ($handle) {
-                foreach ($messages as $message) {
-                    fputcsv($handle, [
-                        $message->name,
-                        $message->email,
-                        $message->subject,
-                        $message->message,
-                        $message->ip_address,
-                        $message->is_read ? 'yes' : 'no',
-                        optional($message->replied_at)->toDateTimeString(),
-                        optional($message->created_at)->toDateTimeString(),
-                    ]);
-                }
-            });
-
-            fclose($handle);
+                ContactMessage::orderByDesc('created_at')->chunk(200, function ($messages) use ($handle) {
+                    foreach ($messages as $message) {
+                        fputcsv($handle, [
+                            $message->name,
+                            $message->email,
+                            $message->subject,
+                            $message->message,
+                            $message->ip_address,
+                            $message->is_read ? 'yes' : 'no',
+                            optional($message->replied_at)->toDateTimeString(),
+                            optional($message->created_at)->toDateTimeString(),
+                        ]);
+                    }
+                });
+            } finally {
+                fclose($handle);
+            }
         }, 'contact-messages.csv', ['Content-Type' => 'text/csv']);
     }
 
     private function authorizeContact(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('content.pages'), 403);
+        // Note: Ensure 'contact.messages' permission is seeded in the database.
+        // Previously used 'content.pages' which was an architectural mismatch.
+        abort_unless(auth('admin')->user()?->hasPermission('contact.messages'), 403);
+    }
+
+    private function getSettingsPayload(): array
+    {
+        return [
+            'contact_form_enabled' => (bool) settings('contact_form_enabled', true),
+            'contact_subject_mode' => settings('contact_subject_mode', 'text'),
+            'contact_subject_options' => settings('contact_subject_options', "General Inquiry\nSupport\nBilling\nPartnership"),
+            'contact_notification_email' => settings('contact_notification_email', settings('mail_from_address')),
+            'contact_success_message' => settings('contact_success_message', 'Your message has been sent successfully. We will get back to you soon!'),
+            'contact_auto_reply_enabled' => (bool) settings('contact_auto_reply_enabled', false),
+            'contact_auto_reply_subject' => settings('contact_auto_reply_subject', 'We received your message'),
+            'contact_auto_reply_message' => settings('contact_auto_reply_message', "Hi {name},\n\nThanks for contacting us. We received your message and will reply soon."),
+        ];
     }
 }

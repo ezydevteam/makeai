@@ -50,6 +50,12 @@ const preferencesForm = useForm({
 const showDeleteModal = ref(false)
 const showRevokeConfirm = ref<number | null>(null)
 
+const cookieConsent = ref({
+    functional: props.user?.cookie_consent?.functional ?? true,
+    analytics: props.user?.cookie_consent?.analytics ?? false,
+    marketing: props.user?.cookie_consent?.marketing ?? false,
+})
+
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {
         pending: t('Pending'),
@@ -194,7 +200,7 @@ const exportedCookieConsent = computed(() => {
                     { key: 'analytics', label: t('Analytics'), desc: t('Usage tracking and performance measurement.') },
                     { key: 'marketing', label: t('Marketing'), desc: t('Ad tracking and retargeting pixels.') },
                 ]" :key="cat.key" class="flex items-center gap-3">
-                    <input :checked="exportedCookieConsent[cat.key]" type="checkbox" class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="exportedCookieConsent[cat.key] = ($event.target as HTMLInputElement).checked; preferencesForm.cookie_consent = { ...exportedCookieConsent }" />
+                    <input v-model="cookieConsent[cat.key]" type="checkbox" class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="preferencesForm.cookie_consent = { ...cookieConsent }" />
                     <div>
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ cat.label }}</span>
                         <p class="text-xs text-gray-500">{{ cat.desc }}</p>

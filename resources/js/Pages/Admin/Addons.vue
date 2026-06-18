@@ -33,8 +33,74 @@ interface AddonConfig {
 const props = defineProps<{ addons: AddonConfig[] }>()
 const { t } = useTranslate()
 const { error: toastError } = useToastr()
-const activate = (slug: string) => router.post(route('admin.addons.activate', { slug }))
-const deactivate = (slug: string) => router.post(route('admin.addons.deactivate', { slug }))
+
+const processing = ref<Record<string, boolean>>({})
+const selectedAddons = ref<string[]>([])
+const bulkProcessing = ref(false)
+
+function toggleSelectAll() {
+    if (selectedAddons.value.length === filteredAddons.value.length) {
+        selectedAddons.value = []
+    } else {
+        selectedAddons.value = filteredAddons.value.map((a) => a.slug)
+    }
+}
+
+function toggleSelect(slug: string) {
+    const idx = selectedAddons.value.indexOf(slug)
+    if (idx === -1) {
+        selectedAddons.value.push(slug)
+    } else {
+        selectedAddons.value.splice(idx, 1)
+    }
+}
+
+const allSelected = computed(() => filteredAddons.value.length > 0 && selectedAddons.value.length === filteredAddons.value.length)
+
+async function bulkActivate() {
+    if (!selectedAddons.value.length) return
+    bulkProcessing.value = true
+    router.post(route('admin.addons.bulk-activate'), {
+        slugs: selectedAddons.value,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            bulkProcessing.value = false
+            selectedAddons.value = []
+        },
+    })
+}
+
+async function bulkDeactivate() {
+    if (!selectedAddons.value.length) return
+    bulkProcessing.value = true
+    router.post(route('admin.addons.bulk-deactivate'), {
+        slugs: selectedAddons.value,
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            bulkProcessing.value = false
+            selectedAddons.value = []
+        },
+    })
+}
+
+const activate = (slug: string) => {
+    processing.value[slug] = true
+    router.post(route('admin.addons.activate', { slug }), {}, {
+        onFinish: () => {
+            processing.value[slug] = false
+        }
+    })
+}
+const deactivate = (slug: string) => {
+    processing.value[slug] = true
+    router.post(route('admin.addons.deactivate', { slug }), {}, {
+        onFinish: () => {
+            processing.value[slug] = false
+        }
+    })
+}
 
 const showUploadModal = ref(false)
 const uploading = ref(false)
@@ -303,12 +369,60 @@ function onPurchaseCodeInput(e: Event) {
                                 :placeholder="t('All Status')"
                             />
                         </div>
+
+                        <div v-if="filteredAddons.length" class="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                :checked="allSelected"
+                                @change="toggleSelectAll"
+                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                            />
+                            <label class="text-sm text-gray-600 dark:text-gray-400">{{ t('Select All') }}</label>
+                        </div>
                     </div>
                 </div>
 
                 <div v-if="filteredAddons.length" class="space-y-4 p-4 sm:p-6">
+                    <!-- Bulk Actions Bar -->
+                    <div v-if="selectedAddons.length" class="flex items-center gap-4 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 dark:border-primary-800 dark:bg-primary-900/20">
+                        <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
+                            {{ t(':count selected', { count: selectedAddons.length }) }}
+                        </span>
+                        <div class="flex items-center gap-2">
+                            <button
+                                @click="bulkActivate"
+                                :disabled="bulkProcessing"
+                                class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                            >
+                                <i v-if="bulkProcessing" class="ti ti-loader-2 animate-spin"></i>
+                                {{ t('Activate Selected') }}
+                            </button>
+                            <button
+                                @click="bulkDeactivate"
+                                :disabled="bulkProcessing"
+                                class="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                            >
+                                <i v-if="bulkProcessing" class="ti ti-loader-2 animate-spin"></i>
+                                {{ t('Deactivate Selected') }}
+                            </button>
+                            <button
+                                @click="selectedAddons = []"
+                                class="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                            >
+                                {{ t('Clear Selection') }}
+                            </button>
+                        </div>
+                    </div>
+
                     <div v-for="addon in filteredAddons" :key="addon.slug" :class="[addon.is_active ? 'border-primary-500/30 bg-primary-50/30 dark:bg-primary-500/5' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40']" class="border rounded-xl p-5 flex flex-col gap-4 shadow-sm">
                 <div class="flex items-center gap-5">
+                    <!-- Checkbox -->
+                    <input
+                        type="checkbox"
+                        :checked="selectedAddons.includes(addon.slug)"
+                        @change="toggleSelect(addon.slug)"
+                        class="h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                    />
                     <div :class="[addon.is_active ? 'bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400']" class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
                         <img
                             v-if="shouldShowLogo(addon)"
@@ -338,13 +452,38 @@ function onPurchaseCodeInput(e: Event) {
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <Link v-if="addon.is_active && addon.settings?.length" :href="route('admin.addons.settings', { slug: addon.slug })" class="px-3 py-2 bg-white dark:bg-gray-700 text-primary-500 border border-gray-200 dark:border-gray-700 dark:text-primary-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 text-sm">{{ t('Settings') }}</Link>
-                        <button v-if="addon.is_active" @click="deactivate(addon.slug)" class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors">{{ t('Deactivate') }}</button>
-                        <button v-else-if="addon.license_ok" @click="handleActivate(addon)" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">{{ t('Activate') }}</button>
+                        <Link v-if="addon.settings?.length" :href="route('admin.addons.settings', { slug: addon.slug })" :aria-label="t('Settings for :name addon', { name: addon.name })" class="px-3 py-2 bg-white dark:bg-gray-700 text-primary-500 border border-gray-200 dark:border-gray-700 dark:text-primary-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 text-sm">{{ t('Settings') }}</Link>
+                        <button 
+                            v-if="addon.is_active" 
+                            @click="deactivate(addon.slug)" 
+                            :disabled="processing[addon.slug]"
+                            :aria-label="t('Deactivate :name addon', { name: addon.name })"
+                            class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
+                                <i class="ti ti-loader-2 animate-spin"></i>
+                                {{ t('Deactivating...') }}
+                            </span>
+                            <span v-else>{{ t('Deactivate') }}</span>
+                        </button>
+                        <button 
+                            v-else-if="addon.license_ok" 
+                            @click="handleActivate(addon)" 
+                            :disabled="processing[addon.slug]"
+                            :aria-label="t('Activate :name addon', { name: addon.name })"
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
+                                <i class="ti ti-loader-2 animate-spin"></i>
+                                {{ t('Activating...') }}
+                            </span>
+                            <span v-else>{{ t('Activate') }}</span>
+                        </button>
                         <span v-else class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-lg text-sm">{{ t('Locked') }}</span>
                         <button
                             v-if="!addon.is_active"
                             type="button"
+                            :aria-label="t('Delete :name addon', { name: addon.name })"
                             class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors"
                             @click="confirmDelete(addon)"
                         >

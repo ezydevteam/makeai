@@ -35,7 +35,6 @@ class ToolCatalogCacheService
                     'description',
                     'icon',
                     'color',
-                    'requires_pro',
                     'requires_login',
                     'sort_order',
                     'tools_count',
@@ -222,6 +221,8 @@ class ToolCatalogCacheService
     {
         $data = [
             'id' => $tool->id,
+            'ulid' => $tool->ulid,
+            'type' => $tool->type ?? 'ai_tool',
             'name' => $tool->name,
             'slug' => $tool->slug,
             'description' => $tool->description,
@@ -229,10 +230,11 @@ class ToolCatalogCacheService
             'icon' => $tool->icon,
             'color' => $tool->color,
             'fields' => $tool->fields ?? [],
+            'tags' => $tool->tags ?? [],
             'output_type' => $tool->output_type ?? 'markdown',
             'access_level' => $tool->access_level,
             'is_featured' => (bool) $tool->is_featured,
-            'requires_pro' => (bool) $tool->requires_pro,
+            'is_embeddable' => (bool) ($tool->is_embeddable ?? false),
             'requires_login' => (bool) ($tool->category?->requires_login ?? false),
             'supports_brand_voice' => (bool) $tool->supports_brand_voice,
             'max_variants' => (int) ($tool->max_variants ?? 1),
@@ -241,7 +243,9 @@ class ToolCatalogCacheService
             'show_editor' => (bool) ($tool->show_editor ?? true),
             'sort_order' => $tool->sort_order,
             'usage_count' => (int) $tool->usage_count,
+            'views_count' => (int) ($tool->views_count ?? 0),
             'avg_output_tokens' => (int) $tool->avg_output_tokens,
+            'avg_latency_ms' => (int) ($tool->avg_latency_ms ?? 0),
             'avg_rating' => (float) $tool->avg_rating,
             'review_count' => (int) $tool->review_count,
             'meta_title' => $tool->meta_title,
@@ -251,6 +255,8 @@ class ToolCatalogCacheService
             'show_related_tools' => (bool) $tool->show_related_tools,
             'show_header' => (bool) ($tool->show_header ?? true),
             'show_footer' => (bool) ($tool->show_footer ?? true),
+            'model_override' => $tool->model_override,
+            'max_tokens_override' => $tool->max_tokens_override,
         ];
 
         if ($includeContent) {
@@ -294,6 +300,8 @@ class ToolCatalogCacheService
     {
         return [
             'id',
+            'ulid',
+            'type',
             'name',
             'slug',
             'description',
@@ -301,10 +309,11 @@ class ToolCatalogCacheService
             'icon',
             'color',
             'fields',
+            'tags',
             'output_type',
             'access_level',
             'is_featured',
-            'requires_pro',
+            'is_embeddable',
             'supports_brand_voice',
             'max_variants',
             'show_regenerate',
@@ -312,7 +321,9 @@ class ToolCatalogCacheService
             'show_editor',
             'sort_order',
             'usage_count',
+            'views_count',
             'avg_output_tokens',
+            'avg_latency_ms',
             'avg_rating',
             'review_count',
             'meta_title',
@@ -322,6 +333,8 @@ class ToolCatalogCacheService
             'show_related_tools',
             'show_header',
             'show_footer',
+            'model_override',
+            'max_tokens_override',
         ];
     }
 

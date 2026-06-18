@@ -30,6 +30,7 @@ class SocialSettingsController extends Controller
 
     public function updateFollow(SocialSettingsRequest $request)
     {
+        $this->authorizeSocialSettings();
         $validated = $request->validated();
 
         DB::transaction(function () use ($validated) {
@@ -87,6 +88,7 @@ class SocialSettingsController extends Controller
 
     public function updateOAuth(SocialSettingsRequest $request)
     {
+        $this->authorizeSocialSettings();
         $validated = $request->validated();
         $providerErrors = [];
 

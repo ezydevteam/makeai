@@ -20,7 +20,7 @@ class CheckUpdates extends Command
         $apiToken = config('license.api_token');
 
         if (blank($itemId) || blank($apiToken)) {
-            $this->warn('Envato credentials not configured. Skipping update check.');
+            $this->warn('Envato credentials not configured yet. Skipping update check.');
 
             return self::SUCCESS;
         }

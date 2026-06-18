@@ -110,6 +110,7 @@ class SystemController extends Controller
 
     public function runCronTask(CronTaskRunRequest $request)
     {
+        $this->authorizeSystem();
         $task = collect($this->scheduledTasks())->firstWhere('key', $request->validated('task'));
 
         abort_unless($task && $task['runnable'], 404);
@@ -136,6 +137,7 @@ class SystemController extends Controller
 
     public function updateMaintenanceSettings(MaintenanceSettingsRequest $request)
     {
+        $this->authorizeSystem();
         $settings = $request->validated();
         $settings['maintenance_message'] = $this->sanitizeHtml($settings['maintenance_message']);
 
@@ -489,7 +491,7 @@ class SystemController extends Controller
         $apiToken = config('license.api_token');
 
         if (blank($itemId) || blank($apiToken)) {
-            return back()->with('error', translate('Envato credentials not configured. Set ENVATO_ITEM_ID and ENVATO_API_TOKEN in your .env file.'));
+            return back()->with('error', translate('Envato credentials not configured yet, please contact the author.'));
         }
 
         try {
@@ -541,13 +543,53 @@ class SystemController extends Controller
         }
     }
 
+    public function applyUpdate()
+    {
+        $this->authorizeSystem();
+
+        try {
+            app(\App\Services\UpdateService::class)->applyUpdate();
+            return back()->with('success', translate('Update applied successfully. The application has been upgraded.'));
+        } catch (\Exception $e) {
+            Log::error('Update failed: ' . $e->getMessage());
+            return back()->with('error', translate('Update failed: :message', ['message' => $e->getMessage()]));
+        }
+    }
+
+    public function rollbackUpdate()
+    {
+        $this->authorizeSystem();
+
+        try {
+            app(\App\Services\UpdateService::class)->rollbackUpdate();
+            return back()->with('success', translate('Rollback completed successfully.'));
+        } catch (\Exception $e) {
+            Log::error('Rollback failed: ' . $e->getMessage());
+            return back()->with('error', translate('Rollback failed: :message', ['message' => $e->getMessage()]));
+        }
+    }
+
     private function updateStatus(): array
     {
+        $rollbackTime = settings('last_rollback_time');
+        $rollbackAvailable = false;
+
+        if ($rollbackTime) {
+            try {
+                $rollbackTimeObj = \Carbon\Carbon::parse($rollbackTime);
+                $rollbackAvailable = $rollbackTimeObj->gte(now()->subHours(24));
+            } catch (\Throwable) {
+                $rollbackAvailable = false;
+            }
+        }
+
         return [
             'current_version' => settings('app_version', '1.0.0'),
             'latest_version' => settings('update_version'),
             'update_available' => (bool) settings('update_available'),
             'last_checked' => settings('update_last_checked'),
+            'rollback_available' => $rollbackAvailable,
+            'rollback_time' => $rollbackTime,
         ];
     }
 

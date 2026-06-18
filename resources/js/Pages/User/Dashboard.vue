@@ -123,8 +123,22 @@ const chartTitle = computed(() => {
     return t('Credit usage — last 7 days')
 })
 
-const switchChartPeriod = (period: string) => {
-    router.get(route('user.dashboard'), { chart_period: period }, { preserveState: true, replace: true })
+const switchChartPeriod = async (period: string) => {
+    try {
+        const response = await fetch(route('user.dashboard.chart.data', { period }), {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+        })
+        if (response.ok) {
+            const data = await response.json()
+            usageChart.value = data.chart
+            chartPeriod.value = period
+        }
+    } catch (error) {
+        console.error('Failed to fetch chart data:', error)
+    }
 }
 
 // Chart

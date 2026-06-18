@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
@@ -46,19 +46,31 @@ const props = defineProps<{
         ads_disabled_plan_ids: number[]
     }
     plans: PlanOption[]
+    filters: {
+        search?: string
+        status?: string
+    }
     editorAd?: AdItem | null
     editorMode?: AdEditorMode | null
 }>()
 
 const { t } = useTranslate()
 const { formatNumber } = useNumberFormat()
+const searchInput = ref<HTMLInputElement | null>(null)
 const deleteTarget = ref<AdItem | null>(null)
 const settingsModalOpen = ref(false)
 const adModalOpen = ref(Boolean(props.editorMode))
 const imagePreviewUrl = ref<string | null>(props.editorAd?.image_url ?? null)
+const search = ref('')
+const status = ref(props.filters.status ?? '')
 const zoneOptions = computed<SelectOption[]>(() =>
     Object.entries(props.zones).map(([value, label]) => ({ value, label })),
 )
+const statusOptions = computed<SelectOption[]>(() => [
+    { value: '', label: t('All statuses') },
+    { value: 'active', label: t('Active') },
+    { value: 'paused', label: t('Paused') },
+])
 const adTypeOptions = computed<SelectOption[]>(() => [
     { value: 'image_link', label: t('Image link') },
     { value: 'custom_html', label: t('Custom HTML') },
@@ -99,6 +111,22 @@ const adForm = useForm({
     end_at: props.editorAd?.end_at ? new Date(props.editorAd.end_at).toISOString().slice(0, 16) : '',
     sort_order: props.editorAd?.sort_order ?? 0,
 })
+const filteredAds = computed(() => {
+    const query = search.value.trim().toLowerCase()
+
+    if (!query) {
+        return props.ads
+    }
+
+    return props.ads.filter((ad) => {
+        return [
+            ad.title,
+            ad.type,
+            ad.zone,
+            ad.show_to,
+        ].some((value) => String(value).toLowerCase().includes(query))
+    })
+})
 
 const resetAdForm = (ad: AdItem | null = null) => {
     adForm.defaults({
@@ -121,6 +149,30 @@ const resetAdForm = (ad: AdItem | null = null) => {
     adForm.reset()
     adForm.clearErrors()
     imagePreviewUrl.value = ad?.image_url ?? null
+}
+
+const buildFilterQuery = () => {
+    const query: Record<string, string> = {}
+
+    if (status.value) {
+        query.status = status.value
+    }
+
+    return query
+}
+
+const applyFilters = () => {
+    router.get(route('admin.ads.index'), buildFilterQuery(), {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        only: ['ads', 'filters', 'editorAd', 'editorMode'],
+    })
+}
+
+const clearFilters = () => {
+    search.value = ''
+    status.value = ''
 }
 
 const toggleAd = (id: number) => {
@@ -149,19 +201,19 @@ const togglePlan = (planId: number) => {
 const openCreateModal = () => {
     resetAdForm()
     adModalOpen.value = true
-    router.get(route('admin.ads.create'), {}, { preserveState: false, preserveScroll: true })
+    router.get(route('admin.ads.create'), buildFilterQuery(), { preserveState: false, preserveScroll: true, replace: true })
 }
 
 const openEditModal = (ad: AdItem) => {
     resetAdForm(ad)
     adModalOpen.value = true
-    router.get(route('admin.ads.edit', ad.id), {}, { preserveState: false, preserveScroll: true })
+    router.get(route('admin.ads.edit', ad.id), buildFilterQuery(), { preserveState: false, preserveScroll: true, replace: true })
 }
 
 const closeAdModal = () => {
     adModalOpen.value = false
     adForm.clearErrors()
-    router.get(route('admin.ads.index'), {}, { preserveState: false, preserveScroll: true })
+    router.get(route('admin.ads.index'), buildFilterQuery(), { preserveState: false, preserveScroll: true, replace: true })
 }
 
 const submitAdForm = () => {
@@ -215,12 +267,55 @@ watch(() => props.editorAd, (ad) => {
 watch(() => props.editorMode, (mode) => {
     adModalOpen.value = Boolean(mode)
 })
+
+watch(() => props.filters, (filters) => {
+    status.value = filters.status ?? ''
+}, { deep: true })
+
+watch(status, () => {
+    applyFilters()
+})
+
+const isTypingTarget = (target: EventTarget | null) =>
+    target instanceof HTMLElement && (
+        target.tagName === 'INPUT'
+        || target.tagName === 'TEXTAREA'
+        || target.tagName === 'SELECT'
+        || target.isContentEditable
+        || target.closest('[role="dialog"]') !== null
+    )
+
+const handleKeydown = (event: KeyboardEvent) => {
+    if (event.key === '/' && !adModalOpen.value && !settingsModalOpen.value && !deleteTarget.value) {
+        if (isTypingTarget(event.target) && event.target !== searchInput.value) {
+            return
+        }
+
+        event.preventDefault()
+        searchInput.value?.focus()
+        searchInput.value?.select()
+        return
+    }
+
+    if (event.key === 'Escape' && !adModalOpen.value && !settingsModalOpen.value && !deleteTarget.value && (search.value || status.value)) {
+        clearFilters()
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
     <Head :title="t('Ads')" />
 
-    <div class="mx-auto max-w-7xl space-y-6 px-6 py-8">
+    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="mx-auto max-w-7xl space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Advertisements') }}</h1>
@@ -239,11 +334,37 @@ watch(() => props.editorMode, (mode) => {
         </div>
 
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-surface-800">
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Advertisements') }}</h2>
-                <div class="inline-flex flex-wrap items-center gap-2 text-xs font-semibold">
-                    <span class="rounded-full bg-primary-100 px-3 py-1 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">{{ t(':count total', { count: ads.length }) }}</span>
-                    <span class="rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ settingsForm.ads_enabled ? t('Ads enabled') : t('Ads disabled') }}</span>
+            <div class="border-b border-gray-200 px-6 py-4 dark:border-surface-800">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div class="relative w-full lg:max-w-md">
+                        <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
+                        <input
+                            ref="searchInput"
+                            v-model="search"
+                            type="text"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-16 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            :placeholder="t('Search ads...')"
+                        />
+                        <span
+                            v-if="!search"
+                            class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                        >
+                            /
+                        </span>
+                        <button
+                            v-if="search"
+                            type="button"
+                            class="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                            :aria-label="t('Clear search')"
+                            @click="search = ''"
+                        >
+                            <i class="ti ti-x text-sm"></i>
+                        </button>
+                    </div>
+
+                    <div class="w-full lg:w-56">
+                        <AppSelect v-model="status" :options="statusOptions" :placeholder="t('All statuses')" />
+                    </div>
                 </div>
             </div>
             <table class="w-full text-left text-sm">
@@ -258,7 +379,7 @@ watch(() => props.editorMode, (mode) => {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
-                    <tr v-for="ad in ads" :key="ad.id" class="hover:bg-primary-50/30 dark:hover:bg-primary-900/10">
+                    <tr v-for="ad in filteredAds" :key="ad.id" class="hover:bg-primary-50/30 dark:hover:bg-primary-900/10">
                         <td class="px-6 py-4">
                             <div class="font-semibold text-gray-900 dark:text-white">{{ ad.title }}</div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">{{ ad.type.replace('_', ' ') }}</div>
@@ -283,7 +404,7 @@ watch(() => props.editorMode, (mode) => {
                             <div class="flex items-center justify-end gap-2">
                                 <Tooltip :content="t('Edit ad')" placement="top">
                                     <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" @click="openEditModal(ad)">
-                                        <i class="ti ti-pencil text-base"></i>
+                                        <i class="ti ti-edit text-base"></i>
                                     </button>
                                 </Tooltip>
                                 <Tooltip :content="t('Delete ad')" placement="top">
@@ -294,12 +415,15 @@ watch(() => props.editorMode, (mode) => {
                             </div>
                         </td>
                     </tr>
-                    <tr v-if="ads.length === 0">
-                        <td colspan="6" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">{{ t('No advertisements found.') }}</td>
+                    <tr v-if="filteredAds.length === 0">
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
+                            {{ search || status ? t('No advertisements match these filters.') : t('No advertisements found.') }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
         </section>
+        </div>
     </div>
 
     <ActionConfirmModal
@@ -313,15 +437,15 @@ watch(() => props.editorMode, (mode) => {
         @confirm="deleteAd"
     />
 
-    <div v-if="adModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeAdModal">
-        <form class="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900" @submit.prevent="submitAdForm">
-            <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-5 dark:border-surface-800">
+    <div v-if="adModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm" @click.self="closeAdModal">
+        <form class="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900" @submit.prevent="submitAdForm">
+            <div class="flex items-start justify-between gap-4 rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                 <div>
                     <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ adModalTitle }}</h2>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure zone, audience, creative, schedule, and tracking behavior.') }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure zone, audience, creative, schedule, and tracking behavior.') }}</p>
                 </div>
-                <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200" :aria-label="t('Close ad editor modal')" @click="closeAdModal">
-                    <i class="ti ti-x text-lg"></i>
+                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800" :aria-label="t('Close modal')" @click="closeAdModal">
+                    <i class="ti ti-x text-base"></i>
                 </button>
             </div>
 
@@ -431,28 +555,27 @@ watch(() => props.editorMode, (mode) => {
                 </div>
             </div>
 
-            <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
-                <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="closeAdModal">
+            <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-gray-900/40">
+                <button type="button" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700" @click="closeAdModal">
                     {{ t('Cancel') }}
                 </button>
-                <button type="submit" :disabled="adForm.processing" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:opacity-60">
-                    <i class="ti ti-device-floppy text-base"></i>
-                    <span>{{ adSubmitLabel }}</span>
+                <button type="submit" :disabled="adForm.processing" class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-60">
+                    {{ adSubmitLabel }}
                 </button>
             </div>
         </form>
     </div>
 
-    <div v-if="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="settingsModalOpen = false">
-        <form class="w-full max-w-3xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900" @submit.prevent="saveSettings">
-            <div class="border-b border-gray-200 px-6 py-5 dark:border-surface-800">
+    <div v-if="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm" @click.self="settingsModalOpen = false">
+        <form class="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-800 dark:bg-surface-900" @submit.prevent="saveSettings">
+            <div class="rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Global Ad Settings') }}</h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set publisher ID, auto ads, and subscriber visibility rules.') }}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set publisher ID, auto ads, and subscriber visibility rules.') }}</p>
                     </div>
-                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200" :aria-label="t('Close settings modal')" @click="settingsModalOpen = false">
-                        <i class="ti ti-x text-lg"></i>
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800" :aria-label="t('Close modal')" @click="settingsModalOpen = false">
+                        <i class="ti ti-x text-base"></i>
                     </button>
                 </div>
             </div>
@@ -512,13 +635,12 @@ watch(() => props.editorMode, (mode) => {
                 </div>
             </div>
 
-            <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
-                <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="settingsModalOpen = false">
+            <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-gray-900/40">
+                <button type="button" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700" @click="settingsModalOpen = false">
                     {{ t('Cancel') }}
                 </button>
-                <button type="submit" :disabled="settingsForm.processing" class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg shadow-primary-500/20 transition-all disabled:opacity-60">
-                    <i class="ti ti-device-floppy text-base"></i>
-                    <span>{{ settingsForm.processing ? t('Saving...') : t('Save Settings') }}</span>
+                <button type="submit" :disabled="settingsForm.processing" class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-60">
+                    {{ settingsForm.processing ? t('Saving...') : t('Save Settings') }}
                 </button>
             </div>
         </form>

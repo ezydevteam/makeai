@@ -13,6 +13,7 @@ interface Category {
     icon: string
     color: string
     requires_login: boolean
+    requires_pro?: boolean
 }
 
 interface Template {
@@ -22,9 +23,9 @@ interface Template {
     description: string
     icon: string
     color: string
-    requires_pro: boolean
     requires_login: boolean
     is_featured: boolean
+    access_level?: string
 }
 
 const props = defineProps<{
@@ -33,6 +34,8 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+
+const isProTool = (tool: Template) => tool.access_level === 'pro_plan' || Boolean(category.requires_pro)
 </script>
 
 <template>
@@ -70,25 +73,25 @@ const { t } = useTranslate()
         <!-- Tool Grid -->
         <div v-if="tools.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <Link
-                v-for="t in tools"
-                :key="t.id"
-                :href="route('ai.tools.show', t.slug)"
+                v-for="tool in tools"
+                :key="tool.id"
+                :href="route('ai.tools.show', tool.slug)"
                 class="group relative bg-white/[0.03] border border-white/5 rounded-2xl p-5 hover:border-white/15 hover:bg-white/[0.05] transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md"
             >
                 <!-- Badges -->
-                <div v-if="t.requires_pro" class="absolute top-3 right-3 px-2 py-0.5 bg-gradient-to-r from-primary-500/20 to-accent-500/20 text-accent-400 text-[10px] font-bold uppercase rounded-full border border-accent-500/20 shadow-sm shadow-accent-500/10">PRO</div>
-                <div v-else-if="t.requires_login" class="absolute top-3 right-3 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20">LOGIN</div>
+                <div v-if="isProTool(tool)" class="absolute top-3 right-3 px-2 py-0.5 bg-gradient-to-r from-primary-500/20 to-accent-500/20 text-accent-400 text-[10px] font-bold uppercase rounded-full border border-accent-500/20 shadow-sm shadow-accent-500/10">PRO</div>
+                <div v-else-if="tool.requires_login" class="absolute top-3 right-3 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20">LOGIN</div>
 
                 <!-- Icon -->
                 <div
                     class="w-12 h-12 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform border"
-                    :style="{ background: (t.color || category.color || '#64748b') + '15', borderColor: (t.color || category.color || '#64748b') + '30' }"
+                    :style="{ background: (tool.color || category.color || '#64748b') + '15', borderColor: (tool.color || category.color || '#64748b') + '30' }"
                 >
-                    <i :class="[t.icon || 'ti ti-wand', 'text-xl']" :style="{ color: t.color || category.color || '#64748b' }"></i>
+                    <i :class="[tool.icon || 'ti ti-wand', 'text-xl']" :style="{ color: tool.color || category.color || '#64748b' }"></i>
                 </div>
 
-                <h3 class="text-white font-semibold text-sm mb-1.5 group-hover:text-primary-400 transition-colors pr-8">{{ t.name }}</h3>
-                <p class="text-gray-500 text-xs leading-relaxed line-clamp-2">{{ t.description }}</p>
+                <h3 class="text-white font-semibold text-sm mb-1.5 group-hover:text-primary-400 transition-colors pr-8">{{ tool.name }}</h3>
+                <p class="text-gray-500 text-xs leading-relaxed line-clamp-2">{{ tool.description }}</p>
 
                 <!-- Arrow -->
                 <div class="absolute bottom-5 right-5 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300">

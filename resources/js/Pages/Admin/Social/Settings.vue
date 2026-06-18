@@ -106,7 +106,7 @@ const submit = () => {
 <template>
     <Head :title="pageTitle" />
 
-    <div class="px-6 py-8">
+    <div class="max-w-7xl mx-auto px-6 py-8">
         <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ pageTitle }}</h1>

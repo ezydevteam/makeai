@@ -150,25 +150,27 @@ class TokenGuard
         $status = $success ? 'completed' : 'cancelled';
         $billingFailed = $deductCredits && ! $deducted && $success;
 
-        AiUsageLog::create([
-            'user_id' => $user?->id,
-            'provider' => $provider,
-            'model' => $model,
-            'type' => $type,
-            'tool_slug' => $metadata['template_slug'] ?? $metadata['tool_slug'] ?? null,
-            'input_tokens' => $inputTokens,
-            'output_tokens' => $outputTokens,
-            'cost_usd' => $costUsd,
-            'credits_used' => ($success && $deductCredits && $deducted) ? $credits : 0,
-            'response_time_ms' => $responseTimeMs,
-            'status' => $billingFailed ? 'failed' : $status,
-            'metadata' => $billingFailed
-                ? array_merge($metadata, [
-                    'billing_error' => 'INSUFFICIENT_CREDITS_AFTER_COMPLETION',
-                    'credits_due' => $credits,
-                ])
-                : $metadata,
-        ]);
+        if ($user) {
+            AiUsageLog::create([
+                'user_id' => $user->id,
+                'provider' => $provider,
+                'model' => $model,
+                'type' => $type,
+                'tool_slug' => $metadata['template_slug'] ?? $metadata['tool_slug'] ?? null,
+                'input_tokens' => $inputTokens,
+                'output_tokens' => $outputTokens,
+                'cost_usd' => $costUsd,
+                'credits_used' => ($success && $deductCredits && $deducted) ? $credits : 0,
+                'response_time_ms' => $responseTimeMs,
+                'status' => $billingFailed ? 'failed' : $status,
+                'metadata' => $billingFailed
+                    ? array_merge($metadata, [
+                        'billing_error' => 'INSUFFICIENT_CREDITS_AFTER_COMPLETION',
+                        'credits_due' => $credits,
+                    ])
+                    : $metadata,
+            ]);
+        }
 
         if ($user) {
             Cache::forget("usage_stats_{$user->id}");
@@ -216,24 +218,26 @@ class TokenGuard
             $deducted = false;
         }
 
-        AiUsageLog::create([
-            'user_id' => $user?->id,
-            'provider' => $provider,
-            'model' => $model,
-            'type' => $type,
-            'tool_slug' => $metadata['template_slug'] ?? $metadata['tool_slug'] ?? null,
-            'input_tokens' => $inputTokens,
-            'output_tokens' => $outputTokens,
-            'cost_usd' => $costUsd,
-            'credits_used' => $deducted ? $credits : 0,
-            'status' => 'failed',
-            'metadata' => $credits > 0 && ! $deducted
-                ? array_merge($metadata, [
-                    'billing_error' => 'INSUFFICIENT_CREDITS_AFTER_FAILURE',
-                    'credits_due' => $credits,
-                ])
-                : $metadata,
-        ]);
+        if ($user) {
+            AiUsageLog::create([
+                'user_id' => $user->id,
+                'provider' => $provider,
+                'model' => $model,
+                'type' => $type,
+                'tool_slug' => $metadata['template_slug'] ?? $metadata['tool_slug'] ?? null,
+                'input_tokens' => $inputTokens,
+                'output_tokens' => $outputTokens,
+                'cost_usd' => $costUsd,
+                'credits_used' => $deducted ? $credits : 0,
+                'status' => 'failed',
+                'metadata' => $credits > 0 && ! $deducted
+                    ? array_merge($metadata, [
+                        'billing_error' => 'INSUFFICIENT_CREDITS_AFTER_FAILURE',
+                        'credits_due' => $credits,
+                    ])
+                    : $metadata,
+            ]);
+        }
     }
 
     /**

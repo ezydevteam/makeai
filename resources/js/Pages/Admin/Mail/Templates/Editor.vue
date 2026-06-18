@@ -4,6 +4,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 
 const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
@@ -86,6 +87,70 @@ const submit = () => {
     }
 
     form.post(route('admin.mail.templates.store'), { preserveScroll: true })
+}
+
+const editorRef = ref<any>(null)
+const aiLoading = ref<string | null>(null)
+const toast = useToastr()
+const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? ''
+
+const mailTemplateAiAssistActions = [
+    {
+        key: 'generate_content',
+        label: t('Generate content'),
+        description: t('Write a professional email body.'),
+    },
+    {
+        key: 'improve_content',
+        label: t('Improve content'),
+        description: t('Rewrite selected text for clarity.'),
+    },
+    {
+        key: 'generate_subject',
+        label: t('Generate subject'),
+        description: t('Create a concise email subject line.'),
+    },
+]
+
+const runAiAssist = async (action: string) => {
+    if (aiLoading.value) return
+
+    aiLoading.value = action
+    const selectedText = editorRef.value?.getSelectedText() ?? ''
+
+    try {
+        const response = await fetch(route('admin.mail.templates.ai-assist'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify({
+                action,
+                subject: form.subject,
+                content: form.content,
+                selected_text: selectedText,
+            }),
+        })
+        const payload = await response.json()
+
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.message || t('AI assist failed.'))
+        }
+
+        if (action === 'generate_subject') {
+            form.subject = payload.data.content
+        } else if (action === 'generate_content') {
+            editorRef.value?.insertAtCursor(payload.data.content)
+        } else if (action === 'improve_content') {
+            editorRef.value?.replaceSelection(payload.data.content)
+        }
+    } catch (error: any) {
+        toast.error(error.message || t('AI assist failed.'))
+    } finally {
+        aiLoading.value = null
+    }
 }
 </script>
 
@@ -190,7 +255,17 @@ const submit = () => {
                         </div>
 
                         <div class="p-6">
-                            <RichEditor v-model="form.content" />
+                            <RichEditor
+                                ref="editorRef"
+                                v-model="form.content"
+                                variant="full"
+                                ai-assist
+                                :ai-assist-actions="mailTemplateAiAssistActions"
+                                :ai-assist-loading-key="aiLoading"
+                                :ai-assist-label="t('AI Assist')"
+                                :ai-assist-loading-label="t('Working...')"
+                                @ai-assist="runAiAssist"
+                            />
                             <p v-if="form.errors.content" class="mt-3 text-sm text-red-600 dark:text-red-400">{{ form.errors.content }}</p>
                         </div>
                     </div>

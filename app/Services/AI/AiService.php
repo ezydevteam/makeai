@@ -120,7 +120,8 @@ class AiService
         ?string $systemPrompt = null,
         ?string $provider = null,
         ?string $model = null,
-        array $options = []
+        array $options = [],
+        string $toolSlug = 'direct'
     ): CompletionResponse {
         $providerName = $provider ?? settings('default_ai_provider', 'openai');
         $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
@@ -145,7 +146,7 @@ class AiService
         $messages[] = ['role' => 'user', 'content' => $prompt];
 
         try {
-            return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options, $systemPrompt, $prompt) {
+            return $this->executeWithFailover(function ($adapter) use ($user, $providerName, $modelName, $messages, $options, $systemPrompt, $prompt, $toolSlug) {
                 $result = $adapter->chatCompletion($messages, $modelName, $options);
 
                 TokenGuard::after(
@@ -154,11 +155,12 @@ class AiService
                     $result['output_tokens'],
                     $result['model'],
                     $providerName,
-                    'chat'
+                    'chat',
+                    ['tool_slug' => $toolSlug]
                 );
 
                 RecordGenerationHistoryJob::dispatch($user, [
-                    'tool_slug' => 'direct',
+                    'tool_slug' => $toolSlug,
                     'prompt_system' => $systemPrompt ?? '',
                     'prompt_user' => $prompt,
                     'field_values' => [],
@@ -468,6 +470,7 @@ class AiService
                     $usageStats['model'] ?? $modelName,
                     $providerName,
                     'stream',
+                    ['tool_slug' => 'direct']
                 );
             }
         } catch (Throwable $e) {
@@ -495,14 +498,34 @@ class AiService
 
         $adapter = ProviderRegistry::resolve($providerName);
 
-        $result = $adapter->embedText($text);
+        try {
+            TokenGuard::before(null, null, $model);
 
-        return new EmbeddingResult(
-            vector: $result['vector'],
-            dimensions: $result['dimensions'],
-            model: $result['model'],
-            tokensUsed: $result['tokens_used'],
-        );
+            $result = $adapter->embedText($text);
+
+            TokenGuard::after(
+                null,
+                $result['tokens_used'],
+                0,
+                $result['model'],
+                $providerName,
+                'embedding',
+                ['tool_slug' => 'embedding']
+            );
+
+            return new EmbeddingResult(
+                vector: $result['vector'],
+                dimensions: $result['dimensions'],
+                model: $result['model'],
+                tokensUsed: $result['tokens_used'],
+            );
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'embedding', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'embedding',
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -522,14 +545,39 @@ class AiService
 
         $adapter = ProviderRegistry::resolve($providerName);
 
-        $results = $adapter->embedBatch($texts);
+        try {
+            TokenGuard::before(null, null, null);
 
-        return array_map(fn (array $r) => new EmbeddingResult(
-            vector: $r['vector'],
-            dimensions: $r['dimensions'],
-            model: $r['model'],
-            tokensUsed: $r['tokens_used'],
-        ), $results);
+            $results = $adapter->embedBatch($texts);
+
+            // Calculate total tokens used across all embeddings
+            $totalTokens = array_sum(array_column($results, 'tokens_used'));
+            $modelName = $results[0]['model'] ?? 'unknown';
+            
+            TokenGuard::after(
+                null,
+                $totalTokens,
+                0,
+                $modelName,
+                $providerName,
+                'embedding',
+                ['tool_slug' => 'embedding_batch', 'batch_size' => count($texts)]
+            );
+
+            return array_map(fn (array $r) => new EmbeddingResult(
+                vector: $r['vector'],
+                dimensions: $r['dimensions'],
+                model: $r['model'],
+                tokensUsed: $r['tokens_used'],
+            ), $results);
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, 'unknown', 'embedding', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'embedding_batch',
+                'batch_size' => count($texts),
+            ]);
+            throw $e;
+        }
     }
 
     // ─── 14C.1: Image Generation ─────────────────────────────────
@@ -547,20 +595,43 @@ class AiService
         $providerName = $provider ?? settings('ai_image_provider', config('ai.default_for_images', 'openai'));
         $provider = app(AiManager::class)->imageProvider($providerName);
 
-        $response = $provider->image(
-            prompt: $prompt,
-            size: $size,
-            quality: $quality,
-            model: $model,
-        );
+        try {
+            TokenGuard::before(null, null, $model);
 
-        return [
-            'images' => collect($response->images)->map(fn ($img) => [
-                'url' => $img->url,
-                'revised_prompt' => $img->revisedPrompt,
-            ])->all(),
-            'model' => $response->meta->model,
-        ];
+            $response = $provider->image(
+                prompt: $prompt,
+                size: $size,
+                quality: $quality,
+                model: $model,
+            );
+
+            // Estimate tokens for image generation (rough estimate: 1000 tokens per image)
+            $estimatedTokens = 1000 * count($response->images);
+            
+            TokenGuard::after(
+                null,
+                $estimatedTokens,
+                0,
+                $response->meta->model,
+                $providerName,
+                'image_generation',
+                ['tool_slug' => 'image_generator']
+            );
+
+            return [
+                'images' => collect($response->images)->map(fn ($img) => [
+                    'url' => $img->url,
+                    'revised_prompt' => $img->revisedPrompt,
+                ])->all(),
+                'model' => $response->meta->model,
+            ];
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'image_generation', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'image_generator',
+            ]);
+            throw $e;
+        }
     }
 
     // ─── 14C.1: Audio Generation ─────────────────────────────────
@@ -578,17 +649,40 @@ class AiService
 
         $provider = app(AiManager::class)->audioProvider($providerName);
 
-        $response = $provider->audio(
-            text: $text,
-            voice: $voice,
-            model: $model,
-        );
+        try {
+            TokenGuard::before(null, null, $model);
 
-        return [
-            'audio_url' => $response->audioUrl,
-            'duration' => $response->duration,
-            'model' => $response->meta->model,
-        ];
+            $response = $provider->audio(
+                text: $text,
+                voice: $voice,
+                model: $model,
+            );
+
+            // Estimate tokens for audio generation (rough estimate: 1 token per 4 chars)
+            $estimatedTokens = (int) ceil(mb_strlen($text) / 4);
+            
+            TokenGuard::after(
+                null,
+                $estimatedTokens,
+                0,
+                $response->meta->model,
+                $providerName,
+                'audio_generation',
+                ['tool_slug' => 'audio_generator']
+            );
+
+            return [
+                'audio_url' => $response->audioUrl,
+                'duration' => $response->duration,
+                'model' => $response->meta->model,
+            ];
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'audio_generation', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'audio_generator',
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -605,19 +699,42 @@ class AiService
 
         $provider = app(AiManager::class)->transcriptionProvider($providerName);
 
-        $response = $provider->transcribe(
-            audio: $audio,
-            language: $language,
-            diarize: $diarize,
-            model: $model,
-        );
+        try {
+            TokenGuard::before(null, null, $model);
 
-        return [
-            'text' => $response->text,
-            'segments' => $response->segments,
-            'language' => $response->language,
-            'model' => $response->meta->model,
-        ];
+            $response = $provider->transcribe(
+                audio: $audio,
+                language: $language,
+                diarize: $diarize,
+                model: $model,
+            );
+
+            // Estimate tokens for transcription (rough estimate: 1 token per 4 chars of output)
+            $estimatedTokens = (int) ceil(mb_strlen($response->text) / 4);
+            
+            TokenGuard::after(
+                null,
+                0,
+                $estimatedTokens,
+                $response->meta->model,
+                $providerName,
+                'transcription',
+                ['tool_slug' => 'transcriber']
+            );
+
+            return [
+                'text' => $response->text,
+                'segments' => $response->segments,
+                'language' => $response->language,
+                'model' => $response->meta->model,
+            ];
+        } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'transcription', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'transcriber',
+            ]);
+            throw $e;
+        }
     }
 
     // ─── 14C.1: Video Generation ─────────────────────────────────
@@ -745,10 +862,22 @@ class AiService
         $adapter = ProviderRegistry::resolve($providerName);
 
         try {
+            TokenGuard::before(null, null, $modelName);
+            
             $result = $adapter->chatCompletion([
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $prompt],
             ], $modelName);
+
+            TokenGuard::after(
+                null,
+                $result['input_tokens'],
+                $result['output_tokens'],
+                $result['model'],
+                $providerName,
+                'document_summary',
+                ['tool_slug' => 'document_summarizer']
+            );
 
             return new CompletionResponse(
                 content: $result['content'],
@@ -757,6 +886,10 @@ class AiService
                 model: $result['model'],
             );
         } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, $modelName, 'document_summary', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'document_summarizer',
+            ]);
             throw new \RuntimeException("Document summarization failed: {$e->getMessage()}", 0, $e);
         }
     }
@@ -780,6 +913,8 @@ class AiService
         $adapter = ProviderRegistry::resolve($providerName);
 
         try {
+            TokenGuard::before(null, null, $modelName);
+            
             $result = $adapter->chatCompletion([
                 ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $prompt],
@@ -795,6 +930,16 @@ class AiService
                 }
             }
 
+            TokenGuard::after(
+                null,
+                $result['input_tokens'],
+                $result['output_tokens'],
+                $result['model'],
+                $providerName,
+                'data_extraction',
+                ['tool_slug' => 'data_extractor']
+            );
+
             return [
                 'data' => $extracted ?? $result['content'],
                 'input_tokens' => $result['input_tokens'],
@@ -802,6 +947,10 @@ class AiService
                 'model' => $result['model'],
             ];
         } catch (Throwable $e) {
+            TokenGuard::recordFailure(null, $providerName, $modelName, 'data_extraction', 0, 0, [
+                'error' => $e->getMessage(),
+                'tool_slug' => 'data_extractor',
+            ]);
             throw new \RuntimeException("Data extraction failed: {$e->getMessage()}", 0, $e);
         }
     }

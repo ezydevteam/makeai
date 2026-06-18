@@ -8,7 +8,7 @@ class SidebarBuilderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth('admin')->check();
+        return auth('admin')->check() && auth('admin')->user()->hasPermission('settings.manage');
     }
 
     public function rules(): array

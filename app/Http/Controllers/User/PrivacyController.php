@@ -165,6 +165,13 @@ class PrivacyController extends Controller
         $user = Auth::user();
         $sessionId = $request->input('session_id');
 
+        // Delete from actual sessions table to terminate the session
+        \DB::table('sessions')
+            ->where('id', $sessionId)
+            ->where('user_id', $user->id)
+            ->delete();
+
+        // Also remove from login history (audit log)
         $user->loginHistory()
             ->where('id', $sessionId)
             ->delete();

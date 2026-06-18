@@ -15,6 +15,15 @@ class FeatureSettingsRequest extends FormRequest
     {
         return [
             'scroll_to_top_enabled' => ['required', 'boolean'],
+            'ai_chat_enabled' => ['required', 'boolean'],
+            'ai_variations_enabled' => ['required', 'boolean'],
+            'social_sharing_enabled' => ['required', 'boolean'],
+            'document_editor_enabled' => ['required', 'boolean'],
+            'favorites_enabled' => ['required', 'boolean'],
+            'reviews_enabled' => ['required', 'boolean'],
+            'recently_used_tools_enabled' => ['required', 'boolean'],
+            'estimated_generation_time_enabled' => ['required', 'boolean'],
+            'subscriptions_enabled' => ['required', 'boolean'],
         ];
     }
 }

@@ -13,6 +13,7 @@ use App\Http\Controllers\Auth\VerificationController;
 use App\Http\Controllers\Billing\StripeController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\CreditTopupController;
 use App\Http\Controllers\ChainController;
 use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\CommentController;
@@ -257,6 +258,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/privacy/sessions/revoke', [PrivacyController::class, 'revokeSession'])->name('privacy.sessions.revoke');
             Route::post('/privacy/sign-out-all', [PrivacyController::class, 'signOutAllDevices'])->name('privacy.sign-out-all');
 
+            // Notification Preferences
+            Route::get('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'index'])->name('notifications.preferences');
+            Route::put('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'update'])->name('notifications.preferences.update');
+
             // Profile actions (PUT endpoints, no UI page)
             Route::put('/profile', [UserSettingsController::class, 'updateProfile'])->name('profile.update');
             Route::put('/profile/password', [UserSettingsController::class, 'updatePassword'])->name('password.update');
@@ -266,6 +271,17 @@ Route::middleware('auth')->group(function () {
             Route::get('/api-keys', [UserSettingsController::class, 'apiKeys'])->name('api-keys');
             Route::post('/api-keys', [UserSettingsController::class, 'storeApiKey'])->name('api-keys.store');
             Route::delete('/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('api-keys.destroy');
+
+            // Billing
+            Route::get('/billing', [\App\Http\Controllers\User\BillingController::class, 'index'])->name('billing');
+
+            // Credit Top-Up
+            Route::get('/credit-topup', [CreditTopupController::class, 'index'])->name('credit-topup');
+            Route::post('/credit-topup/calculate', [CreditTopupController::class, 'calculate'])->name('credit-topup.calculate');
+            Route::post('/credit-topup/checkout', [CreditTopupController::class, 'checkout'])->name('credit-topup.checkout');
+
+            // Search
+            Route::get('/search', [\App\Http\Controllers\User\SearchController::class, 'index'])->name('search');
 
             // Account Deletion
             Route::post('/account/delete', [UserSettingsController::class, 'requestAccountDeletion'])->name('account.delete');
@@ -304,6 +320,9 @@ Route::middleware('auth')->group(function () {
             // Usage Dashboard
             Route::get('/usage', [UsageDashboardController::class, 'index'])->name('usage.index');
             Route::post('/usage/export', [UsageDashboardController::class, 'export'])->name('usage.export');
+
+            // Dashboard Chart API
+            Route::get('/chart', [DashboardController::class, 'chartData'])->name('chart.data');
 
             // Tool Collections
             Route::prefix('collections')->name('collections.')->group(function () {
@@ -353,13 +372,15 @@ Route::middleware('auth')->group(function () {
                 Route::get('/checklist', [OnboardingController::class, 'checklistState'])->name('checklist');
                 Route::post('/tooltip/dismiss', [OnboardingController::class, 'dismissTooltip'])->name('tooltip.dismiss');
             });
-        });
 
-        // Standalone endpoints (not under /user/dashboard prefix)
-        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
-        Route::get('/notifications/latest', [NotificationController::class, 'latest'])->name('notifications.latest');
-        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
-        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
+            // Notifications
+            Route::prefix('notifications')->name('notifications.')->group(function () {
+                Route::get('/', [NotificationController::class, 'index'])->name('index');
+                Route::get('/latest', [NotificationController::class, 'latest'])->name('latest');
+                Route::post('/read-all', [NotificationController::class, 'markAllRead'])->name('read-all');
+                Route::post('/{notification}/read', [NotificationController::class, 'markRead'])->name('read');
+            });
+        });
 
         // Tool Favorites & Ratings (small POST endpoints)
         Route::post('/favorites/toggle', [FavoriteController::class, 'toggle'])->name('favorites.toggle');
@@ -396,9 +417,9 @@ Route::get('/shared/rag/{token}', [App\Http\Controllers\RagToolController::class
 Route::get('/playground/s/{uuid}', [PlaygroundController::class, 'showShare'])->name('playground.share.show');
 
 // Public embed routes
-Route::get('/embed/{token}', [EmbedController::class, 'show'])->name('embed.show');
-Route::post('/embed/{token}/run', [EmbedController::class, 'run'])->name('embed.run');
-Route::post('/embed/{token}/unlock', [EmbedController::class, 'unlock'])->name('embed.unlock');
+Route::get('/embed/{token}', [EmbedController::class, 'show'])->name('embed.show')->middleware('throttle:public_tool,60,3600');
+Route::post('/embed/{token}/run', [EmbedController::class, 'run'])->name('embed.run')->middleware('throttle:public_tool,30,3600');
+Route::post('/embed/{token}/unlock', [EmbedController::class, 'unlock'])->name('embed.unlock')->middleware('throttle:public,5,900');
 
 // ─── Blog ───────────────────────────────────
 Route::get('/blog/rss', [BlogController::class, 'rss'])->name('blog.rss');
@@ -452,8 +473,16 @@ Route::get('/chat/{ulid?}', function (?string $ulid = null) {
         'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
         'chat_credits_low_threshold' => (int) settings('chat_credits_low_threshold', 100),
         'active_chat_ulid' => $ulid,
+        'kb_available' => class_exists(\Addons\PublicKnowledgeBase\Services\KbSearchService::class),
     ]);
 })->name('chat.index');
+
+// ─── Shared Conversation View ─────────────────
+Route::get('/share/{token}', function (string $token) {
+    return Inertia::render('Chat/SharedView', [
+        'share_token' => $token,
+    ]);
+})->name('chat.share');
 
 // ─── Dynamic CMS Pages ──────────────────────
 Route::post('/{slug}/password', function (Request $request, string $slug) {

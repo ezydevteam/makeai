@@ -568,9 +568,9 @@ class NotificationEventService
             ->whereBetween('subscription_ends_at', [now()->addDays(3)->startOfDay(), now()->addDays(3)->endOfDay()])
             ->chunkById(100, function ($users) use (&$count) {
                 foreach ($users as $user) {
-                    $this->notifyUser($user, [
+                    $this->notifications->send($user, [
                         'title' => translate('Subscription renewing soon'),
-                        'body' => translate(':plan_name renews in 3 days. Make sure your payment method is up to date.', [
+                        'message' => translate(':plan_name renews in 3 days. Make sure your payment method is up to date.', [
                             'plan_name' => $user->plan?->name ?? translate('Your plan'),
                         ]),
                         'level' => 'info',

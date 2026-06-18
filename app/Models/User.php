@@ -33,7 +33,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at', 'trial_ends_at',
         'referral_code', 'affiliate_custom_slug', 'referred_by', 'referral_earnings', 'referral_count',
         'theme_preference', 'locale', 'timezone',
-        'preferences', 'personal_api_keys', 'brand_voice',
+        'preferences', 'personal_api_keys', 'brand_voice', 'chat_custom_instructions',
         'stripe_id', 'pm_type', 'pm_last_four',
         'is_active', 'has_trialed', 'is_banned', 'ban_reason',
         'otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until',
@@ -80,7 +80,65 @@ class User extends Authenticatable implements MustVerifyEmail
             'locked_until' => 'datetime',
             'onboarding_completed_at' => 'datetime',
             'dismissed_tooltips' => 'array',
+            'notification_preferences' => 'array',
         ];
+    }
+
+    /**
+     * Default notification preferences structure.
+     */
+    public static function defaultNotificationPreferences(): array
+    {
+        return [
+            'in_app' => [
+                'billing' => true,
+                'content' => true,
+                'security' => true,
+                'affiliate' => true,
+                'updates' => true,
+                'admin' => true,
+            ],
+            'email' => [
+                'billing' => true,
+                'content' => true,
+                'security' => true,
+                'affiliate' => true,
+                'updates' => true,
+                'admin' => true,
+            ],
+        ];
+    }
+
+    /**
+     * Get notification preferences with defaults merged.
+     */
+    public function getNotificationPreferences(): array
+    {
+        $defaults = self::defaultNotificationPreferences();
+        $current = $this->notification_preferences ?? [];
+
+        return [
+            'in_app' => array_merge($defaults['in_app'], $current['in_app'] ?? []),
+            'email' => array_merge($defaults['email'], $current['email'] ?? []),
+        ];
+    }
+
+    /**
+     * Check if user wants in-app notification for a group.
+     */
+    public function wantsInAppNotification(string $group): bool
+    {
+        $prefs = $this->getNotificationPreferences();
+        return $prefs['in_app'][$group] ?? true;
+    }
+
+    /**
+     * Check if user wants email notification for a group.
+     */
+    public function wantsEmailNotification(string $group): bool
+    {
+        $prefs = $this->getNotificationPreferences();
+        return $prefs['email'][$group] ?? true;
     }
 
     /**
@@ -104,6 +162,23 @@ class User extends Authenticatable implements MustVerifyEmail
     public function getRouteKeyName(): string
     {
         return 'ulid';
+    }
+
+    /**
+     * Get the internal AI user email (dynamic based on site domain).
+     */
+    public static function internalAiEmail(): string
+    {
+        $domain = parse_url(config('app.url', 'http://localhost'), PHP_URL_HOST) ?? 'localhost';
+        return "internalai@{$domain}";
+    }
+
+    /**
+     * Get the internal AI user name.
+     */
+    public static function internalAiName(): string
+    {
+        return 'Internal AI';
     }
 
     // ─── Relationships ──────────────────────────
@@ -462,6 +537,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function chatProjects()
     {
         return $this->hasMany(ChatProject::class);
+    }
+
+    public function conversationTags()
+    {
+        return $this->hasMany(ConversationTag::class);
     }
 
     public function ragSessions()

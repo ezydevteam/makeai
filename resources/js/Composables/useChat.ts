@@ -11,16 +11,30 @@ export interface ChatProduct {
 export interface Conversation {
     ulid: string; title: string | null; product_slug: string | null
     model: string | null; last_message_at: string; project_id: number | null
+    is_pinned?: boolean; share_token?: string | null
+    tags?: ConversationTag[]
 }
 
 export interface ChatMessage {
     id: number | string; role: 'user' | 'assistant'; content: string
     model?: string; input_tokens: number; output_tokens: number; credits_charged: number
-    created_at?: string
+    created_at?: string; kb_sources?: KbSource[]; attachments?: ChatAttachment[]
+}
+
+export interface KbSource {
+    ulid: string; title: string; slug: string
 }
 
 export interface ChatProject {
     id: number; name: string; color_hex: string | null; conversations_count: number
+}
+
+export interface ConversationTag {
+    id: number; name: string; color: string; conversations_count?: number
+}
+
+export interface ChatAttachment {
+    id: string; name: string; mime_type: string; size: number; url?: string
 }
 
 function csrf(): string {
@@ -96,6 +110,8 @@ export function useChat() {
         return groups
     })
     const projects = ref<ChatProject[]>([])
+    const tags = ref<ConversationTag[]>([])
+    const selectedTag = ref<ConversationTag | null>(null)
 
     const defaultChatModel = (usePage().props.default_chat_model as string) || 'gpt-4o-mini'
     const allowModelSelect = (usePage().props.allow_model_select as boolean) ?? true
@@ -110,13 +126,24 @@ export function useChat() {
     const selectedModel = ref<string | null>(allowModelSelect ? null : defaultChatModel)
     const abortController = ref<AbortController | null>(null)
     const pendingConversationUlid = ref<string | null>(null)
+    const hasMoreMessages = ref(false)
+    const loadingOlder = ref(false)
+    const useKnowledgeBase = ref(false)
+    const kbAvailable = (usePage().props.kb_available as boolean) ?? false
+    const availableModels = computed(() => {
+        const models = usePage().props.available_chat_models as string[] | undefined
+        return models ?? [defaultChatModel]
+    })
 
     async function loadProducts() {
         try { const data = await apiGet<{ success: boolean; data: ChatProduct[] }>('/api/v1/chat/products'); products.value = data.data } catch {}
     }
     async function loadConversations(projectId?: number | null) {
         try {
-            const url = projectId ? `/api/v1/chat?project_id=${projectId}` : '/api/v1/chat'
+            const params = new URLSearchParams()
+            if (projectId) params.append('project_id', projectId.toString())
+            if (selectedTag.value) params.append('tag_id', selectedTag.value.id.toString())
+            const url = params.toString() ? `/api/v1/chat?${params}` : '/api/v1/chat'
             const data = await apiGet<{ success: boolean; data: Conversation[] }>(url)
             conversations.value = data.data
         } catch {}
@@ -125,11 +152,66 @@ export function useChat() {
         try { const data = await apiGet<{ success: boolean; data: ChatProject[] }>('/api/v1/chat/projects'); projects.value = data.data } catch {}
     }
 
+    async function loadTags() {
+        try { const data = await apiGet<{ success: boolean; data: ConversationTag[] }>('/api/v1/chat/tags'); tags.value = data.data } catch {}
+    }
+
+    async function createTag(name: string, color?: string): Promise<ConversationTag> {
+        const data = await apiPost<{ success: boolean; data: ConversationTag }>('/api/v1/chat/tags', { name, color })
+        tags.value = [...tags.value, data.data]
+        return data.data
+    }
+
+    async function updateTag(id: number, name: string, color?: string): Promise<void> {
+        const data = await apiPut<{ success: boolean; data: ConversationTag }>(`/api/v1/chat/tags/${id}`, { name, color })
+        const idx = tags.value.findIndex(t => t.id === id)
+        if (idx !== -1) tags.value[idx] = data.data
+    }
+
+    async function deleteTag(id: number): Promise<void> {
+        await apiDelete(`/api/v1/chat/tags/${id}`)
+        tags.value = tags.value.filter(t => t.id !== id)
+        if (selectedTag.value?.id === id) {
+            selectedTag.value = null
+            await loadConversations()
+        }
+    }
+
+    async function tagConversation(ulid: string, tagIds: number[]): Promise<void> {
+        await apiPut(`/api/v1/chat/${ulid}/tags`, { tag_ids: tagIds })
+        await loadConversations()
+    }
+
+    async function filterByTag(tag: ConversationTag | null) {
+        selectedTag.value = tag
+        await loadConversations(selectedProject.value?.id ?? null)
+    }
+
     async function loadMessages(ulid: string) {
         try {
-            const data = await apiGet<{ success: boolean; data: { messages: ChatMessage[] } }>(`/api/v1/chat/${ulid}`)
+            const data = await apiGet<{ success: boolean; data: { messages: ChatMessage[]; has_more: boolean } }>(`/api/v1/chat/${ulid}`)
             messages.value = data.data.messages || []
+            hasMoreMessages.value = data.data.has_more || false
         } catch {}
+    }
+
+    async function loadOlderMessages(ulid: string) {
+        if (loadingOlder.value || !hasMoreMessages.value || messages.value.length === 0) return
+
+        loadingOlder.value = true
+        try {
+            const oldestMessage = messages.value[0]
+            const data = await apiGet<{ success: boolean; data: { messages: ChatMessage[]; has_more: boolean } }>(
+                `/api/v1/chat/${ulid}?before=${oldestMessage.id}`
+            )
+            const olderMessages = data.data.messages || []
+            if (olderMessages.length > 0) {
+                messages.value = [...olderMessages, ...messages.value]
+            }
+            hasMoreMessages.value = data.data.has_more || false
+        } catch {} finally {
+            loadingOlder.value = false
+        }
     }
 
     function newChat(product?: ChatProduct) {
@@ -196,17 +278,19 @@ export function useChat() {
         }
     })
 
-    async function sendMessage(content: string, product_slug?: string) {
+    async function sendMessage(content: string, product_slug?: string, attachments?: ChatAttachment[]) {
         if (!content.trim() || isStreaming.value) return
 
         const model = selectedModel.value
             ?? selectedProduct.value?.default_model
             ?? (usePage().props.default_chat_model as string)
-            ?? 'gpt-4o-mini'
+            ?? availableModels.value[0]
+            ?? ''
 
         const userMsg: ChatMessage = {
             id: Date.now(), role: 'user', content,
             input_tokens: 0, output_tokens: 0, credits_charged: 0,
+            attachments: attachments?.length ? attachments : undefined,
         }
         messages.value = [...messages.value, userMsg]
         isStreaming.value = true
@@ -241,6 +325,8 @@ export function useChat() {
                 content,
                 product_slug ?? selectedProduct.value?.slug ?? undefined,
                 model,
+                attachments,
+                useKnowledgeBase.value,
             )
 
             await loadConversations(selectedProject.value?.id ?? null)
@@ -272,7 +358,11 @@ export function useChat() {
         }
     }
 
-    async function streamMessage(ulid: string, content: string, product_slug?: string, model?: string) {
+    async function streamMessage(ulid: string, content: string, product_slug?: string, model?: string, attachments?: ChatAttachment[], use_kb?: boolean) {
+        const body: Record<string, unknown> = { content, product_slug: product_slug ?? undefined, model: model ?? undefined }
+        if (attachments?.length) body.attachments = attachments
+        if (use_kb) body.use_knowledge_base = true
+
         const res = await fetch(`/api/v1/chat/${ulid}/message`, {
             method: 'POST',
             headers: {
@@ -282,7 +372,7 @@ export function useChat() {
             },
             credentials: 'same-origin',
             signal: abortController.value?.signal,
-            body: JSON.stringify({ content, product_slug: product_slug ?? undefined, model: model ?? undefined }),
+            body: JSON.stringify(body),
         })
 
         if (!res.ok) {
@@ -328,6 +418,13 @@ export function useChat() {
                             }
                             messages.value = msgs
                         }
+                    } else if (event.type === 'kb_sources') {
+                        const msgs = [...messages.value]
+                        const last = msgs[msgs.length - 1]
+                        if (last.role === 'assistant' && event.sources?.length) {
+                            msgs[msgs.length - 1] = { ...last, kb_sources: event.sources }
+                            messages.value = msgs
+                        }
                     } else if (event.type === 'error') {
                         throw new Error(event.message)
                     }
@@ -345,6 +442,38 @@ export function useChat() {
             newChat()
         }
         await loadConversations()
+    }
+
+    async function togglePin(ulid: string) {
+        const data = await apiPut<{ success: boolean; data: Conversation }>(`/api/v1/chat/${ulid}/pin`, {})
+        const idx = conversations.value.findIndex(c => c.ulid === ulid)
+        if (idx !== -1) conversations.value[idx] = data.data
+        if (activeConversation.value?.ulid === ulid) {
+            activeConversation.value = data.data
+        }
+    }
+
+    async function shareConversation(ulid: string): Promise<string> {
+        const data = await apiPost<{ success: boolean; data: { share_url: string; share_token: string } }>(`/api/v1/chat/${ulid}/share`, {})
+        const idx = conversations.value.findIndex(c => c.ulid === ulid)
+        if (idx !== -1) {
+            conversations.value[idx] = { ...conversations.value[idx], share_token: data.data.share_token }
+        }
+        if (activeConversation.value?.ulid === ulid) {
+            activeConversation.value = { ...activeConversation.value, share_token: data.data.share_token }
+        }
+        return data.data.share_url
+    }
+
+    async function unshareConversation(ulid: string) {
+        await apiDelete(`/api/v1/chat/${ulid}/share`)
+        const idx = conversations.value.findIndex(c => c.ulid === ulid)
+        if (idx !== -1) {
+            conversations.value[idx] = { ...conversations.value[idx], share_token: null }
+        }
+        if (activeConversation.value?.ulid === ulid) {
+            activeConversation.value = { ...activeConversation.value, share_token: null }
+        }
     }
 
     async function createProject(name: string, color_hex?: string) {
@@ -386,6 +515,49 @@ export function useChat() {
         }
     }
 
+    async function branchConversation(convUlid: string, messageId: number | string) {
+        const data = await apiPost<{ success: boolean; data: Conversation }>(`/api/v1/chat/${convUlid}/branch`, {
+            message_id: messageId,
+        })
+        await loadConversations(selectedProject.value?.id ?? null)
+        await selectConversation(data.data)
+        return data.data
+    }
+
+    async function editMessage(convUlid: string, messageId: number | string, newContent: string) {
+        const res = await apiPut<{ success: boolean; data: { message: ChatMessage; should_regenerate: boolean } }>(
+            `/api/v1/chat/${convUlid}/message/${messageId}`,
+            { content: newContent }
+        )
+
+        // Reload messages to reflect the edit and deletion of subsequent messages
+        await loadMessages(convUlid)
+
+        // If should_regenerate is true, trigger a new AI response
+        if (res.data.should_regenerate) {
+            const editedMessage = res.data.message
+            await sendMessage(editedMessage.content, selectedProduct.value?.slug ?? undefined)
+        }
+
+        return res.data
+    }
+
+    async function exportConversation(ulid: string, format: string = 'md'): Promise<void> {
+        const res = await fetch(`/api/v1/chat/${ulid}/export?format=${format}`)
+        if (!res.ok) throw friendlyError(res)
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `conversation-${ulid}.${format}`
+        a.click()
+        URL.revokeObjectURL(url)
+    }
+
+    async function updateChatSettings(customInstructions: string | null): Promise<void> {
+        await apiPut('/api/v1/chat/settings', { custom_instructions: customInstructions })
+    }
+
     const isGuest = !usePage().props.auth?.user
     const allowGuest = (usePage().props.allow_guest_messages as boolean) ?? false
 
@@ -393,19 +565,24 @@ export function useChat() {
         loadProducts()
         loadConversations()
         loadProjects()
+        loadTags()
     } else if (allowGuest) {
         loadProducts()
         loadConversations()
         loadProjects()
+        loadTags()
     }
 
     return {
-        products, conversations, groupedConversations, projects,
+        products, conversations, groupedConversations, projects, tags, selectedTag,
         selectedProduct, activeConversation, selectedProject, messages,
         isStreaming, loading, error, selectedModel,
+        useKnowledgeBase, kbAvailable,
         newChat, selectConversation, selectProject, sendMessage, stopStreaming,
-        loadConversations, loadProjects,
-        deleteConversation, createProject, renameProject, deleteProject, moveToProject,
-        renameConversation, selectConversationByUlid,
+        loadConversations, loadProjects, loadTags, loadOlderMessages, hasMoreMessages, loadingOlder,
+        deleteConversation, togglePin, shareConversation, unshareConversation, createProject, renameProject, deleteProject, moveToProject,
+        createTag, updateTag, deleteTag, tagConversation, filterByTag,
+        renameConversation, selectConversationByUlid, branchConversation, editMessage, exportConversation,
+        updateChatSettings,
     }
 }

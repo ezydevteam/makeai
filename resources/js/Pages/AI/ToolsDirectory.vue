@@ -20,6 +20,7 @@ interface Category {
     slug: string
     icon: string
     color: string
+    requires_pro?: boolean
     active_tools_count?: number
 }
 
@@ -33,20 +34,25 @@ interface Tool {
     icon: string
     color: string
     is_featured: boolean
-    requires_pro: boolean
     requires_login: boolean
+    access_level?: string
+    tags?: string[]
+    views_count?: number
+    avg_latency_ms?: number
 }
 
 const props = defineProps<{
     tools: Tool[]
     categories: Category[]
     featured: Tool[]
+    recentlyUsed: Tool[]
     initialCategory?: number | string
 }>()
 
 const { t } = useTranslate()
 const activeCategory = ref<number | string>(props.initialCategory || 'all')
 const search = ref('')
+const activeTag = ref<string | null>(null)
 const featuredModules = [Navigation, Pagination, A11y]
 const featuredSwiper = ref<SwiperClass | null>(null)
 const featuredAtStart = ref(true)
@@ -58,6 +64,21 @@ const categoryOptions = computed(() => [
         label: category.name,
         icon: category.icon || undefined,
     })),
+])
+
+const allTags = computed(() => {
+    const tagSet = new Set<string>()
+    props.tools.forEach(tool => {
+        if (Array.isArray(tool.tags)) {
+            tool.tags.forEach(tag => tagSet.add(tag))
+        }
+    })
+    return Array.from(tagSet).sort()
+})
+
+const tagOptions = computed(() => [
+    { value: '', label: t('All tags') },
+    ...allTags.value.map(tag => ({ value: tag, label: tag })),
 ])
 
 function slideFeatured(direction: 'prev' | 'next') {
@@ -72,6 +93,20 @@ function slideFeatured(direction: 'prev' | 'next') {
     }
 
     swiper.slideNext()
+}
+
+function formatViews(views: number): string {
+    if (views >= 1000000) {
+        return (views / 1000000).toFixed(1) + 'M'
+    }
+    if (views >= 1000) {
+        return (views / 1000).toFixed(1) + 'K'
+    }
+    return views.toString()
+}
+
+function isProTool(tool: Tool): boolean {
+    return tool.access_level === 'pro_plan' || Boolean(tool.category?.requires_pro)
 }
 
 function onFeaturedSwiper(swiper: SwiperClass) {
@@ -89,6 +124,9 @@ const filtered = computed(() => {
     let list = props.tools
     if (activeCategory.value !== 'all') {
         list = list.filter(t => t.category_id === activeCategory.value)
+    }
+    if (activeTag.value) {
+        list = list.filter(t => t.tags?.includes(activeTag.value!))
     }
     if (search.value.trim()) {
         const q = search.value.toLowerCase()
@@ -142,7 +180,7 @@ const filtered = computed(() => {
                                 </div>
                                 <div>
                                     <div class="text-[11px] uppercase tracking-widest text-gray-500">{{ t('Tools') }}</div>
-                                    <div class="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">{{ filtered.length }}</div>
+                                    <div class="mt-0.5 text-xl font-bold text-gray-900 dark:text-white">{{ tools.length }}</div>
                                 </div>
                             </div>
                         </div>
@@ -209,7 +247,7 @@ const filtered = computed(() => {
                                 >
                                     <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.08),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.08),transparent_35%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_40%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.08),transparent_35%)]"></div>
                                     <div class="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary-500/10 blur-3xl"></div>
-                                    <div v-if="item.requires_pro" class="badge badge-pro absolute right-4 top-4">{{ t('PRO') }}</div>
+                                    <div v-if="isProTool(item)" class="badge badge-pro absolute right-4 top-4">{{ t('PRO') }}</div>
                                     <div class="relative z-10 flex h-full flex-col">
                                         <div class="mb-5 flex items-start justify-between gap-3">
                                             <div class="flex h-14 w-14 items-center justify-center rounded-[1.15rem] border border-white/60 bg-white/80 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/10" :style="{ boxShadow: `0 12px 30px ${ (item.color || '#1F75FE') }20` }">
@@ -240,6 +278,33 @@ const filtered = computed(() => {
                 </div>
             </section>
 
+            <section v-if="recentlyUsed.length > 0 && activeCategory === 'all' && !search && !activeTag" class="mb-8">
+                <div class="mb-4 flex items-center gap-2">
+                    <i class="ti ti-clock text-primary-500"></i>
+                    <h2 class="font-heading text-xl font-black text-gray-900 dark:text-white">{{ t('Recently Used') }}</h2>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <Link
+                        v-for="item in recentlyUsed"
+                        :key="'recent-'+item.id"
+                        :href="route('ai.tools.show', item.slug)"
+                        class="group card relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-1 hover:border-primary-200 hover:shadow-lg dark:border-white/5 dark:bg-white/[0.03]"
+                    >
+                        <div class="mb-3 flex items-center gap-3">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl border" :style="{ background: (item.color || '#64748b') + '14', borderColor: (item.color || '#64748b') + '28' }">
+                                <i :class="[item.icon || 'ti ti-wand', 'text-[18px]']" :style="{ color: item.color || '#64748b' }"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-sm font-bold text-gray-900 transition-colors group-hover:text-primary-600 dark:text-white">{{ item.name }}</h3>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ item.category?.name }}</p>
+                            </div>
+                            <i class="ti ti-arrow-right text-primary-400 opacity-0 transition-opacity group-hover:opacity-100"></i>
+                        </div>
+                        <p class="line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ item.description }}</p>
+                    </Link>
+                </div>
+            </section>
+
             <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <h2 class="font-heading text-xl font-black text-gray-900 dark:text-white">
@@ -248,7 +313,7 @@ const filtered = computed(() => {
                     </h2>
                 </div>
 
-                <div class="grid lg:w-fit grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_200px] lg:items-end lg:ml-auto">
+                <div class="grid lg:w-fit grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_200px_200px] lg:items-end lg:ml-auto">
                     <div class="relative">
                         <input
                             v-model="search"
@@ -265,6 +330,13 @@ const filtered = computed(() => {
                         :placeholder="t('All categories')"
                         live-search
                     />
+
+                    <AppSelect
+                        v-if="allTags.length > 0"
+                        v-model="activeTag"
+                        :options="tagOptions"
+                        :placeholder="t('All tags')"
+                    />
                 </div>
             </div>
 
@@ -275,7 +347,7 @@ const filtered = computed(() => {
                     :href="route('ai.tools.show', item.slug)"
                     class="group card relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-5 transition-all hover:-translate-y-1 hover:border-primary-200 hover:shadow-lg dark:border-white/5 dark:bg-white/[0.03]"
                 >
-                    <div v-if="item.requires_pro" class="badge badge-pro absolute right-4 top-4">{{ t('PRO') }}</div>
+                    <div v-if="isProTool(item)" class="badge badge-pro absolute right-4 top-4">{{ t('PRO') }}</div>
 
                     <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border" :style="{ background: (item.color || '#64748b') + '14', borderColor: (item.color || '#64748b') + '28' }">
                         <i :class="[item.icon || 'ti ti-wand', 'text-[22px]']" :style="{ color: item.color || '#64748b' }"></i>
@@ -291,11 +363,17 @@ const filtered = computed(() => {
                                 {{ item.category.name }}
                             </span>
                         </div>
-                        <span class=" text-primary-400 inline-flex items-center gap-1">
-                            <i class="ti ti-sparkles text-sm"></i>
-                            {{ t('Open tool') }}
-                            <i class="ti ti-arrow-right text-base opacity-0 transition-opacity group-hover:opacity-100"></i>
-                        </span>
+                        <div class="flex items-center gap-2">
+                            <span v-if="item.views_count" class="inline-flex items-center gap-1 text-[10px] text-gray-400">
+                                <i class="ti ti-eye text-[10px]"></i>
+                                {{ formatViews(item.views_count) }}
+                            </span>
+                            <span class=" text-primary-400 inline-flex items-center gap-1">
+                                <i class="ti ti-sparkles text-sm"></i>
+                                {{ t('Open tool') }}
+                                <i class="ti ti-arrow-right text-base opacity-0 transition-opacity group-hover:opacity-100"></i>
+                            </span>
+                        </div>
                     </div>
                 </Link>
                 </template>
@@ -307,7 +385,7 @@ const filtered = computed(() => {
                 </div>
                 <h3 class="font-heading text-xl font-bold text-gray-900 dark:text-white">{{ t('No tools found') }}</h3>
                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t("We couldn't find any tools matching your search criteria.") }}</p>
-                <button @click="search = ''; activeCategory = 'all'" class="btn-primary mt-5 rounded-xl px-4 py-2 text-sm font-semibold">
+                <button @click="search = ''; activeCategory = 'all'; activeTag = null" class="btn-primary mt-5 rounded-xl px-4 py-2 text-sm font-semibold">
                     {{ t('Clear Filters') }}
                 </button>
             </div>

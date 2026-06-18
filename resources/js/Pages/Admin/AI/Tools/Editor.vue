@@ -21,6 +21,7 @@ const props = defineProps<{
 
 const isEditing = computed(() => !!props.tool)
 const activeTab = ref('basic')
+const activeContentSection = ref('about')
 
 const tabs = computed(() => {
     const list = [
@@ -38,6 +39,22 @@ const tabs = computed(() => {
     )
     return list
 })
+
+const tabDescriptions: Record<string, string> = {
+    basic: t('Set the tool identity, visibility, and access rules.'),
+    prompts: t('Control model behavior, prompt templates, and output settings.'),
+    fields: t('Design the dynamic form fields shown to users.'),
+    content: t('Manage about blocks, steps, examples, and FAQs.'),
+    seo: t('Configure search metadata and social preview assets.'),
+}
+
+const pageTitle = computed(() => (isEditing.value ? t('Edit Tool') : t('Create Tool')))
+
+const pageDescription = computed(() => (
+    isEditing.value
+        ? t('Update tool settings, prompts, fields, content, and search metadata.')
+        : t('Create a new AI tool with access rules, prompts, dynamic fields, and SEO content.')
+))
 
 const textLength = (value: unknown) => String(value || '').length
 
@@ -69,9 +86,9 @@ const form = useForm({
     sort_order: props.tool?.sort_order || 0,
     is_active: props.tool?.is_active ?? true,
     is_featured: props.tool?.is_featured ?? false,
-    requires_pro: props.tool?.requires_pro ?? false,
     show_header: props.tool?.show_header ?? true,
     show_footer: props.tool?.show_footer ?? true,
+    is_embeddable: props.tool?.is_embeddable ?? true,
     access_level: props.tool?.access_level || 'inherit',
 
     // Prompts
@@ -118,20 +135,20 @@ const categoryOptions = computed(() => [
 ])
 
 const accessLevelOptions = [
-    { value: 'inherit', label: 'Inherit' },
-    { value: 'public', label: 'Public' },
-    { value: 'login_required', label: 'Login Required' },
-    { value: 'free_plan', label: 'Free Plan' },
-    { value: 'pro_plan', label: 'Pro Plan' },
+    { value: 'inherit', label: t('Inherit') },
+    { value: 'public', label: t('Public') },
+    { value: 'login_required', label: t('Login Required') },
+    { value: 'free_plan', label: t('Free Plan') },
+    { value: 'pro_plan', label: t('Pro Plan') },
 ]
 
 const outputTypeOptions = [
-    { value: 'text', label: 'Text' },
-    { value: 'markdown', label: 'Markdown' },
-    { value: 'html', label: 'HTML' },
-    { value: 'code', label: 'Code' },
-    { value: 'list', label: 'List' },
-    { value: 'json', label: 'JSON' },
+    { value: 'text', label: t('Text') },
+    { value: 'markdown', label: t('Markdown') },
+    { value: 'html', label: t('HTML') },
+    { value: 'code', label: t('Code') },
+    { value: 'list', label: t('List') },
+    { value: 'json', label: t('JSON') },
 ]
 
 const modelOptions = computed(() => {
@@ -143,28 +160,34 @@ const modelOptions = computed(() => {
 })
 
 const fieldTypeOptions = [
-    { value: 'text', label: 'Text' },
-    { value: 'textarea', label: 'Textarea' },
-    { value: 'select', label: 'Select' },
-    { value: 'number', label: 'Number' },
-    { value: 'toggle', label: 'Toggle' },
-    { value: 'slider', label: 'Slider' },
-    { value: 'color', label: 'Color' },
-    { value: 'tags_input', label: 'Tags Input' },
-    { value: 'tone_select', label: 'Tone Select' },
-    { value: 'language_select', label: 'Language Select' },
-    { value: 'length_select', label: 'Length Select' },
-    { value: 'model_select', label: 'Model Select' },
-    { value: 'image_upload', label: 'Image Upload' },
-    { value: 'file_upload', label: 'File Upload' },
-    { value: 'code_input', label: 'Code Input' },
-    { value: 'url', label: 'URL' },
-    { value: 'date', label: 'Date' },
-    { value: 'datetime_local', label: 'Date & Time' },
-    { value: 'radio', label: 'Radio' },
-    { value: 'multi_select', label: 'Multi Select' },
-    { value: 'hidden', label: 'Hidden' },
+    { value: 'text', label: t('Text') },
+    { value: 'textarea', label: t('Textarea') },
+    { value: 'select', label: t('Select') },
+    { value: 'number', label: t('Number') },
+    { value: 'toggle', label: t('Toggle') },
+    { value: 'slider', label: t('Slider') },
+    { value: 'color', label: t('Color') },
+    { value: 'tags_input', label: t('Tags Input') },
+    { value: 'tone_select', label: t('Tone Select') },
+    { value: 'language_select', label: t('Language Select') },
+    { value: 'length_select', label: t('Length Select') },
+    { value: 'model_select', label: t('Model Select') },
+    { value: 'image_upload', label: t('Image Upload') },
+    { value: 'file_upload', label: t('File Upload') },
+    { value: 'code_input', label: t('Code Input') },
+    { value: 'url', label: t('URL') },
+    { value: 'date', label: t('Date') },
+    { value: 'datetime_local', label: t('Date & Time') },
+    { value: 'radio', label: t('Radio') },
+    { value: 'multi_select', label: t('Multi Select') },
+    { value: 'hidden', label: t('Hidden') },
 ]
+
+const findOptionLabel = (options: { value: string; label: string }[], value: unknown, fallback: string) => {
+    return options.find((option) => option.value === value)?.label || fallback
+}
+
+const activeTabDescription = computed(() => tabDescriptions[activeTab.value] || t('Manage this section.'))
 
 // ─── Auto-slug ────────────────────────────────
 
@@ -266,23 +289,19 @@ const submit = () => {
         form.post(route('admin.ai.tools.store'))
     }
 }
+
 </script>
 
 <template>
-    <Head :title="(isEditing ? t('Edit Tool') : t('Create Tool')) + ' - ' + t('Admin')" />
+    <Head :title="pageTitle + ' - ' + t('Admin')" />
 
-    <div class="mx-auto w-full sm:max-w-5xl space-y-6 px-4 sm:px-6">
-        <!-- Header -->
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditing ? t('Edit Tool') : t('Create Tool') }}</h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {{ isEditing
-                        ? t('Update tool settings, prompts, fields, content, and search metadata.')
-                        : t('Create a new AI tool with access rules, prompts, dynamic fields, and SEO content.') }}
-                </p>
-                <p v-if="isEditing" class="mt-2 text-xs font-medium text-gray-400 dark:text-gray-500">{{ props.tool?.slug }}</p>
+    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ pageTitle }}</h1>
+                <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ pageDescription }}</p>
             </div>
+
             <div class="flex flex-wrap items-center gap-3">
                 <Link
                     :href="route('admin.ai.tools.index')"
@@ -304,28 +323,75 @@ const submit = () => {
                     {{ isEditing ? t('Save Changes') : t('Create Tool') }}
                 </button>
             </div>
-        </div>
+        </section>
 
-        <!-- Tabs -->
-        <div class="bg-white dark:bg-surface-900 rounded-2xl border border-gray-200 dark:border-surface-800 overflow-hidden">
-            <div class="flex border-b border-gray-100 dark:border-surface-800 overflow-x-auto">
-                    <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key" :class="[activeTab === tab.key ? 'text-primary-600 dark:text-primary-400 border-primary-500' : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300']" class="flex items-center gap-2 px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap">
-                        <i :class="[tab.icon, 'text-base']"></i>
-                        {{ tab.label }}
-                    </button>
-            </div>
+        <div class="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
+            <aside class="space-y-4 xl:sticky xl:top-6 xl:self-start">
+                <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800">
+                        <div class="space-y-1">
+                            <h6 class="text-base mb-0 font-semibold text-gray-700 dark:text-gray-200">
+                                {{ form.name || t('Untitled Tool') }}
+                            </h6>
+                            <p class="text-xs font-medium lowercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+                                {{ form.slug || t('no-slug') }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-1">
+                        <button
+                            v-for="tab in tabs"
+                            :key="tab.key"
+                            type="button"
+                            @click="activeTab = tab.key"
+                            :class="activeTab === tab.key
+                                ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300'
+                                : 'border-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50 dark:text-gray-300 dark:hover:border-surface-700 dark:hover:bg-surface-800'"
+                            class="flex w-full items-center gap-3 rounded-xl border px-4 py-2 text-left text-sm font-medium transition"
+                        >
+                            <span
+                                :class="activeTab === tab.key
+                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                                    : 'bg-gray-100 text-gray-500 dark:bg-surface-800 dark:text-gray-400'"
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-full text-base"
+                            >
+                                <i :class="tab.icon"></i>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block truncate">{{ tab.label }}</span>
+                            </span>
+                        </button>
+                    </div>
+                </section>
 
-            <div class="p-6 space-y-5">
-                <!-- Errors -->
-                <div v-if="Object.keys(form.errors).length" class="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
-                    <ul class="list-disc pl-4 space-y-1">
-                        <li v-for="(err, key) in form.errors" :key="key">{{ err }}</li>
-                    </ul>
+            </aside>
+
+            <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
+                            <i :class="[tabs.find((tab) => tab.key === activeTab)?.icon || 'ti ti-settings', 'text-lg']"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-base font-semibold text-gray-900 dark:text-white">
+                                {{ tabs.find((tab) => tab.key === activeTab)?.label || t('Section') }}
+                            </p>
+                            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ activeTabDescription }}</p>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="space-y-5 p-6">
+                    <!-- Errors -->
+                    <div v-if="Object.keys(form.errors).length" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                        <ul class="list-disc space-y-1 pl-4">
+                            <li v-for="(err, key) in form.errors" :key="key">{{ err }}</li>
+                        </ul>
+                    </div>
 
                 <!-- ═══ TAB: Basic ═══ -->
                 <div v-show="activeTab === 'basic'" class="space-y-5">
-                    <div class="grid grid-cols-2 gap-5">
+                    <div class="grid gap-5 md:grid-cols-2">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Name') }} *</label>
                             <input v-model="form.name" @input="autoSlug" type="text" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="t('Blog Post Writer')" />
@@ -339,7 +405,7 @@ const submit = () => {
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Description') }} *</label>
                         <textarea v-model="form.description" rows="2" @input="autoExpand" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm resize-none overflow-hidden" :placeholder="t('Generate professional blog posts...')" />
                     </div>
-                    <div class="grid grid-cols-3 gap-5">
+                    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <AppSelect v-model="form.category_id" :options="categoryOptions" :label="t('Category')" :placeholder="t('Select a category')" live-search />
                         </div>
@@ -350,7 +416,7 @@ const submit = () => {
                             <AppColorPicker v-model="form.color" :label="t('Color')" />
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 gap-5">
+                    <div class="grid gap-5 md:grid-cols-2">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Sort Order') }}</label>
                             <input v-model.number="form.sort_order" type="number" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" />
@@ -387,17 +453,6 @@ const submit = () => {
                         <div class="flex items-center gap-3">
                             <button
                                 type="button"
-                                :class="form.requires_pro ? 'bg-accent-500' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.requires_pro = !form.requires_pro"
-                            >
-                                <span :class="form.requires_pro ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Requires Pro') }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <button
-                                type="button"
                                 :class="form.show_header ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
                                 class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
                                 @click="form.show_header = !form.show_header"
@@ -417,6 +472,17 @@ const submit = () => {
                             </button>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Site Footer') }}</span>
                         </div>
+                        <div class="flex items-center gap-3">
+                            <button
+                                type="button"
+                                :class="form.is_embeddable ? 'bg-primary-500' : 'bg-gray-200 dark:bg-surface-600'"
+                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
+                                @click="form.is_embeddable = !form.is_embeddable"
+                            >
+                                <span :class="form.is_embeddable ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
+                            </button>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Embeddable') }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -424,15 +490,15 @@ const submit = () => {
                 <div v-if="props.tool?.type !== 'rag'" v-show="activeTab === 'prompts'" class="space-y-5">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('System Prompt') }}</label>
-                        <textarea v-model="form.prompt_system" rows="5" @input="autoExpand" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono resize-none overflow-hidden" :placeholder="t('You are a professional writer...')" />
+                        <textarea v-model="form.prompt_system" rows="10" class="max-h-[420px] min-h-[220px] w-full overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-sm dark:border-surface-700 dark:bg-surface-800" :placeholder="t('You are a professional writer...')" />
                         <p class="text-xs text-gray-400 mt-1">{{ t("Instructions for the AI's behavior and persona.") }}</p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('User Prompt Template') }}</label>
-                        <textarea v-model="form.prompt_user" rows="5" @input="autoExpand" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm font-mono resize-none overflow-hidden" :placeholder="t('Write a blog post about {topic}...')" />
+                        <textarea v-model="form.prompt_user" rows="10" class="max-h-[420px] min-h-[220px] w-full overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-sm dark:border-surface-700 dark:bg-surface-800" :placeholder="t('Write a blog post about {topic}...')" />
                         <p class="text-xs text-gray-400 mt-1">{{ t('Use') }} <code class="text-primary-500">{field_key}</code> {{ t('for dynamic field placeholders.') }}</p>
                     </div>
-                    <div class="grid grid-cols-3 gap-5">
+                    <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <AppSelect v-model="form.output_type" :options="outputTypeOptions" :label="t('Output Type')" />
                         </div>
@@ -443,6 +509,19 @@ const submit = () => {
                         <div>
                             <AppSelect v-model="form.model_override" :options="modelOptions" :label="t('Model Override')" :placeholder="t('Use default model')" />
                             <p class="text-xs text-gray-400 mt-1">{{ t('Force a specific AI model for this tool.') }}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Max Tokens Override') }}</label>
+                            <input v-model.number="form.max_tokens_override" type="number" min="100" max="128000" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="t('Leave empty for global default')" />
+                            <p class="text-xs text-gray-400 mt-1">{{ t('Override the global max tokens limit for this tool.') }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Avg Output Tokens') }}</label>
+                            <input v-model.number="form.avg_output_tokens" type="number" min="50" class="w-full px-4 py-2.5 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm" :placeholder="t('Average tokens for cost estimation')" />
+                            <p class="text-xs text-gray-400 mt-1">{{ t('Used for credit cost estimation on the frontend.') }}</p>
                         </div>
                     </div>
 
@@ -547,14 +626,56 @@ const submit = () => {
 
                 <!-- ═══ TAB: Content ═══ -->
                 <div v-show="activeTab === 'content'" class="space-y-5">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('About Content') }}</label>
-                        <textarea v-model="form.about_content" rows="4" @input="autoExpand" class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl text-sm resize-none overflow-hidden" :placeholder="t('Describe what this tool does...')" />
+                    <div class="flex flex-wrap gap-2 border-b border-gray-200 pb-3 dark:border-surface-800">
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            :class="activeContentSection === 'about' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200'"
+                            @click="activeContentSection = 'about'"
+                        >
+                            {{ t('About') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            :class="activeContentSection === 'steps' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200'"
+                            @click="activeContentSection = 'steps'"
+                        >
+                            {{ t('How It Works') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            :class="activeContentSection === 'examples' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200'"
+                            @click="activeContentSection = 'examples'"
+                        >
+                            {{ t('Examples') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            :class="activeContentSection === 'faqs' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200'"
+                            @click="activeContentSection = 'faqs'"
+                        >
+                            {{ t('FAQs') }}
+                        </button>
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+                            :class="activeContentSection === 'visibility' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-gray-200'"
+                            @click="activeContentSection = 'visibility'"
+                        >
+                            {{ t('Visibility') }}
+                        </button>
                     </div>
 
-                    <!-- How It Works -->
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
+                    <div v-show="activeContentSection === 'about'">
+                        <label class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('About Content') }}</label>
+                        <textarea v-model="form.about_content" rows="4" @input="autoExpand" class="w-full resize-none overflow-hidden rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm dark:border-surface-700 dark:bg-surface-800" :placeholder="t('Describe what this tool does...')" />
+                    </div>
+
+                    <div v-show="activeContentSection === 'steps'">
+                        <div class="mb-2 flex items-center justify-between">
                             <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('How It Works') }}</label>
                         </div>
                         <div v-for="(step, i) in form.how_it_works" :key="i" class="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
@@ -564,29 +685,28 @@ const submit = () => {
                             </div>
                             <div class="grid gap-3 md:grid-cols-[80px_1fr_1fr]">
                                 <div>
-                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Step #') }}</label>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Step #') }}</label>
                                     <input v-model.number="step.step" type="number" min="1" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Icon') }}</label>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Icon') }}</label>
                                     <IconClassSelect v-model="step.icon" :placeholder="t('Choose an icon')" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Title') }}</label>
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Title') }}</label>
                                     <input v-model="step.title" type="text" :placeholder="t('Step title')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                                 </div>
                             </div>
                             <div class="mt-3">
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Description') }}</label>
-                                <textarea v-model="step.description" rows="2" @input="autoExpand" :placeholder="t('Short step description')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm resize-none overflow-hidden dark:border-surface-700 dark:bg-surface-900" />
+                                <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Description') }}</label>
+                                <textarea v-model="step.description" rows="2" @input="autoExpand" :placeholder="t('Short step description')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             </div>
                         </div>
                         <button type="button" class="text-sm font-semibold text-primary-600 hover:text-primary-700" @click="addStep">{{ t('+ Add Step') }}</button>
                     </div>
 
-                    <!-- Usage Examples -->
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
+                    <div v-show="activeContentSection === 'examples'">
+                        <div class="mb-2 flex items-center justify-between">
                             <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Usage Examples') }}</label>
                         </div>
                         <div v-for="(example, i) in form.usage_examples" :key="i" class="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
@@ -595,46 +715,44 @@ const submit = () => {
                                 <button type="button" class="text-xs font-semibold text-red-500 hover:text-red-600" @click="confirmRemoveExample(Number(i))">{{ t('Remove') }}</button>
                             </div>
                             <div class="mb-3">
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Title') }}</label>
+                                <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Title') }}</label>
                                 <input v-model="example.title" type="text" :placeholder="t('Example title')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             </div>
                             <div class="mb-3">
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Description') }}</label>
-                                <textarea v-model="example.description" rows="3" @input="autoExpand" :placeholder="t('Describe the input scenario for this example...')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm resize-none overflow-hidden dark:border-surface-700 dark:bg-surface-900" />
+                                <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Description') }}</label>
+                                <textarea v-model="example.description" rows="3" @input="autoExpand" :placeholder="t('Describe the input scenario for this example...')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Output') }}</label>
-                                <textarea v-model="example.output" rows="4" @input="autoExpand" :placeholder="t('Generated output preview')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm resize-none overflow-hidden dark:border-surface-700 dark:bg-surface-900" />
+                                <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Output') }}</label>
+                                <textarea v-model="example.output" rows="4" @input="autoExpand" :placeholder="t('Generated output preview')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             </div>
                         </div>
                         <button type="button" class="text-sm font-semibold text-primary-600 hover:text-primary-700" @click="addExample">{{ t('+ Add Example') }}</button>
                     </div>
 
-                    <!-- FAQs -->
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
+                    <div v-show="activeContentSection === 'faqs'">
+                        <div class="mb-2 flex items-center justify-between">
                             <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('FAQs') }}</label>
                         </div>
-                        <div v-for="(faq, i) in form.faq_items" :key="i" class="flex gap-3 mb-3">
+                        <div v-for="(faq, i) in form.faq_items" :key="i" class="mb-3 flex gap-3">
                             <div class="flex-1 space-y-2">
                                 <div>
-                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Question') }}</label>
-                                    <input v-model="faq.question" type="text" :placeholder="t('FAQ question')" class="w-full px-3 py-2 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg text-sm" />
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Question') }}</label>
+                                    <input v-model="faq.question" type="text" :placeholder="t('FAQ question')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800" />
                                 </div>
                                 <div>
-                                    <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Answer') }}</label>
-                                    <textarea v-model="faq.answer" rows="2" @input="autoExpand" :placeholder="t('FAQ answer')" class="w-full px-3 py-2 bg-gray-50 dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-lg text-sm resize-none overflow-hidden" />
+                                    <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Answer') }}</label>
+                                    <textarea v-model="faq.answer" rows="2" @input="autoExpand" :placeholder="t('FAQ answer')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800" />
                                 </div>
                             </div>
-                            <button @click="confirmRemoveFaq(Number(i))" class="p-1 text-gray-400 hover:text-red-500 self-start mt-2">
+                            <button @click="confirmRemoveFaq(Number(i))" class="mt-2 self-start p-1 text-gray-400 hover:text-red-500">
                                 <i class="ti ti-x text-base"></i>
                             </button>
                         </div>
                         <button @click="addFaq" class="text-sm font-semibold text-primary-600 hover:text-primary-700">{{ t('+ Add FAQ') }}</button>
                     </div>
 
-                    <!-- Content section toggles -->
-                    <div class="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">
+                    <div v-show="activeContentSection === 'visibility'" class="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">
                         <div class="flex items-center gap-3">
                             <button type="button" :class="form.show_about ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_about = !form.show_about">
                                 <span :class="form.show_about ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
@@ -689,7 +807,7 @@ const submit = () => {
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('OG Image') }}</label>
                         <div v-if="form.og_image || ogImagePreview" class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800 flex items-center gap-3">
-                            <img :src="ogImagePreview || `/storage/${form.og_image}`" alt="OG Image" class="h-16 w-auto max-w-[200px] rounded object-cover" />
+                            <img :src="ogImagePreview || `/storage/${form.og_image}`" :alt="t('OG Image')" class="h-16 w-auto max-w-[200px] rounded object-cover" />
                             <button type="button" @click="removeOgImage" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>
                         </div>
                         <input type="file" accept="image/png,image/jpeg,image/webp" @change="setOgImage" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:border-0 file:bg-primary-50 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-primary-600 dark:file:bg-primary-900/30 dark:file:text-primary-400" />
@@ -697,7 +815,8 @@ const submit = () => {
                         <span v-if="form.errors.og_image_file" class="mt-1 block text-xs text-danger-600">{{ form.errors.og_image_file }}</span>
                     </div>
                 </div>
-            </div>
+                </div>
+            </section>
         </div>
     </div>
 

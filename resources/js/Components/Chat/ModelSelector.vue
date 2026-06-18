@@ -13,37 +13,72 @@ onClickOutside(dropdownRef, () => { open.value = false })
 
 const allowModelSelect = (page.props.allow_model_select as boolean) ?? true
 const availableModels: string[] = (page.props.available_models as string[]) || []
-const defaultModel = (page.props.default_chat_model as string) || 'gpt-4o-mini'
+const defaultModel = (page.props.default_chat_model as string) || availableModels[0] || ''
 
 const friendlyMap: Record<string, string> = {
-    'gpt-4o': 'GPT-4o',
-    'gpt-4o-mini': 'GPT-4o Mini',
+    // OpenAI
+    'gpt-5.5': 'GPT-5.5 (Most Powerful)',
+    'gpt-5.5-mini': 'GPT-5.5 Mini (Fast & Affordable)',
+    'gpt-5.4': 'GPT-5.4 (Advanced)',
+    'gpt-4o': 'GPT-4o (Great All-Rounder)',
+    'gpt-4o-mini': 'GPT-4o Mini (Budget-Friendly)',
     'gpt-4-turbo': 'GPT-4 Turbo',
     'gpt-4': 'GPT-4',
     'gpt-3.5-turbo': 'GPT-3.5 Turbo',
-    'o3-mini': 'o3 Mini',
+    'o3': 'o3 (Deep Reasoning)',
+    'o3-mini': 'o3 Mini (Efficient Reasoning)',
+    'o4-mini': 'o4 Mini (Efficient Reasoning)',
+    'o1': 'o1 (Deep Reasoning)',
     'o1-mini': 'o1 Mini',
-    'o1': 'o1',
+    // Anthropic
+    'claude-opus-4-8': 'Claude Opus 4.8 (Most Capable)',
+    'claude-sonnet-4-6': 'Claude Sonnet 4.6 (Best Balance)',
+    'claude-sonnet-4-5': 'Claude Sonnet 4.5 (Best Balance)',
+    'claude-haiku-4-5': 'Claude Haiku 4.5 (Fast & Lightweight)',
     'claude-3-opus': 'Claude 3 Opus',
     'claude-3-sonnet': 'Claude 3.5 Sonnet',
     'claude-3-haiku': 'Claude 3 Haiku',
     'claude-3-5-sonnet': 'Claude 3.5 Sonnet',
     'claude-3-5-haiku': 'Claude 3.5 Haiku',
-    'claude-sonnet-4-5': 'Claude Sonnet 4.5',
-    'claude-haiku-4-5': 'Claude Haiku 4.5',
-    'gemini-2.5-flash': 'Gemini 2.5 Flash',
-    'gemini-2.5-pro': 'Gemini 2.5 Pro',
-    'gemini-2.0-flash': 'Gemini 2.0 Flash',
+    // Google Gemini
+    'gemini-3.5-flash': 'Gemini 3.5 Flash (Ultra Fast)',
+    'gemini-3.1-pro': 'Gemini 3.1 Pro (High Performance)',
+    'gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite (Lightweight)',
+    'gemini-2.5-pro': 'Gemini 2.5 Pro (Reliable)',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash (Quick)',
+    'gemini-2.0-flash': 'Gemini 2.0 Flash (Budget)',
     'gemini-1.5-pro': 'Gemini 1.5 Pro',
     'gemini-1.5-flash': 'Gemini 1.5 Flash',
-    'deepseek-v3': 'DeepSeek V3',
-    'deepseek-r1': 'DeepSeek R1',
-    'mistral-large': 'Mistral Large',
-    'perplexity-sonar': 'Perplexity Sonar',
-    'dall-e-3': 'DALL·E 3',
-    'flux-pro': 'Flux Pro',
-    'ideogram': 'Ideogram',
-    'stability-sd3': 'Stable Diffusion 3',
+    // xAI Grok
+    'grok-4.3': 'Grok 4.3 (Latest & Smartest)',
+    'grok-4.1-fast': 'Grok 4.1 Fast (Speedy)',
+    'grok-3': 'Grok 3 (Previous Gen)',
+    'grok-3-mini': 'Grok 3 Mini (Compact)',
+    // DeepSeek
+    'deepseek-v4-pro': 'DeepSeek V4 Pro (Best Quality)',
+    'deepseek-v4-flash': 'DeepSeek V4 Flash (Fast & Cheap)',
+    'deepseek-r1': 'DeepSeek R1 (Reasoning & Code)',
+    'deepseek-v3': 'DeepSeek V3 (Balanced)',
+    // Perplexity
+    'sonar': 'Sonar (Web Search)',
+    'sonar-pro': 'Sonar Pro (Advanced Search)',
+    'sonar-reasoning': 'Sonar Reasoning (Search + Think)',
+    'sonar-deep-research': 'Sonar Deep Research (In-Depth)',
+    'perplexity-sonar': 'Sonar (Web Search)',
+    // Groq
+    'llama-4-scout-17b': 'Llama 4 Scout (Ultra Fast)',
+    'llama-3.3-70b': 'Llama 3.3 70B (Powerful Open-Source)',
+    'mixtral-8x7b': 'Mixtral 8x7B (Fast MoE)',
+    // Mistral
+    'mistral-large-latest': 'Mistral Large (Top Tier)',
+    'mistral-medium-latest': 'Mistral Medium (Balanced)',
+    'mistral-small-latest': 'Mistral Small (Lightweight)',
+    'mistral-large': 'Mistral Large (Top Tier)',
+    // Image
+    'dall-e-3': 'DALL-E 3 (Image Gen)',
+    'flux-pro': 'Flux Pro (Image Gen)',
+    'ideogram': 'Ideogram (Image Gen)',
+    'stability-sd3': 'Stable Diffusion 3 (Image Gen)',
 }
 
 function friendlyName(model: string): string {

@@ -96,6 +96,6 @@ class OnboardingController extends Controller
         $dismissed[] = $validated['tooltip_key'];
         $user->update(['dismissed_tooltips' => array_unique($dismissed)]);
 
-        return response()->json(['ok' => true]);
+        return back();
     }
 }

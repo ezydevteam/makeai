@@ -18,7 +18,11 @@ class MenuItemRequest extends FormRequest
         return [
             'label' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:url,page,route'],
-            'url' => ['nullable', 'required_if:type,url', 'string', 'max:500'],
+            'url' => [
+                'nullable', 'required_if:type,url', 'string', 'max:500',
+                // CRITICAL SECURITY: Prevent XSS via javascript:, data:, or vbscript: protocols
+                'not_regex:/^(javascript|data|vbscript):/i',
+            ],
             'page_id' => ['nullable', 'required_if:type,page', 'exists:pages,id'],
             'route_name' => ['nullable', 'required_if:type,route', 'string', 'max:100'],
             'parent_id' => ['nullable', 'exists:menu_items,id'],

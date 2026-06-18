@@ -99,17 +99,18 @@ const buildChart = async () => {
         data: {
             labels: chartLabels.value,
             datasets: [
-                { label: t('Clicks'), data: props.chart.map((p) => p.clicks), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 },
-                { label: t('Registrations'), data: props.chart.map((p) => p.registrations), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 },
-                { label: t('Conversions'), data: props.chart.map((p) => p.conversions), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3 },
+                { label: t('Clicks'), data: props.chart.map((p) => p.clicks), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 0 },
+                { label: t('Registrations'), data: props.chart.map((p) => p.registrations), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 0 },
+                { label: t('Conversions'), data: props.chart.map((p) => p.conversions), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3, pointRadius: 0, pointHoverRadius: 0 },
             ],
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            elements: { point: { radius: 0, hoverRadius: 0 } },
             plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16, font: { size: 11 } } } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }, x: { ticks: { font: { size: 10 }, maxRotation: 0 } } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }, x: { offset: false, ticks: { font: { size: 10 }, maxRotation: 0 } } },
         },
     })
 }

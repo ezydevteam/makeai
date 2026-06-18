@@ -187,34 +187,6 @@ return [
             'url' => env('PERPLEXITY_URL', 'https://api.perplexity.ai'),
             'models' => ['sonar', 'sonar-pro', 'sonar-reasoning', 'sonar-deep-research'],
         ],
-
-        'together' => [
-            'name' => 'Together AI',
-            'driver' => 'together',
-            'key' => env('TOGETHER_API_KEY'),
-            'url' => env('TOGETHER_URL', 'https://api.together.xyz/v1'),
-            'models' => [
-                'meta-llama/Llama-4-Maverick-17B-128E-Instruct',
-                'meta-llama/Llama-4-Scout-17B-16E-Instruct',
-                'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo',
-                'deepseek-ai/DeepSeek-V4-Pro',
-                'deepseek-ai/DeepSeek-V4-Flash',
-                'mistralai/Mixtral-8x7B-Instruct-v0.1',
-            ],
-        ],
-
-        'replicate' => [
-            'name' => 'Replicate',
-            'driver' => 'replicate',
-            'key' => env('REPLICATE_API_TOKEN'),
-            'url' => env('REPLICATE_URL', 'https://api.replicate.com/v1'),
-            'models' => [
-                'meta/meta-llama-3.3-70b-instruct',
-                'mistralai/mixtral-8x7b-instruct-v0.1',
-                'stability-ai/stable-diffusion-3.5-large',
-                'black-forest-labs/flux-1.1-pro',
-            ],
-        ],
     ],
 
     /*
@@ -261,8 +233,8 @@ return [
     */
 
     'rag' => [
-        'chunk_size' => (int) env('AI_CHUNK_SIZE', 1000),
-        'chunk_overlap' => (int) env('AI_CHUNK_OVERLAP', 200),
+        'chunk_size' => (int) env('AI_CHUNK_SIZE', 800),
+        'chunk_overlap' => (int) env('AI_CHUNK_OVERLAP', 100),
         'max_context_chunks' => (int) env('AI_MAX_CONTEXT_CHUNKS', 10),
         'vector_store_driver' => env('AI_VECTOR_STORE_DRIVER', 'database'),
     ],

@@ -75,6 +75,7 @@ class AdminSeeder extends Seeder
             ['slug' => 'settings.mail', 'name' => 'Mail Settings', 'group' => 'settings'],
             ['slug' => 'settings.security', 'name' => 'Security Settings', 'group' => 'settings'],
             ['slug' => 'settings.license', 'name' => 'License Settings', 'group' => 'settings'],
+            ['slug' => 'settings.gdpr', 'name' => 'GDPR Settings', 'group' => 'settings'],
 
             // AI Management
             ['slug' => 'ai.tools', 'name' => 'Manage AI Tools & Access', 'group' => 'ai'],

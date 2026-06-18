@@ -6,9 +6,12 @@ use App\Http\Controllers\AI\DocumentController;
 use App\Http\Controllers\AI\GenerateController;
 use App\Http\Controllers\AI\ToolCatalogController;
 use App\Http\Controllers\AI\ToolReviewController;
-use App\Http\Controllers\API\ChatController;
-use App\Http\Controllers\API\ChatProductController;
-use App\Http\Controllers\API\ChatProjectController;
+use App\Http\Controllers\Api\ChatAttachmentController;
+use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ChatFeedbackController;
+use App\Http\Controllers\Api\ChatProductController;
+use App\Http\Controllers\Api\ChatProjectController;
+use App\Http\Controllers\Api\ConversationTagController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -71,15 +74,34 @@ Route::prefix('v1')->group(function () {
     Route::get('/chat/products', [ChatProductController::class, 'index']);
 
     Route::middleware(['web', 'auth'])->prefix('chat')->group(function () {
+        Route::post('/attachments', [ChatAttachmentController::class, 'store']);
+        Route::get('/attachments/{id}/preview', [ChatAttachmentController::class, 'preview']);
+        Route::post('/feedback', [ChatFeedbackController::class, 'store']);
+        Route::get('/{ulid}/feedback', [ChatFeedbackController::class, 'index']);
+        Route::put('/settings', [ChatController::class, 'updateSettings']);
         Route::get('/', [ChatController::class, 'index']);
         Route::post('/', [ChatController::class, 'store']);
         Route::get('/projects', [ChatProjectController::class, 'index']);
         Route::post('/projects', [ChatProjectController::class, 'store']);
         Route::put('/projects/{project}', [ChatProjectController::class, 'update']);
         Route::delete('/projects/{project}', [ChatProjectController::class, 'destroy']);
+        Route::get('/tags', [ConversationTagController::class, 'index']);
+        Route::post('/tags', [ConversationTagController::class, 'store']);
+        Route::put('/tags/{id}', [ConversationTagController::class, 'update']);
+        Route::delete('/tags/{id}', [ConversationTagController::class, 'destroy']);
+        Route::put('/{ulid}/tags', [ConversationTagController::class, 'tagConversation']);
         Route::get('/{ulid}', [ChatController::class, 'show']);
+        Route::get('/{ulid}/export', [ChatController::class, 'export']);
         Route::post('/{ulid}/message', [ChatController::class, 'sendMessage']);
+        Route::post('/{ulid}/branch', [ChatController::class, 'branch']);
+        Route::put('/{ulid}/message/{messageId}', [ChatController::class, 'editMessage']);
+        Route::put('/{ulid}/pin', [ChatController::class, 'togglePin']);
+        Route::post('/{ulid}/share', [ChatController::class, 'share']);
+        Route::delete('/{ulid}/share', [ChatController::class, 'unshare']);
         Route::put('/{ulid}', [ChatController::class, 'update']);
         Route::delete('/{ulid}', [ChatController::class, 'destroy']);
     });
 });
+
+// Public share route (no auth required)
+Route::get('/share/{token}', [ChatController::class, 'sharedView']);

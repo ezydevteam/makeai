@@ -7,7 +7,8 @@ import { useTranslate } from '@/Composables/useTranslate'
 import { useTheme } from '@/Composables/useTheme'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import type { useChat, ChatProject, Conversation, ChatProduct } from '@/Composables/useChat'
+import TagManager from '@/Components/Chat/TagManager.vue'
+import type { useChat, ChatProject, Conversation, ChatProduct, ConversationTag } from '@/Composables/useChat'
 
 const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -52,6 +53,10 @@ const renamingConversationUlid = ref<string | null>(null)
 const showProducts = ref(false)
 const productRef = ref<HTMLElement | null>(null)
 
+const showTagManager = ref(false)
+const showTagFilter = ref(false)
+const tagFilterRef = ref<HTMLElement | null>(null)
+
 const renamingProjectId = ref<number | null>(null)
 const renameValue = ref('')
 
@@ -82,6 +87,7 @@ onClickOutside(learnMoreRef, () => { learnMoreOpen.value = false })
 onClickOutside(settingsRef, () => { if (showSettings.value) showSettings.value = false })
 onClickOutside(moveMenuRef, () => { moveMenuOpen.value = null })
 onClickOutside(productRef, () => { showProducts.value = false })
+onClickOutside(tagFilterRef, () => { showTagFilter.value = false })
 
 const syncProfileForm = () => {
     profileForm.name = user.value?.name || ''
@@ -91,8 +97,24 @@ const syncProfileForm = () => {
 
 const openSettings = () => {
     syncProfileForm()
+    customInstructions.value = (page.props.auth?.user as any)?.chat_custom_instructions || ''
+    customInstructionsSaved.value = false
     showSettings.value = true
     menuOpen.value = false
+}
+
+const saveCustomInstructions = async () => {
+    savingCustomInstructions.value = true
+    customInstructionsSaved.value = false
+    try {
+        await chat.updateChatSettings(customInstructions.value || null)
+        customInstructionsSaved.value = true
+        setTimeout(() => { customInstructionsSaved.value = false }, 3000)
+    } catch (error) {
+        console.error('Failed to save custom instructions:', error)
+    } finally {
+        savingCustomInstructions.value = false
+    }
 }
 
 const topProducts = computed(() => chat.products.value.slice(0, 2))
@@ -123,6 +145,14 @@ const filteredConversations = computed(() => {
     })
 })
 
+const pinnedConversations = computed(() => {
+    return filteredConversations.value.filter(conv => conv.is_pinned)
+})
+
+const unpinnedConversations = computed(() => {
+    return filteredConversations.value.filter(conv => !conv.is_pinned)
+})
+
 const grouped = computed(() => {
     const groups: Record<string, Conversation[]> = {
         today: [],
@@ -131,7 +161,7 @@ const grouped = computed(() => {
         older: [],
     }
 
-    for (const conv of filteredConversations.value) {
+    for (const conv of unpinnedConversations.value) {
         const ts = new Date(conv.last_message_at || '')
         const now = new Date()
         const days = Math.floor((now.getTime() - ts.getTime()) / 86400000)
@@ -180,6 +210,39 @@ const doRenameConversation = async () => {
     const title = renameValue.value.trim()
     await chat.renameConversation(renamingConversationUlid.value, title || null)
     renamingConversationUlid.value = null
+}
+
+const shareConversation = async (conv: Conversation) => {
+    try {
+        const shareUrl = await chat.shareConversation(conv.ulid)
+        await navigator.clipboard.writeText(shareUrl)
+        // Show a brief success indication
+        moveMenuOpen.value = null
+    } catch (e) {
+        console.error('Failed to share conversation:', e)
+    }
+}
+
+const copyShareLink = async (conv: Conversation) => {
+    if (!conv.share_token) return
+    const shareUrl = `${window.location.origin}/share/${conv.share_token}`
+    try {
+        await navigator.clipboard.writeText(shareUrl)
+        moveMenuOpen.value = null
+    } catch (e) {
+        console.error('Failed to copy share link:', e)
+    }
+}
+
+const toggleConversationTag = async (conv: Conversation, tag: ConversationTag) => {
+    const currentTags = conv.tags || []
+    const hasTag = currentTags.some(t => t.id === tag.id)
+    const newTagIds = hasTag
+        ? currentTags.filter(t => t.id !== tag.id).map(t => t.id)
+        : [...currentTags.map(t => t.id), tag.id]
+    
+    await chat.tagConversation(conv.ulid, newTagIds)
+    moveMenuOpen.value = null
 }
 
 const confirmDelete = async () => {
@@ -403,6 +466,60 @@ const otherProjects = computed(() => {
             </div>
         </div>
 
+        <!-- Tag filter -->
+        <div v-if="chat.tags.value.length > 0 && !isCompactSidebar" class="px-3 pt-1 pb-1">
+            <div class="relative" ref="tagFilterRef">
+                <button
+                    class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    :class="{ 'bg-black/5 dark:bg-white/5': chat.selectedTag.value }"
+                    @click="showTagFilter = !showTagFilter"
+                >
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    <span class="flex-1 text-left truncate">
+                        {{ chat.selectedTag.value ? chat.selectedTag.value.name : t('Filter by tag') }}
+                    </span>
+                    <svg v-if="chat.selectedTag.value" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="shrink-0" @click.stop="chat.filterByTag(null)">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <svg v-else width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="shrink-0">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div v-if="showTagFilter" class="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1 z-50 max-h-60 overflow-y-auto">
+                    <button
+                        class="flex items-center gap-2 w-full px-3 py-2 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        @click="chat.filterByTag(null); showTagFilter = false"
+                    >
+                        <span>{{ t('All conversations') }}</span>
+                    </button>
+                    <button
+                        v-for="tag in chat.tags.value"
+                        :key="tag.id"
+                        class="flex items-center gap-2 w-full px-3 py-2 text-sm text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        :class="{ 'bg-black/5 dark:bg-white/5': chat.selectedTag.value?.id === tag.id }"
+                        @click="chat.filterByTag(tag); showTagFilter = false"
+                    >
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: tag.color }"></span>
+                        <span class="flex-1 truncate">{{ tag.name }}</span>
+                        <span class="text-xs text-[#b0aca8] dark:text-white/30">{{ tag.conversations_count || 0 }}</span>
+                    </button>
+                    <div class="border-t border-black/5 dark:border-white/10 my-1"></div>
+                    <button
+                        class="flex items-center gap-2 w-full px-3 py-2 text-sm text-primary-500 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                        @click="showTagManager = true; showTagFilter = false"
+                    >
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span>{{ t('Manage tags') }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- New Chat button -->
         <div :class="isCompactSidebar ? 'p-1' : 'px-3 py-2'">
             <template v-if="isCompactSidebar">
@@ -565,6 +682,17 @@ const otherProjects = computed(() => {
                             >
                                 {{ conv.title || t('New conversation') }}
                             </span>
+                            <!-- Tag badges -->
+                            <div v-if="conv.tags && conv.tags.length" class="flex gap-1 shrink-0">
+                                <span
+                                    v-for="tag in conv.tags.slice(0, 2)"
+                                    :key="tag.id"
+                                    class="w-2 h-2 rounded-full"
+                                    :style="{ backgroundColor: tag.color }"
+                                    :title="tag.name"
+                                ></span>
+                                <span v-if="conv.tags.length > 2" class="text-[10px] text-[#b0aca8] dark:text-white/30">+{{ conv.tags.length - 2 }}</span>
+                            </div>
                         </template>
 
                         <!-- Move to project / Delete actions -->
@@ -587,6 +715,87 @@ const otherProjects = computed(() => {
                                     <span>{{ t('Remove from project') }}</span>
                                 </button>
                                 <div class="border-t border-black/5 dark:border-white/10 my-0.5"></div>
+                                <div class="relative group/export">
+                                    <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                        <span>{{ t('Export') }}</span>
+                                        <svg class="ml-auto" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+                                    <div class="absolute left-full top-0 ml-1 min-w-[120px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1 z-50 opacity-0 invisible group-hover/export:opacity-100 group-hover/export:visible transition-all">
+                                        <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="chat.exportConversation(conv.ulid, 'md'); moveMenuOpen = null">
+                                            <span>Markdown</span>
+                                        </button>
+                                        <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="chat.exportConversation(conv.ulid, 'json'); moveMenuOpen = null">
+                                            <span>JSON</span>
+                                        </button>
+                                        <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="chat.exportConversation(conv.ulid, 'pdf'); moveMenuOpen = null">
+                                            <span>PDF</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="chat.togglePin(conv.ulid); moveMenuOpen = null">
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" /></svg>
+                                    <span>{{ t('Pin') }}</span>
+                                </button>
+                                <button 
+                                    v-if="conv.share_token"
+                                    class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" 
+                                    @click.stop="copyShareLink(conv); moveMenuOpen = null"
+                                >
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                    <span>{{ t('Copy Share Link') }}</span>
+                                </button>
+                                <button 
+                                    v-if="conv.share_token"
+                                    class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/5 transition-colors" 
+                                    @click.stop="chat.unshareConversation(conv.ulid); moveMenuOpen = null"
+                                >
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                                    <span>{{ t('Unshare') }}</span>
+                                </button>
+                                <button 
+                                    v-else
+                                    class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" 
+                                    @click.stop="shareConversation(conv); moveMenuOpen = null"
+                                >
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                    <span>{{ t('Share') }}</span>
+                                </button>
+                                <div class="relative group/tags">
+                                    <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+                                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                                        <span>{{ t('Tags') }}</span>
+                                        <svg class="ml-auto" width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                    </button>
+                                    <div class="absolute left-full top-0 ml-1 min-w-[160px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1 z-50 opacity-0 invisible group-hover/tags:opacity-100 group-hover/tags:visible transition-all max-h-60 overflow-y-auto">
+                                        <div v-if="chat.tags.value.length === 0" class="px-3.5 py-2 text-xs text-[#b0aca8] dark:text-white/30">
+                                            {{ t('No tags yet') }}
+                                        </div>
+                                        <button
+                                            v-for="tag in chat.tags.value"
+                                            :key="tag.id"
+                                            class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                            @click.stop="toggleConversationTag(conv, tag); moveMenuOpen = null"
+                                        >
+                                            <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: tag.color }"></span>
+                                            <span class="flex-1 truncate">{{ tag.name }}</span>
+                                            <svg v-if="conv.tags?.some(t => t.id === tag.id)" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </button>
+                                        <div class="border-t border-black/5 dark:border-white/10 my-1"></div>
+                                        <button
+                                            class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-primary-500 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                                            @click.stop="showTagManager = true; moveMenuOpen = null"
+                                        >
+                                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            <span>{{ t('Manage tags') }}</span>
+                                        </button>
+                                    </div>
+                                </div>
                                 <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="startConversationRename(conv)">
                                     <i class="ti ti-pencil text-[12px]"></i>
                                     <span>{{ t('Rename') }}</span>
@@ -669,7 +878,7 @@ const otherProjects = computed(() => {
                         <Link href="/privacy-policy" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Privacy Policy') }}</Link>
                         <Link href="/terms" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Terms of Use') }}</Link>
                         <Link href="/refund-policy" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Usage Policy') }}</Link>
-                        <Link href="/ai-tools" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('About Us') }}</Link>
+                        <Link href="/ai-tools" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('AI Tools') }}</Link>
                         <div class="px-3.5 py-1.5 text-[11px] text-[#b0aca8] dark:text-white/20">
                             <div class="font-medium text-[#6e6a65] dark:text-white/40 mb-1">{{ t('Keyboard Shortcuts') }}</div>
                             <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Ctrl+Shift+O</kbd><span>{{ t('New Chat') }}</span></div>
@@ -708,6 +917,9 @@ const otherProjects = computed(() => {
         @cancel="deletingConversation = null; deletingProject = null"
         @confirm="confirmDelete"
     />
+
+    <!-- Tag Manager Modal -->
+    <TagManager v-if="showTagManager" @close="showTagManager = false" />
 
     <!-- Settings Modal -->
     <Teleport v-if="showSettings" to="body">
@@ -761,6 +973,30 @@ const otherProjects = computed(() => {
                                 {{ profileForm.processing ? t('Saving...') : t('Save changes') }}
                             </button>
                         </div>
+                    </div>
+
+                    <div class="border-t border-black/5 dark:border-white/5 pt-5">
+                        <label class="block text-xs font-medium text-[#6e6a65] dark:text-white/40 mb-1.5">{{ t('Custom Instructions') }}</label>
+                        <p class="text-xs text-[#b0aca8] dark:text-white/30 mb-2">{{ t('Tell the AI how you want it to respond. These instructions apply to all your conversations.') }}</p>
+                        <textarea
+                            v-model="customInstructions"
+                            rows="4"
+                            maxlength="2000"
+                            class="w-full rounded-lg border border-black/5 dark:border-white/10 bg-black/[0.02] dark:bg-white/5 px-3 py-2 text-sm text-[#1a1a1a] dark:text-white/80 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 resize-none"
+                            :placeholder="t('e.g., Always respond in a professional tone. Use bullet points for lists.')"
+                        ></textarea>
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="text-xs text-[#b0aca8] dark:text-white/30">{{ customInstructions.length }}/2000</span>
+                            <button
+                                type="button"
+                                class="inline-flex items-center justify-center rounded-lg bg-primary-100 px-4 py-2 text-sm font-medium text-primary-500 transition-colors hover:bg-primary-200 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/15 disabled:opacity-50"
+                                :disabled="savingCustomInstructions"
+                                @click="saveCustomInstructions"
+                            >
+                                {{ savingCustomInstructions ? t('Saving...') : t('Save Instructions') }}
+                            </button>
+                        </div>
+                        <p v-if="customInstructionsSaved" class="mt-2 text-xs text-success-500">{{ t('Saved successfully!') }}</p>
                     </div>
 
                     <div>

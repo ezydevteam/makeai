@@ -24,7 +24,7 @@ const menuGroups = ref<Record<string, boolean>>({})
 const isSuperAdmin = computed(() => (page.props.admin as any)?.isSuperAdmin ?? false)
 const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
 const pendingCommentsCount = computed(() => Number((page.props.admin as any)?.pendingCommentsCount ?? 0))
-const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+const isExtendedLicense = computed(() => Boolean(page.props.isExtendedLicense))
 const addonMenuItems = computed(() => (page.props.addonMenuItems as any[]) ?? [])
 
 // Group addon menu items by slug, flatten single-item addons
@@ -105,7 +105,7 @@ function autoExpandOnRoute(group: string, patterns: string[]) {
 
 autoExpandOnRoute('users', ['admin.users.*', 'admin.admins.*', 'admin.roles.*'])
 autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
-autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.coupons.*'])
+autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.subscriptions.*', 'admin.coupons.*', 'admin.credit-settings.*'])
 autoExpandOnRoute('blog', ['admin.blog.posts.*', 'admin.blog.categories.*', 'admin.blog.tags.*', 'admin.blog.settings.*', 'admin.comments.*'])
 autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*', 'admin.header.*', 'admin.footer.*', 'admin.homepage.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.appearance.*', 'admin.license.*'])
@@ -182,29 +182,31 @@ for (const item of addonMenuItems.value) {
           </button>
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('ai') }">
-          <Link :href="route('admin.ai.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.categories.*') }">{{ t('Categories') }}</Link>
           <Link :href="route('admin.ai.tools.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.tools.*') }">{{ t('Tools') }}</Link>
           <Link :href="route('admin.ai.templates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.templates.*') }">{{ t('Templates') }}</Link>
-          <Link :href="route('admin.ai.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.index') || isActive('admin.ai.provider') }">{{ t('Providers & Keys') }}</Link>
-          <Link :href="route('admin.ai.access.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.access.*') }">{{ t('Access Settings') }}</Link>
+          <Link :href="route('admin.ai.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.categories.*') }">{{ t('Categories') }}</Link>
+          <Link :href="route('admin.ai.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.index') || isActive('admin.ai.provider') }">{{ t('Providers') }}</Link>
+          <Link :href="route('admin.ai.access.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.access.*') }">{{ t('Access Control') }}</Link>
           <Link :href="route('admin.ai.rag.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.rag.*') }">{{ t('RAG Settings') }}</Link>
           <Link :href="route('admin.ai.logs.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.logs.*') }">{{ t('Usage & Logs') }}</Link>
         </div>
       </div>
 
       <!-- Premium (Pro only) -->
-      <div v-if="isProAvailable && canAny(['plans.view', 'payments.view', 'payments.gateways'])">
+      <div v-if="isExtendedLicense && canAny(['plans.view', 'payments.view', 'payments.gateways'])">
         <Tooltip :content="t('Premium')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('premium')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('premium') || isActive('admin.plans.*') || isActive('admin.payment-gateways.*') || isActive('admin.coupons.*'), 'open': isGroupOpen('premium') }">
+          <button @click="toggleGroup('premium')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('premium') || isActive('admin.plans.*') || isActive('admin.payment-gateways.*') || isActive('admin.subscriptions.*') || isActive('admin.coupons.*'), 'open': isGroupOpen('premium') }">
             <svg class="sidebar-icon text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
             <span v-show="!collapsed" class="flex-1 text-left">{{ t('Premium') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
           </button>
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('premium') }">
-          <Link v-if="can('plans.view')" :href="route('admin.plans.index')" class="sidebar-subitem" :class="{ active: isActive('admin.plans.*') }">{{ t('Plans & Pricing') }}</Link>
-          <Link v-if="can('payments.view')" :href="route('admin.payment-gateways.index')" class="sidebar-subitem" :class="{ active: isActive('admin.payment-gateways.*') }">{{ t('Payments') }}</Link>
+          <Link v-if="can('payments.view')" :href="route('admin.subscriptions.index')" class="sidebar-subitem" :class="{ active: isActive('admin.subscriptions.*') }">{{ t('Subscriptions') }}</Link>
+          <Link v-if="can('plans.view')" :href="route('admin.plans.index')" class="sidebar-subitem" :class="{ active: isActive('admin.plans.*') }">{{ t('Plans') }}</Link>
+          <Link v-if="can('settings.manage')" :href="route('admin.credit-settings.index')" class="sidebar-subitem" :class="{ active: isActive('admin.credit-settings.*') }">{{ t('Credits') }}</Link>
           <Link v-if="can('payments.gateways')" :href="route('admin.coupons.index')" class="sidebar-subitem" :class="{ active: isActive('admin.coupons.*') }">{{ t('Coupons') }}</Link>
+          <Link v-if="can('payments.view')" :href="route('admin.payment-gateways.index')" class="sidebar-subitem" :class="{ active: isActive('admin.payment-gateways.*') }">{{ t('Gateways') }}</Link>
         </div>
       </div>
 
@@ -326,6 +328,7 @@ for (const item of addonMenuItems.value) {
           <Link :href="route('admin.system.cron-jobs')" class="sidebar-subitem" :class="{ active: isSystemCronActive() }">{{ t('Cron Jobs') }}</Link>
           <Link :href="route('admin.system.maintenance')" class="sidebar-subitem" :class="{ active: isSystemMaintenanceActive() }">{{ t('Maintenance') }}</Link>
           <Link :href="route('admin.system.rate-limits.index')" class="sidebar-subitem" :class="{ active: isRateLimitsActive() }">{{ t('Rate Limits') }}</Link>
+          <Link v-if="isSuperAdmin" :href="route('admin.audit-logs.index')" class="sidebar-subitem" :class="{ active: isActive('admin.audit-logs.*') }">{{ t('Audit Logs') }}</Link>
           <Link :href="route('admin.appearance.index')" class="sidebar-subitem" :class="{ active: isCustomStyleActive() }">{{ t('Custom Style') }}</Link>
           <a v-if="broadcasting.redis_available" href="/horizon" class="sidebar-subitem" target="_blank" rel="noopener">
             {{ t('Horizon') }}
@@ -618,3 +621,4 @@ html.dark .sidebar-subitem:hover {
 }
 
 </style>
+e>

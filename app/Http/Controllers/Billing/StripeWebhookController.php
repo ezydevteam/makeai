@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Services\Payment\PaymentActivationService;
 use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 
 class StripeWebhookController extends Controller
 {
-    public function handleWebhook(Request $request, SubscriptionLifecycleService $lifecycle): JsonResponse
+    public function handleWebhook(Request $request, SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation): JsonResponse
     {
         $payload = $request->getContent();
         $signature = (string) $request->header('Stripe-Signature');
@@ -26,7 +27,7 @@ class StripeWebhookController extends Controller
         $object = $event['data']['object'] ?? [];
 
         match ($type) {
-            'checkout.session.completed' => $this->handleCheckoutCompleted($object, $lifecycle),
+            'checkout.session.completed' => $this->handleCheckoutCompleted($object, $lifecycle, $activation),
             'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $lifecycle),
             'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object, $lifecycle),
             default => null,
@@ -35,7 +36,7 @@ class StripeWebhookController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function handleCheckoutCompleted(array $session, SubscriptionLifecycleService $lifecycle): void
+    private function handleCheckoutCompleted(array $session, SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation): void
     {
         $paymentId = $session['metadata']['payment_id'] ?? null;
         $subscriptionId = $session['subscription'] ?? null;
@@ -57,7 +58,12 @@ class StripeWebhookController extends Controller
             return;
         }
 
-        $lifecycle->activateFromPayment($payment, $session['id'], $subscriptionId);
+        // Route to appropriate activation method based on payment type
+        if ($payment->type === 'credit_topup') {
+            $activation->activateCreditTopup($payment, $session['id']);
+        } else {
+            $lifecycle->activateFromPayment($payment, $session['id'], $subscriptionId);
+        }
     }
 
     private function handleSubscriptionUpdated(array $subscription, SubscriptionLifecycleService $lifecycle): void

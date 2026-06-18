@@ -139,11 +139,13 @@ class AffiliateController extends Controller
                     ->oldest('approved_at')
                     ->get()
                     ->each(function (AffiliateCommission $commission) use (&$remaining) {
-                        if ($remaining <= 0) {
+                        $commissionAmount = (float) $commission->amount;
+
+                        if ($remaining < $commissionAmount) {
                             return false;
                         }
 
-                        $remaining -= (float) $commission->amount;
+                        $remaining -= $commissionAmount;
                         $commission->update([
                             'status' => 'paid',
                             'paid_at' => now(),

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onUnmounted, ref, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
@@ -24,6 +24,24 @@ import kotlin from 'highlight.js/lib/languages/kotlin'
 import dart from 'highlight.js/lib/languages/dart'
 import shell from 'highlight.js/lib/languages/shell'
 import Tooltip from '@/Components/UI/Tooltip.vue'
+import { useTranslate } from '@/Composables/useTranslate'
+import { useSpeechSynthesis } from '@/Composables/useSpeechSynthesis'
+
+const { t } = useTranslate()
+const { isSpeaking, isPaused, isSupported: speechSupported, currentTextId, speak, pause, resume, stop } = useSpeechSynthesis()
+
+function toggleSpeak() {
+    const messageId = String(props.message.id)
+    if (currentTextId.value === messageId) {
+        if (isPaused.value) {
+            resume()
+        } else {
+            pause()
+        }
+    } else {
+        speak(props.message.content, messageId)
+    }
+}
 
 hljs.registerLanguage('javascript', javascript)
 hljs.registerLanguage('js', javascript)
@@ -64,10 +82,11 @@ const emit = defineEmits<{
 }>()
 
 const props = defineProps<{
-    message: { id: number | string; role: string; content: string; model?: string; input_tokens: number; output_tokens: number; credits_charged: number; created_at?: string }
+    message: { id: number | string; role: string; content: string; model?: string; input_tokens: number; output_tokens: number; credits_charged: number; created_at?: string; attachments?: Array<{ id: string; name: string; mime_type: string; size: number; url?: string }> | null; kb_sources?: Array<{ ulid: string; title: string; slug: string }> }
     isStreaming: boolean
     userCredits: number
     creditThreshold: number
+    conversationUlid?: string
 }>()
 
 const messageDate = computed(() => {
@@ -105,6 +124,45 @@ onUnmounted(() => {
 const copied = ref(false)
 const liked = ref(false)
 const disliked = ref(false)
+const isEditing = ref(false)
+const editContent = ref('')
+
+function startEditing() {
+    editContent.value = props.message.content
+    isEditing.value = true
+}
+
+function cancelEditing() {
+    isEditing.value = false
+    editContent.value = ''
+}
+
+async function saveEdit() {
+    if (!props.conversationUlid || !editContent.value.trim()) return
+    
+    const chat = inject<ReturnType<typeof import('@/Composables/useChat').useChat>>('chat')
+    if (chat) {
+        await chat.editMessage(props.conversationUlid, props.message.id, editContent.value.trim())
+        isEditing.value = false
+        editContent.value = ''
+    }
+}
+
+const imagePreviewOpen = ref(false)
+const imagePreviewUrl = ref('')
+const imagePreviewName = ref('')
+
+function openImagePreview(att: { id: string; name: string; mime_type: string }) {
+    imagePreviewUrl.value = `/api/v1/chat/attachments/${att.id}/preview`
+    imagePreviewName.value = att.name
+    imagePreviewOpen.value = true
+}
+
+function closeImagePreview() {
+    imagePreviewOpen.value = false
+    imagePreviewUrl.value = ''
+    imagePreviewName.value = ''
+}
 
 function copyMessage() {
     navigator.clipboard.writeText(props.message.content).then(() => {
@@ -126,17 +184,68 @@ function shareMessage() {
 }
 
 function toggleLike() {
-    liked.value = !liked.value
+    const wasLiked = liked.value
+    liked.value = !wasLiked
     if (liked.value) disliked.value = false
+    
+    // Submit to API
+    if (props.conversationUlid && props.message.role === 'assistant') {
+        submitFeedback(wasLiked ? -1 : 1)
+    }
 }
 
 function toggleDislike() {
-    disliked.value = !disliked.value
+    const wasDisliked = disliked.value
+    disliked.value = !wasDisliked
     if (disliked.value) liked.value = false
+    
+    // Submit to API
+    if (props.conversationUlid && props.message.role === 'assistant') {
+        submitFeedback(wasDisliked ? 1 : -1)
+    }
+}
+
+async function submitFeedback(rating: number) {
+    if (!props.conversationUlid) return
+    
+    try {
+        const csrf = () => {
+            const cookie = document.cookie.match('(^|;)\\s*XSRF-TOKEN\\s*=\\s*([^;]+)')
+            return cookie ? decodeURIComponent(cookie.pop() || '') : ''
+        }
+        
+        await fetch('/api/v1/chat/feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-XSRF-TOKEN': csrf(),
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                conversation_ulid: props.conversationUlid,
+                message_id: props.message.id,
+                rating: rating,
+            }),
+        })
+    } catch (error) {
+        console.error('Failed to submit feedback:', error)
+        // Revert on error
+        liked.value = false
+        disliked.value = false
+    }
 }
 
 function repeatMessage() {
     emit('repeat', props.message.id)
+}
+
+function branchFromHere() {
+    if (!props.conversationUlid) return
+    const chat = inject<ReturnType<typeof import('@/Composables/useChat').useChat>>('chat')
+    if (chat) {
+        chat.branchConversation(props.conversationUlid, props.message.id)
+    }
 }
 
 function handleCodeCopy(e: Event) {
@@ -184,6 +293,28 @@ const showCreditsRemaining = computed(() => {
     <template v-if="message.role === 'user'">
         <div class="group flex justify-end">
             <div class="max-w-[80%]">
+                <!-- Attachment badges -->
+                <div v-if="message.attachments?.length" class="flex flex-wrap gap-1.5 mb-1.5 justify-end">
+                    <template v-for="att in message.attachments" :key="att.id">
+                        <!-- Image thumbnail -->
+                        <div v-if="att.mime_type?.startsWith('image/')" class="relative group/img">
+                            <img
+                                :src="`/api/v1/chat/attachments/${att.id}/preview`"
+                                :alt="att.name"
+                                class="w-20 h-20 object-cover rounded-lg border border-black/5 dark:border-white/10 cursor-pointer hover:opacity-90 transition-opacity"
+                                @click="openImagePreview(att)"
+                            />
+                        </div>
+                        <!-- File badge -->
+                        <div
+                            v-else
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-white/60 dark:bg-white/5 border border-black/5 dark:border-white/10 px-2 py-1 text-[11px] text-[#6e6a65] dark:text-white/50"
+                        >
+                            <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-5.7l-1.415-1.414" /></svg>
+                            <span class="truncate max-w-[120px]">{{ att.name }}</span>
+                        </div>
+                    </template>
+                </div>
                 <div class="px-4 py-2.5 rounded-2xl bg-[#f0edeb] dark:bg-white/10 text-[#1a1a1a] dark:text-[#e8e6e3] rounded-br-sm">
                     <div class="text-[15px] leading-relaxed whitespace-pre-wrap break-words">{{ message.content }}</div>
                 </div>
@@ -210,6 +341,13 @@ const showCreditsRemaining = computed(() => {
                         <button class="action-btn" @click="repeatMessage">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.985 4.356v4.992" />
+                            </svg>
+                        </button>
+                    </Tooltip>
+                    <Tooltip :content="'Branch from here'" placement="top">
+                        <button class="action-btn" @click="branchFromHere">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                         </button>
                     </Tooltip>
@@ -261,6 +399,23 @@ const showCreditsRemaining = computed(() => {
                     </div>
                 </div>
 
+                <!-- KB Sources -->
+                <div v-if="message.kb_sources?.length" class="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span class="text-[11px] text-[#6e6a65] dark:text-white/40 flex items-center gap-1">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
+                        {{ t('Sources:') }}
+                    </span>
+                    <a
+                        v-for="source in message.kb_sources"
+                        :key="source.ulid"
+                        :href="`/kb/article/${source.slug}`"
+                        target="_blank"
+                        class="inline-flex items-center gap-1 rounded-md bg-primary-500/10 px-2 py-0.5 text-[11px] text-primary-600 dark:text-primary-400 hover:bg-primary-500/20 transition-colors"
+                    >
+                        {{ source.title }}
+                    </a>
+                </div>
+
                 <!-- Action buttons -->
                 <div v-if="!isStreaming && message.content" class="flex items-center gap-1 mt-3">
                     <span v-if="messageDate" class="text-xs text-[#b0aca8] dark:text-white/30 mr-1">{{ messageDate }}</span>
@@ -295,7 +450,7 @@ const showCreditsRemaining = computed(() => {
                     </Tooltip>
 
                     <!-- Dislike (thumbs down) -->
-                    <Tooltip :content="'Dislike'" placement="top">
+                    <Tooltip :content="t('Dislike')" placement="top">
                         <button class="action-btn" :class="{ 'active': disliked }" @click="toggleDislike">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
@@ -315,6 +470,34 @@ const showCreditsRemaining = computed(() => {
             </div>
         </div>
     </template>
+
+    <!-- Image Preview Modal -->
+    <Teleport to="body">
+        <div
+            v-if="imagePreviewOpen"
+            class="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            @click.self="closeImagePreview"
+        >
+            <div class="relative max-w-[90vw] max-h-[90vh]">
+                <button
+                    class="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                    @click="closeImagePreview"
+                >
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+                <img
+                    :src="imagePreviewUrl"
+                    :alt="imagePreviewName"
+                    class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                />
+                <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent rounded-b-lg">
+                    <p class="text-white text-sm truncate">{{ imagePreviewName }}</p>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <style>

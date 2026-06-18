@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AppSelect from '@/Components/AppSelect.vue'
+import Pagination from '@/Components/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
@@ -25,50 +27,120 @@ interface Program {
     social_posts: Array<{ text: string; platform?: string }> | null
 }
 
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
+interface PaginatedResponse<T> {
+    data: T[]
+    links: PaginationLink[]
+    from?: number
+    to?: number
+    total?: number
+}
+
+interface AffiliateUser {
+    id: number
+    ulid: string
+    name: string
+    email: string
+    referral_code: string
+    referral_earnings: string | number
+    affiliate_referrals_count?: number
+    referral_count?: number
+}
+
+interface CommissionParty {
+    ulid?: string
+    name?: string
+    email?: string
+}
+
+interface CommissionItem {
+    id: number
+    amount: string | number
+    status: string
+    referrer: CommissionParty | null
+    referred: CommissionParty | null
+}
+
+interface PayoutUser {
+    ulid?: string
+    name?: string
+    email?: string
+}
+
+interface PayoutItem {
+    id: number
+    amount: string | number
+    method: string
+    status: string
+    user: PayoutUser | null
+}
+
 const props = defineProps<{
     program: Program
     termsPageOptions: Array<{ title: string; slug: string }>
     stats: Record<string, number>
-    affiliates: { data: Array<any> }
-    commissions: { data: Array<any> }
-    payouts: { data: Array<any> }
-    topEarners: Array<any>
+    affiliates: PaginatedResponse<AffiliateUser>
+    commissions: PaginatedResponse<CommissionItem>
+    payouts: PaginatedResponse<PayoutItem>
 }>()
 
 const { t } = useTranslate()
+
 const payoutMethodOptions = ['paypal', 'bank_transfer', 'credits']
 const payoutNote = ref<Record<number, string>>({})
 const payoutStatus = ref<Record<number, string>>({})
 const showSettingsModal = ref(false)
+const searchQuery = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
 const activeTab = ref<'commissions' | 'payouts' | 'affiliates'>('commissions')
+const processing = ref<Record<number, boolean>>({})
+const rejectModal = ref({
+    open: false,
+    commissionId: null as number | null,
+    processing: false,
+})
 
 const mkBanners = ref<Array<{ url: string; label: string }>>(
-    (props.program.marketing_banners || []).map((b) => ({ url: b.url || '', label: b.label || '' })),
+    (props.program.marketing_banners || []).map((banner) => ({
+        url: banner.url || '',
+        label: banner.label || '',
+    })),
 )
 const mkEmails = ref<Array<{ subject: string; body: string }>>(
-    (props.program.promotional_emails || []).map((e) => ({ subject: e.subject || '', body: e.body || '' })),
+    (props.program.promotional_emails || []).map((email) => ({
+        subject: email.subject || '',
+        body: email.body || '',
+    })),
 )
 const mkPosts = ref<Array<{ text: string; platform: string }>>(
-    (props.program.social_posts || []).map((p) => ({ text: p.text || '', platform: p.platform || '' })),
+    (props.program.social_posts || []).map((post) => ({
+        text: post.text || '',
+        platform: post.platform || '',
+    })),
 )
 
 const addBanner = () => mkBanners.value.push({ url: '', label: '' })
-const removeBanner = (i: number) => mkBanners.value.splice(i, 1)
+const removeBanner = (index: number) => mkBanners.value.splice(index, 1)
 const addEmail = () => mkEmails.value.push({ subject: '', body: '' })
-const removeEmail = (i: number) => mkEmails.value.splice(i, 1)
+const removeEmail = (index: number) => mkEmails.value.splice(index, 1)
 const addPost = () => mkPosts.value.push({ text: '', platform: '' })
-const removePost = (i: number) => mkPosts.value.splice(i, 1)
+const removePost = (index: number) => mkPosts.value.splice(index, 1)
 
-const commissionTypeOptions = [
+const commissionTypeOptions = computed(() => [
     { value: 'percentage', label: t('Percentage') },
     { value: 'fixed', label: t('Fixed') },
-]
+])
 
-const commissionOnOptions = [
+const commissionOnOptions = computed(() => [
     { value: 'first_purchase', label: t('First purchase') },
     { value: 'all_purchases', label: t('All purchases') },
     { value: 'subscription', label: t('Subscription') },
-]
+])
 
 const form = useForm({
     is_active: props.program.is_active,
@@ -88,11 +160,125 @@ const form = useForm({
     marketing_banners: mkBanners.value,
     promotional_emails: mkEmails.value,
     social_posts: mkPosts.value,
-} as any)
+})
+
+const searchPlaceholder = computed(() => {
+    if (activeTab.value === 'commissions') {
+        return t('Search referrer, referred user, status...')
+    }
+
+    if (activeTab.value === 'payouts') {
+        return t('Search user, method, status...')
+    }
+
+    return t('Search affiliate, email, code...')
+})
+
+const summaryItems = computed(() => [
+    {
+        key: 'total_affiliates',
+        label: t('Total affiliates'),
+        value: props.stats.total_affiliates ?? 0,
+    },
+    {
+        key: 'total_paid',
+        label: t('Total paid'),
+        value: props.stats.total_paid ?? 0,
+    },
+    {
+        key: 'pending_payouts',
+        label: t('Pending payouts'),
+        value: props.stats.pending_payouts ?? 0,
+    },
+    {
+        key: 'pending_commissions',
+        label: t('Pending commissions'),
+        value: props.stats.pending_commissions ?? 0,
+    },
+])
+
+const filteredCommissions = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+
+    if (!query) {
+        return props.commissions.data
+    }
+
+    return props.commissions.data.filter((commission) => {
+        return [
+            commission.referrer?.name ?? '',
+            commission.referrer?.email ?? '',
+            commission.referred?.name ?? '',
+            commission.referred?.email ?? '',
+            commission.status,
+            String(commission.amount),
+        ].some((value) => value.toLowerCase().includes(query))
+    })
+})
+
+const filteredPayouts = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+
+    if (!query) {
+        return props.payouts.data
+    }
+
+    return props.payouts.data.filter((payout) => {
+        return [
+            payout.user?.name ?? '',
+            payout.user?.email ?? '',
+            payout.method,
+            payout.status,
+            String(payout.amount),
+        ].some((value) => value.toLowerCase().includes(query))
+    })
+})
+
+const filteredAffiliates = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+
+    if (!query) {
+        return props.affiliates.data
+    }
+
+    return props.affiliates.data.filter((affiliate) => {
+        return [
+            affiliate.name,
+            affiliate.email,
+            affiliate.referral_code,
+            affiliate.ulid,
+            String(affiliate.referral_earnings),
+        ].some((value) => value.toLowerCase().includes(query))
+    })
+})
+
+const visibleRowsCount = computed(() => {
+    if (activeTab.value === 'commissions') {
+        return filteredCommissions.value.length
+    }
+
+    if (activeTab.value === 'payouts') {
+        return filteredPayouts.value.length
+    }
+
+    return filteredAffiliates.value.length
+})
+
+const activePagination = computed(() => {
+    if (activeTab.value === 'commissions') {
+        return props.commissions
+    }
+
+    if (activeTab.value === 'payouts') {
+        return props.payouts
+    }
+
+    return props.affiliates
+})
 
 const toggleMethod = (method: string) => {
     form.payout_methods = form.payout_methods.includes(method)
-        ? form.payout_methods.filter((item: string) => item !== method)
+        ? form.payout_methods.filter((item) => item !== method)
         : [...form.payout_methods, method]
 }
 
@@ -100,6 +286,7 @@ const save = () => {
     form.marketing_banners = mkBanners.value
     form.promotional_emails = mkEmails.value
     form.social_posts = mkPosts.value
+
     form.post(route('admin.affiliate.settings'), {
         preserveScroll: true,
         onSuccess: () => {
@@ -108,321 +295,734 @@ const save = () => {
     })
 }
 
-const approve = (id: number) => router.post(route('admin.affiliate.commissions.approve', id), {}, { preserveScroll: true })
-const reject = (id: number) => router.post(route('admin.affiliate.commissions.reject', id), {}, { preserveScroll: true })
-const processPayout = (id: number) => router.post(route('admin.affiliate.payouts.process', id), {
-    status: payoutStatus.value[id] || 'processing',
-    admin_note: payoutNote.value[id] || '',
-}, { preserveScroll: true })
+const approve = (id: number) => {
+    processing.value[id] = true
+
+    router.post(route('admin.affiliate.commissions.approve', id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            processing.value[id] = false
+        },
+    })
+}
+
+const requestReject = (id: number) => {
+    rejectModal.value = {
+        open: true,
+        commissionId: id,
+        processing: false,
+    }
+}
+
+const confirmReject = () => {
+    if (rejectModal.value.commissionId === null) {
+        return
+    }
+
+    rejectModal.value.processing = true
+    const id = rejectModal.value.commissionId
+
+    router.post(route('admin.affiliate.commissions.reject', id), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            rejectModal.value = {
+                open: false,
+                commissionId: null,
+                processing: false,
+            }
+        },
+    })
+}
+
+const processPayout = (id: number) => {
+    processing.value[id] = true
+
+    router.post(route('admin.affiliate.payouts.process', id), {
+        status: payoutStatus.value[id] || 'processing',
+        admin_note: payoutNote.value[id] || '',
+    }, {
+        preserveScroll: true,
+        onFinish: () => {
+            processing.value[id] = false
+        },
+    })
+}
+
+const focusSearchOnSlash = (event: KeyboardEvent) => {
+    if (event.key !== '/' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
+        return
+    }
+
+    const target = event.target as HTMLElement | null
+
+    if (target) {
+        const isTypingContext = target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+
+        if (isTypingContext) {
+            return
+        }
+    }
+
+    event.preventDefault()
+    searchInputRef.value?.focus()
+    searchInputRef.value?.select()
+}
+
+const clearSearchOnEscape = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
+        return
+    }
+
+    if (showSettingsModal.value || rejectModal.value.open || !searchQuery.value) {
+        return
+    }
+
+    event.preventDefault()
+    searchQuery.value = ''
+}
+
+onMounted(() => {
+    document.addEventListener('keydown', focusSearchOnSlash)
+    document.addEventListener('keydown', clearSearchOnEscape)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', focusSearchOnSlash)
+    document.removeEventListener('keydown', clearSearchOnEscape)
+})
 </script>
 
 <template>
     <Head :title="t('Affiliate')" />
 
     <AdminLayout>
-        <div class="mx-auto max-w-7xl px-6 py-8">
-            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Affiliate Management') }}</h1>
-                    <p class="mt-1 text-sm text-gray-500">{{ t('Manage commission rules, approvals, and payout requests.') }}</p>
-                </div>
-                <button type="button" class="inline-flex items-center justify-center rounded-lg bg-white text-gray-800 dark:text-gray-100 border border-gray-200 transition-all duration-300 hover:bg-surface-300 dark:bg-surface-800 dark:border-gray-700 dark:hover:bg-surface-700 dark:hover:border-gray-600 px-4 py-2 text-sm" @click="showSettingsModal = true">
-                    <i class="ti ti-settings mr-1"></i>
-                    {{ t('Settings') }}
-                </button>
-            </div>
-
-            <div class="mb-6 grid gap-4 md:grid-cols-4">
-                <div v-for="(value, key) in stats" :key="key" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                    <p class="text-xs font-bold uppercase tracking-wider text-gray-500">{{ t(String(key).replaceAll('_', ' ')) }}</p>
-                    <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ value }}</p>
-                </div>
-            </div>
-
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div class="flex flex-col gap-4 border-b border-gray-100 p-5 md:flex-row md:items-center md:justify-between">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                        {{
-                            activeTab === 'commissions'
-                                ? t('Commission approval queue')
-                                : activeTab === 'payouts'
-                                    ? t('Payout requests')
-                                    : t('Affiliates')
-                        }}
-                    </h2>
-
-                    <div class="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-                        <button
-                            type="button"
-                            class="rounded-md px-4 py-2 text-sm font-medium transition"
-                            :class="activeTab === 'commissions' ? 'bg-white text-primary-600 shadow-sm dark:bg-gray-900' : 'text-gray-600 dark:text-gray-300'"
-                            @click="activeTab = 'commissions'"
-                        >
-                            {{ t('Commissions') }}
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded-md px-4 py-2 text-sm font-medium transition"
-                            :class="activeTab === 'payouts' ? 'bg-white text-primary-600 shadow-sm dark:bg-gray-900' : 'text-gray-600 dark:text-gray-300'"
-                            @click="activeTab = 'payouts'"
-                        >
-                            {{ t('Payouts') }}
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded-md px-4 py-2 text-sm font-medium transition"
-                            :class="activeTab === 'affiliates' ? 'bg-white text-primary-600 shadow-sm dark:bg-gray-900' : 'text-gray-600 dark:text-gray-300'"
-                            @click="activeTab = 'affiliates'"
-                        >
-                            {{ t('Affiliates') }}
-                        </button>
-                    </div>
-                </div>
-
-                <table v-if="activeTab === 'commissions'" class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-500">
-                        <tr>
-                            <th class="px-4 py-3">{{ t('Referrer') }}</th>
-                            <th class="px-4 py-3">{{ t('Referred') }}</th>
-                            <th class="px-4 py-3">{{ t('Amount') }}</th>
-                            <th class="px-4 py-3">{{ t('Status') }}</th>
-                            <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="commission in commissions.data" :key="commission.id" class="border-t border-gray-100">
-                            <td class="px-4 py-3">{{ commission.referrer?.name }}</td>
-                            <td class="px-4 py-3">{{ commission.referred?.name }}</td>
-                            <td class="px-4 py-3">{{ commission.amount }}</td>
-                            <td class="px-4 py-3">
-                                <span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700">{{ t(commission.status) }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <button v-if="commission.status === 'pending'" class="mr-2 rounded-lg btn-primary" @click="approve(commission.id)">{{ t('Approve') }}</button>
-                                <button v-if="commission.status === 'pending'" class="rounded-lg bg-red-500 px-3 py-1 text-xs font-bold text-white" @click="reject(commission.id)">{{ t('Reject') }}</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <table v-else-if="activeTab === 'payouts'" class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-500">
-                        <tr>
-                            <th class="px-4 py-3">{{ t('User') }}</th>
-                            <th class="px-4 py-3">{{ t('Amount') }}</th>
-                            <th class="px-4 py-3">{{ t('Method') }}</th>
-                            <th class="px-4 py-3">{{ t('Status') }}</th>
-                            <th class="px-4 py-3">{{ t('Process') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="payout in payouts.data" :key="payout.id" class="border-t border-gray-100">
-                            <td class="px-4 py-3">{{ payout.user?.name }}</td>
-                            <td class="px-4 py-3">{{ payout.amount }}</td>
-                            <td class="px-4 py-3">{{ t(payout.method) }}</td>
-                            <td class="px-4 py-3">{{ t(payout.status) }}</td>
-                            <td class="px-4 py-3">
-                                <div class="flex gap-2">
-                                    <select v-model="payoutStatus[payout.id]" class="rounded-lg border border-gray-200 px-2 py-1 text-xs">
-                                        <option value="processing">{{ t('Processing') }}</option>
-                                        <option value="paid">{{ t('Paid') }}</option>
-                                        <option value="rejected">{{ t('Rejected') }}</option>
-                                    </select>
-                                    <input v-model="payoutNote[payout.id]" class="w-28 rounded-lg border border-gray-200 px-2 py-1 text-xs" :placeholder="t('Note')" />
-                                    <button class="rounded-lg btn-primary" @click="processPayout(payout.id)">{{ t('Save') }}</button>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <table v-else class="w-full text-left text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase text-gray-500">
-                        <tr>
-                            <th class="px-4 py-3">{{ t('User') }}</th>
-                            <th class="px-4 py-3">{{ t('Code') }}</th>
-                            <th class="px-4 py-3">{{ t('Referrals') }}</th>
-                            <th class="px-4 py-3">{{ t('Earnings') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="affiliate in affiliates.data" :key="affiliate.ulid" class="border-t border-gray-100">
-                            <td class="px-4 py-3">{{ affiliate.name }}<span class="block text-xs text-gray-500">{{ affiliate.email }}</span></td>
-                            <td class="px-4 py-3 font-semibold">{{ affiliate.referral_code }}</td>
-                            <td class="px-4 py-3">{{ affiliate.affiliate_referrals_count }}</td>
-                            <td class="px-4 py-3">{{ affiliate.referral_earnings }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </section>
-        </div>
-
-        <div v-if="showSettingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showSettingsModal = false">
-            <div class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-800 dark:bg-gray-900">
-                <div class="flex items-start justify-between border-b border-gray-200 px-6 py-5 dark:border-gray-800">
+        <div class="py-6">
+            <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+                <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                        <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Affiliate settings') }}</h2>
-                        <p class="mt-1 text-sm text-gray-500">{{ t('Configure commission rules, payout handling, and campaign assets.') }}</p>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                            {{ t('Affiliate Management') }}
+                        </h1>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('Manage commission rules, approvals, payout requests, and affiliate assets.') }}
+                        </p>
                     </div>
-                    <button type="button" class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="showSettingsModal = false">
-                        <i class="ti ti-x"></i>
+
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        @click="showSettingsModal = true"
+                    >
+                        <i class="ti ti-settings text-base"></i>
+                        {{ t('Settings') }}
                     </button>
                 </div>
 
-                <form class="flex-1 overflow-y-auto px-6 py-6" @submit.prevent="save">
+                <div class="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div
+                        v-for="item in summaryItems"
+                        :key="item.key"
+                        class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800"
+                    >
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {{ item.label }}
+                        </p>
+                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">
+                            {{ item.value }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                    <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div class="w-full xl:max-w-md">
+                                <div class="relative">
+                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                        <i class="ti ti-search text-base"></i>
+                                    </span>
+                                    <input
+                                        ref="searchInputRef"
+                                        v-model="searchQuery"
+                                        type="text"
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        :placeholder="searchPlaceholder"
+                                    />
+                                    <span
+                                        v-if="!searchQuery"
+                                        class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                                    >
+                                        /
+                                    </span>
+                                    <button
+                                        v-if="searchQuery"
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                        :aria-label="t('Clear search')"
+                                        :title="t('Clear search')"
+                                        @click="searchQuery = ''"
+                                    >
+                                        <i class="ti ti-x text-base"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                                <button
+                                    type="button"
+                                    class="rounded-lg px-4 py-2 text-sm font-medium transition"
+                                    :class="activeTab === 'commissions' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'"
+                                    @click="activeTab = 'commissions'"
+                                >
+                                    {{ t('Commissions') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-lg px-4 py-2 text-sm font-medium transition"
+                                    :class="activeTab === 'payouts' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'"
+                                    @click="activeTab = 'payouts'"
+                                >
+                                    {{ t('Payouts') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-lg px-4 py-2 text-sm font-medium transition"
+                                    :class="activeTab === 'affiliates' ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-700'"
+                                    @click="activeTab = 'affiliates'"
+                                >
+                                    {{ t('Affiliates') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table v-if="activeTab === 'commissions'" class="min-w-full divide-y divide-gray-100 text-left dark:divide-gray-800">
+                            <thead class="bg-gray-50 dark:bg-gray-900/60">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Referrer') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Referred') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Amount') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                    <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Action') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <tr
+                                    v-for="commission in filteredCommissions"
+                                    :key="commission.id"
+                                    class="bg-white transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/30"
+                                >
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ commission.referrer?.name || '—' }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ commission.referrer?.email || '—' }}</div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ commission.referred?.name || '—' }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ commission.referred?.email || '—' }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ commission.amount }}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                            {{ t(commission.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-right">
+                                        <div v-if="commission.status === 'pending'" class="inline-flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                :disabled="processing[commission.id]"
+                                                :aria-label="t('Approve commission :id', { id: commission.id })"
+                                                class="btn-primary rounded-lg px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                @click="approve(commission.id)"
+                                            >
+                                                <span v-if="processing[commission.id]" class="inline-flex items-center gap-2">
+                                                    <i class="ti ti-loader-2 animate-spin text-sm"></i>
+                                                    {{ t('Approving...') }}
+                                                </span>
+                                                <span v-else>{{ t('Approve') }}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                :aria-label="t('Reject commission :id', { id: commission.id })"
+                                                class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300 dark:hover:bg-red-950/50"
+                                                @click="requestReject(commission.id)"
+                                            >
+                                                {{ t('Reject') }}
+                                            </button>
+                                        </div>
+                                        <span v-else class="text-sm text-gray-400 dark:text-gray-500">—</span>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredCommissions.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        {{ t('No commissions found.') }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <table v-else-if="activeTab === 'payouts'" class="min-w-full divide-y divide-gray-100 text-left dark:divide-gray-800">
+                            <thead class="bg-gray-50 dark:bg-gray-900/60">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('User') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Amount') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Method') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Process') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <tr
+                                    v-for="payout in filteredPayouts"
+                                    :key="payout.id"
+                                    class="bg-white transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/30"
+                                >
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ payout.user?.name || '—' }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ payout.user?.email || '—' }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ payout.amount }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ t(payout.method) }}</td>
+                                    <td class="px-6 py-4">
+                                        <span
+                                            class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium"
+                                            :class="payout.status === 'paid'
+                                                ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                                : payout.status === 'rejected'
+                                                    ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                                    : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'"
+                                        >
+                                            {{ t(payout.status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="grid gap-2 lg:grid-cols-[minmax(0,140px)_minmax(0,180px)_auto]">
+                                            <select
+                                                v-model="payoutStatus[payout.id]"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            >
+                                                <option value="processing">{{ t('Processing') }}</option>
+                                                <option value="paid">{{ t('Paid') }}</option>
+                                                <option value="rejected">{{ t('Rejected') }}</option>
+                                            </select>
+                                            <input
+                                                v-model="payoutNote[payout.id]"
+                                                type="text"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                                :placeholder="t('Add note')"
+                                            />
+                                            <button
+                                                type="button"
+                                                :disabled="processing[payout.id]"
+                                                :aria-label="t('Process payout :id', { id: payout.id })"
+                                                class="btn-primary rounded-lg px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                                @click="processPayout(payout.id)"
+                                            >
+                                                <span v-if="processing[payout.id]" class="inline-flex items-center gap-2">
+                                                    <i class="ti ti-loader-2 animate-spin text-sm"></i>
+                                                    {{ t('Saving...') }}
+                                                </span>
+                                                <span v-else>{{ t('Save') }}</span>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="filteredPayouts.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        {{ t('No payouts found.') }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <table v-else class="min-w-full divide-y divide-gray-100 text-left dark:divide-gray-800">
+                            <thead class="bg-gray-50 dark:bg-gray-900/60">
+                                <tr>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Affiliate') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Code') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Referrals') }}</th>
+                                    <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Earnings') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <tr
+                                    v-for="affiliate in filteredAffiliates"
+                                    :key="affiliate.ulid"
+                                    class="bg-white transition-colors hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/30"
+                                >
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ affiliate.name }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">{{ affiliate.email }}</div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="font-mono text-sm font-medium text-gray-900 dark:text-white">{{ affiliate.referral_code }}</span>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                        {{ affiliate.affiliate_referrals_count ?? affiliate.referral_count ?? 0 }}
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ affiliate.referral_earnings }}</td>
+                                </tr>
+                                <tr v-if="filteredAffiliates.length === 0">
+                                    <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        {{ t('No affiliates found.') }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div
+                        v-if="!searchQuery && activePagination.links.length > 3"
+                        class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6"
+                    >
+                        <Pagination
+                            :links="activePagination.links"
+                            :from="activePagination.from"
+                            :to="activePagination.to"
+                            :total="activePagination.total"
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="showSettingsModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm"
+            @click.self="showSettingsModal = false"
+        >
+            <div class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
+                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-700">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Affiliate Settings') }}</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure commission rules, payout handling, and campaign assets.') }}</p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700"
+                        :aria-label="t('Close modal')"
+                        :disabled="form.processing"
+                        @click="showSettingsModal = false"
+                    >
+                        <i class="ti ti-x text-base"></i>
+                    </button>
+                </div>
+
+                <form class="overflow-y-auto p-6" @submit.prevent="save">
                     <div class="space-y-6">
-                        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                            <div class="mb-4 flex items-center justify-between">
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Settings') }}</h3>
-                                <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Active') }}
-                                    <input v-model="form.is_active" type="checkbox" />
+                        <section class="rounded-xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-900/40">
+                            <div class="mb-4 flex items-center justify-between gap-4">
+                                <div>
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Program Settings') }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control default commission behavior and affiliate eligibility rules.') }}</p>
+                                </div>
+
+                                <label class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+                                    <span>{{ t('Active') }}</span>
+                                    <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
                                 </label>
                             </div>
 
-                            <div class="space-y-4">
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <AppSelect v-model="form.commission_type" :label="t('Commission type')" :options="commissionTypeOptions" />
-                                    <label class="block">
-                                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Value') }}</span>
-                                        <input v-model="form.commission_value" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-                                    </label>
-                                </div>
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <AppSelect v-model="form.commission_type" :label="t('Commission type')" :options="commissionTypeOptions" />
+
+                                <label class="block">
+                                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Value') }}</span>
+                                    <input
+                                        v-model="form.commission_value"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    />
+                                </label>
 
                                 <AppSelect v-model="form.commission_on" :label="t('Commission on')" :options="commissionOnOptions" />
 
-                                <div class="grid gap-4 md:grid-cols-3">
-                                    <label class="block">
-                                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cookie days') }}</span>
-                                        <input v-model="form.cookie_days" type="number" min="1" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-                                    </label>
-                                    <label class="block">
-                                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Minimum payout') }}</span>
-                                        <input v-model="form.min_payout" type="number" min="0" step="0.01" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-                                    </label>
-                                    <label class="block">
-                                        <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Commission hold days') }}</span>
-                                        <input v-model="form.commission_hold_days" type="number" min="0" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-                                    </label>
-                                </div>
-
                                 <label class="block">
-                                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Payout methods') }}</span>
-                                    <span class="flex flex-wrap gap-2">
-                                        <button v-for="method in payoutMethodOptions" :key="method" type="button" :class="form.payout_methods.includes(method) ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'" class="rounded-full px-3 py-1 text-xs font-bold" @click="toggleMethod(method)">
-                                            {{ t(method.replace('_', ' ')) }}
-                                        </button>
-                                    </span>
-                                </label>
-
-                                <div class="grid gap-3 md:grid-cols-2">
-                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium dark:border-gray-700">
-                                        {{ t('Enable payout requests') }}
-                                        <input v-model="form.payouts_enabled" type="checkbox" />
-                                    </label>
-                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium dark:border-gray-700">
-                                        {{ t('Auto approve commissions') }}
-                                        <input v-model="form.auto_approve_commissions" type="checkbox" />
-                                    </label>
-                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium dark:border-gray-700">
-                                        {{ t('Award credits on first purchase') }}
-                                        <input v-model="form.referral_credits_enabled" type="checkbox" />
-                                    </label>
-                                    <label class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-sm font-medium dark:border-gray-700">
-                                        {{ t('Allow custom alias') }}
-                                        <input v-model="form.allow_custom_alias" type="checkbox" />
-                                    </label>
-                                </div>
-
-                                <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('First purchase credit amount') }}</span>
-                                    <input v-model="form.referral_credits_amount" type="number" min="0" step="0.0001" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" />
-                                    <span class="mt-1 block text-xs text-gray-500">{{ t('Credits are added to the referrer only once, when the referred user completes the first purchase.') }}</span>
-                                </label>
-                            </div>
-                        </section>
-
-                        <div class="grid gap-6 xl:grid-cols-2">
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                                <div class="mb-4 flex items-center justify-between">
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Marketing banners') }}</h3>
-                                    <button type="button" class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="addBanner">+ {{ t('Add banner') }}</button>
-                                </div>
-                                <div class="space-y-3">
-                                    <div v-for="(b, i) in mkBanners" :key="i" class="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
-                                        <div class="mb-2 flex items-center justify-between">
-                                            <span class="text-xs font-bold text-gray-500">#{{ i + 1 }}</span>
-                                            <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removeBanner(i)">{{ t('Remove') }}</button>
-                                        </div>
-                                        <input v-model="b.url" type="url" class="mb-2 w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" placeholder="https://example.com/banner.png" />
-                                        <input v-model="b.label" type="text" class="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" :placeholder="t('Label (optional)')" />
-                                    </div>
-                                    <p v-if="mkBanners.length === 0" class="text-sm text-gray-400">{{ t('No banners configured.') }}</p>
-                                </div>
-                            </section>
-
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                                <div class="mb-4 flex items-center justify-between">
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Promotional emails') }}</h3>
-                                    <button type="button" class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="addEmail">+ {{ t('Add email') }}</button>
-                                </div>
-                                <div class="space-y-3">
-                                    <div v-for="(e, i) in mkEmails" :key="i" class="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
-                                        <div class="mb-2 flex items-center justify-between">
-                                            <span class="text-xs font-bold text-gray-500">#{{ i + 1 }}</span>
-                                            <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removeEmail(i)">{{ t('Remove') }}</button>
-                                        </div>
-                                        <input v-model="e.subject" type="text" class="mb-2 w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" :placeholder="t('Subject')" />
-                                        <textarea v-model="e.body" rows="4" class="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" :placeholder="t('Email body')" />
-                                    </div>
-                                    <p v-if="mkEmails.length === 0" class="text-sm text-gray-400">{{ t('No email templates configured.') }}</p>
-                                </div>
-                            </section>
-                        </div>
-
-                        <div class="grid gap-6 xl:grid-cols-2">
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                                <div class="mb-4 flex items-center justify-between">
-                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Social media posts') }}</h3>
-                                    <button type="button" class="rounded-lg border border-gray-200 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300" @click="addPost">+ {{ t('Add post') }}</button>
-                                </div>
-                                <div class="space-y-3">
-                                    <div v-for="(p, i) in mkPosts" :key="i" class="rounded-lg border border-gray-100 p-3 dark:border-gray-700">
-                                        <div class="mb-2 flex items-center justify-between">
-                                            <span class="text-xs font-bold text-gray-500">#{{ i + 1 }}</span>
-                                            <button type="button" class="text-xs font-bold text-red-500 hover:text-red-700" @click="removePost(i)">{{ t('Remove') }}</button>
-                                        </div>
-                                        <input v-model="p.platform" type="text" class="mb-2 w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" :placeholder="t('Platform (e.g. Twitter, LinkedIn)')" />
-                                        <textarea v-model="p.text" rows="3" class="w-full rounded border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-950" :placeholder="t('Post text')" />
-                                    </div>
-                                    <p v-if="mkPosts.length === 0" class="text-sm text-gray-400">{{ t('No social posts configured.') }}</p>
-                                </div>
-                            </section>
-
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                                <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{{ t('Terms') }}</h3>
-                                <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Terms page slug') }}</span>
-                                    <input v-model="form.terms_page_slug" list="affiliate-terms-pages" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950" placeholder="affiliate-terms" />
+                                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Terms page slug') }}</span>
+                                    <input
+                                        v-model="form.terms_page_slug"
+                                        list="affiliate-terms-pages"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                        :placeholder="t('Enter page slug')"
+                                    />
                                     <datalist id="affiliate-terms-pages">
                                         <option v-for="page in termsPageOptions" :key="page.slug" :value="page.slug">{{ page.title }}</option>
                                     </datalist>
-                                    <span class="mt-1 block text-xs text-gray-500">{{ t('Create a CMS page first, then enter its slug here.') }}</span>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Create a CMS page first, then enter its slug here.') }}</p>
                                 </label>
+                            </div>
+
+                            <div class="mt-4 grid gap-4 md:grid-cols-3">
+                                <label class="block">
+                                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Cookie days') }}</span>
+                                    <input
+                                        v-model="form.cookie_days"
+                                        type="number"
+                                        min="1"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    />
+                                </label>
+
+                                <label class="block">
+                                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Minimum payout') }}</span>
+                                    <input
+                                        v-model="form.min_payout"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    />
+                                </label>
+
+                                <label class="block">
+                                    <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Commission hold days') }}</span>
+                                    <input
+                                        v-model="form.commission_hold_days"
+                                        type="number"
+                                        min="0"
+                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    />
+                                </label>
+                            </div>
+
+                            <div class="mt-4">
+                                <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Payout methods') }}</span>
+                                <div class="flex flex-wrap gap-2">
+                                    <button
+                                        v-for="method in payoutMethodOptions"
+                                        :key="method"
+                                        type="button"
+                                        class="rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
+                                        :class="form.payout_methods.includes(method)
+                                            ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                                            : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800'"
+                                        @click="toggleMethod(method)"
+                                    >
+                                        {{ t(method.replace('_', ' ')) }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 grid gap-3 md:grid-cols-2">
+                                <label class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                                    <span>{{ t('Enable payout requests') }}</span>
+                                    <input v-model="form.payouts_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                </label>
+                                <label class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                                    <span>{{ t('Auto approve commissions') }}</span>
+                                    <input v-model="form.auto_approve_commissions" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                </label>
+                                <label class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                                    <span>{{ t('Award credits on first purchase') }}</span>
+                                    <input v-model="form.referral_credits_enabled" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                </label>
+                                <label class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+                                    <span>{{ t('Allow custom alias') }}</span>
+                                    <input v-model="form.allow_custom_alias" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+                                </label>
+                            </div>
+
+                            <label class="mt-4 block">
+                                <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('First purchase credit amount') }}</span>
+                                <input
+                                    v-model="form.referral_credits_amount"
+                                    type="number"
+                                    min="0"
+                                    step="0.0001"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                />
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                    {{ t('Credits are added to the referrer only once, when the referred user completes the first purchase.') }}
+                                </p>
+                            </label>
+                        </section>
+
+                        <div class="grid gap-6 xl:grid-cols-2">
+                            <section class="rounded-xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div class="mb-4 flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Marketing Banners') }}</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Share banner assets with affiliates for external promotion.') }}</p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        @click="addBanner"
+                                    >
+                                        {{ t('Add banner') }}
+                                    </button>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div
+                                        v-for="(banner, index) in mkBanners"
+                                        :key="index"
+                                        class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+                                    >
+                                        <div class="mb-3 flex items-center justify-between">
+                                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">#{{ index + 1 }}</span>
+                                            <button type="button" class="text-xs font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" @click="removeBanner(index)">
+                                                {{ t('Remove') }}
+                                            </button>
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            <input
+                                                v-model="banner.url"
+                                                type="url"
+                                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                                :placeholder="t('Banner URL')"
+                                            />
+                                            <input
+                                                v-model="banner.label"
+                                                type="text"
+                                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                                :placeholder="t('Label optional')"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p v-if="mkBanners.length === 0" class="text-sm text-gray-500 dark:text-gray-400">{{ t('No banners configured.') }}</p>
+                                </div>
+                            </section>
+
+                            <section class="rounded-xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-900/40">
+                                <div class="mb-4 flex items-center justify-between gap-3">
+                                    <div>
+                                        <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Promotional Emails') }}</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Prepare reusable outreach copy for affiliate campaigns.') }}</p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        @click="addEmail"
+                                    >
+                                        {{ t('Add email') }}
+                                    </button>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div
+                                        v-for="(email, index) in mkEmails"
+                                        :key="index"
+                                        class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+                                    >
+                                        <div class="mb-3 flex items-center justify-between">
+                                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">#{{ index + 1 }}</span>
+                                            <button type="button" class="text-xs font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" @click="removeEmail(index)">
+                                                {{ t('Remove') }}
+                                            </button>
+                                        </div>
+
+                                        <div class="space-y-3">
+                                            <input
+                                                v-model="email.subject"
+                                                type="text"
+                                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                                :placeholder="t('Subject')"
+                                            />
+                                            <textarea
+                                                v-model="email.body"
+                                                rows="4"
+                                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                                :placeholder="t('Email body')"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p v-if="mkEmails.length === 0" class="text-sm text-gray-500 dark:text-gray-400">{{ t('No email templates configured.') }}</p>
+                                </div>
                             </section>
                         </div>
+
+                        <section class="rounded-xl border border-gray-200 bg-gray-50 p-5 dark:border-gray-700 dark:bg-gray-900/40">
+                            <div class="mb-4 flex items-center justify-between gap-3">
+                                <div>
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Social Media Posts') }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Save short affiliate-ready post ideas for reuse across channels.') }}</p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                    @click="addPost"
+                                >
+                                    {{ t('Add post') }}
+                                </button>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div
+                                    v-for="(post, index) in mkPosts"
+                                    :key="index"
+                                    class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900"
+                                >
+                                    <div class="mb-3 flex items-center justify-between">
+                                        <span class="text-xs font-medium text-gray-500 dark:text-gray-400">#{{ index + 1 }}</span>
+                                        <button type="button" class="text-xs font-medium text-red-600 transition-colors hover:text-red-700 dark:text-red-400 dark:hover:text-red-300" @click="removePost(index)">
+                                            {{ t('Remove') }}
+                                        </button>
+                                    </div>
+
+                                    <div class="space-y-3">
+                                        <input
+                                            v-model="post.platform"
+                                            type="text"
+                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                            :placeholder="t('Platform name')"
+                                        />
+                                        <textarea
+                                            v-model="post.text"
+                                            rows="3"
+                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                            :placeholder="t('Post text')"
+                                        />
+                                    </div>
+                                </div>
+
+                                <p v-if="mkPosts.length === 0" class="text-sm text-gray-500 dark:text-gray-400">{{ t('No social posts configured.') }}</p>
+                            </div>
+                        </section>
                     </div>
                 </form>
 
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-950/60">
-                    <button type="button" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-white dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900" @click="showSettingsModal = false">
+                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <button
+                        type="button"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        :disabled="form.processing"
+                        @click="showSettingsModal = false"
+                    >
                         {{ t('Cancel') }}
                     </button>
-                    <button type="button" :disabled="form.processing" class="rounded-lg btn-primary px-4 py-2 text-sm" @click="save">
-                        {{ form.processing ? t('Saving...') : t('Save settings') }}
+
+                    <button
+                        type="button"
+                        :disabled="form.processing"
+                        class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                        @click="save"
+                    >
+                        {{ form.processing ? t('Saving...') : t('Save Settings') }}
                     </button>
                 </div>
             </div>
         </div>
+
+        <ActionConfirmModal
+            :open="rejectModal.open"
+            :title="t('Reject commission?')"
+            :message="t('Are you sure you want to reject this commission? This action cannot be undone.')"
+            :confirm-label="t('Reject')"
+            :processing="rejectModal.processing"
+            variant="danger"
+            @confirm="confirmReject"
+            @cancel="rejectModal.open = false"
+        />
     </AdminLayout>
 </template>

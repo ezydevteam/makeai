@@ -15,7 +15,7 @@ class DocumentIngestionService
 {
     public function __construct(
         private TextExtractionService $extractor,
-        private ChunkingService $chunker,
+        private SemanticChunkingService $chunker,
         private VectorStoreService $vectorStore,
         private AiService $aiService,
     ) {}

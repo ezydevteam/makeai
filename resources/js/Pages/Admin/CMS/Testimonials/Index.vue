@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
@@ -9,6 +9,8 @@ import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
+
+defineOptions({ layout: AdminLayout })
 
 interface Testimonial {
     id: number
@@ -49,6 +51,10 @@ const aiGenerating = ref(false)
 const editingId = ref<number | null>(null)
 const deleteTargetId = ref<number | null>(null)
 const openActionMenuId = ref<number | null>(null)
+const searchInput = ref<HTMLInputElement | null>(null)
+const searchQuery = ref('')
+const selectedStatus = ref<'all' | 'active' | 'inactive' | 'featured'>('all')
+const selectedSource = ref<'all' | Testimonial['source']>('all')
 const actionMenuPosition = ref({ top: 0, left: 0, placement: 'bottom' as 'top' | 'bottom' })
 const importInput = ref<HTMLInputElement | null>(null)
 const avatarPreview = ref<string | null>(null)
@@ -82,6 +88,18 @@ const sourceOptions = [
     { value: 'ai', label: t('AI') },
 ]
 
+const statusOptions = [
+    { value: 'all', label: t('All Status') },
+    { value: 'active', label: t('Active') },
+    { value: 'inactive', label: t('Inactive') },
+    { value: 'featured', label: t('Featured') },
+]
+
+const filterSourceOptions = [
+    { value: 'all', label: t('All Sources') },
+    ...sourceOptions,
+]
+
 const sourceClasses: Record<Testimonial['source'], string> = {
     manual: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
     google: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
@@ -106,18 +124,6 @@ const blank = (): TestimonialForm => ({
 
 const form = useForm(blank())
 
-const totalTestimonials = computed(() => props.testimonials.length)
-const activeTestimonials = computed(() => props.testimonials.filter((item) => item.is_active).length)
-const featuredTestimonials = computed(() => props.testimonials.filter((item) => item.is_featured).length)
-const averageRating = computed(() => {
-    if (props.testimonials.length === 0) {
-        return '0.0'
-    }
-
-    const total = props.testimonials.reduce((sum, item) => sum + item.rating, 0)
-    return (total / props.testimonials.length).toFixed(1)
-})
-
 const sortedTestimonials = computed(() =>
     [...props.testimonials].sort((left, right) => {
         if (left.sort_order !== right.sort_order) {
@@ -127,6 +133,31 @@ const sortedTestimonials = computed(() =>
         return right.id - left.id
     }),
 )
+
+const filteredTestimonials = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+
+    return sortedTestimonials.value.filter((testimonial) => {
+        const matchesSearch = !query || [
+            testimonial.name,
+            testimonial.role ?? '',
+            testimonial.company ?? '',
+            testimonial.content,
+            sourceLabel(testimonial.source),
+        ].join(' ').toLowerCase().includes(query)
+
+        const matchesStatus = selectedStatus.value === 'all'
+            || (selectedStatus.value === 'active' && testimonial.is_active)
+            || (selectedStatus.value === 'inactive' && !testimonial.is_active)
+            || (selectedStatus.value === 'featured' && testimonial.is_featured)
+
+        const matchesSource = selectedSource.value === 'all' || testimonial.source === selectedSource.value
+
+        return matchesSearch && matchesStatus && matchesSource
+    })
+})
+
+const hasActiveFilters = computed(() => Boolean(searchQuery.value || selectedStatus.value !== 'all' || selectedSource.value !== 'all'))
 
 const openCreate = () => {
     form.reset()
@@ -252,14 +283,80 @@ const handleViewportChange = () => {
     openActionMenuId.value = null
 }
 
+const clearFilters = () => {
+    searchQuery.value = ''
+    selectedStatus.value = 'all'
+    selectedSource.value = 'all'
+}
+
+const isTypingTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) {
+        return false
+    }
+
+    const tagName = target.tagName.toLowerCase()
+
+    return tagName === 'input'
+        || tagName === 'textarea'
+        || tagName === 'select'
+        || target.isContentEditable
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+    if (event.key === '/') {
+        if (event.metaKey || event.ctrlKey || event.altKey || isTypingTarget(event.target)) {
+            return
+        }
+
+        event.preventDefault()
+        searchInput.value?.focus()
+        searchInput.value?.select()
+        return
+    }
+
+    if (event.key !== 'Escape') {
+        return
+    }
+
+    if (openActionMenuId.value !== null) {
+        openActionMenuId.value = null
+        return
+    }
+
+    if (deleteTargetId.value !== null) {
+        deleteTargetId.value = null
+        return
+    }
+
+    if (showForm.value) {
+        closeForm()
+        return
+    }
+
+    if (showAiForm.value) {
+        showAiForm.value = false
+        return
+    }
+
+    if (isTypingTarget(event.target) && event.target !== searchInput.value) {
+        return
+    }
+
+    if (hasActiveFilters.value) {
+        clearFilters()
+    }
+}
+
 onMounted(() => {
     document.addEventListener('click', handleDocumentClick)
+    document.addEventListener('keydown', handleKeydown)
     window.addEventListener('resize', handleViewportChange)
     window.addEventListener('scroll', handleViewportChange, true)
 })
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleDocumentClick)
+    document.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('resize', handleViewportChange)
     window.removeEventListener('scroll', handleViewportChange, true)
 })
@@ -360,13 +457,12 @@ const generateTestimonials = async () => {
 <template>
     <Head :title="t('Testimonials - Admin')" />
 
-    <AdminLayout>
-        <div class="mx-auto max-w-7xl px-6 py-8">
-            <div class="mb-8 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div class="space-y-2">
                     <div>
-                        <h1 class="font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ t('Testimonials') }}</h1>
-                        <p class="mt-2 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Testimonials') }}</h1>
+                        <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                             {{ t('Manage customer proof for your homepage and marketing sections from one consistent admin workspace.') }}
                         </p>
                     </div>
@@ -400,58 +496,81 @@ const generateTestimonials = async () => {
                     </Tooltip>
                     <button
                         type="button"
-                        class="btn-primary"
+                        class="inline-flex items-center gap-2 btn-primary px-4 py-2 text-sm"
                         @click="openCreate"
                     >
                         <i class="ti ti-plus text-base"></i>
                         {{ t('Add Testimonial') }}
                     </button>
                 </div>
-            </div>
+        </section>
 
-            <div class="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Total') }}</div>
-                    <div class="mt-3 font-heading text-3xl font-bold text-gray-900 dark:text-white">{{ totalTestimonials }}</div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('All testimonials stored in the library.') }}</p>
+        <section class="overflow-visible rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
+                <div class="relative w-full lg:max-w-xl lg:flex-1">
+                    <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+                    <input
+                        ref="searchInput"
+                        v-model="searchQuery"
+                        type="text"
+                        :placeholder="t('Search testimonials, company, role, or review')"
+                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    >
+                    <span
+                        v-if="!searchQuery"
+                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                    >/</span>
+                    <button
+                        v-if="searchQuery"
+                        type="button"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                        @click="searchQuery = ''"
+                    >
+                        <i class="ti ti-x text-base"></i>
+                    </button>
                 </div>
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Active') }}</div>
-                    <div class="mt-3 font-heading text-3xl font-bold text-emerald-600">{{ activeTestimonials }}</div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Currently visible across public sections.') }}</p>
-                </div>
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Featured') }}</div>
-                    <div class="mt-3 font-heading text-3xl font-bold text-amber-500">{{ featuredTestimonials }}</div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Highlighted entries for premium placement.') }}</p>
-                </div>
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Average Rating') }}</div>
-                    <div class="mt-3 font-heading text-3xl font-bold text-blue-600">{{ averageRating }}</div>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Overall score based on saved testimonials.') }}</p>
-                </div>
-            </div>
 
-            <div class="overflow-visible rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                <div v-if="sortedTestimonials.length === 0" class="px-6 py-16 text-center">
-                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl dark:bg-emerald-900/20">
-                        <span>💬</span>
+                <div class="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[26rem] lg:flex-row lg:justify-end">
+                    <div class="w-full lg:w-52">
+                        <AppSelect
+                            v-model="selectedStatus"
+                            :options="statusOptions"
+                            :placeholder="t('All Status')"
+                        />
                     </div>
-                    <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">{{ t('No testimonials yet') }}</h3>
+                    <div class="w-full lg:w-52">
+                        <AppSelect
+                            v-model="selectedSource"
+                            :options="filterSourceOptions"
+                            :placeholder="t('All Sources')"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="filteredTestimonials.length === 0" class="px-6 py-16 text-center">
+                    <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl dark:bg-emerald-900/20">
+                        <i class="ti ti-message-2 text-2xl text-emerald-600 dark:text-emerald-300"></i>
+                    </div>
+                    <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">
+                        {{ hasActiveFilters ? t('No testimonials match these filters') : t('No testimonials yet') }}
+                    </h3>
                     <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Create your first testimonial to start building social proof across the homepage and landing sections.') }}
+                        {{ hasActiveFilters
+                            ? t('Try clearing the current search or filters to see more testimonials.')
+                            : t('Create your first testimonial to start building social proof across the homepage and landing sections.') }}
                     </p>
                     <button
                         type="button"
                         class="btn-primary mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
-                        @click="openCreate"
+                        @click="hasActiveFilters ? clearFilters() : openCreate()"
                     >
-                        {{ t('Add First Testimonial') }}
+                        {{ hasActiveFilters ? t('Clear Filters') : t('Add First Testimonial') }}
                     </button>
-                </div>
+            </div>
 
-                <div v-else class="overflow-visible">
-                    <div class="overflow-x-auto overflow-y-visible rounded-t-2xl">
+            <div v-else class="overflow-visible">
+                <div class="overflow-x-auto overflow-y-visible">
                     <table class="min-w-full divide-y divide-gray-200 dark:divide-surface-700">
                         <thead class="bg-gray-50 dark:bg-surface-800/70">
                             <tr>
@@ -465,7 +584,7 @@ const generateTestimonials = async () => {
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
                             <tr
-                                v-for="testimonial in sortedTestimonials"
+                                v-for="testimonial in filteredTestimonials"
                                 :key="testimonial.id"
                                 class="transition hover:bg-primary-50/60 dark:hover:bg-primary-900/10"
                             >
@@ -597,44 +716,34 @@ const generateTestimonials = async () => {
                             </tr>
                         </tbody>
                     </table>
-                    </div>
                 </div>
             </div>
-        </div>
+        </section>
 
         <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeForm">
-            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-[16px] border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 bg-gray-50 px-6 py-5 dark:border-surface-700 dark:bg-surface-800/80">
+            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
                     <div class="flex items-start justify-between gap-4">
-                        <div class="flex items-start gap-4">
-                            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500 text-white shadow-sm">
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 10.5h4.75m-4.75 3h8.75M6.75 19.5l-3-1.5V6.75A2.25 2.25 0 0 1 6 4.5h12A2.25 2.25 0 0 1 20.25 6.75v8.5A2.25 2.25 0 0 1 18 17.5H9.31L6.75 19.5Zm11.5-11.75.375.75.75.375-.75.375-.375.75-.375-.75-.75-.375.75-.375.375-.75Z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 class="font-heading text-2xl font-semibold text-gray-900 dark:text-white">
-                                    {{ editingId ? t('Edit Testimonial') : t('Create Testimonial') }}
-                                </h3>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    {{ t('Shape customer proof with clean content, trusted identity details, and clear publishing controls.') }}
-                                </p>
-                            </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                                {{ editingId ? t('Edit Testimonial') : t('Create Testimonial') }}
+                            </h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                {{ t('Shape customer proof with clean content, trusted identity details, and clear publishing controls.') }}
+                            </p>
                         </div>
                         <button
                             type="button"
-                            class="rounded-xl p-2 text-gray-400 transition hover:bg-white/80 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-gray-200"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
+                            :aria-label="t('Close modal')"
                             @click="closeForm"
                         >
-                            <span class="sr-only">{{ t('Close') }}</span>
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
+                            <i class="ti ti-x text-base"></i>
                         </button>
                     </div>
                 </div>
 
-                <div class="flex-1 overflow-y-auto px-6 py-6">
+                <div class="flex-1 overflow-y-auto p-6">
                     <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
                         <div class="space-y-6">
                             <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
@@ -816,21 +925,21 @@ const generateTestimonials = async () => {
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
+                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Required fields are marked with *') }}
                     </div>
                     <div class="flex items-center gap-3">
                         <button
                             type="button"
-                            class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700"
+                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
                             @click="closeForm"
                         >
                             {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
-                            class="btn-primary inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="form.processing"
                             @click="submit"
                         >
@@ -843,25 +952,23 @@ const generateTestimonials = async () => {
         </div>
 
         <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="showAiForm = false">
-            <div class="w-full max-w-xl overflow-hidden rounded-[16px] border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="flex items-center justify-between border-b border-gray-200 px-6 py-5 dark:border-surface-700">
+            <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-3 dark:border-surface-700">
                     <div>
-                        <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">{{ t('AI Generate Testimonials') }}</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Generate demo-friendly testimonials with a consistent admin flow.') }}</p>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('AI Generate Testimonials') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Generate demo-friendly testimonials with a consistent admin flow.') }}</p>
                     </div>
                     <button
                         type="button"
-                        class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-gray-200"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
+                        :aria-label="t('Close modal')"
                         @click="showAiForm = false"
                     >
-                        <span class="sr-only">{{ t('Close') }}</span>
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
+                        <i class="ti ti-x text-base"></i>
                     </button>
                 </div>
 
-                <div class="space-y-5 px-6 py-6">
+                <div class="space-y-5 p-6">
                     <div>
                         <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company Type') }}</label>
                         <input
@@ -902,17 +1009,17 @@ const generateTestimonials = async () => {
                     </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
+                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
                     <button
                         type="button"
-                        class="rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
                         @click="showAiForm = false"
                     >
                         {{ t('Cancel') }}
                     </button>
                     <button
                         type="button"
-                        class="btn-primary inline-flex items-center rounded-xl px-6 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="btn-primary inline-flex items-center rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                         :disabled="aiGenerating"
                         @click="generateTestimonials"
                     >
@@ -930,5 +1037,5 @@ const generateTestimonials = async () => {
             @cancel="deleteTargetId = null"
             @confirm="confirmDelete"
         />
-    </AdminLayout>
+    </div>
 </template>

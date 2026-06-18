@@ -75,16 +75,21 @@ class SocialAuthController extends Controller
         if ($user) {
             $foundByEmail = $user->oauth_provider !== $provider || $user->oauth_id !== $providerId;
 
+            // CRITICAL SECURITY: Prevent account takeover via unverified OAuth emails.
+            // If the account exists but was registered with a different provider/email-password,
+            // we must NOT allow login. The user must use their original login method.
+            if ($foundByEmail) {
+                return redirect()->route('login')
+                    ->with('error', translate('An account with this email already exists. Please log in using your existing method.'));
+            }
+
             $user->forceFill([
                 'name' => $user->name ?: $name,
                 'avatar' => $user->avatar ?: $avatar,
                 'email_verified_at' => $user->email_verified_at ?: now(),
+                'oauth_provider' => $provider,
+                'oauth_id' => $providerId,
             ]);
-
-            if (! $foundByEmail) {
-                $user->oauth_provider = $provider;
-                $user->oauth_id = $providerId;
-            }
 
             $user->save();
         } else {

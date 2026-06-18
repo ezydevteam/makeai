@@ -370,10 +370,12 @@ class LaravelAiDriver implements AiDriverInterface
             } elseif ($msg['role'] === 'assistant') {
                 $history[] = new AssistantMessage($msg['content']);
             } elseif ($msg['role'] === 'user') {
+                // Support both string content and array content (multi-modal)
+                $messageContent = $msg['content'];
                 if ($i === $lastUserIdx) {
-                    $prompt = $msg['content'];
+                    $prompt = $messageContent;
                 } else {
-                    $history[] = new UserMessage($msg['content']);
+                    $history[] = new UserMessage($messageContent);
                 }
             }
         }

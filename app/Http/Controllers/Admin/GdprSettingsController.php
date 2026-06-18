@@ -34,6 +34,11 @@ class GdprSettingsController extends Controller
 
     public function update(Request $request)
     {
+        abort_unless(
+            auth('admin')->user()?->hasAnyPermission(['settings.gdpr', 'settings.manage']),
+            403
+        );
+
         $validated = $request->validate([
             'enabled' => ['required', 'boolean'],
             'eu_only' => ['required', 'boolean'],

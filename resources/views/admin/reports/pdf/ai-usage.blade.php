@@ -40,7 +40,7 @@
       <td>{{ number_format($row->output_tokens) }}</td>
       <td>${{ number_format($row->cost_usd, 6) }}</td>
       <td>
-        <span class="badge {{ $row->status === 'success' ? 'badge-green' : 'badge-red' }}">
+        <span class="badge {{ $row->status === 'completed' ? 'badge-green' : ($row->status === 'failed' ? 'badge-red' : 'badge-yellow') }}">
           {{ ucfirst($row->status) }}
         </span>
       </td>

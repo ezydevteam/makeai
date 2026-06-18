@@ -77,6 +77,7 @@ async function save() {
         if (res.ok || res.redirected) {
             resetForm()
             fetchNotes()
+            emit('close')
         } else {
             const data = await res.json()
             error.value = data.message || 'Something went wrong.'
@@ -120,7 +121,12 @@ async function fetchNotes() {
 const isReminderDue = (n: Note) => n.reminder_date && !n.reminder_sent && new Date(n.reminder_date) <= new Date()
 
 watch(() => props.open, async (isOpen) => {
-    if (!isOpen) return
+    if (!isOpen) {
+        resetForm()
+        return
+    }
+
+    resetForm()
     await fetchNotes()
     if (props.editNoteId) {
         const note = notes.value.find(n => n.id === props.editNoteId)
@@ -142,7 +148,7 @@ watch(() => props.open, async (isOpen) => {
                 </div>
 
                 <!-- Form -->
-                <div class="p-6 border-b border-gray-100 dark:border-surface-800">
+                <div class="px-6 py-6">
                     <div class="grid grid-cols-1 gap-3">
                         <input v-model="form.subject" type="text" :placeholder="t('Subject')" maxlength="255"
                             class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:placeholder-gray-500" />
@@ -161,7 +167,7 @@ watch(() => props.open, async (isOpen) => {
                             </div>
                         </div>
                         <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 pt-1">
                             <button @click="save" :disabled="loading"
                                 class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all disabled:opacity-50">
                                 {{ editingNote ? t('Update') : t('Add Note') }}

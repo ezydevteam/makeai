@@ -52,11 +52,14 @@ const normalizedOptions = (field: ToolField) => {
         return tones.map(t => ({ label: t, value: t.toLowerCase() }))
     }
     if (field.type === 'length_select') {
+        if (field.options && field.options.length > 0) {
+            return field.options
+        }
         return [
-            { label: 'Short - about 100 words', value: 'short' },
-            { label: 'Medium - about 300 words', value: 'medium' },
-            { label: 'Long - about 600 words', value: 'long' },
-            { label: 'Very Long - about 1200 words', value: 'very_long' },
+            { label: 'Short (~100 words)', value: 'short' },
+            { label: 'Medium (~300 words)', value: 'medium' },
+            { label: 'Long (~600 words)', value: 'long' },
+            { label: 'Very Long (~1200 words)', value: 'very_long' },
         ]
     }
     if (field.type === 'language_select') {

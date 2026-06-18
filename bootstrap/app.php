@@ -54,6 +54,7 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.auth' => AdminAuth::class,
             'admin.permission' => AdminPermission::class,
+            'admin.audit' => \App\Http\Middleware\AdminAuditLog::class,
             'check.credits' => CheckCredits::class,
             'not.banned' => NotBanned::class,
             'throttle' => ThrottleAiRequests::class,

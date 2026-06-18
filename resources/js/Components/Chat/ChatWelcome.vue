@@ -1,15 +1,10 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { inject } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import type { useChat, ChatProduct } from '@/Composables/useChat'
+import type { useChat } from '@/Composables/useChat'
 
 const { t } = useTranslate()
 const chat = inject<ReturnType<typeof useChat>>('chat')!
-
-const showAll = ref(false)
-
-const topProducts = computed(() => chat.products.value.slice(0, 2))
-const moreProducts = computed(() => chat.products.value.slice(2))
 
 const getProductIconClass = (icon?: string | null) => {
     const value = icon?.trim()
@@ -22,10 +17,6 @@ const getProductIconClass = (icon?: string | null) => {
     if (value.startsWith('ti ')) return value
     if (value.startsWith('ti-')) return `ti ${value}`
     return `ti ti-${value}`
-}
-
-const selectProduct = (p: ChatProduct) => {
-    chat.newChat(p)
 }
 </script>
 

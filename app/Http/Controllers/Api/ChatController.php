@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
@@ -27,7 +28,7 @@ class ChatController extends Controller
         $user = Auth::user();
         $isPro = $user->is_pro === true || ($user->plan?->type ?? '') === 'pro';
 
-        $query = $user->conversations()->latest('last_message_at');
+        $query = $user->conversations()->orderByDesc('is_pinned')->latest('last_message_at');
 
         $limit = $isPro ? 200 : (int) settings('free_max_chat_history', 30);
         $query->limit($limit);
@@ -38,9 +39,13 @@ class ChatController extends Controller
             $query->whereNull('project_id');
         }
 
+        if ($request->filled('tag_id')) {
+            $query->whereHas('tags', fn($q) => $q->where('conversation_tags.id', $request->integer('tag_id')));
+        }
+
         return response()->json([
             'success' => true,
-            'data' => $query->get(),
+            'data' => $query->with('tags')->get(),
         ]);
     }
 
@@ -67,17 +72,39 @@ class ChatController extends Controller
         ], 201);
     }
 
-    public function show(string $ulid): JsonResponse
+    public function show(Request $request, string $ulid): JsonResponse
     {
         $conversation = Conversation::where('ulid', $ulid)
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
+        $perPage = 30;
+        $beforeId = $request->input('before');
+
+        $query = $conversation->messages()->orderBy('created_at', 'desc');
+
+        if ($beforeId) {
+            $beforeMessage = $conversation->messages()->find($beforeId);
+            if ($beforeMessage) {
+                $query->where('created_at', '<', $beforeMessage->created_at);
+            }
+        }
+
+        $messages = $query->limit($perPage + 1)->get();
+        $hasMore = $messages->count() > $perPage;
+
+        if ($hasMore) {
+            $messages = $messages->take($perPage);
+        }
+
+        $messages = $messages->sortBy('created_at')->values();
+
         return response()->json([
             'success' => true,
             'data' => [
                 'conversation' => $conversation,
-                'messages' => $conversation->messages()->get(),
+                'messages' => $messages,
+                'has_more' => $hasMore,
             ],
         ]);
     }
@@ -116,6 +143,297 @@ class ChatController extends Controller
         ]);
     }
 
+    public function togglePin(string $ulid): JsonResponse
+    {
+        $conversation = Conversation::where('ulid', $ulid)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $conversation->update(['is_pinned' => !$conversation->is_pinned]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $conversation,
+        ]);
+    }
+
+    public function share(string $ulid): JsonResponse
+    {
+        $conversation = Conversation::where('ulid', $ulid)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        if (!$conversation->share_token) {
+            $conversation->update(['share_token' => (string) \Illuminate\Support\Str::ulid()]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'share_url' => url("/share/{$conversation->share_token}"),
+                'share_token' => $conversation->share_token,
+            ],
+        ]);
+    }
+
+    public function unshare(string $ulid): JsonResponse
+    {
+        $conversation = Conversation::where('ulid', $ulid)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $conversation->update(['share_token' => null]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function sharedView(string $token): JsonResponse
+    {
+        $conversation = Conversation::where('share_token', $token)->firstOrFail();
+
+        $messages = $conversation->messages()
+            ->where('role', 'assistant')
+            ->orderBy('created_at')
+            ->get(['role', 'content', 'model', 'created_at']);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'title' => $conversation->title,
+                'model' => $conversation->model,
+                'messages' => $messages,
+            ],
+        ]);
+    }
+
+    public function branch(Request $request, string $ulid): JsonResponse
+    {
+        $user = Auth::user();
+        $conversation = Conversation::where('ulid', $ulid)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'message_id' => 'required|integer|exists:conversation_messages,id',
+        ]);
+
+        $branchMessage = $conversation->messages()->find($validated['message_id']);
+        if (!$branchMessage) {
+            return response()->json(['success' => false, 'message' => 'Message not found.'], 404);
+        }
+
+        // Create new conversation branched from this point
+        $newConversation = $user->conversations()->create([
+            'product_slug' => $conversation->product_slug,
+            'project_id' => $conversation->project_id,
+            'model' => $conversation->model,
+            'title' => ($conversation->title ?: 'Chat') . ' (branch)',
+            'parent_conversation_id' => $conversation->id,
+            'branch_point_message_id' => $branchMessage->id,
+            'last_message_at' => now(),
+        ]);
+
+        // Copy messages up to and including the branch point
+        $messagesUpToBranch = $conversation->messages()
+            ->where('created_at', '<=', $branchMessage->created_at)
+            ->orderBy('created_at')
+            ->get();
+
+        foreach ($messagesUpToBranch as $msg) {
+            $newConversation->messages()->create([
+                'role' => $msg->role,
+                'content' => $msg->content,
+                'model' => $msg->model,
+                'input_tokens' => $msg->input_tokens,
+                'output_tokens' => $msg->output_tokens,
+                'credits_charged' => $msg->credits_charged,
+                'attachments' => $msg->attachments,
+                'created_at' => $msg->created_at,
+            ]);
+        }
+
+        $newConversation->update([
+            'message_count' => $messagesUpToBranch->count(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $newConversation,
+        ], 201);
+    }
+
+    public function editMessage(Request $request, string $ulid, int $messageId): JsonResponse
+    {
+        $user = Auth::user();
+        $conversation = Conversation::where('ulid', $ulid)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'content' => 'required|string|max:16000',
+        ]);
+
+        $message = $conversation->messages()->where('role', 'user')->find($messageId);
+        if (!$message) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Message not found or cannot be edited.',
+            ], 404);
+        }
+
+        // Update the message content
+        $message->update(['content' => $validated['content']]);
+
+        // Delete all messages after this one (both user and assistant)
+        $conversation->messages()
+            ->where('created_at', '>', $message->created_at)
+            ->delete();
+
+        // Recalculate message count
+        $messageCount = $conversation->messages()->count();
+        $conversation->update(['message_count' => $messageCount]);
+
+        return response()->json([
+            'success' => true,
+            'message' => translate('Message updated successfully.'),
+            'data' => [
+                'message' => $message,
+                'should_regenerate' => true,
+            ],
+        ]);
+    }
+
+    public function export(Request $request, string $ulid): \Symfony\Component\HttpFoundation\Response
+    {
+        $user = Auth::user();
+        $conversation = Conversation::where('ulid', $ulid)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $format = $request->input('format', 'md');
+        $messages = $conversation->messages()->orderBy('created_at')->get();
+
+        $title = $conversation->title ?: 'Chat Export';
+        $filename = \Illuminate\Support\Str::slug($title) . '-' . $conversation->ulid;
+
+        if ($format === 'json') {
+            $data = [
+                'conversation' => [
+                    'ulid' => $conversation->ulid,
+                    'title' => $conversation->title,
+                    'model' => $conversation->model,
+                    'created_at' => $conversation->created_at->toIso8601String(),
+                    'message_count' => $conversation->message_count,
+                ],
+                'messages' => $messages->map(fn ($m) => [
+                    'role' => $m->role,
+                    'content' => $m->content,
+                    'model' => $m->model,
+                    'created_at' => $m->created_at?->toIso8601String(),
+                    'attachments' => $m->attachments,
+                ]),
+            ];
+
+            return response()->json($data, 200, [
+                'Content-Disposition' => "attachment; filename=\"{$filename}.json\"",
+            ]);
+        }
+
+        if ($format === 'pdf') {
+            // Generate markdown first, then convert to HTML for PDF
+            $markdown = $this->generateMarkdownExport($conversation, $messages);
+            $html = $this->markdownToHtml($markdown);
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+            return $pdf->download("{$filename}.pdf");
+        }
+
+        // Default: markdown
+        $markdown = $this->generateMarkdownExport($conversation, $messages);
+        return response($markdown, 200, [
+            'Content-Type' => 'text/markdown',
+            'Content-Disposition' => "attachment; filename=\"{$filename}.md\"",
+        ]);
+    }
+
+    private function generateMarkdownExport(Conversation $conversation, $messages): string
+    {
+        $title = $conversation->title ?: 'Chat Export';
+        $date = $conversation->created_at->format('Y-m-d H:i:s');
+        
+        $md = "# {$title}\n\n";
+        $md .= "**Exported:** {$date}  \n";
+        $md .= "**Model:** {$conversation->model}  \n";
+        $md .= "**Messages:** {$conversation->message_count}\n\n";
+        $md .= "---\n\n";
+
+        foreach ($messages as $msg) {
+            $role = ucfirst($msg->role);
+            $time = $msg->created_at?->format('H:i:s') ?? '';
+            
+            $md .= "## {$role}";
+            if ($time) {
+                $md .= " _({$time})_";
+            }
+            $md .= "\n\n";
+            $md .= $msg->content . "\n\n";
+            
+            if ($msg->attachments) {
+                $md .= "**Attachments:**\n";
+                foreach ($msg->attachments as $att) {
+                    $md .= "- {$att['name']} ({$att['type']})\n";
+                }
+                $md .= "\n";
+            }
+            
+            $md .= "---\n\n";
+        }
+
+        return $md;
+    }
+
+    private function markdownToHtml(string $markdown): string
+    {
+        $html = \Illuminate\Support\Str::markdown($markdown);
+        
+        return '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; line-height: 1.6; color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        h2 { margin-top: 30px; color: #555; }
+        hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        em { color: #888; }
+    </style>
+</head>
+<body>' . $html . '</body></html>';
+    }
+
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+
+        $validated = $request->validate([
+            'chat_custom_instructions' => 'nullable|string|max:2000',
+        ]);
+
+        $user->update([
+            'chat_custom_instructions' => $validated['chat_custom_instructions'] ?? null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => translate('Settings updated successfully.'),
+            'data' => [
+                'chat_custom_instructions' => $user->chat_custom_instructions,
+            ],
+        ]);
+    }
+
     public function sendMessage(Request $request, string $ulid): StreamedResponse
     {
         $user = Auth::user();
@@ -127,6 +445,15 @@ class ChatController extends Controller
             'content' => 'required|string|max:16000',
             'product_slug' => 'nullable|string|exists:chatbot_products,slug',
             'model' => 'nullable|string|max:150',
+            'attachments' => 'nullable|array|max:5',
+            'attachments.*.id' => 'required|string|max:26',
+            'attachments.*.name' => 'required|string|max:255',
+            'attachments.*.type' => 'required|string|max:100',
+            'attachments.*.size' => 'required|integer|min:1',
+            'attachments.*.extension' => 'required|string|max:10',
+            'attachments.*.storage_path' => 'required|string|max:500',
+            'attachments.*.text_content' => 'nullable|string|max:20000',
+            'use_knowledge_base' => 'nullable|boolean',
         ]);
 
         $product = null;
@@ -137,7 +464,43 @@ class ChatController extends Controller
         }
 
         $model = $validated['model'] ?? $conversation->model ?? $product?->default_model ?? 'gpt-4o-mini';
+        
+        // Validate model exists and is active
+        $aiModel = \App\Models\AiModel::where('slug', $model)->where('is_active', true)->first();
+        if (!$aiModel) {
+            return response()->stream(function () use ($model) {
+                echo 'data: '.json_encode(['type' => 'error', 'message' => "Model '{$model}' is not available."])."\n\n";
+            }, 200, [
+                'Content-Type' => 'text/event-stream',
+                'X-Accel-Buffering' => 'no',
+                'Cache-Control' => 'no-cache',
+            ]);
+        }
+        
         $systemPrompt = $product?->system_prompt ?? null;
+
+        // Inject user's custom instructions if they exist
+        if ($user->chat_custom_instructions) {
+            $customInstructions = "\n\nUser's Custom Instructions:\n" . $user->chat_custom_instructions;
+            $systemPrompt = ($systemPrompt ?? '') . $customInstructions;
+        }
+
+        // Inject knowledge base context if requested
+        $kbSources = [];
+        if (!empty($validated['use_knowledge_base']) && class_exists(\Addons\PublicKnowledgeBase\Services\KbSearchService::class)) {
+            try {
+                $kbService = app(\Addons\PublicKnowledgeBase\Services\KbSearchService::class);
+                $kbResult = $kbService->getRelevantContext($validated['content']);
+
+                if (!empty($kbResult['context'])) {
+                    $kbContext = "\n\nKnowledge Base Context (use this information to help answer the user's question):\n" . $kbResult['context'];
+                    $systemPrompt = ($systemPrompt ?? '') . $kbContext;
+                    $kbSources = $kbResult['sources'];
+                }
+            } catch (\Throwable $e) {
+                // Silently fail - KB is optional
+            }
+        }
 
         $productSwitch = null;
         if ($product && $conversation->product_slug !== $product->slug) {
@@ -145,11 +508,14 @@ class ChatController extends Controller
             $conversation->update(['product_slug' => $product->slug]);
         }
 
+        $attachments = $validated['attachments'] ?? null;
+
         $userMsg = $conversation->messages()->create([
             'role' => 'user',
             'content' => $validated['content'],
             'model' => $model,
             'product_switch' => $productSwitch,
+            'attachments' => $attachments,
         ]);
 
         if (! $conversation->title) {
@@ -169,7 +535,59 @@ class ChatController extends Controller
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
         }
         foreach ($history as $msg) {
-            $messages[] = ['role' => $msg->role, 'content' => $msg->content];
+            $content = $msg->content;
+            
+            // Handle user messages with attachments
+            if ($msg->role === 'user' && $msg->attachments) {
+                $imageAttachments = [];
+                $textAttachments = [];
+                
+                foreach ($msg->attachments as $attachment) {
+                    $mimeType = $attachment['type'] ?? '';
+                    
+                    // Check if it's an image
+                    if (str_starts_with($mimeType, 'image/')) {
+                        $imageAttachments[] = $attachment;
+                    } elseif (!empty($attachment['text_content'])) {
+                        $textAttachments[] = "[File: {$attachment['name']}]\n{$attachment['text_content']}";
+                    }
+                }
+                
+                // If there are images, use multi-modal format
+                if (!empty($imageAttachments)) {
+                    $contentParts = [['type' => 'text', 'text' => $content]];
+                    
+                    // Add image URLs as base64 data
+                    foreach ($imageAttachments as $img) {
+                        $imgPath = $img['storage_path'] ?? null;
+                        if ($imgPath && Storage::disk('local')->exists($imgPath)) {
+                            $fullPath = Storage::disk('local')->path($imgPath);
+                            $imgData = file_get_contents($fullPath);
+                            $base64 = base64_encode($imgData);
+                            $dataUrl = "data:{$mimeType};base64,{$base64}";
+                            $contentParts[] = [
+                                'type' => 'image_url',
+                                'image_url' => ['url' => $dataUrl],
+                            ];
+                        }
+                    }
+                    
+                    // Append text attachment content
+                    if (!empty($textAttachments)) {
+                        $contentParts[0]['text'] .= "\n\n" . implode("\n\n", $textAttachments);
+                    }
+                    
+                    $messages[] = ['role' => $msg->role, 'content' => $contentParts];
+                } else {
+                    // No images, use traditional text format
+                    if (!empty($textAttachments)) {
+                        $content .= "\n\n" . implode("\n\n", $textAttachments);
+                    }
+                    $messages[] = ['role' => $msg->role, 'content' => $content];
+                }
+            } else {
+                $messages[] = ['role' => $msg->role, 'content' => $content];
+            }
         }
 
         $provider = $model ? $this->resolveProvider($model) : 'openai';
@@ -187,10 +605,19 @@ class ChatController extends Controller
         }
 
         return response()->stream(function () use (
-            $conversation, $user, $model, $provider, $messages
+            $conversation, $user, $model, $provider, $messages, $kbSources
 
         ) {
             $fullContent = '';
+
+            // Emit KB sources before streaming tokens
+            if (!empty($kbSources)) {
+                echo 'data: '.json_encode(['type' => 'kb_sources', 'sources' => $kbSources])."\n\n";
+                if (ob_get_level() > 0) {
+                    ob_flush();
+                }
+                flush();
+            }
 
             try {
                 $adapter = ProviderRegistry::resolve($provider);

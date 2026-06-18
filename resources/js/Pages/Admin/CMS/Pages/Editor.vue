@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue';
 import { Head, useForm, Link, router } from '@inertiajs/vue3';
+import { onClickOutside } from '@vueuse/core'
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { useToastr } from '@/Composables/useToastr';
 import { useTranslate } from '@/Composables/useTranslate';
@@ -81,12 +82,26 @@ const form = useForm({
 
 const featuredPreview = ref(props.page?.featured_image ? `/storage/${props.page.featured_image}` : null);
 const ogPreview = ref(props.page?.og_image ? `/storage/${props.page.og_image}` : null);
+const publishMenuOpen = ref(false)
+const publishMenuRef = ref<HTMLElement | null>(null)
 
 const statusOptions = computed(() => [
     { value: 'draft', label: t('Draft') },
     { value: 'published', label: t('Published') },
     { value: 'scheduled', label: t('Scheduled') },
 ]);
+
+const primaryActionLabel = computed(() => {
+    if (form.status === 'published') {
+        return t('Publish')
+    }
+
+    if (form.status === 'scheduled') {
+        return t('Schedule')
+    }
+
+    return t('Save Draft')
+})
 
 const templateOptions = computed(() => [
     { value: 'default', label: t('Default') },
@@ -114,6 +129,11 @@ const sidebarPositionOptions = computed(() => [
     { value: 'left', label: t('Sidebar Left') },
     { value: 'right', label: t('Sidebar Right') },
 ]);
+
+const setStatus = (value: 'draft' | 'published' | 'scheduled') => {
+    form.status = value
+    publishMenuOpen.value = false
+}
 
 const pageAiAssistActions: AiAssistAction[] = [
     {
@@ -303,44 +323,85 @@ const confirmDeletePage = () => {
         },
     });
 };
+
+onClickOutside(publishMenuRef, () => {
+    publishMenuOpen.value = false
+})
 </script>
 
 <template>
     <Head :title="page ? t('Edit Page') : t('Create Page')" />
-    <div class="mx-auto max-w-7xl px-6 py-8">
-        <div class="mb-8 rounded-3xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="mb-8">
             <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                <div class="flex items-start gap-4">
-                    <Link :href="route('admin.pages.index')" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 text-gray-500 transition-colors hover:bg-white hover:text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 dark:hover:text-white">
-                        <i class="ti ti-arrow-left text-lg"></i>
-                    </Link>
-                    <div>
-                        <div class="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 dark:border-primary-900/30 dark:bg-primary-900/20 dark:text-primary-300">
-                            <i class="ti ti-file-text text-sm"></i>
-                            {{ page ? t('Content Editor') : t('New Content Draft') }}
-                        </div>
-                        <h1 class="mt-3 text-2xl font-bold text-gray-900 dark:text-white">{{ page ? t('Edit Page') : t('Create Page') }}</h1>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{{ t('Design, organize, and publish custom content for your public site from one workspace.') }}</p>
-                    </div>
+                <div>
+                    <h1 class="mt-3 text-2xl font-bold text-gray-900 dark:text-white">{{ page ? t('Edit Page') : t('Create Page') }}</h1>
+                    <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{{ t('Design, organize, and publish custom content for your public site from one workspace.') }}</p>
                 </div>
 
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                    v-if="page && !page.is_system"
-                    @click="confirmDeletePage"
-                    type="button"
-                    class="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-xs font-bold uppercase tracking-widest text-red-600 transition-colors hover:bg-red-100 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
-                >
-                    {{ t('Delete Page') }}
-                </button>
-
-                    <div class="min-w-[180px]">
-                        <AppSelect v-model="form.status" :options="statusOptions" />
-                    </div>
-
-                    <button @click="submit" :disabled="form.processing" class="btn-primary rounded-2xl px-8 py-3 font-bold transition-all shadow-lg shadow-primary-600/20">
-                        {{ form.processing ? t('Saving...') : page ? t('Update Page') : t('Publish Page') }}
+                    <button
+                        v-if="page && !page.is_system"
+                        @click="confirmDeletePage"
+                        type="button"
+                        class="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
+                    >
+                        {{ t('Delete Page') }}
                     </button>
+
+                    <Link
+                        :href="route('admin.pages.index')"
+                        class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700  transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    >
+                        <i class="ti ti-arrow-left text-base"></i>
+                        {{ t('Back') }}
+                    </Link>
+
+                    <div ref="publishMenuRef" class="relative">
+                        <div class="inline-flex overflow-hidden rounded-lg shadow-sm ring-1 ring-primary-600/20">
+                            <button
+                                @click="submit"
+                                :disabled="form.processing"
+                                type="button"
+                                class="inline-flex items-center justify-center gap-2 bg-primary-500 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60"
+                            >
+                                <i class="ti ti-device-floppy text-base"></i>
+                                {{ form.processing ? t('Saving...') : primaryActionLabel }}
+                            </button>
+                            <button
+                                type="button"
+                                class="inline-flex items-center justify-center bg-primary-500 px-3 text-white transition-colors disabled:opacity-60"
+                                :aria-label="t('Change page status')"
+                                @click="publishMenuOpen = !publishMenuOpen"
+                            >
+                                <i class="ti ti-chevron-down text-base"></i>
+                            </button>
+                        </div>
+
+                        <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Save as Draft') }}
+                                </span>
+                                <i v-if="form.status === 'draft'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('scheduled')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-calendar-time text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Schedule Page') }}
+                                </span>
+                                <i v-if="form.status === 'scheduled'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('published')">
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="ti ti-rocket text-base text-gray-400 dark:text-gray-500"></i>
+                                    {{ t('Publish Now') }}
+                                </span>
+                                <i v-if="form.status === 'published'" class="ti ti-check text-base text-primary-600"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -348,17 +409,19 @@ const confirmDeletePage = () => {
         <div class="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
             <!-- Editor Column -->
             <div class="space-y-6">
-                <div class="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="space-y-6">
                     <div>
-                        <label class="mb-3 block text-xs font-bold uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">{{ t('Page Title') }}</label>
+                        <label class="mb-3 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Title') }}</label>
                         <input v-model="form.title" @input="syncSlug" type="text" :placeholder="t('Enter page title')" class="w-full border-none bg-transparent p-0 text-4xl font-black text-gray-900 placeholder:text-gray-300 focus:ring-0 dark:text-white dark:placeholder:text-gray-600">
+                        <p v-if="form.errors.title" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.title }}</p>
                         <div class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-surface-800 dark:bg-surface-800">
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Page Slug') }}</label>
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Slug') }}</label>
                             <div class="flex flex-col gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 md:flex-row md:items-center">
                                 <span class="truncate text-gray-700 dark:text-gray-300">{{ $page.props.app?.url }}/</span>
                                 <input v-model="form.slug" @input="markSlugTouched" type="text" :placeholder="t('page-slug')" class="min-w-[220px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-900 dark:text-white">
                             </div>
+                            <p v-if="form.errors.slug" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.slug }}</p>
                         </div>
                     </div>
 
@@ -374,42 +437,47 @@ const confirmDeletePage = () => {
                             :ai-assist-loading-label="t('Working...')"
                             @ai-assist="runAiAssist"
                         />
+                        <p v-if="form.errors.content" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.content }}</p>
                     </div>
 
                     <div>
-                        <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Excerpt (Short Summary)') }}</label>
-                        <textarea v-model="form.excerpt" rows="3" class="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                        <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Excerpt (Short Summary)') }}</label>
+                        <textarea v-model="form.excerpt" rows="3" :placeholder="t('Write a short summary for this page')" class="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                        <p v-if="form.errors.excerpt" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.excerpt }}</p>
                     </div>
                 </div>
                 </div>
 
                 <!-- SEO Card -->
-                <div class="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-8">
-                        <h3 class="text-sm font-bold uppercase tracking-[0.18em] text-gray-900 dark:text-white">{{ t('Search Engine Optimization') }}</h3>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Control how this page appears in search engines and social sharing previews.') }}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('SEO') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control how this page appears in search engines and social sharing previews.') }}</p>
                     </div>
                     <div class="grid grid-cols-1 gap-6">
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Meta Title') }}</label>
-                            <input v-model="form.meta_title" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Meta Title') }}</label>
+                            <input v-model="form.meta_title" type="text" :placeholder="t('Enter SEO title')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <p v-if="form.errors.meta_title" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.meta_title }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Meta Description') }}</label>
-                            <textarea v-model="form.meta_description" rows="3" class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Meta Description') }}</label>
+                            <textarea v-model="form.meta_description" rows="3" :placeholder="t('Enter meta description')" class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                            <p v-if="form.errors.meta_description" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.meta_description }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Meta Keywords') }}</label>
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Meta Keywords') }}</label>
                             <input v-model="form.meta_keywords" type="text" :placeholder="t('keyword1, keyword2...')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition-all focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <p v-if="form.errors.meta_keywords" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.meta_keywords }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Open Graph Image') }}</label>
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Open Graph Image') }}</label>
                             <div class="flex items-center gap-4">
                                 <div class="flex h-20 w-32 items-center justify-center overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 dark:border-surface-800 dark:bg-surface-800">
                                     <img v-if="ogPreview" :src="ogPreview" class="h-full w-full object-cover">
                                     <svg v-else class="w-7 h-7 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                 </div>
-                                <label class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-xs font-bold text-gray-600 transition-colors hover:text-primary-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:text-primary-300">
+                                <label class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:text-primary-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:text-primary-300">
                                     <input type="file" class="hidden" @change="handleOgChange" accept="image/*">
                                     {{ t('Upload Image') }}
                                 </label>
@@ -422,46 +490,51 @@ const confirmDeletePage = () => {
             <!-- Settings Column -->
             <div class="space-y-6">
                 <!-- Page Attributes -->
-                <div class="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-6">
-                        <h3 class="text-sm font-bold uppercase tracking-[0.18em] text-gray-900 dark:text-white">{{ t('Attributes') }}</h3>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Control template choice, structure, visibility, and layout behavior.') }}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Attributes') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control template choice, structure, visibility, and layout behavior.') }}</p>
                     </div>
                     <div class="space-y-4">
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Template') }}</label>
-                            <AppSelect v-model="form.template" :options="templateOptions" />
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Template') }}</label>
+                            <AppSelect v-model="form.template" :options="templateOptions" :placeholder="t('Select template')" />
+                            <p v-if="form.errors.template" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.template }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Parent Page') }}</label>
-                            <AppSelect v-model="form.parent_id" :options="parentOptions" />
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Parent Page') }}</label>
+                            <AppSelect v-model="form.parent_id" :options="parentOptions" :placeholder="t('Select parent page')" />
+                            <p v-if="form.errors.parent_id" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.parent_id }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Display Order') }}</label>
-                            <input v-model="form.sort_order" type="number" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Display Order') }}</label>
+                            <input v-model="form.sort_order" type="number" :placeholder="t('Enter display order')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <p v-if="form.errors.sort_order" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.sort_order }}</p>
                         </div>
                         <div v-if="form.status === 'scheduled'">
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Publish At') }}</label>
-                            <input v-model="form.published_at" type="datetime-local" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Publish At') }}</label>
+                            <input v-model="form.published_at" type="datetime-local" :placeholder="t('Choose publish date and time')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                             <p v-if="form.errors.published_at" class="mt-2 text-xs font-bold text-danger-600">{{ form.errors.published_at }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Password Protection') }}</label>
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Password Protection') }}</label>
                             <input v-model="form.password" type="password" :placeholder="page?.has_password ? t('Leave blank to keep current password') : t('Optional page password')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            <p v-if="page?.has_password" class="mt-2 text-[10px] font-bold uppercase tracking-widest text-primary-600 dark:text-primary-300">{{ t('Password enabled') }}</p>
+                            <p v-if="form.errors.password" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.password }}</p>
+                            <p v-if="page?.has_password" class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">{{ t('Password enabled') }}</p>
                         </div>
                         <div>
-                            <label class="mb-2 block text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Container Width') }}</label>
-                            <AppSelect v-model="form.container_width" :options="containerWidthOptions" />
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Container Width') }}</label>
+                            <AppSelect v-model="form.container_width" :options="containerWidthOptions" :placeholder="t('Select container width')" />
+                            <p v-if="form.errors.container_width" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.container_width }}</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Featured Image -->
-                <div class="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-4">
-                        <h3 class="text-sm font-bold uppercase tracking-[0.18em] text-gray-900 dark:text-white">{{ t('Featured Image') }}</h3>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the main visual used for listings and page presentation.') }}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Featured Image') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the main visual used for listings and page presentation.') }}</p>
                     </div>
                     <div class="relative group">
                         <div class="aspect-video overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 flex items-center justify-center dark:border-surface-800 dark:bg-surface-800">
@@ -470,32 +543,32 @@ const confirmDeletePage = () => {
                         </div>
                         <label class="absolute inset-0 flex items-center justify-center bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
                             <input type="file" class="hidden" @change="handleFeaturedChange" accept="image/*">
-                            <span class="text-white text-[10px] font-black uppercase tracking-widest">{{ t('Update Image') }}</span>
+                            <span class="text-white text-sm font-semibold">{{ t('Update Image') }}</span>
                         </label>
                     </div>
                 </div>
 
                 <!-- Layout Options -->
-                <div class="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-6">
-                        <h3 class="text-sm font-bold uppercase tracking-[0.18em] text-gray-900 dark:text-white">{{ t('Layout Options') }}</h3>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Toggle visible elements and adjust how this page is framed on the frontend.') }}</p>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Toggle visible elements and adjust how this page is framed on the frontend.') }}</p>
                     </div>
                     <div class="space-y-4">
                         <label class="flex items-center justify-between cursor-pointer group">
-                            <span class="text-xs font-bold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Title') }}</span>
+                            <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Title') }}</span>
                             <button @click="form.show_title = !form.show_title" type="button" :class="form.show_title ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
                                 <span :class="form.show_title ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
                             </button>
                         </label>
                         <label class="flex items-center justify-between cursor-pointer group">
-                            <span class="text-xs font-bold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Sidebar') }}</span>
+                            <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Sidebar') }}</span>
                             <button @click="form.show_sidebar = !form.show_sidebar" type="button" :class="form.show_sidebar ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
                                 <span :class="form.show_sidebar ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
                             </button>
                         </label>
                         <div v-if="form.show_sidebar" class="pt-2">
-                            <AppSelect v-model="form.sidebar_position" :options="sidebarPositionOptions" />
+                            <AppSelect v-model="form.sidebar_position" :options="sidebarPositionOptions" :placeholder="t('Select sidebar position')" />
                         </div>
                     </div>
                 </div>

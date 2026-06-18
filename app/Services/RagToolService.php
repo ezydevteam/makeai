@@ -430,6 +430,16 @@ class RagToolService
                     ['tool_slug' => $session->tool_slug],
                 );
 
+                // Add chunk-based credits
+                $chunksPerCredit = (int) settings('rag_chunks_per_credit', 50);
+                if ($chunksPerCredit > 0 && count($sources) > 0) {
+                    $chunkCredits = (int) ceil(count($sources) / $chunksPerCredit);
+                    $creditsUsed += $chunkCredits;
+                    
+                    // Deduct additional credits for chunks
+                    $user->decrement('credits', $chunkCredits);
+                }
+
                 $inputTokens = $usageStats['input_tokens'] ?? 0;
                 $outputTokens = $usageStats['output_tokens'] ?? 0;
 

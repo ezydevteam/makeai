@@ -14,6 +14,7 @@ use App\Services\AI\AiService;
 use App\Services\SupportTicketService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -52,6 +53,8 @@ class TicketController extends Controller
                 'first_response_hours' => (int) settings('sla_first_response_hours', 24),
                 'resolution_hours' => (int) settings('sla_resolution_hours', 72),
             ],
+            'settings' => $this->settingsPayload(),
+            'openSettings' => $request->boolean('settings'),
         ]);
     }
 
@@ -101,16 +104,19 @@ class TicketController extends Controller
         abort_unless((bool) settings('ai_reply_suggestion', true), 403);
 
         $ticket->load(['user:id,name', 'department:id,name', 'replies']);
-        $admin = auth('admin')->user();
-        $user = User::where('email', $admin?->email)->first() ?? User::query()->first();
+        
+        // Use a dedicated system user for internal admin AI operations to prevent leaking customer quotas/context
+        $user = User::firstOrCreate(
+            ['email' => User::internalAiEmail()],
+            [
+                'name' => User::internalAiName(),
+                'password' => bcrypt(Str::random(32)),
+                'is_active' => true,
+                'plan_id' => null,
+                'subscription_status' => 'active',
+            ]
+        );
 
-        if (! $user) {
-            return response()->json([
-                'success' => false,
-                'code' => 'AI_USER_MISSING',
-                'message' => translate('No user account is available to process AI requests.'),
-            ], 422);
-        }
         $history = $ticket->replies
             ->where('is_internal_note', false)
             ->map(fn ($reply) => strtoupper($reply->author_type).': '.strip_tags($reply->content))
@@ -120,7 +126,8 @@ class TicketController extends Controller
             $user,
             "Draft a helpful support reply.\n\nSubject: {$ticket->subject}\nDepartment: {$ticket->department?->name}\nCustomer: {$ticket->user?->name}\n\nConversation:\n{$history}",
             'You are a concise SaaS support agent. Return clean HTML paragraphs only, no greeting if one already exists.',
-            options: ['max_tokens' => 500, 'temperature' => 0.35]
+            options: ['max_tokens' => 500, 'temperature' => 0.35],
+            toolSlug: 'admin_ticket_suggest'
         );
 
         return response()->json([
@@ -225,25 +232,28 @@ class TicketController extends Controller
 
         $callback = function () use ($tickets) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Ticket #', 'Subject', 'Customer', 'Email', 'Department', 'Assigned To', 'Status', 'Priority', 'Created', 'Resolved At', 'Rating']);
+            
+            try {
+                fputcsv($handle, ['Ticket #', 'Subject', 'Customer', 'Email', 'Department', 'Assigned To', 'Status', 'Priority', 'Created', 'Resolved At', 'Rating']);
 
-            foreach ($tickets as $ticket) {
-                fputcsv($handle, [
-                    $ticket->ticket_number,
-                    $ticket->subject,
-                    $ticket->user?->name ?? '',
-                    $ticket->user?->email ?? '',
-                    $ticket->department?->name ?? '',
-                    $ticket->assignedAdmin?->name ?? translate('Unassigned'),
-                    $ticket->status,
-                    $ticket->priority,
-                    $ticket->created_at?->toDateTimeString() ?? '',
-                    $ticket->resolved_at?->toDateTimeString() ?? '',
-                    $ticket->satisfaction_rating ?? '',
-                ]);
+                foreach ($tickets as $ticket) {
+                    fputcsv($handle, [
+                        $ticket->ticket_number,
+                        $ticket->subject,
+                        $ticket->user?->name ?? '',
+                        $ticket->user?->email ?? '',
+                        $ticket->department?->name ?? '',
+                        $ticket->assignedAdmin?->name ?? translate('Unassigned'),
+                        $ticket->status,
+                        $ticket->priority,
+                        $ticket->created_at?->toDateTimeString() ?? '',
+                        $ticket->resolved_at?->toDateTimeString() ?? '',
+                        $ticket->satisfaction_rating ?? '',
+                    ]);
+                }
+            } finally {
+                fclose($handle);
             }
-
-            fclose($handle);
         };
 
         return response()->stream($callback, 200, $headers);
@@ -262,6 +272,23 @@ class TicketController extends Controller
             'in_progress' => (int) ($statusCounts['in_progress'] ?? 0),
             'waiting_user' => (int) ($statusCounts['waiting_user'] ?? 0),
             'resolved' => (int) ($statusCounts['resolved'] ?? 0),
+        ];
+    }
+
+    private function settingsPayload(): array
+    {
+        return [
+            'tickets_enabled' => (bool) settings('tickets_enabled', true),
+            'max_attachments_per_reply' => (int) settings('max_attachments_per_reply', 5),
+            'max_attachment_size_mb' => (int) settings('max_attachment_size_mb', 10),
+            'allowed_attachment_types' => settings('allowed_attachment_types', 'jpg,png,gif,pdf,txt,zip,mp4'),
+            'auto_close_resolved_days' => (int) settings('auto_close_resolved_days', 7),
+            'sla_first_response_hours' => (int) settings('sla_first_response_hours', 24),
+            'sla_resolution_hours' => (int) settings('sla_resolution_hours', 72),
+            'notify_admin_new_ticket' => (bool) settings('notify_admin_new_ticket', true),
+            'notify_user_reply' => (bool) settings('notify_user_reply', true),
+            'satisfaction_rating_enabled' => (bool) settings('satisfaction_rating_enabled', true),
+            'ai_reply_suggestion' => (bool) settings('ai_reply_suggestion', true),
         ];
     }
 

@@ -42,8 +42,6 @@ class ProviderRegistry
         'jina' => 'jina',
         'voyageai' => 'voyageai',
         'perplexity' => 'perplexity',
-        'together' => 'together',
-        'replicate' => 'replicate',
     ];
 
     /**

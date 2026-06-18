@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Payment;
+use App\Services\Payment\PaymentActivationService;
 use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,17 +23,17 @@ class ProcessPaymentWebhookJob implements ShouldQueue
         public array $payload,
     ) {}
 
-    public function handle(SubscriptionLifecycleService $lifecycle): void
+    public function handle(SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation): void
     {
         try {
             match ($this->gateway) {
-                'paypal' => $this->processPayPal($lifecycle),
-                'paddle' => $this->processPaddle($lifecycle),
-                'razorpay' => $this->processRazorpay($lifecycle),
-                'sslcommerz' => $this->processSslCommerz($lifecycle),
-                'coingate' => $this->processCoinGate($lifecycle),
-                'paystack' => $this->processPaystack($lifecycle),
-                '2checkout' => $this->processTwoCheckout($lifecycle),
+                'paypal' => $this->processPayPal($lifecycle, $activation),
+                'paddle' => $this->processPaddle($lifecycle, $activation),
+                'razorpay' => $this->processRazorpay($lifecycle, $activation),
+                'sslcommerz' => $this->processSslCommerz($lifecycle, $activation),
+                'coingate' => $this->processCoinGate($lifecycle, $activation),
+                'paystack' => $this->processPaystack($lifecycle, $activation),
+                '2checkout' => $this->processTwoCheckout($lifecycle, $activation),
                 default => Log::warning('Unknown gateway in webhook job', ['gateway' => $this->gateway]),
             };
         } catch (\Throwable $e) {
@@ -49,7 +50,19 @@ class ProcessPaymentWebhookJob implements ShouldQueue
         }
     }
 
-    private function processPayPal(SubscriptionLifecycleService $lifecycle): void
+    /**
+     * Activate a payment, routing to the appropriate method based on payment type.
+     */
+    private function activatePayment(Payment $payment, string $gatewayPaymentId, SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation, ?string $gatewaySubscriptionId = null): void
+    {
+        if ($payment->type === 'credit_topup') {
+            $activation->activateCreditTopup($payment, $gatewayPaymentId);
+        } else {
+            $lifecycle->activateFromPayment($payment, $gatewayPaymentId, $gatewaySubscriptionId);
+        }
+    }
+
+    private function processPayPal(SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation): void
     {
         // PayPal validation requires outbound HTTP request, handled here asynchronously
         $gateway = \App\Models\PaymentGateway::where('slug', 'paypal')->where('is_enabled', true)->firstOrFail();
@@ -66,7 +79,7 @@ class ProcessPaymentWebhookJob implements ShouldQueue
             $payment = Payment::where('ulid', $paymentUlid)->orWhere('gateway_payment_id', $paymentUlid)->first();
 
             if ($payment && $payment->status !== 'completed') {
-                $lifecycle->activateFromPayment($payment, data_get($resource, 'id'));
+                $this->activatePayment($payment, data_get($resource, 'id'), $lifecycle, $activation);
             }
         }
 
@@ -145,7 +158,7 @@ class ProcessPaymentWebhookJob implements ShouldQueue
         return $gateway->is_test_mode ? 'https://api-m.sandbox.paypal.com' : 'https://api-m.paypal.com';
     }
 
-    private function processSslCommerz(SubscriptionLifecycleService $lifecycle): void
+    private function processSslCommerz(SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation): void
     {
         $gateway = \App\Models\PaymentGateway::where('slug', 'sslcommerz')->where('is_enabled', true)->firstOrFail();
         $payment = Payment::where('ulid', $this->payload['tran_id'])->first();
@@ -156,7 +169,7 @@ class ProcessPaymentWebhookJob implements ShouldQueue
 
         if (in_array($this->payload['status'], ['VALID', 'VALIDATED'], true)) {
             if ($this->validSslCommerzPayment($gateway, $payment)) {
-                $lifecycle->activateFromPayment($payment, (string) ($this->payload['bank_tran_id'] ?? $this->payload['val_id']));
+                $this->activatePayment($payment, (string) ($this->payload['bank_tran_id'] ?? $this->payload['val_id']), $lifecycle, $activation);
             }
         } elseif (in_array($this->payload['status'], ['FAILED', 'CANCELLED', 'UNATTEMPTED', 'EXPIRED'], true)) {
             $lifecycle->fail($payment, (string) $this->payload['status']);

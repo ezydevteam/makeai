@@ -6,7 +6,7 @@ import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 defineOptions({ layout: UserDashboardLayout })
 
 const page = usePage()
-const user = computed(() => page.props.user as any)
+const user = computed(() => page.props.auth?.user as any)
 
 const profileForm = useForm({
     name: user.value?.name ?? '',

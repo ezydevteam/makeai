@@ -85,7 +85,7 @@ class ThrottleAiRequests
         $ip = $request->ip();
 
         return match ($category) {
-            'text_gen' => $request->user()?->ulid ?? 'ip:'.$ip,
+            'text_gen' => ($request->user()?->ulid ?? 'ip:'.$ip).'|tool:'.($request->input('slug') ?? '_'),
             'auth' => strtolower((string) ($request->input('email') ?? '')).'|'.$ip,
             'otp' => ($request->session()->get('admin_2fa_id')
                 ?? $request->session()->get('user_2fa_id')

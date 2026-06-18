@@ -187,6 +187,88 @@ class KbSearchService
         yield json_encode(['type' => 'done', 'query_id' => $log->id]) . "\n";
     }
 
+    /**
+     * Retrieve relevant KB context chunks for a query (no AI generation).
+     *
+     * Returns ['context' => string, 'sources' => array].
+     */
+    public function getRelevantContext(string $query, int $topK = 5): array
+    {
+        $embeddingResult = $this->ai->embedText($query);
+        $queryVector = $embeddingResult->vector;
+
+        $candidates = KbEmbedding::query()
+            ->join('kb_articles', 'kb_embeddings.kb_article_id', '=', 'kb_articles.id')
+            ->where('kb_articles.status', 'published')
+            ->where('kb_articles.published_at', '<=', now())
+            ->where('kb_articles.embed_status', 'done')
+            ->select(
+                'kb_embeddings.id',
+                'kb_embeddings.kb_article_id',
+                'kb_embeddings.chunk_text',
+                'kb_embeddings.embedding',
+                'kb_articles.title',
+                'kb_articles.slug',
+                'kb_articles.ulid',
+            )
+            ->limit(500)
+            ->orderBy('kb_embeddings.kb_article_id')
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return ['context' => '', 'sources' => []];
+        }
+
+        $scored = [];
+        foreach ($candidates as $c) {
+            $emb = $c->embedding;
+            if (is_string($emb)) {
+                $emb = json_decode($emb, true);
+            }
+            if (! is_array($emb) || empty($emb)) {
+                continue;
+            }
+            $sim = $this->cosineSimilarity($queryVector, $emb);
+            if ($sim < 0.3) {
+                continue;
+            }
+            $scored[] = ['similarity' => $sim, 'row' => $c];
+        }
+
+        usort($scored, fn ($a, $b) => $b['similarity'] <=> $a['similarity']);
+        $topChunks = array_slice($scored, 0, $topK);
+
+        if (empty($topChunks)) {
+            return ['context' => '', 'sources' => []];
+        }
+
+        // Build context string
+        $contextChunks = collect($topChunks)->map(fn ($c) =>
+            "Article: {$c['row']->title}\n{$c['row']->chunk_text}"
+        )->implode("\n\n---\n\n");
+
+        // Build unique source articles
+        $seen = [];
+        $sources = [];
+        foreach ($topChunks as $sc) {
+            $id = $sc['row']->kb_article_id;
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $sources[] = [
+                'ulid' => $sc['row']->ulid,
+                'title' => $sc['row']->title,
+                'slug' => $sc['row']->slug,
+            ];
+            if (count($sources) >= 5) {
+                break;
+            }
+        }
+
+        return ['context' => $contextChunks, 'sources' => $sources];
+    }
+
     public function getRelatedArticles(KbArticle $article, int $limit = 4): Collection
     {
         $embeddings = KbEmbedding::where('kb_article_id', $article->id)->pluck('embedding');

@@ -17,6 +17,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useToastr } from '@/Composables/useToastr'
 import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
 import { RICH_EDITOR_FONT_OPTIONS } from '@/config/fontFamilies'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
@@ -180,10 +181,27 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useTranslate()
+const toast = useToastr()
 const isSourceMode = ref(false)
 const sourceContent = ref(props.modelValue)
 const overflowOpen = ref(false)
 const aiAssistOpen = ref(false)
+const aiAssistSuccess = ref(false)
+let wasAiLoading = false
+
+watch(() => props.aiAssistLoadingKey, (newVal) => {
+    if (newVal) {
+        wasAiLoading = true
+        aiAssistSuccess.value = false
+    } else if (wasAiLoading) {
+        wasAiLoading = false
+        aiAssistSuccess.value = true
+        toast.success(t('AI assist completed successfully.'))
+        setTimeout(() => {
+            aiAssistSuccess.value = false
+        }, 2000)
+    }
+})
 const formatOpen = ref(false)
 const linkModalOpen = ref(false)
 const imageModalOpen = ref(false)
@@ -788,7 +806,16 @@ onBeforeUnmount(() => {
             <div class="flex-1"></div>
             <div class="flex shrink-0 items-center gap-1 border-l border-gray-200 dark:border-surface-700 pl-2">
                 <div v-if="aiAssist && defaultAiActions.length" data-rich-editor-ai-assist class="relative">
-                    <button type="button" @click.stop="toggleAiAssistMenu" :disabled="Boolean(aiAssistLoadingKey)" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30" title="AI Assist">✨AI</button>
+                    <button type="button" @click.stop="toggleAiAssistMenu" :disabled="Boolean(aiAssistLoadingKey)" class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-xs font-bold text-violet-700 transition-colors hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30" title="AI Assist">
+                        <svg v-if="aiAssistLoadingKey" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <svg v-else-if="aiAssistSuccess" class="h-4 w-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span v-else>✨AI</span>
+                    </button>
                     <div v-if="aiAssistOpen" class="absolute end-0 top-10 z-40 w-64 overflow-y-auto overscroll-contain rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900" :style="{ maxHeight: `${toolbarAiMaxHeight}px` }">
                         <button v-for="action in defaultAiActions" :key="action.key" type="button" @click="runAiAssist(action)" :disabled="Boolean(aiAssistLoadingKey)" class="flex w-full flex-col rounded-lg px-3 py-2 text-start text-sm transition-colors hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-violet-900/20">
                             <span class="font-medium text-gray-800 dark:text-gray-100">{{ action.label }}</span>

@@ -24,11 +24,10 @@ interface ToolData {
     name: string
     slug: string
     description: string
-    category?: { name: string; slug: string; icon?: string; color?: string }
+    category?: { name: string; slug: string; icon?: string; color?: string; requires_pro?: boolean }
     icon?: string
     color?: string
     output_type?: string
-    requires_pro?: boolean
     requires_login?: boolean
     access_level?: string
     fields: ToolField[] | string | Record<string, ToolField>
@@ -38,6 +37,9 @@ interface ToolData {
     faq_items?: Array<{ question: string; answer: string }> | string | Record<string, unknown>
     avg_rating?: number
     review_count?: number
+    views_count?: number
+    avg_latency_ms?: number
+    max_variants?: number
     show_about: boolean
     show_how_it_works: boolean
     show_usage_examples: boolean
@@ -69,9 +71,10 @@ const props = defineProps<{
     showCreditCosts: boolean
     languages: Array<{ code: string; name: string }>
     models: Array<{ slug: string; name: string; provider: string }>
-    authUser: { id: number; name: string; credits: string } | null
+    authUser: { id: number; name: string; credits: string; is_pro?: boolean } | null
     canReview: boolean
     restoredHistory?: RestoredHistory | null
+    effectiveMaxTokens: number
 }>()
 
 const formValues = ref<Record<string, unknown>>({})
@@ -181,12 +184,51 @@ const showUpgradeModal = ref(false)
 
 const routeTo = (name: string, params?: unknown): string => route(name, params)
 
+const formatLatency = (ms: number): string => {
+    if (ms < 1000) return `${ms}ms`
+    const seconds = Math.round(ms / 1000)
+    if (seconds < 60) return `${seconds}s`
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`
+}
+
+const formatViews = (views: number): string => {
+    if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`
+    if (views >= 1000) return `${(views / 1000).toFixed(1)}K`
+    return views.toString()
+}
+
+const shareUrl = computed(() => typeof window !== 'undefined' ? window.location.href : '')
+
 const fields = computed<ToolField[]>(() => {
     if (!props.tool.fields) return []
     if (typeof props.tool.fields === 'string') {
         try { return JSON.parse(props.tool.fields) } catch { return [] }
     }
     return Array.isArray(props.tool.fields) ? props.tool.fields : Object.values(props.tool.fields)
+})
+
+const dynamicFields = computed<ToolField[]>(() => {
+    return fields.value.map(field => {
+        if (field.type === 'length_select') {
+            const max = props.effectiveMaxTokens || 2000
+            const toWords = (pct: number) => {
+                const words = Math.round((max * pct) / 1.3)
+                return Math.max(10, Math.round(words / 10) * 10)
+            }
+            return {
+                ...field,
+                options: [
+                    { label: `Short (~${toWords(0.07)} words)`, value: 'short' },
+                    { label: `Medium (~${toWords(0.20)} words)`, value: 'medium' },
+                    { label: `Long (~${toWords(0.40)} words)`, value: 'long' },
+                    { label: `Very Long (~${toWords(0.80)} words)`, value: 'very_long' },
+                ]
+            }
+        }
+        return field
+    })
 })
 
 const normalizeArray = <T,>(value: unknown): T[] => {
@@ -217,6 +259,79 @@ const canSubmit = computed(() => {
     })
 })
 
+const needsLogin = computed(() => {
+    return (props.tool.requires_login || (props.tool.access_level && props.tool.access_level !== 'public')) && !props.authUser?.id
+})
+
+const needsPro = computed(() => {
+    const level = props.tool.access_level || 'inherit'
+    if (!Boolean(props.tool.category?.requires_pro) && level !== 'pro_plan') return false
+    if (!isProAvailable.value) return false
+    if (!props.authUser?.id) return true
+    return !props.authUser.is_pro
+})
+
+const canGenerate = computed(() => {
+    if (needsLogin.value) return false
+    if (needsPro.value) return false
+    return true
+})
+
+const bannerType = computed(() => {
+    if (needsPro.value) return 'pro'
+    if (needsLogin.value) {
+        const level = props.tool.access_level || 'inherit'
+        if (level === 'public') return 'free_limited'
+        return 'login'
+    }
+    return null
+})
+
+const bannerClass = computed(() => {
+    switch (bannerType.value) {
+        case 'pro': return 'border-accent-500/20 bg-accent-500/10 text-accent-700 dark:border-accent-500/20 dark:bg-accent-500/10 dark:text-accent-300'
+        case 'free_limited': return 'border-emerald-500/20 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300'
+        case 'login': return 'border-amber-500/20 bg-amber-50 text-amber-700 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300'
+        default: return ''
+    }
+})
+
+const bannerIcon = computed(() => {
+    switch (bannerType.value) {
+        case 'pro': return 'ti ti-crown'
+        case 'free_limited': return 'ti ti-gift'
+        case 'login': return 'ti ti-login'
+        default: return ''
+    }
+})
+
+const bannerTitle = computed(() => {
+    switch (bannerType.value) {
+        case 'pro': return t('Pro subscription required')
+        case 'free_limited': return t('Free but limited access')
+        case 'login': return t('Login required to generate')
+        default: return ''
+    }
+})
+
+const bannerAction = computed(() => {
+    switch (bannerType.value) {
+        case 'pro': return t('Upgrade to Pro')
+        case 'free_limited': return t('Sign in for full access')
+        case 'login': return t('Sign in now')
+        default: return ''
+    }
+})
+
+const bannerLink = computed(() => {
+    switch (bannerType.value) {
+        case 'pro': return routeTo('pricing')
+        case 'free_limited': return routeTo('login')
+        case 'login': return routeTo('login')
+        default: return '#'
+    }
+})
+
 const contentTabsVisible = computed(() => (
     hasAbout.value || hasHowItWorks.value || hasUsageExamples.value ||
     hasFaqs.value || Boolean(props.tool.show_reviews) ||
@@ -227,11 +342,22 @@ const hasAbout = computed(() => props.tool.show_about && String(props.tool.about
 const hasHowItWorks = computed(() => props.tool.show_how_it_works && howItWorks.value.some(s => String(s.title || '').trim() !== '' || String(s.description || '').trim() !== ''))
 const hasUsageExamples = computed(() => props.tool.show_usage_examples && usageExamples.value.some(e => String(e.title || '').trim() !== '' || Object.keys(e.input || {}).length > 0 || exampleOutput(e.output).trim() !== ''))
 const hasFaqs = computed(() => props.tool.show_faqs && faqItems.value.some(f => String(f.question || '').trim() !== '' || String(f.answer || '').trim() !== ''))
+const accessBadgeLabel = computed(() => {
+    const level = props.tool.access_level || 'inherit'
+    if (Boolean(props.tool.category?.requires_pro) || level === 'pro_plan') return t('Pro')
+    if (level === 'login_required') return t('Login')
+    if (level === 'free_plan') return t('Free')
+    return t('Free')
+})
+
 const accessBadgeClass = computed(() => {
-    if (props.tool.requires_pro) {
+    const level = props.tool.access_level || 'inherit'
+    if (Boolean(props.tool.category?.requires_pro) || level === 'pro_plan') {
         return 'border-accent-500/20 bg-gradient-to-r from-accent-500 to-primary-500 text-white shadow-sm'
     }
-
+    if (level === 'login_required') {
+        return 'border-sky-500/20 bg-sky-500/15 text-sky-800 dark:text-sky-200'
+    }
     return 'border-emerald-500/20 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
 })
 
@@ -323,11 +449,11 @@ watch(activeTab, (newTab) => {
 })
 
 const runGenerate = () => {
-    if (!canSubmit.value) return
+    if (!canSubmit.value || !canGenerate.value) return
     const accessLevel = props.tool.access_level || 'inherit'
     if (!props.authUser?.id && accessLevel !== 'public') { showLoginModal.value = true; return }
     if (props.tool.requires_login && !props.authUser?.id) { showLoginModal.value = true; return }
-    if (accessLevel === 'pro_plan' || props.tool.requires_pro) { showUpgradeModal.value = true; return }
+    if (accessLevel === 'pro_plan' || Boolean(props.tool.category?.requires_pro)) { showUpgradeModal.value = true; return }
 
     const modelField = fields.value.find(f => f.type === 'model_select')
     const model = modelField ? String(formValues.value[fieldName(modelField)] || '') : ''
@@ -336,11 +462,11 @@ const runGenerate = () => {
 }
 
 const generateVariations = async () => {
-    if (isAnyStreaming.value) return
+    if (isAnyStreaming.value || !canGenerate.value) return
     const accessLevel = props.tool.access_level || 'inherit'
     if (!props.authUser?.id && accessLevel !== 'public') { showLoginModal.value = true; return }
     if (props.tool.requires_login && !props.authUser?.id) { showLoginModal.value = true; return }
-    if (accessLevel === 'pro_plan' || props.tool.requires_pro) { showUpgradeModal.value = true; return }
+    if (accessLevel === 'pro_plan' || Boolean(props.tool.category?.requires_pro)) { showUpgradeModal.value = true; return }
 
     isVariationsMode.value = true
     activeVariationTab.value = 0
@@ -476,6 +602,18 @@ const submitReview = async () => {
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
+                        <Tooltip v-if="tool.avg_latency_ms" :content="t('Average generation time')" placement="bottom">
+                            <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                                <i class="ti ti-clock text-[13px] text-gray-600 dark:text-gray-200"></i>
+                                {{ formatLatency(tool.avg_latency_ms) }}
+                            </span>
+                        </Tooltip>
+                        <Tooltip v-if="tool.views_count" :content="t('Total views')" placement="bottom">
+                            <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                                <i class="ti ti-eye text-[13px] text-gray-600 dark:text-gray-200"></i>
+                                {{ formatViews(tool.views_count) }}
+                            </span>
+                        </Tooltip>
                         <Tooltip :content="t('Average rating')" placement="bottom">
                             <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
                                 <i class="ti ti-star-filled text-[13px] text-gray-600 dark:text-gray-200"></i>
@@ -509,7 +647,7 @@ const submitReview = async () => {
                                                 class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] whitespace-nowrap shadow-sm"
                                                 :class="accessBadgeClass"
                                             >
-                                                {{ tool.requires_pro ? t('Pro') : t('Free') }}
+                                                {{ accessBadgeLabel }}
                                                 </span>
                                         </div>
                                         <p class="max-w-5xl text-[15px] text-gray-500 dark:text-gray-400">
@@ -546,15 +684,29 @@ const submitReview = async () => {
                             </div>
                         </div>
                         <div class="flex-1 min-h-0 overflow-y-auto px-6 py-5">
-                            <DynamicForm v-model="formValues" :fields="fields" :languages="languages" :models="models" :disabled="isAnyStreaming" @submit="runGenerate">
-                                <div v-if="showCreditCosts && dynamicCredits" class="mb-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-xs text-primary-700 dark:border-primary-500/20 dark:bg-primary-500/10 dark:text-primary-300">
+                            <div v-if="!canGenerate" class="mb-4 rounded-xl border px-4 py-3 text-xs" :class="bannerClass">
+                                <div class="flex items-center gap-2 font-medium">
+                                    <i :class="bannerIcon" class="text-[14px]"></i>
+                                    {{ bannerTitle }}
+                                </div>
+                                <div class="mt-1">
+                                    <Link :href="bannerLink" class="underline font-semibold hover:no-underline">
+                                        {{ bannerAction }}
+                                    </Link>
+                                </div>
+                            </div>
+                            <DynamicForm v-model="formValues" :fields="dynamicFields" :languages="languages" :models="models" :disabled="isAnyStreaming" @submit="runGenerate">
+                                <div v-if="showCreditCosts && dynamicCredits" class="mb-4 rounded-xl border px-4 py-3 text-xs" :class="tool.access_level === 'public' && !authUser ? 'border-emerald-100 bg-emerald-50 text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-primary-100 bg-primary-50 text-primary-700 dark:border-primary-500/20 dark:bg-primary-500/10 dark:text-primary-300'">
                                     <div class="flex items-center gap-2 font-medium">
-                                        <i class="ti ti-receipt-2 text-[14px]"></i>
-                                        {{ t('Estimated cost') }}
+                                        <i :class="tool.access_level === 'public' && !authUser ? 'ti ti-gift' : 'ti ti-receipt-2'" class="text-[14px]"></i>
+                                        {{ tool.access_level === 'public' && !authUser ? t('Free preview') : t('Estimated cost') }}
                                     </div>
-                                    <div class="mt-1">
+                                    <div v-if="tool.access_level !== 'public' || authUser" class="mt-1">
                                         <span class="font-semibold">~{{ dynamicCredits.estimated_credits }}</span> {{ t('credits') }}
                                         <span v-if="dynamicCredits.estimated_tokens"> · ~{{ dynamicCredits.estimated_tokens }} {{ t('tokens') }}</span>
+                                    </div>
+                                    <div v-else class="mt-1 text-emerald-600 dark:text-emerald-400">
+                                        {{ t('No login or credits required. Output may be limited.') }}
                                     </div>
                                 </div>
                                 <div v-if="activeError" class="mb-4 flex items-start gap-2 rounded-xl border border-danger-500/20 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400">
@@ -564,7 +716,7 @@ const submitReview = async () => {
                             </DynamicForm>
                         </div>
                         <div class="shrink-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur-md dark:border-white/5 dark:bg-[#101418]/90">
-                            <button type="button" :disabled="!canSubmit" class="btn-primary w-full justify-center rounded-xl py-3 text-sm font-semibold shadow-lg disabled:cursor-not-allowed disabled:opacity-50" @click="runGenerate">
+                            <button type="button" :disabled="!canSubmit || !canGenerate" class="btn-primary w-full justify-center rounded-xl py-3 text-sm font-semibold shadow-lg disabled:cursor-not-allowed disabled:opacity-50" @click="runGenerate">
                                 <svg v-if="isAnyStreaming" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -602,13 +754,13 @@ const submitReview = async () => {
                         <OutputPanel :output="activeOutput" :reasoning="activeReasoning" :is-reasoning="activeIsReasoning" :output-type="tool.output_type || 'markdown'" :loading="activeIsStreaming" :usage="activeUsage" :saved-document="activeSavedDocument" :show-credit-costs="showCreditCosts" :can-save="Boolean(authUser)" :slug="tool.slug" :default-title="`${tool.name} Output`" @document-saved="handleDocumentSaved" />
                     </div>
                     <div v-if="activeOutput" class="flex flex-wrap gap-2">
-                        <button type="button" :disabled="isAnyStreaming" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="regenerate">
+                        <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="regenerate">
                             <i class="ti ti-refresh text-[14px]"></i>
                             {{ t('Regenerate') }}
                         </button>
                         
-                        <Tooltip v-if="tool.max_variants > 1" :content="t('Generates 3 alternatives simultaneously using 3x credits')" placement="top">
-                            <button type="button" :disabled="isAnyStreaming" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="generateVariations">
+                        <Tooltip v-if="(tool.max_variants ?? 0) > 1" :content="t('Generates 3 alternatives simultaneously using 3x credits')" placement="top">
+                            <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="generateVariations">
                                 <svg v-if="isAnyStreaming && isVariationsMode" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -618,7 +770,7 @@ const submitReview = async () => {
                             </button>
                         </Tooltip>
 
-                        <button type="button" :disabled="isAnyStreaming" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="isSidebarOpen = true">
+                        <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="isSidebarOpen = true">
                             <i class="ti ti-sparkles text-[14px]"></i>
                             {{ t('Improve') }}
                         </button>
@@ -631,9 +783,9 @@ const submitReview = async () => {
 
                     <div v-if="activeOutput" class="mt-3 pt-3 border-t border-gray-100 dark:border-white/5">
                         <SocialShare
-                            :url="window.location.href"
+                            :url="shareUrl"
                             :title="tool.name"
-                            style="icon"
+                            :style="'icon'"
                         />
                     </div>
                 </div>
@@ -848,7 +1000,7 @@ const submitReview = async () => {
                         <div class="border-t border-gray-100 pt-4 dark:border-white/5">
                             <button 
                                 type="button" 
-                                :disabled="!refineInstruction.trim() || activeIsStreaming"
+                                :disabled="!refineInstruction.trim() || activeIsStreaming || !canGenerate"
                                 class="btn-primary w-full justify-center rounded-xl py-3 text-sm font-semibold shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                                 @click="applyRefinement"
                             >

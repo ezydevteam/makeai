@@ -57,9 +57,9 @@ const actorId = computed(() => {
 
     return Number((page.props.auth as any)?.user?.id ?? 0)
 })
-const latestRoute = computed(() => props.context === 'admin' ? route('admin.notifications.latest') : route('notifications.latest'))
-const indexRoute = computed(() => props.context === 'admin' ? route('admin.notifications.index') : route('notifications.index'))
-const markAllRoute = computed(() => props.context === 'admin' ? route('admin.notifications.read-all') : route('notifications.read-all'))
+const latestRoute = computed(() => props.context === 'admin' ? route('admin.notifications.latest') : route('user.dashboard.notifications.latest'))
+const indexRoute = computed(() => props.context === 'admin' ? route('admin.notifications.index') : route('user.dashboard.notifications.index'))
+const markAllRoute = computed(() => props.context === 'admin' ? route('admin.notifications.read-all') : route('user.dashboard.notifications.read-all'))
 
 const csrf = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? ''
 
@@ -131,7 +131,7 @@ const unsubscribeRealtime = () => {
 
 const markReadUrl = (id: string) => props.context === 'admin'
     ? route('admin.notifications.read', id)
-    : route('notifications.read', id)
+    : route('user.dashboard.notifications.read', id)
 
 const markRead = async (item: NotificationItem) => {
     if (!item.is_read) {

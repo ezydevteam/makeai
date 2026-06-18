@@ -299,6 +299,15 @@ class ThemeAddonController extends Controller
     public function activateAddon(Request $request, string $slug)
     {
         if ($this->addonService->activate($slug)) {
+            // Log activity
+            \DB::table('admin_audit_logs')->insert([
+                'admin_id' => auth('admin')->id(),
+                'action' => 'addon_activated',
+                'description' => "Activated addon: {$slug}",
+                'metadata' => json_encode(['addon_slug' => $slug]),
+                'created_at' => now(),
+            ]);
+
             return back()->with('success', translate('Addon :addon activated successfully.', ['addon' => $slug]));
         }
 
@@ -311,6 +320,15 @@ class ThemeAddonController extends Controller
     public function deactivateAddon(Request $request, string $slug)
     {
         $this->addonService->deactivate($slug);
+
+        // Log activity
+        \DB::table('admin_audit_logs')->insert([
+            'admin_id' => auth('admin')->id(),
+            'action' => 'addon_deactivated',
+            'description' => "Deactivated addon: {$slug}",
+            'metadata' => json_encode(['addon_slug' => $slug]),
+            'created_at' => now(),
+        ]);
 
         return back()->with('success', translate('Addon :addon deactivated.', ['addon' => $slug]));
     }
@@ -440,6 +458,9 @@ class ThemeAddonController extends Controller
      */
     public function installAddon(Request $request)
     {
+        // CRITICAL SECURITY: Explicit authorization check for addon installation
+        abort_unless(auth('admin')->user()?->hasAnyPermission(['addons.manage', 'settings.manage']), 403);
+
         $request->validate([
             'addon_zip' => ['required', 'file', 'mimes:zip', 'max:20480'],
         ]);
@@ -473,6 +494,29 @@ class ThemeAddonController extends Controller
             return back()->with('error', translate('Invalid addon zip structure. Expected a single root directory.'));
         }
 
+        // CRITICAL SECURITY FIX: Validate all paths to prevent Zip Slip (Path Traversal)
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = $zip->getNameIndex($i);
+            
+            // 1. Reject absolute paths
+            if (str_starts_with($name, '/') || str_starts_with($name, '\\')) {
+                $zip->close();
+                return back()->with('error', translate('Invalid addon zip: contains absolute paths.'));
+            }
+            
+            // 2. Reject directory traversal attempts
+            if (str_contains($name, '../') || str_contains($name, '..\\')) {
+                $zip->close();
+                return back()->with('error', translate('Invalid addon zip: contains directory traversal attempts.'));
+            }
+            
+            // 3. Ensure the file belongs to the expected root directory
+            if (! str_starts_with($name, $slug . '/') && $name !== $slug . '/') {
+                $zip->close();
+                return back()->with('error', translate('Invalid addon zip: files must be inside the root directory.'));
+            }
+        }
+
         // Check if the slug has addon.json or settings.json
         $hasManifest = false;
         for ($i = 0; $i < $zip->numFiles; $i++) {
@@ -494,9 +538,32 @@ class ThemeAddonController extends Controller
 
         $destPath = $addonsPath . '/' . $slug;
 
-        // Extract: strip the root folder
-        $zip->extractTo($addonsPath);
+        // CRITICAL SECURITY FIX: Extract to a secure temporary directory first
+        $tempDir = sys_get_temp_dir() . '/addon_upload_' . uniqid();
+        if (! is_dir($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+
+        $zip->extractTo($tempDir);
         $zip->close();
+
+        $sourceDir = $tempDir . '/' . $slug;
+
+        if (! is_dir($sourceDir)) {
+            \Illuminate\Support\Facades\File::deleteDirectory($tempDir);
+            return back()->with('error', translate('Invalid addon zip structure after extraction.'));
+        }
+
+        // Ensure destination parent exists
+        if (! is_dir($addonsPath)) {
+            mkdir($addonsPath, 0755, true);
+        }
+
+        // Copy the validated directory to the final destination safely
+        \Illuminate\Support\Facades\File::copyDirectory($sourceDir, $destPath);
+        
+        // Clean up the temporary directory
+        \Illuminate\Support\Facades\File::deleteDirectory($tempDir);
 
         // Run sync to register the new addon
         $this->addonService->syncFromFilesystem();
@@ -505,6 +572,61 @@ class ThemeAddonController extends Controller
         $this->addonService->migrateAddon($slug);
 
         return back()->with('success', translate('Addon installed successfully. You can now activate it below.'));
+    }
+
+    /**
+     * Bulk activate addons.
+     */
+    public function bulkActivate(Request $request)
+    {
+        $validated = $request->validate([
+            'slugs' => ['required', 'array', 'min:1'],
+            'slugs.*' => ['string'],
+        ]);
+
+        $activated = 0;
+        foreach ($validated['slugs'] as $slug) {
+            if ($this->addonService->activate($slug)) {
+                $activated++;
+
+                \DB::table('admin_audit_logs')->insert([
+                    'admin_id' => auth('admin')->id(),
+                    'action' => 'addon_activated',
+                    'description' => "Activated addon: {$slug}",
+                    'metadata' => json_encode(['addon_slug' => $slug]),
+                    'created_at' => now(),
+                ]);
+            }
+        }
+
+        return back()->with('success', translate(':count addon(s) activated.', ['count' => $activated]));
+    }
+
+    /**
+     * Bulk deactivate addons.
+     */
+    public function bulkDeactivate(Request $request)
+    {
+        $validated = $request->validate([
+            'slugs' => ['required', 'array', 'min:1'],
+            'slugs.*' => ['string'],
+        ]);
+
+        $deactivated = 0;
+        foreach ($validated['slugs'] as $slug) {
+            $this->addonService->deactivate($slug);
+            $deactivated++;
+
+            \DB::table('admin_audit_logs')->insert([
+                'admin_id' => auth('admin')->id(),
+                'action' => 'addon_deactivated',
+                'description' => "Deactivated addon: {$slug}",
+                'metadata' => json_encode(['addon_slug' => $slug]),
+                'created_at' => now(),
+            ]);
+        }
+
+        return back()->with('success', translate(':count addon(s) deactivated.', ['count' => $deactivated]));
     }
 
     /**

@@ -15,8 +15,8 @@ class ChunkingService
 
     public function __construct()
     {
-        $this->chunkSize = (int) (settings('ai_chunk_size') ?: config('ai.rag.chunk_size', 1000));
-        $this->chunkOverlap = (int) (settings('ai_chunk_overlap') ?: config('ai.rag.chunk_overlap', 200));
+        $this->chunkSize = (int) (settings('rag_chunk_size') ?: config('ai.rag.chunk_size', 800));
+        $this->chunkOverlap = (int) (settings('rag_chunk_overlap') ?: config('ai.rag.chunk_overlap', 100));
     }
 
     /**

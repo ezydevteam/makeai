@@ -39,7 +39,7 @@ class LanguageUpdateRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return true;
+        return auth('admin')->check();
     }
 
     protected function prepareForValidation(): void

@@ -14,14 +14,14 @@ use Inertia\Response;
 
 class AdController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        return $this->renderIndex();
+        return $this->renderIndex($request);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
-        return $this->renderIndex(editorMode: 'create');
+        return $this->renderIndex($request, editorMode: 'create');
     }
 
     public function store(AdRequest $request): RedirectResponse
@@ -33,9 +33,9 @@ class AdController extends Controller
         return redirect()->route('admin.ads.index')->with('success', translate('Advertisement created successfully.'));
     }
 
-    public function edit(Ad $ad): Response
+    public function edit(Request $request, Ad $ad): Response
     {
-        return $this->renderIndex($ad, 'edit');
+        return $this->renderIndex($request, $ad, 'edit');
     }
 
     public function update(AdRequest $request, Ad $ad): RedirectResponse
@@ -49,6 +49,7 @@ class AdController extends Controller
 
     public function destroy(Ad $ad): RedirectResponse
     {
+        $this->authorizeAds();
         $ad->delete();
 
         return redirect()->route('admin.ads.index')->with('success', translate('Advertisement deleted successfully.'));
@@ -56,13 +57,16 @@ class AdController extends Controller
 
     public function toggle(Ad $ad): RedirectResponse
     {
+        $this->authorizeAds();
         $ad->update(['is_active' => ! $ad->is_active]);
 
-        return back();
+        return back()->with('success', translate('Advertisement status updated successfully.'));
     }
 
     public function updateSettings(Request $request): RedirectResponse
     {
+        $this->authorizeAds();
+
         $data = $request->validate([
             'ads_enabled' => ['boolean'],
             'adsense_publisher_id' => ['nullable', 'string', 'max:100', 'regex:/^ca-pub-[0-9]+$/'],
@@ -126,9 +130,34 @@ class AdController extends Controller
         }
     }
 
-    private function renderIndex(?Ad $editorAd = null, ?string $editorMode = null): Response
+    private function authorizeAds(): void
     {
-        $ads = Ad::orderBy('zone')->orderBy('sort_order')->latest()->get()->map(function ($ad) {
+        if (! auth('admin')->check()) {
+            abort(403, translate('Unauthorized.'));
+        }
+    }
+
+    private function renderIndex(Request $request, ?Ad $editorAd = null, ?string $editorMode = null): Response
+    {
+        $query = Ad::query();
+
+        if ($request->filled('search')) {
+            $search = trim($request->string('search')->toString());
+
+            $query->where(function ($builder) use ($search) {
+                $builder
+                    ->where('title', 'like', "%{$search}%")
+                    ->orWhere('zone', 'like', "%{$search}%")
+                    ->orWhere('type', 'like', "%{$search}%")
+                    ->orWhere('show_to', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $query->where('is_active', $request->string('status')->toString() === 'active');
+        }
+
+        $ads = $query->orderBy('zone')->orderBy('sort_order')->latest()->get()->map(function ($ad) {
             return array_merge($ad->toArray(), [
                 'ctr' => $ad->ctr,
             ]);
@@ -136,6 +165,7 @@ class AdController extends Controller
 
         return Inertia::render('Admin/Ads/Index', [
             'ads' => $ads,
+            'filters' => $request->only(['search', 'status']),
             'zones' => config('ads.zones'),
             'settings' => [
                 'ads_enabled' => (bool) settings('ads_enabled', true),

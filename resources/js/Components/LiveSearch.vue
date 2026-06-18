@@ -119,6 +119,12 @@ const focus = () => {
     }
 }
 
+const focusInput = () => {
+    input.value?.focus()
+    input.value?.select()
+    focus()
+}
+
 const chooseSuggestion = (suggestion: string) => {
     query.value = suggestion
     void nextTick(search)
@@ -166,6 +172,14 @@ const submit = () => {
 }
 
 const closeOnEscape = () => {
+    if (query.value.trim().length > 0) {
+        query.value = ''
+        groups.value = []
+        loading.value = false
+        open.value = props.enableLiveSearch && props.showSuggestions
+        return
+    }
+
     open.value = false
     input.value?.blur()
 }
@@ -179,8 +193,7 @@ const onDocumentClick = (event: MouseEvent) => {
 const onShortcut = (event: KeyboardEvent) => {
     if ((event.ctrlKey || event.metaKey) && event.key === '/') {
         event.preventDefault()
-        input.value?.focus()
-        open.value = true
+        focusInput()
     }
 }
 
@@ -208,7 +221,7 @@ onUnmounted(() => {
     <div
         ref="root"
         class="relative transition-[width,transform] duration-200 ease-out"
-        :class="compact ? 'w-full' : 'w-52 focus-within:w-80 focus-within:scale-[1.01]'"
+        :class="compact ? 'w-full' : 'w-full max-w-[30rem] focus-within:scale-[1.01]'"
     >
         <label class="sr-only" :for="`live-search-${context}`">{{ t('Search') }}</label>
         <svg class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -222,13 +235,20 @@ onUnmounted(() => {
             autocomplete="off"
             data-global-search
             :placeholder="t('Search...')"
-            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 ps-10 pe-11 text-sm text-gray-900 shadow-sm transition-all focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 ps-10 pe-24 text-sm text-gray-900 shadow-sm transition-all focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
             @focus="focus"
             @keydown.down.prevent="navigate(1)"
             @keydown.up.prevent="navigate(-1)"
             @keydown.enter.prevent="submit"
             @keydown.esc.prevent="closeOnEscape"
         >
+        <span
+            v-if="!loading && !query"
+            class="pointer-events-none absolute end-3 top-1/2 inline-flex h-6 -translate-y-1/2 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-400 shadow-sm dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+        >
+            <span>Ctrl</span>
+            <span>/</span>
+        </span>
         <svg v-if="loading" class="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />

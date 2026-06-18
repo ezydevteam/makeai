@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendInAppNotification;
 use App\Models\Admin;
 use App\Models\AdminRole;
+use App\Models\User;
 use App\Notifications\InAppNotification;
 use DateTimeInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -15,12 +16,40 @@ use Illuminate\Support\Facades\Notification as NotificationFacade;
 class InAppNotificationService
 {
     /**
+     * Map notification categories to preference groups.
+     */
+    private const CATEGORY_TO_GROUP_MAP = [
+        'credits' => 'billing',
+        'subscription' => 'billing',
+        'payment' => 'billing',
+        'billing' => 'billing',
+        'document' => 'content',
+        'media' => 'content',
+        'export' => 'content',
+        'security' => 'security',
+        'affiliate' => 'affiliate',
+        'announcement' => 'updates',
+        'ai_tool' => 'updates',
+        'system' => 'updates',
+    ];
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     public function send(Model $notifiable, array $payload, bool $queue = true, ?DateTimeInterface $delayUntil = null): void
     {
         if (! $this->enabled()) {
             return;
+        }
+
+        // Check user preferences for in-app notifications
+        if ($notifiable instanceof User) {
+            $category = $payload['category'] ?? 'system';
+            $group = $this->getGroupForCategory($category);
+
+            if (! $notifiable->wantsInAppNotification($group)) {
+                return;
+            }
         }
 
         $payload = $this->normalizePayload($payload);
@@ -36,6 +65,14 @@ class InAppNotificationService
         }
 
         NotificationFacade::sendNow($notifiable, new InAppNotification($payload));
+    }
+
+    /**
+     * Get the preference group for a notification category.
+     */
+    public function getGroupForCategory(string $category): string
+    {
+        return self::CATEGORY_TO_GROUP_MAP[$category] ?? 'admin';
     }
 
     /**

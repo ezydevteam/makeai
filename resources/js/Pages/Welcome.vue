@@ -1049,24 +1049,24 @@ onUnmounted(() => {
                     <!-- Live DB testimonials -->
                     <div v-if="getTestimonialsSlice(section).length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div
-                            v-for="t in getTestimonialsSlice(section)"
-                            :key="t.id"
+                            v-for="testimonial in getTestimonialsSlice(section)"
+                            :key="testimonial.id"
                             :class="testimonialsCardClass(asString(section.config.card_style, 'bordered'))"
                         >
                             <div v-if="asString(section.config.card_style, 'bordered') !== 'simple'" class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-500 via-secondary-500 to-violet-500"></div>
                             <div v-if="asString(section.config.card_style, 'spotlight') === 'spotlight'" class="absolute -right-12 -top-12 h-28 w-28 rounded-full bg-primary-500/10 blur-3xl"></div>
                             <!-- Stars -->
                             <div class="relative z-10 flex items-center gap-0.5">
-                                <svg v-for="(filled, i) in stars(t.rating)" :key="i" class="h-4 w-4" :class="filled ? 'text-yellow-400' : 'text-gray-200 dark:text-surface-700'" fill="currentColor" viewBox="0 0 20 20">
+                                <svg v-for="(filled, i) in stars(testimonial.rating)" :key="i" class="h-4 w-4" :class="filled ? 'text-yellow-400' : 'text-gray-200 dark:text-surface-700'" fill="currentColor" viewBox="0 0 20 20">
                                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                                 </svg>
                             </div>
                             <!-- Quote -->
-                            <p class="relative z-10 flex-1 text-sm leading-relaxed text-gray-700 dark:text-gray-300">&ldquo;{{ t.content }}&rdquo;</p>
+                            <p class="relative z-10 flex-1 text-sm leading-relaxed text-gray-700 dark:text-gray-300">&ldquo;{{ testimonial.content }}&rdquo;</p>
                             <!-- Author -->
                             <div class="relative z-10 flex items-center gap-3 border-t border-gray-100 pt-4 dark:border-surface-700">
-                                <div v-if="t.avatar" class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-700">
-                                    <img :src="resolveMediaUrl(t.avatar)" :alt="t.name" class="h-full w-full object-cover">
+                                <div v-if="testimonial.avatar" class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-700">
+                                    <img :src="resolveMediaUrl(testimonial.avatar)" :alt="testimonial.name" class="h-full w-full object-cover">
                                 </div>
                                 <div v-else class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-black text-primary-600 dark:bg-primary-900/30 dark:text-primary-400">
                                     {{ t.name.charAt(0) }}

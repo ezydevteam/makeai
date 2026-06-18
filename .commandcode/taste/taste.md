@@ -48,4 +48,4 @@
 - Log warnings when database `increment()`/`decrement()` returns 0, indicating the target row may not exist. Confidence: 0.65
 
 # workflow
-- When presenting multiple improvement recommendations, implement all identified fixes rather than asking for selection. Confidence: 0.80
+- When presenting multiple improvement recommendations, implement all identified fixes rather than asking for selection. Confidence: 0.90

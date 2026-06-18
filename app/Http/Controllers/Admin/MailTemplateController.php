@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\MailTemplateAiAssistRequest;
 use App\Http\Requests\Admin\MailTemplateRequest;
 use App\Http\Requests\Admin\MailTemplateStoreRequest;
 use App\Models\MailTemplate;
+use App\Models\User;
+use App\Services\AI\AiService;
 use Database\Seeders\MailTemplateSeeder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class MailTemplateController extends Controller
@@ -80,6 +85,58 @@ class MailTemplateController extends Controller
         return redirect()
             ->route('admin.mail.templates.index')
             ->with('success', translate('Mail template updated successfully.'));
+    }
+
+    public function aiAssist(MailTemplateAiAssistRequest $request, AiService $aiService): JsonResponse
+    {
+        $validated = $request->validated();
+        $action = $validated['action'];
+        $subject = trim($validated['subject'] ?? '');
+        $content = Str::limit(strip_tags($validated['content'] ?? ''), 12000, '');
+        $selectedText = trim(strip_tags($validated['selected_text'] ?? ''));
+
+        if (in_array($action, ['improve_content'], true) && $selectedText === '' && $content === '') {
+            return response()->json([
+                'success' => false,
+                'code' => 'EMPTY_CONTENT',
+                'message' => translate('Add content before using this AI assist action.'),
+            ], 422);
+        }
+
+        $user = User::firstOrCreate(
+            ['email' => User::internalAiEmail()],
+            [
+                'name' => User::internalAiName(),
+                'password' => bcrypt(Str::random(32)),
+                'is_active' => true,
+                'is_banned' => false,
+            ]
+        );
+
+        $result = $aiService->complete(
+            $user,
+            $this->aiAssistPrompt($action, $subject, $content, $selectedText),
+            'You are an expert email copywriter for a SaaS platform. Return only the requested content, with no preamble.',
+            options: ['max_tokens' => 800, 'temperature' => 0.5],
+            toolSlug: 'admin_mail_template_assist'
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'content' => \App\Services\TiptapHtmlSanitizer::sanitize(trim($result->content ?? ''), \App\Services\TiptapHtmlSanitizer::BASIC_TAGS),
+            ],
+            'message' => translate('AI assist completed.'),
+        ]);
+    }
+
+    private function aiAssistPrompt(string $action, string $subject, string $content, string $selectedText): string
+    {
+        return match ($action) {
+            'generate_content' => "Write a professional, engaging SaaS email body in clean HTML. Use the subject as context. Return HTML only.\n\nSubject: {$subject}",
+            'improve_content' => "Improve the selected email text for clarity, flow, and professionalism. Keep the meaning intact. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'generate_subject' => "Generate one concise, engaging email subject line under 50 characters. Return plain text only.\n\nContext:\n{$content}",
+        };
     }
 
     public function destroy(MailTemplate $template): RedirectResponse

@@ -35,6 +35,11 @@ class SendAdminNotificationEmail implements ShouldQueue
             return;
         }
 
+        // Check if user wants admin email notifications
+        if (! $user->wantsEmailNotification('admin')) {
+            return;
+        }
+
         $subject = (string) ($this->payload['title'] ?? translate('Notification'));
         $message = (string) ($this->payload['message'] ?? '');
         $actionUrl = $this->payload['action_url'] ?? null;

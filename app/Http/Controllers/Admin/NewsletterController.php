@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\NewsletterCampaignRequest;
 use App\Http\Requests\Admin\NewsletterSettingsRequest;
 use App\Jobs\SendNewsletterCampaign;
 use App\Models\NewsletterCampaign;
+use App\Models\NewsletterCampaignRecipient;
 use App\Models\NewsletterSubscriber;
 use App\Models\Setting;
 use App\Models\User;
@@ -75,6 +76,7 @@ class NewsletterController extends Controller
      */
     public function storeCampaign(NewsletterCampaignRequest $request)
     {
+        $this->authorizeNewsletter();
         $data = $request->validated();
 
         if ($data['audience'] === 'users_pro' && ! isProAvailable()) {
@@ -91,6 +93,7 @@ class NewsletterController extends Controller
      */
     public function sendCampaign(NewsletterCampaign $campaign)
     {
+        $this->authorizeNewsletter();
         if (in_array($campaign->status, ['sending', 'sent'], true)) {
             return back()->with('error', translate('Campaign is already queued or sent.'));
         }
@@ -122,6 +125,7 @@ class NewsletterController extends Controller
      */
     public function destroyCampaign(NewsletterCampaign $campaign)
     {
+        $this->authorizeNewsletter();
         if ($campaign->status === 'sending') {
             return back()->with('error', translate('Cannot delete a campaign that is currently sending.'));
         }
@@ -136,6 +140,7 @@ class NewsletterController extends Controller
      */
     public function updateCampaign(NewsletterCampaignRequest $request, NewsletterCampaign $campaign)
     {
+        $this->authorizeNewsletter();
         if ($campaign->status !== 'draft') {
             return back()->with('error', translate('Only draft campaigns can be edited.'));
         }
@@ -156,6 +161,7 @@ class NewsletterController extends Controller
      */
     public function testCampaign(NewsletterCampaign $campaign)
     {
+        $this->authorizeNewsletter();
         $adminEmail = auth('admin')->user()?->email;
 
         if (! $adminEmail) {
@@ -182,6 +188,7 @@ class NewsletterController extends Controller
      */
     public function destroySubscriber(NewsletterSubscriber $subscriber)
     {
+        $this->authorizeNewsletter();
         $subscriber->delete();
 
         return back()->with('success', translate('Subscriber removed.'));
@@ -192,6 +199,7 @@ class NewsletterController extends Controller
      */
     public function saveSettings(NewsletterSettingsRequest $request)
     {
+        $this->authorizeNewsletter();
         foreach ($request->validated() as $key => $value) {
             if (in_array($key, self::SECRET_KEYS, true) && blank($value)) {
                 continue;
@@ -206,6 +214,7 @@ class NewsletterController extends Controller
 
     public function retryFailed(NewsletterCampaign $campaign)
     {
+        $this->authorizeNewsletter();
         if ($campaign->status !== 'sent') {
             return back()->with('error', translate('Only sent campaigns with failures can be retried.'));
         }
@@ -221,5 +230,12 @@ class NewsletterController extends Controller
         SendNewsletterCampaign::dispatch($campaign->id, true)->onQueue('emails');
 
         return back()->with('success', translate('Retrying :count failed recipients.', ['count' => $failedCount]));
+    }
+
+    private function authorizeNewsletter(): void
+    {
+        if (! auth('admin')->check()) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

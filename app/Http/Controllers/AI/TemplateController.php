@@ -44,10 +44,35 @@ class TemplateController extends Controller
 
         $featured = $tools->where('is_featured', true)->take(6)->values();
 
+        $recentlyUsed = collect();
+        if (auth()->check()) {
+            $recentSlugs = \App\Models\AiUsageLog::where('user_id', auth()->id())
+                ->where('type', 'template')
+                ->where('status', 'completed')
+                ->orderByDesc('created_at')
+                ->take(50)
+                ->pluck('metadata')
+                ->filter()
+                ->map(fn ($meta) => is_array($meta) ? ($meta['tool_slug'] ?? null) : null)
+                ->filter()
+                ->unique()
+                ->take(8)
+                ->values();
+
+            if ($recentSlugs->isNotEmpty()) {
+                $slugMap = $tools->keyBy('slug');
+                $recentlyUsed = $recentSlugs
+                    ->filter(fn ($slug) => $slugMap->has($slug))
+                    ->map(fn ($slug) => $slugMap[$slug])
+                    ->values();
+            }
+        }
+
         return Inertia::render('AI/ToolsDirectory', [
             'tools' => $tools,
             'categories' => $categories,
             'featured' => $featured,
+            'recentlyUsed' => $recentlyUsed,
             'initialCategory' => $initialCategory,
         ]);
     }
@@ -61,25 +86,23 @@ class TemplateController extends Controller
 
         $toolData = $this->toolCatalog->toolBySlug($slug);
 
-        $tool = AiTool::find($toolData['id']);
-
         $isAdminPreview = request()->query('preview') === '1' && auth('admin')->check();
 
-        if (! $tool || (! $tool->is_active && ! $isAdminPreview) || (! $tool->category?->is_active && ! $isAdminPreview)) {
+        // Use cached data for type check and basic validation
+        if (! $toolData || ($toolData['type'] === 'rag' && ! $isAdminPreview)) {
             abort(404);
         }
 
-        if ($this->toolAccess->requiresAuth($tool) && ! auth()->check()) {
-            return redirect()->route('login')->with('error', translate('You must be logged in to access this tool.'));
-        }
-
-        if ($tool->isProRequired() && ! auth()->user()?->isPro()) {
-            return redirect()->back()->with('error', translate('This tool requires a Pro plan. Please upgrade to continue.'));
-        }
-
         // RAG tools use their own controller + page
-        if ($tool->type === 'rag') {
+        if ($toolData['type'] === 'rag') {
             return app(\App\Http\Controllers\RagToolController::class)->show($slug);
+        }
+
+        // Fetch fresh model for relationships and real-time active checks
+        $tool = AiTool::find($toolData['id']);
+        
+        if (! $tool || (! $tool->is_active && ! $isAdminPreview) || (! $tool->category?->is_active && ! $isAdminPreview)) {
+            abort(404);
         }
 
         // Track view (only for real visits, not admin preview)
@@ -109,10 +132,14 @@ class TemplateController extends Controller
         $estimatedCredits = null;
         $showCreditCosts = (bool) settings('show_tool_credit_costs', true);
         if ($showCreditCosts) {
-            $model = $tool->model_override ?? settings('default_ai_model', 'gpt-4o-mini');
+            // Use cached model_override instead of fetching from fresh model
+            $model = $toolData['model_override'] ?? settings('default_ai_model', 'gpt-4o-mini');
             $promptBuilder = app(PromptBuilder::class);
             $estimatedCredits = $promptBuilder->estimateCost($tool, $model, null);
         }
+
+        // Use cached max_tokens_override
+        $effectiveMaxTokens = $toolData['max_tokens_override'] ?? (int) settings('default_max_tokens', 2000);
 
         $toolData['favorites_count'] = $tool->favorites()->count();
         $toolData['is_favorited'] = auth()->check()
@@ -157,13 +184,14 @@ class TemplateController extends Controller
                 ->orderBy('name')
                 ->get(['code', 'name']),
             'models' => AiModel::active()->ofType('chat')->orderBy('provider')->orderBy('name')->get(['slug', 'name', 'provider']),
-            'authUser' => auth()->user()?->only('id', 'name', 'credits'),
+            'authUser' => auth()->user() ? array_merge(auth()->user()->only('id', 'name', 'credits'), ['is_pro' => auth()->user()->isPro()]) : null,
             'canReview' => auth()->check() && AiUsageLog::where('user_id', auth()->id())
                 ->where('type', 'template')
                 ->where('status', 'completed')
                 ->where('metadata->tool_slug', $tool->slug)
                 ->exists(),
             'restoredHistory' => $restoredHistory,
+            'effectiveMaxTokens' => $effectiveMaxTokens,
         ]);
     }
 

@@ -104,7 +104,7 @@ class AdminRole extends Model
             'manager' => [
                 'dashboard.view', 'dashboard.analytics',
                 'users.view', 'users.create', 'users.edit', 'users.credits', 'users.manage',
-                'settings.manage', 'settings.general', 'settings.ai', 'settings.payment', 'settings.mail',
+                'settings.manage', 'settings.general', 'settings.ai', 'settings.payment', 'settings.mail', 'settings.gdpr',
                 'ai.tools', 'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
                 'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
                 'plans.view', 'plans.create', 'plans.edit',

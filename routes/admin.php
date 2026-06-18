@@ -1,30 +1,30 @@
 <?php
 
 use App\Http\Controllers\Admin\AdController;
-use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\Roles\Admins\AdminController;
+use App\Http\Controllers\Admin\AdminAuditLogController;
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminNoteController;
 use App\Http\Controllers\Admin\AdminTwoFactorController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\AffiliateController;
-use App\Http\Controllers\Admin\AiAccessController;
-use App\Http\Controllers\Admin\AiManagementController;
-use App\Http\Controllers\Admin\AiToolCategoryController;
-use App\Http\Controllers\Admin\AiToolController;
-use App\Http\Controllers\Admin\AiUsageLogController;
+use App\Http\Controllers\Admin\AI\Access\AiAccessController;
+use App\Http\Controllers\Admin\AI\Providers\AiManagementController;
+use App\Http\Controllers\Admin\AI\Categories\AiToolCategoryController;
+use App\Http\Controllers\Admin\AI\Tools\AiToolController;
+use App\Http\Controllers\Admin\AI\Logs\AiUsageLogController;
 use App\Http\Controllers\Admin\AppearanceController;
-use App\Http\Controllers\Admin\BlogCategoryController;
-use App\Http\Controllers\Admin\BlogPostController;
-use App\Http\Controllers\Admin\BlogSettingsController;
-use App\Http\Controllers\Admin\BlogTagController;
+use App\Http\Controllers\Admin\CMS\Blog\BlogCategoryController;
+use App\Http\Controllers\Admin\CMS\Blog\BlogPostController;
+use App\Http\Controllers\Admin\CMS\Blog\BlogSettingsController;
+use App\Http\Controllers\Admin\CMS\Blog\BlogTagController;
 use App\Http\Controllers\Admin\CMS\AnnouncementController;
-use App\Http\Controllers\Admin\CommentModerationController;
+use App\Http\Controllers\Admin\CMS\Blog\CommentModerationController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use App\Http\Controllers\Admin\ContactSettingsController;
 use App\Http\Controllers\Admin\FeatureSettingsController;
-use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\ExportCenterController;
-use App\Http\Controllers\Admin\FaqController;
+use App\Http\Controllers\Admin\CMS\FaqController;
 use App\Http\Controllers\Admin\FooterBuilderController;
 use App\Http\Controllers\Admin\GdprSettingsController;
 use App\Http\Controllers\Admin\GeneralSettingsController;
@@ -38,23 +38,26 @@ use App\Http\Controllers\Admin\MailTemplateController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\NewsletterController;
 use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
-use App\Http\Controllers\Admin\PageController;
-use App\Http\Controllers\Admin\PaymentGatewayController;
-use App\Http\Controllers\Admin\PlanController;
+use App\Http\Controllers\Admin\CMS\PageController;
+use App\Http\Controllers\Admin\Premium\CreditSettingsController;
+use App\Http\Controllers\Admin\Premium\Payments\CouponController;
+use App\Http\Controllers\Admin\Premium\Payments\PaymentGatewayController;
+use App\Http\Controllers\Admin\Premium\Plans\PlanController;
+use App\Http\Controllers\Admin\Premium\Subscriptions\SubscriptionManagementController;
 use App\Http\Controllers\Admin\RateLimitController;
-use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\Roles\Admins\RoleController;
 use App\Http\Controllers\Admin\SidebarBuilderController;
-use App\Http\Controllers\Admin\SiteTemplateController;
+use App\Http\Controllers\Admin\AI\Templates\SiteTemplateController;
 use App\Http\Controllers\Admin\SocialSettingsController;
 use App\Http\Controllers\Admin\Support\CannedResponseController as SupportCannedResponseController;
 use App\Http\Controllers\Admin\Support\DepartmentController as SupportDepartmentController;
 use App\Http\Controllers\Admin\Support\SettingsController as SupportSettingsController;
 use App\Http\Controllers\Admin\Support\TicketController as SupportTicketController;
 use App\Http\Controllers\Admin\SystemController;
-use App\Http\Controllers\Admin\TestimonialController;
+use App\Http\Controllers\Admin\CMS\TestimonialController;
 use App\Http\Controllers\Admin\ThemeAddonController;
 use App\Http\Controllers\Admin\TranslationController;
-use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\Roles\Users\UserManagementController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -85,11 +88,17 @@ Route::middleware('guest:admin')->group(function () {
 });
 
 // ─── Authenticated ──────────────────────────────────
-Route::middleware('admin.auth')->group(function () {
+Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     Route::post('logout', [AdminLoginController::class, 'logout'])->name('admin.logout');
 
     // Dashboard
-    Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+    Route::middleware('admin.permission:dashboard.view')->group(function () {
+        Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
+        Route::get('activity', [AdminDashboardController::class, 'activity'])->name('admin.activity.index');
+    });
+
+    // Audit Logs (Super Admin only - enforced in controller)
+    Route::get('audit-logs', [AdminAuditLogController::class, 'index'])->name('admin.audit-logs.index');
 
     // Admin Notes
     Route::get('notes', [AdminNoteController::class, 'index'])->name('admin.notes.index');
@@ -114,25 +123,31 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
         Route::get('addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
         Route::post('addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
+        
+        // Bulk actions
+        Route::post('addons/bulk-activate', [ThemeAddonController::class, 'bulkActivate'])->name('admin.addons.bulk-activate');
+        Route::post('addons/bulk-deactivate', [ThemeAddonController::class, 'bulkDeactivate'])->name('admin.addons.bulk-deactivate');
     });
 
     // Users Management
-    Route::get('roles/users', [UserManagementController::class, 'index'])->name('admin.users.index');
-    Route::get('roles/users/trash', [UserManagementController::class, 'trash'])->name('admin.users.trash');
-    Route::get('roles/users/create', [UserManagementController::class, 'create'])->name('admin.users.create');
-    Route::post('roles/users', [UserManagementController::class, 'store'])->name('admin.users.store');
-    Route::get('roles/users/export', [UserManagementController::class, 'export'])->name('admin.users.export');
-    Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->name('admin.users.bulk');
-    Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->name('admin.users.trash.bulk');
-    Route::post('roles/users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
-    Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->name('admin.users.restore');
-    Route::delete('roles/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->name('admin.users.force-delete');
-    Route::get('roles/users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
-    Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
-    Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->name('admin.users.delete');
-    Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
-    Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->name('admin.users.2fa.disable');
-    Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
+    Route::middleware('admin.permission:users.view')->group(function () {
+        Route::get('roles/users', [UserManagementController::class, 'index'])->name('admin.users.index');
+        Route::get('roles/users/trash', [UserManagementController::class, 'trash'])->name('admin.users.trash');
+        Route::get('roles/users/create', [UserManagementController::class, 'create'])->name('admin.users.create');
+        Route::post('roles/users', [UserManagementController::class, 'store'])->name('admin.users.store');
+        Route::get('roles/users/export', [UserManagementController::class, 'export'])->name('admin.users.export');
+        Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->name('admin.users.bulk');
+        Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->name('admin.users.trash.bulk');
+        Route::post('roles/users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
+        Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->name('admin.users.restore');
+        Route::delete('roles/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->name('admin.users.force-delete');
+        Route::get('roles/users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
+        Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
+        Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->name('admin.users.delete');
+        Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
+        Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->name('admin.users.2fa.disable');
+        Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
+    });
 
     // Administrators & Roles
     Route::get('roles/admins', [AdminController::class, 'index'])->name('admin.admins.index');
@@ -159,13 +174,15 @@ Route::middleware('admin.auth')->group(function () {
         Route::delete('/overrides/{override}', [RateLimitController::class, 'deleteOverride'])->name('overrides.delete');
     });
 
-    Route::get('roles/admins/permissions', [RoleController::class, 'index'])->name('admin.roles.index');
-    Route::get('roles/admins/permissions/create', [RoleController::class, 'create'])->name('admin.roles.create');
-    Route::post('roles/admins/permissions', [RoleController::class, 'store'])->name('admin.roles.store');
-    Route::get('roles/admins/permissions/{role}/edit', [RoleController::class, 'edit'])->name('admin.roles.edit');
-    Route::post('roles/admins/permissions/{role}/restore-default', [RoleController::class, 'restoreDefault'])->name('admin.roles.restore-default');
-    Route::post('roles/admins/permissions/{role}', [RoleController::class, 'update'])->name('admin.roles.update');
-    Route::delete('roles/admins/permissions/{role}', [RoleController::class, 'destroy'])->name('admin.roles.delete');
+    Route::middleware('admin.permission:roles.view')->group(function () {
+        Route::get('roles/admins/permissions', [RoleController::class, 'index'])->name('admin.roles.index');
+        Route::get('roles/admins/permissions/create', [RoleController::class, 'create'])->name('admin.roles.create');
+        Route::post('roles/admins/permissions', [RoleController::class, 'store'])->name('admin.roles.store');
+        Route::get('roles/admins/permissions/{role}/edit', [RoleController::class, 'edit'])->name('admin.roles.edit');
+        Route::post('roles/admins/permissions/{role}/restore-default', [RoleController::class, 'restoreDefault'])->name('admin.roles.restore-default');
+        Route::post('roles/admins/permissions/{role}', [RoleController::class, 'update'])->name('admin.roles.update');
+        Route::delete('roles/admins/permissions/{role}', [RoleController::class, 'destroy'])->name('admin.roles.delete');
+    });
 
     // Localization
     Route::middleware('admin.permission:translations.manage')->group(function () {
@@ -193,11 +210,17 @@ Route::middleware('admin.auth')->group(function () {
     Route::get('premium/gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
     Route::post('premium/gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
     Route::post('premium/gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
+    Route::get('premium/subscriptions', [SubscriptionManagementController::class, 'index'])->name('admin.subscriptions.index');
+    Route::post('premium/subscriptions/{user}/deactivate', [SubscriptionManagementController::class, 'deactivate'])->name('admin.subscriptions.deactivate');
     Route::get('premium/coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
     Route::post('premium/coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
     Route::post('premium/coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
     Route::post('premium/coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
     Route::delete('premium/coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
+
+    // Credit Settings
+    Route::get('premium/credit-settings', [CreditSettingsController::class, 'index'])->name('admin.credit-settings.index');
+    Route::put('premium/credit-settings', [CreditSettingsController::class, 'update'])->name('admin.credit-settings.update');
 
     Route::get('marketing/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
     Route::post('marketing/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
@@ -349,14 +372,18 @@ Route::middleware('admin.auth')->group(function () {
     });
 
     // General Settings
-    Route::get('settings', [GeneralSettingsController::class, 'edit'])->name('admin.settings.index');
-    Route::post('settings', [GeneralSettingsController::class, 'update'])->name('admin.settings.update');
-    Route::get('settings/features', [FeatureSettingsController::class, 'edit'])->name('admin.features.settings');
-    Route::post('settings/features', [FeatureSettingsController::class, 'update'])->name('admin.features.settings.update');
+    Route::middleware('admin.permission:settings.general,settings.manage')->group(function () {
+        Route::get('settings', [GeneralSettingsController::class, 'edit'])->name('admin.settings.index');
+        Route::post('settings', [GeneralSettingsController::class, 'update'])->name('admin.settings.update');
+        Route::get('settings/features', [FeatureSettingsController::class, 'edit'])->name('admin.features.settings');
+        Route::post('settings/features', [FeatureSettingsController::class, 'update'])->name('admin.features.settings.update');
+    });
 
     // GDPR Settings
-    Route::get('settings/gdpr', [GdprSettingsController::class, 'edit'])->name('admin.gdpr.settings');
-    Route::post('settings/gdpr', [GdprSettingsController::class, 'update'])->name('admin.gdpr.settings.update');
+    Route::middleware('admin.permission:settings.manage')->group(function () {
+        Route::get('settings/gdpr', [GdprSettingsController::class, 'edit'])->name('admin.gdpr.settings');
+        Route::post('settings/gdpr', [GdprSettingsController::class, 'update'])->name('admin.gdpr.settings.update');
+    });
 
     // License (PART 03)
     Route::middleware('admin.permission:settings.license')->group(function () {
@@ -376,6 +403,8 @@ Route::middleware('admin.auth')->group(function () {
         Route::post('system/cache', [SystemController::class, 'clearCache'])->name('admin.system.cache.clear');
         Route::post('system/cron/run', [SystemController::class, 'runCronTask'])->name('admin.system.cron.run');
         Route::post('system/check-updates', [SystemController::class, 'checkUpdates'])->name('admin.system.check-updates');
+        Route::post('system/apply-update', [SystemController::class, 'applyUpdate'])->name('admin.system.apply-update');
+        Route::post('system/rollback-update', [SystemController::class, 'rollbackUpdate'])->name('admin.system.rollback-update');
         Route::post('system/maintenance/settings', [SystemController::class, 'updateMaintenanceSettings'])->name('admin.system.maintenance.settings');
         Route::post('system/maintenance/toggle', [SystemController::class, 'toggleMaintenance'])->name('admin.system.maintenance.toggle');
     });
@@ -398,6 +427,7 @@ Route::middleware('admin.auth')->group(function () {
         Route::get('mail/templates', [MailTemplateController::class, 'index'])->name('admin.mail.templates.index');
         Route::get('mail/templates/create', [MailTemplateController::class, 'create'])->name('admin.mail.templates.create');
         Route::post('mail/templates', [MailTemplateController::class, 'store'])->name('admin.mail.templates.store');
+        Route::post('mail/templates/ai-assist', [MailTemplateController::class, 'aiAssist'])->name('admin.mail.templates.ai-assist');
         Route::get('mail/templates/{template}/edit', [MailTemplateController::class, 'edit'])->name('admin.mail.templates.edit');
         Route::post('mail/templates/{template}', [MailTemplateController::class, 'update'])->name('admin.mail.templates.update');
         Route::delete('mail/templates/{template}', [MailTemplateController::class, 'destroy'])->name('admin.mail.templates.delete');
@@ -438,6 +468,7 @@ Route::middleware('admin.auth')->group(function () {
     Route::middleware('admin.permission:content.comments')->group(function () {
         Route::get('content/comments', [CommentModerationController::class, 'index'])->name('admin.comments.index');
         Route::post('content/comments/settings', [CommentModerationController::class, 'updateSettings'])->name('admin.comments.settings');
+        Route::post('content/comments/bulk', [CommentModerationController::class, 'bulk'])->name('admin.comments.bulk');
         Route::post('content/comments/{comment}/approve', [CommentModerationController::class, 'approve'])->name('admin.comments.approve');
         Route::post('content/comments/{comment}/spam', [CommentModerationController::class, 'spam'])->name('admin.comments.spam');
         Route::delete('content/comments/{comment}', [CommentModerationController::class, 'destroy'])->name('admin.comments.delete');
@@ -501,12 +532,17 @@ Route::middleware('admin.auth')->group(function () {
         Route::get('/logs', [AiUsageLogController::class, 'index'])->name('logs.index');
 
         // Tools (Full CRUD)
+        Route::post('/tools/bulk', [AiToolController::class, 'bulk'])->name('tools.bulk');
         Route::post('/tools/{tool}/toggle', [AiToolController::class, 'toggle'])->name('tools.toggle');
+        Route::get('/tools/trash', [AiToolController::class, 'trash'])->name('tools.trash');
+        Route::post('/tools/trash/bulk', [AiToolController::class, 'bulkTrash'])->name('tools.trash.bulk');
+        Route::post('/tools/{tool}/restore', [AiToolController::class, 'restore'])->withTrashed()->name('tools.restore');
+        Route::delete('/tools/{tool}/force-delete', [AiToolController::class, 'forceDelete'])->withTrashed()->name('tools.force-delete');
         Route::post('/tools/reviews/{review}/action', [AiToolController::class, 'reviewAction'])->name('tools.reviews.action');
         Route::post('/categories/{category}/toggle-active', [AiToolCategoryController::class, 'toggleActive'])->name('categories.toggle-active');
         Route::post('/categories/{category}/toggle-pro', [AiToolCategoryController::class, 'togglePro'])->name('categories.toggle-pro');
         Route::post('/categories/{category}/toggle-login', [AiToolCategoryController::class, 'toggleLogin'])->name('categories.toggle-login');
         Route::resource('categories', AiToolCategoryController::class)->except(['create', 'show', 'edit']);
-        Route::resource('tools', AiToolController::class);
+        Route::resource('tools', AiToolController::class)->except(['show']);
     });
 });

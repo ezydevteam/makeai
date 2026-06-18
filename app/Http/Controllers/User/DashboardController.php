@@ -37,6 +37,17 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function chartData(Request $request)
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $period = $request->query('period', '7d');
+
+        return response()->json([
+            'chart' => $this->usageChart($user, $period),
+        ]);
+    }
+
     private function stats(User $user): array
     {
         return [

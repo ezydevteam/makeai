@@ -128,7 +128,7 @@ async function testConnection() {
 <template>
     <Head :title="t('Notification Settings')" />
 
-    <div class="space-y-6">
+    <div class="max-w-7xl mx-auto space-y-6">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div class="space-y-1">
                 <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Notification Settings') }}</h1>
@@ -164,170 +164,128 @@ async function testConnection() {
             </div>
         </section>
 
-        <section class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div class="space-y-6">
-                <section class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Delivery Controls') }}</h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose how notifications are delivered and how frequently fallback refresh should run.') }}</p>
-                    </div>
+        <div class="space-y-6">
+            <section class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+                <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Delivery Controls') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose how notifications are delivered and how frequently fallback refresh should run.') }}</p>
+                </div>
 
-                    <div class="grid gap-6 p-6 md:grid-cols-2">
-                        <label class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
-                            <span>
-                                <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Notifications') }}</span>
-                                <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Hide notification bells and stop delivery when disabled.') }}</span>
-                            </span>
-                            <button
-                                type="button"
-                                class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                :class="form.notifications_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
-                                @click="form.notifications_enabled = !form.notifications_enabled"
-                            >
-                                <span
-                                    class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition"
-                                    :class="form.notifications_enabled ? 'translate-x-5' : 'translate-x-1'"
-                                />
-                            </button>
-                        </label>
-
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Driver') }}</label>
-                            <AppSelect
-                                v-model="form.notifications_driver"
-                                :options="driverOptions"
-                                :placeholder="t('Select driver')"
-                            />
-                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Reverb is preferred for Laravel-native realtime delivery. Polling is the safest fallback.') }}</p>
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Polling Interval') }}</label>
-                            <AppSelect
-                                v-model="pollingIntervalValue"
-                                :options="pollingIntervalOptions"
-                                :placeholder="t('Select interval')"
-                            />
-                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Shorter intervals feel faster but increase request frequency.') }}</p>
-                        </div>
-
-                        <div class="rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
-                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Connection Check') }}</p>
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Use the test button to validate whether the currently saved driver configuration looks complete enough for delivery.') }}</p>
-                        </div>
-                    </div>
-                </section>
-
-                <section
-                    v-if="form.notifications_driver === 'reverb'"
-                    class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900"
-                >
-                    <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Reverb Configuration') }}</h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the built-in Laravel Reverb transport used for realtime notification broadcasting.') }}</p>
-                    </div>
-
-                    <div class="grid gap-6 p-6 md:grid-cols-2">
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App ID') }}</label>
-                            <input v-model="form.reverb.app_id" type="text" :placeholder="t('Enter Reverb app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App Key') }}</label>
-                            <input v-model="form.reverb.app_key" type="text" :placeholder="t('Enter Reverb app key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App Secret') }}</label>
-                            <input v-model="form.reverb.app_secret" type="password" :placeholder="props.settings.reverb.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Reverb app secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Host') }}</label>
-                            <input v-model="form.reverb.host" type="text" :placeholder="t('e.g. 127.0.0.1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Port') }}</label>
-                            <input v-model.number="form.reverb.port" type="number" min="1" max="65535" :placeholder="t('e.g. 8080')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Scheme') }}</label>
-                            <AppSelect
-                                v-model="form.reverb.scheme"
-                                :options="schemeOptions"
-                                :placeholder="t('Select scheme')"
-                            />
-                        </div>
-                    </div>
-                </section>
-
-                <section
-                    v-if="form.notifications_driver === 'pusher'"
-                    class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900"
-                >
-                    <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Pusher Configuration') }}</h2>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use this only when the environment is wired for Pusher-compatible delivery instead of Reverb.') }}</p>
-                    </div>
-
-                    <div class="grid gap-6 p-6 md:grid-cols-2">
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App ID') }}</label>
-                            <input v-model="form.pusher.app_id" type="text" :placeholder="t('Enter Pusher app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Key') }}</label>
-                            <input v-model="form.pusher.key" type="text" :placeholder="t('Enter Pusher key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Secret') }}</label>
-                            <input v-model="form.pusher.secret" type="password" :placeholder="props.settings.pusher.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Pusher secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cluster') }}</label>
-                            <input v-model="form.pusher.cluster" type="text" :placeholder="t('e.g. mt1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <aside class="space-y-6">
-                <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Readiness') }}</h2>
-                    <div class="mt-4 space-y-3">
-                        <div class="rounded-2xl border px-4 py-3" :class="connectionStats.reverbReady ? 'border-primary-200 bg-primary-50/60 dark:border-primary-900/40 dark:bg-primary-900/10' : 'border-gray-200 bg-gray-50 dark:border-surface-700 dark:bg-surface-950/40'">
-                            <div class="flex items-center justify-between gap-3">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Reverb') }}</p>
-                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" :class="connectionStats.reverbReady ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-200 text-gray-600 dark:bg-surface-800 dark:text-gray-300'">
-                                    {{ connectionStats.reverbReady ? t('Configured') : t('Incomplete') }}
-                                </span>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Requires app key and host at minimum for readiness checks.') }}</p>
-                        </div>
-
-                        <div class="rounded-2xl border px-4 py-3" :class="connectionStats.pusherReady ? 'border-primary-200 bg-primary-50/60 dark:border-primary-900/40 dark:bg-primary-900/10' : 'border-gray-200 bg-gray-50 dark:border-surface-700 dark:bg-surface-950/40'">
-                            <div class="flex items-center justify-between gap-3">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Pusher') }}</p>
-                                <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" :class="connectionStats.pusherReady ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-gray-200 text-gray-600 dark:bg-surface-800 dark:text-gray-300'">
-                                    {{ connectionStats.pusherReady ? t('Configured') : t('Incomplete') }}
-                                </span>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Requires key and cluster at minimum for readiness checks.') }}</p>
-                        </div>
-                    </div>
-                </section>
-
-                <section class="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Recommendations') }}</h2>
-                    <div class="mt-4 space-y-3">
-                        <div
-                            v-for="(item, index) in recommendations"
-                            :key="index"
-                            class="rounded-2xl border border-gray-200 bg-gray-50/70 px-4 py-3 text-sm text-gray-600 dark:border-surface-700 dark:bg-surface-950/40 dark:text-gray-300"
+                <div class="grid gap-6 p-6 md:grid-cols-2">
+                    <label class="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Notifications') }}</span>
+                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Hide notification bells and stop delivery when disabled.') }}</span>
+                        </span>
+                        <button
+                            type="button"
+                            class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                            :class="form.notifications_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
+                            @click="form.notifications_enabled = !form.notifications_enabled"
                         >
-                            {{ item }}
-                        </div>
+                            <span
+                                class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition"
+                                :class="form.notifications_enabled ? 'translate-x-5' : 'translate-x-1'"
+                            />
+                        </button>
+                    </label>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Driver') }}</label>
+                        <AppSelect
+                            v-model="form.notifications_driver"
+                            :options="driverOptions"
+                            :placeholder="t('Select driver')"
+                        />
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Reverb is preferred for Laravel-native realtime delivery. Polling is the safest fallback.') }}</p>
                     </div>
-                </section>
-            </aside>
-        </section>
+
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Polling Interval') }}</label>
+                        <AppSelect
+                            v-model="pollingIntervalValue"
+                            :options="pollingIntervalOptions"
+                            :placeholder="t('Select interval')"
+                        />
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Shorter intervals feel faster but increase request frequency.') }}</p>
+                    </div>
+
+                    <div class="rounded-2xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Connection Check') }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Use the test button to validate whether the currently saved driver configuration looks complete enough for delivery.') }}</p>
+                    </div>
+                </div>
+            </section>
+
+            <section
+                v-if="form.notifications_driver === 'reverb'"
+                class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900"
+            >
+                <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Reverb Configuration') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the built-in Laravel Reverb transport used for realtime notification broadcasting.') }}</p>
+                </div>
+
+                <div class="grid gap-6 p-6 md:grid-cols-2">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App ID') }}</label>
+                        <input v-model="form.reverb.app_id" type="text" :placeholder="t('Enter Reverb app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App Key') }}</label>
+                        <input v-model="form.reverb.app_key" type="text" :placeholder="t('Enter Reverb app key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App Secret') }}</label>
+                        <input v-model="form.reverb.app_secret" type="password" :placeholder="props.settings.reverb.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Reverb app secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Host') }}</label>
+                        <input v-model="form.reverb.host" type="text" :placeholder="t('e.g. 127.0.0.1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Port') }}</label>
+                        <input v-model.number="form.reverb.port" type="number" min="1" max="65535" :placeholder="t('e.g. 8080')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Scheme') }}</label>
+                        <AppSelect
+                            v-model="form.reverb.scheme"
+                            :options="schemeOptions"
+                            :placeholder="t('Select scheme')"
+                        />
+                    </div>
+                </div>
+            </section>
+
+            <section
+                v-if="form.notifications_driver === 'pusher'"
+                class="rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900"
+            >
+                <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Pusher Configuration') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use this only when the environment is wired for Pusher-compatible delivery instead of Reverb.') }}</p>
+                </div>
+
+                <div class="grid gap-6 p-6 md:grid-cols-2">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App ID') }}</label>
+                        <input v-model="form.pusher.app_id" type="text" :placeholder="t('Enter Pusher app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Key') }}</label>
+                        <input v-model="form.pusher.key" type="text" :placeholder="t('Enter Pusher key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Secret') }}</label>
+                        <input v-model="form.pusher.secret" type="password" :placeholder="props.settings.pusher.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Pusher secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cluster') }}</label>
+                        <input v-model="form.pusher.cluster" type="text" :placeholder="t('e.g. mt1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    </div>
+                </div>
+            </section>
+        </div>
     </div>
 </template>

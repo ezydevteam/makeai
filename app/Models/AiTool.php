@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\AI\ToolCatalogCacheService;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -13,6 +14,8 @@ use Illuminate\Support\Str;
  */
 class AiTool extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'ai_tools';
 
     protected $fillable = [
@@ -28,7 +31,7 @@ class AiTool extends Model
 
         // Access control
         'access_level', 'requires_pro',
-        'is_active', 'is_featured', 'is_system', 'supports_brand_voice', 'show_header', 'show_footer',
+        'is_active', 'is_featured', 'is_system', 'is_embeddable', 'supports_brand_voice', 'show_header', 'show_footer',
 
         // Stats
         'sort_order', 'usage_count', 'views_count', 'avg_output_tokens', 'avg_latency_ms',
@@ -57,6 +60,7 @@ class AiTool extends Model
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
             'is_system' => 'boolean',
+            'is_embeddable' => 'boolean',
             'show_header' => 'boolean',
             'show_footer' => 'boolean',
             'requires_pro' => 'boolean',
@@ -145,7 +149,7 @@ class AiTool extends Model
             if ($tool->wasRecentlyCreated || $tool->wasChanged([
                 'name', 'slug', 'description', 'category_id',
                 'icon', 'color', 'fields', 'tags', 'output_type', 'access_level',
-                'is_active', 'is_featured', 'requires_pro', 'supports_brand_voice', 'show_header', 'show_footer',
+                'is_active', 'is_featured', 'supports_brand_voice', 'show_header', 'show_footer',
                 'sort_order', 'avg_rating', 'review_count',
                 'meta_title', 'meta_description', 'og_image',
                 'about_content', 'how_it_works', 'usage_examples', 'faq_items',
@@ -158,6 +162,11 @@ class AiTool extends Model
         });
 
         static::deleted(function (AiTool $tool) {
+            ToolCatalogCacheService::invalidateForTool($tool);
+            app(\App\Services\SitemapService::class)->invalidate();
+        });
+
+        static::restored(function (AiTool $tool) {
             ToolCatalogCacheService::invalidateForTool($tool);
             app(\App\Services\SitemapService::class)->invalidate();
         });
@@ -222,8 +231,7 @@ class AiTool extends Model
 
     public function isProRequired(): bool
     {
-        return $this->requires_pro
-            || $this->access_level === 'pro_plan'
+        return $this->access_level === 'pro_plan'
             || ($this->category?->requires_pro ?? false);
     }
 
@@ -253,16 +261,24 @@ class AiTool extends Model
     {
         $this->increment('usage_count');
 
-        ToolCatalogCacheService::forgetTool($this->slug);
+        // Invalidate both individual tool cache and list caches (since usage_count is displayed in lists)
+        ToolCatalogCacheService::invalidateForTool($this);
     }
 
     public function updateReviewStats(): void
     {
         $approved = $this->approvedReviews();
-        $this->update([
-            'avg_rating' => round($approved->avg('rating') ?? 0, 2),
-            'review_count' => $approved->count(),
+        $avgRating = round($approved->avg('rating') ?? 0, 2);
+        $reviewCount = $approved->count();
+
+        // Use direct DB update to avoid triggering model events and cache invalidation loops
+        static::where('id', $this->id)->update([
+            'avg_rating' => $avgRating,
+            'review_count' => $reviewCount,
         ]);
+
+        // Manually invalidate cache since we bypassed model events
+        ToolCatalogCacheService::invalidateForTool($this);
     }
 
     // ─── Related Tools ──────────────────────────

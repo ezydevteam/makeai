@@ -29,6 +29,7 @@ class LanguageController extends Controller
      */
     public function store(LanguageStoreRequest $request)
     {
+        $this->authorizeLanguages();
         $data = $request->safe()->except('flag_file');
         $data['flag'] = $this->storeFlag($request);
 
@@ -54,6 +55,7 @@ class LanguageController extends Controller
      */
     public function update(LanguageUpdateRequest $request, Language $language)
     {
+        $this->authorizeLanguages();
         $data = $request->safe()->except('flag_file');
         $flag = $this->storeFlag($request);
 
@@ -74,6 +76,7 @@ class LanguageController extends Controller
      */
     public function setDefault(Language $language)
     {
+        $this->authorizeLanguages();
         Language::where('is_default', true)->update(['is_default' => false]);
         $language->update(['is_default' => true, 'is_active' => true]);
         session([
@@ -90,6 +93,7 @@ class LanguageController extends Controller
      */
     public function destroy(Language $language)
     {
+        $this->authorizeLanguages();
         if ($language->is_default) {
             return back()->with('error', translate('Cannot delete the default language.'));
         }
@@ -124,5 +128,12 @@ class LanguageController extends Controller
         }
 
         Storage::disk('public')->delete(str_replace('/storage/', '', $flag));
+    }
+
+    private function authorizeLanguages(): void
+    {
+        if (! auth('admin')->check()) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

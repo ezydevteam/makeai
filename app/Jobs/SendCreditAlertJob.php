@@ -22,6 +22,11 @@ class SendCreditAlertJob implements ShouldQueue
 
     public function handle(MailService $mailService): void
     {
+        // Check if user wants billing email notifications
+        if (! $this->user->wantsEmailNotification('billing')) {
+            return;
+        }
+
         $mailService->processSend('credits_low', $this->user->email, [
             'user_name' => $this->user->name,
             'credits' => (int) $this->user->credits,

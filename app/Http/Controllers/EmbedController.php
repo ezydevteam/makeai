@@ -20,7 +20,7 @@ class EmbedController extends Controller
     {
         $embed = ToolEmbed::where('token', $token)->where('is_active', true)->firstOrFail();
 
-        $tool = AiTool::where('slug', $embed->tool_slug)->firstOrFail();
+        $tool = AiTool::where('slug', $embed->tool_slug)->where('is_active', true)->firstOrFail();
 
         if (! $tool->is_embeddable) {
             abort(403, 'This tool is not embeddable.');
@@ -30,7 +30,8 @@ class EmbedController extends Controller
         if ($origin && ! empty($embed->allowed_origins)) {
             $allowed = false;
             foreach ($embed->allowed_origins as $allowedOrigin) {
-                if ($origin === $allowedOrigin || str_ends_with($origin, $allowedOrigin)) {
+                $allowedOrigin = trim($allowedOrigin);
+                if ($origin === $allowedOrigin || str_ends_with($origin, '.'.$allowedOrigin)) {
                     $allowed = true;
                     break;
                 }

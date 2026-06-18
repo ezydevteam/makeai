@@ -28,6 +28,7 @@ class ExportCenterController extends Controller
 
     public function index(): \Inertia\Response
     {
+        $this->authorizeExports();
         $disk = Storage::disk('local');
         $files = collect($disk->files('exports/' . auth('admin')->id()))
             ->map(function ($path) use ($disk) {
@@ -73,6 +74,7 @@ class ExportCenterController extends Controller
 
     public function export(Request $request): JsonResponse|BinaryFileResponse|Response
     {
+        $this->authorizeExports();
         $request->validate([
             'type' => 'required|in:users,ai-usage,revenue,affiliates',
             'format' => 'required|in:xlsx,csv,pdf',
@@ -160,7 +162,9 @@ class ExportCenterController extends Controller
 
     public function download(string $file): BinaryFileResponse
     {
-        $path = 'exports/' . auth('admin')->id() . '/' . $file;
+        $this->authorizeExports();
+        $safeFile = basename($file);
+        $path = 'exports/' . auth('admin')->id() . '/' . $safeFile;
 
         if (! Storage::disk('local')->exists($path)) {
             abort(404);
@@ -171,7 +175,9 @@ class ExportCenterController extends Controller
 
     public function deleteFile(string $file): JsonResponse
     {
-        $path = 'exports/' . auth('admin')->id() . '/' . $file;
+        $this->authorizeExports();
+        $safeFile = basename($file);
+        $path = 'exports/' . auth('admin')->id() . '/' . $safeFile;
 
         if (Storage::disk('local')->exists($path)) {
             Storage::disk('local')->delete($path);
@@ -396,6 +402,7 @@ class ExportCenterController extends Controller
 
     public function estimate(Request $request): JsonResponse
     {
+        $this->authorizeExports();
         $request->validate([
             'type' => 'required|in:users,ai-usage,revenue,affiliates',
             'date_from' => 'nullable|date',
@@ -447,5 +454,12 @@ class ExportCenterController extends Controller
         if (str_ends_with($filename, '.csv')) return 'csv';
         if (str_ends_with($filename, '.pdf')) return 'pdf';
         return 'unknown';
+    }
+
+    private function authorizeExports(): void
+    {
+        if (! auth('admin')->check()) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

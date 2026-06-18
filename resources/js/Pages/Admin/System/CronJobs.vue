@@ -147,7 +147,14 @@ const runCronTask = (taskKey: string) => {
                     <span class="font-mono text-xs text-gray-500">storage/logs/laravel.log</span>
                 </div>
                 <div class="h-80 overflow-y-auto font-mono text-xs text-gray-400">
-                    <div v-for="(log, index) in logs" :key="index" class="border-b border-white/5 py-1 last:border-none">
+                    <div v-if="logs.length === 0" class="flex h-full flex-col items-center justify-center text-center">
+                        <svg class="mb-2 h-8 w-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p class="text-sm font-medium text-gray-500">{{ t('No recent logs found.') }}</p>
+                        <p class="mt-1 text-xs text-gray-600">{{ t('Logs will appear here after cron tasks or system events run.') }}</p>
+                    </div>
+                    <div v-else v-for="(log, index) in logs" :key="index" class="border-b border-white/5 py-1 last:border-none">
                         <span :class="log.includes('ERROR') ? 'text-danger-400' : (log.includes('INFO') ? 'text-primary-400' : 'text-gray-500')">{{ log }}</span>
                     </div>
                 </div>

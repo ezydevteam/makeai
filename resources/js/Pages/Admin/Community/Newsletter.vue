@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
@@ -100,7 +100,8 @@ const editingCampaignId = ref<number | null>(null)
 const sendTargetId = ref<number | null>(null)
 const deleteTargetId = ref<number | null>(null)
 const deleteSubscriberId = ref<number | null>(null)
-const subscriberSearch = ref(props.subscribers.search ?? '')
+const subscriberSearchInput = ref<HTMLInputElement | null>(null)
+const subscriberSearch = ref('')
 const subscriberStatus = ref(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('status') ?? 'all' : 'all')
 
 const tabOptions = [
@@ -178,24 +179,38 @@ const primaryActionLabel = computed(() => {
 const canShowPrimaryAction = computed(() => activeTab.value !== 'subscribers')
 const usesExternalDriver = computed(() => settingsForm.newsletter_driver !== 'internal')
 const modalTitle = computed(() => editingCampaignId.value ? t('Edit Campaign') : t('Create Campaign'))
+const filteredSubscribers = computed(() => {
+    const query = subscriberSearch.value.trim().toLowerCase()
+
+    if (!query) {
+        return props.subscribers.data
+    }
+
+    return props.subscribers.data.filter((subscriber) => {
+        return [
+            subscriber.email,
+            subscriber.name ?? '',
+            subscriber.status,
+        ].some((value) => String(value).toLowerCase().includes(query))
+    })
+})
 
 const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || t('Newsletter subscribers')
 
 const formatNumber = (value: number | undefined) => new Intl.NumberFormat().format(value ?? 0)
 
 const filterSubscribers = () => {
-    router.get(route('admin.newsletter.index'), {
-        search: subscriberSearch.value,
-        status: subscriberStatus.value === 'all' ? '' : subscriberStatus.value,
-    }, {
+    const query: Record<string, string> = {}
+
+    if (subscriberStatus.value !== 'all') {
+        query.status = subscriberStatus.value
+    }
+
+    router.get(route('admin.newsletter.index'), query, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
     })
-}
-
-const filterSubscribersOnStatusChange = () => {
-    filterSubscribers()
 }
 
 const clearSubscriberSearch = () => {
@@ -204,7 +219,6 @@ const clearSubscriberSearch = () => {
     }
 
     subscriberSearch.value = ''
-    filterSubscribers()
 }
 
 const openCreateCampaign = () => {
@@ -306,16 +320,61 @@ const handlePrimaryAction = () => {
         saveSettings()
     }
 }
+
+const clearSubscriberFilters = () => {
+    const hadStatus = subscriberStatus.value !== 'all'
+
+    subscriberSearch.value = ''
+    subscriberStatus.value = 'all'
+
+    if (hadStatus) {
+        filterSubscribers()
+    }
+}
+
+const handleKeydown = (event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null
+    const isTypingTarget = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT' || target?.isContentEditable
+
+    if (event.key === '/' && activeTab.value === 'subscribers' && !showCampaignModal.value && !sendTargetId.value && !deleteTargetId.value && !deleteSubscriberId.value && !isTypingTarget) {
+        event.preventDefault()
+        subscriberSearchInput.value?.focus()
+        subscriberSearchInput.value?.select()
+        return
+    }
+
+    if (event.key === 'Escape' && activeTab.value === 'subscribers' && !showCampaignModal.value && !sendTargetId.value && !deleteTargetId.value && !deleteSubscriberId.value && (subscriberSearch.value || subscriberStatus.value !== 'all')) {
+        event.preventDefault()
+        clearSubscriberFilters()
+    }
+}
+
+watch(subscriberStatus, () => {
+    if (activeTab.value !== 'subscribers') {
+        return
+    }
+
+    filterSubscribers()
+})
+
+onMounted(() => {
+    document.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
     <Head :title="t('Newsletter')" />
 
-    <div class="space-y-6">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="mx-auto max-w-7xl space-y-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-1">
-                <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">{{ t('Newsletter') }}</h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Newsletter') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Manage subscribers, campaigns, integrations, and popup capture from one place.') }}
                 </p>
             </div>
@@ -366,22 +425,28 @@ const handlePrimaryAction = () => {
 
         <div v-if="activeTab === 'subscribers'" class="space-y-4">
             <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
-                <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 dark:border-surface-700 lg:flex-row lg:items-end lg:justify-between">
+                <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 dark:border-surface-700 lg:flex-row lg:items-center lg:justify-between">
                     <div class="w-full max-w-md">
                         <label class="sr-only">{{ t('Search subscribers') }}</label>
                         <div class="relative">
                             <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
                             <input
+                                ref="subscriberSearchInput"
                                 v-model="subscriberSearch"
                                 type="text"
-                                :placeholder="t('Search subscribers...')"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                @input="filterSubscribers"
+                                :placeholder="t('Search subscribers... (/)')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-16 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                             >
+                            <span
+                                v-if="!subscriberSearch"
+                                class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                            >
+                                /
+                            </span>
                             <button
                                 v-if="subscriberSearch"
                                 type="button"
-                                class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                                class="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
                                 :aria-label="t('Clear search')"
                                 @click="clearSubscriberSearch"
                             >
@@ -389,9 +454,9 @@ const handlePrimaryAction = () => {
                             </button>
                         </div>
                     </div>
-                    <div class="w-full lg:w-auto">
+                    <div class="w-full lg:w-52">
                         <div class="min-w-[190px]">
-                            <AppSelect v-model="subscriberStatus" :options="subscriberStatusOptions" @update:modelValue="filterSubscribersOnStatusChange" />
+                            <AppSelect v-model="subscriberStatus" :options="subscriberStatusOptions" :placeholder="t('All status')" />
                         </div>
                     </div>
                 </div>
@@ -406,7 +471,7 @@ const handlePrimaryAction = () => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
-                            <tr v-for="subscriber in subscribers.data" :key="subscriber.id" class="transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-500/5">
+                            <tr v-for="subscriber in filteredSubscribers" :key="subscriber.id" class="transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-500/5">
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ subscriber.email }}</div>
                                     <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ subscriber.name || t('Anonymous') }}</div>
@@ -435,9 +500,9 @@ const handlePrimaryAction = () => {
                                     </button>
                                 </td>
                             </tr>
-                            <tr v-if="subscribers.data.length === 0">
+                            <tr v-if="filteredSubscribers.length === 0">
                                 <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-400">
-                                    {{ t('No subscribers found.') }}
+                                    {{ subscriberSearch || subscriberStatus !== 'all' ? t('No subscribers match these filters.') : t('No subscribers found.') }}
                                 </td>
                             </tr>
                         </tbody>
@@ -446,6 +511,7 @@ const handlePrimaryAction = () => {
             </div>
 
             <Pagination class="mt-2" :links="subscribers.links" />
+        </div>
         </div>
 
         <div v-if="activeTab === 'campaigns'" class="space-y-4">

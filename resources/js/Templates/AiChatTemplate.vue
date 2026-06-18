@@ -11,9 +11,6 @@ import ChatInput from '@/Components/Chat/ChatInput.vue'
 
 const props = defineProps<{
     template?: Record<string, any>
-    tools?: any[]
-    hide_footer?: boolean
-    chatbot_only?: boolean
 }>()
 
 const { t } = useTranslate()
@@ -25,6 +22,8 @@ const isProAvailable = computed(() => Boolean(page.props.isProAvailable as boole
 const chat = useChat()
 
 const sidebarCollapsed = ref(false)
+const sidebarMobileOpen = ref(false)
+const isMobileSidebar = ref(false)
 
 function handleKeydown(e: KeyboardEvent) {
     const mod = e.metaKey || e.ctrlKey
