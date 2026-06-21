@@ -17,7 +17,7 @@ class ContactController extends Controller
      */
     public function store(Request $request)
     {
-        if (! settings('contact_form_enabled', true)) {
+        if (! settings('contact_enabled', true)) {
             return back()->with('error', translate('Contact form is currently disabled.'));
         }
 

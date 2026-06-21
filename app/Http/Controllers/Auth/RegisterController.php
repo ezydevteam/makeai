@@ -29,6 +29,7 @@ class RegisterController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
+            'ip_address' => $request->ip(),
         ]);
 
         $affiliate->attachReferralToUser($request, $user);
@@ -37,11 +38,18 @@ class RegisterController extends Controller
 
         Auth::login($user);
 
-        $otp = $user->generateOtp();
-        $this->sendVerificationOtp($user, $otp);
+        if ((bool) settings('email_verification_enabled', true)) {
+            $otp = $user->generateOtp();
+            $this->sendVerificationOtp($user, $otp);
 
-        return redirect()->route('verification.notice')
-            ->with('success', translate('Account created! Please verify your email.'));
+            return redirect()->route('verification.notice')
+                ->with('success', translate('Account created! Please verify your email.'));
+        }
+
+        $user->markEmailAsVerified();
+
+        return redirect()->route('user.dashboard')
+            ->with('success', translate('Account created! Welcome.'));
     }
 
     private function sendVerificationOtp(User $user, string $otp): void

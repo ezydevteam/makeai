@@ -65,7 +65,7 @@ useFlashToasts()
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50 dark:bg-surface-950 text-gray-900 dark:text-gray-100 flex flex-col font-sans transition-colors duration-300">
+    <div class="frontend-theme min-h-screen bg-gray-50 dark:bg-surface-950 text-gray-900 dark:text-gray-100 flex flex-col font-sans transition-colors duration-300">
         <!-- Demo Banner (user-facing) -->
         <div v-if="isDemo && !demoDismissed" :class="bannerBg" class="px-4 py-2.5 text-center relative overflow-hidden">
             <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent" />

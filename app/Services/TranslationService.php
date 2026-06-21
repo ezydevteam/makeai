@@ -6,6 +6,7 @@ use App\Models\Language;
 use App\Models\Translation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 
 class TranslationService
 {
@@ -19,6 +20,10 @@ class TranslationService
 
     public static function getForLocale(string $locale): array
     {
+        if (! Schema::hasTable('languages') || ! Schema::hasTable('translations')) {
+            return [];
+        }
+
         $cacheKey = "makeai:translations:{$locale}";
         $cached = Cache::get($cacheKey);
 
@@ -43,6 +48,10 @@ class TranslationService
 
     private static function translationsFor(string $langCode): Collection
     {
+        if (! Schema::hasTable('languages') || ! Schema::hasTable('translations')) {
+            return collect();
+        }
+
         $cacheKey = "translations_{$langCode}";
         $cached = Cache::get($cacheKey);
 
@@ -79,6 +88,10 @@ class TranslationService
      */
     public static function clearCache(?string $langCode = null): void
     {
+        if (! Schema::hasTable('languages')) {
+            return;
+        }
+
         if ($langCode) {
             Cache::forget("translations_{$langCode}");
             Cache::forget("makeai:translations:{$langCode}");
@@ -95,6 +108,10 @@ class TranslationService
      */
     public static function syncKey(string $key): void
     {
+        if (! Schema::hasTable('languages') || ! Schema::hasTable('translations')) {
+            return;
+        }
+
         $languages = Language::all();
         foreach ($languages as $lang) {
             Translation::firstOrCreate(

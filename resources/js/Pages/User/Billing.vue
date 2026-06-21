@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
+import { computed } from 'vue'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -33,6 +34,9 @@ const props = defineProps<{
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
 const { formatNumber, formatCurrency } = useNumberFormat()
+const page = usePage()
+
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {

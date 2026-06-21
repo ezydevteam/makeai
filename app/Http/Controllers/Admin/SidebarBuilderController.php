@@ -9,6 +9,11 @@ use Inertia\Inertia;
 
 class SidebarBuilderController extends Controller
 {
+    public function getAvailablePages(): array
+    {
+        return $this->availablePages();
+    }
+
     public function index()
     {
         $sidebarConfig = Setting::where('key', 'sidebar_config')->value('value');

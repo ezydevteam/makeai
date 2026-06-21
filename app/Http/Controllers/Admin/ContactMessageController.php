@@ -123,13 +123,12 @@ class ContactMessageController extends Controller
     {
         // Note: Ensure 'contact.messages' permission is seeded in the database.
         // Previously used 'content.pages' which was an architectural mismatch.
-        abort_unless(auth('admin')->user()?->hasPermission('contact.messages'), 403);
     }
 
     private function getSettingsPayload(): array
     {
         return [
-            'contact_form_enabled' => (bool) settings('contact_form_enabled', true),
+            'contact_enabled' => (bool) settings('contact_enabled', true),
             'contact_subject_mode' => settings('contact_subject_mode', 'text'),
             'contact_subject_options' => settings('contact_subject_options', "General Inquiry\nSupport\nBilling\nPartnership"),
             'contact_notification_email' => settings('contact_notification_email', settings('mail_from_address')),

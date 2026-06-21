@@ -12,6 +12,14 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Throwable;
 
+/**
+ * @method bool hasPermission(string $slug)
+ * @method bool hasAnyPermission(array $slugs)
+ * @method bool hasAllPermissions(array $slugs)
+ * @method bool isSuperAdmin()
+ * @method array getAllPermissions()
+ * @method void clearPermissionCache()
+ */
 class Admin extends Authenticatable
 {
     use HasRBAC, Notifiable, SoftDeletes;

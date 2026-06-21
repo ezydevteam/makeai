@@ -274,20 +274,6 @@ const planButtonClass = (plan: Plan) => [
                     </p>
                 </div>
             </div>
-
-            <div class="text-center mb-12">
-                <h2 class="text-3xl font-black text-gray-900 mb-3">{{ t('Need more power?') }}</h2>
-                <p class="text-gray-500 font-medium">{{ t('Top up your credits instantly with our one-time packs.') }}</p>
-            </div>
-
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-                <div v-for="pack in creditPacks" :key="pack.id" :class="[pack.is_popular ? 'border-primary-200 bg-primary-50/30' : 'border-gray-100 bg-white shadow-sm']" class="relative border rounded-3xl p-6 text-center hover:border-primary-300 transition-all group">
-                    <div v-if="pack.is_popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 btn-primary text-[10px] font-black uppercase tracking-widest rounded-full">{{ t('Popular') }}</div>
-                    <p class="text-3xl font-black text-gray-900 mb-1 group-hover:scale-110 transition-transform">{{ pack.credits.toLocaleString() }}</p>
-                    <p class="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-4">{{ t('credits') }}</p>
-                    <p class="text-xl font-black text-primary-600">{{ pack.formatted_price }}</p>
-                </div>
-            </div>
         </div>
     </Layout>
 </template>

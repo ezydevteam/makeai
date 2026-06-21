@@ -23,7 +23,7 @@ class FooterBuilderRequest extends FormRequest
             'background.image_url' => ['nullable', 'string', 'url', 'max:2048'],
             'background.overlay_opacity' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'custom_css' => ['nullable', 'string', 'max:2000'],
-            'container_width' => ['nullable', 'string', 'in:default,full,boxed'],
+            'container_width' => ['nullable', 'string'], // full, 1080px, 1280px, 1536px, or legacy default/boxed
             'column_flex' => ['nullable', 'string', 'in:default,column-1,column-2,column-3,column-4'],
             'text_color' => ['nullable', 'string', 'max:50'],
             'heading_style' => ['nullable', 'string', 'in:default,accent,minimal'],
@@ -100,7 +100,7 @@ class FooterBuilderRequest extends FormRequest
 
         $data['background'] = $data['background'] ?? ['color' => '', 'image_url' => '', 'overlay_opacity' => 0];
         $data['custom_css'] = $data['custom_css'] ?? '';
-        $data['container_width'] = $data['container_width'] ?? 'default';
+        $data['container_width'] = $data['container_width'] ?? '1280px';
         $data['column_flex'] = $data['column_flex'] ?? 'default';
         $data['text_color'] = $data['text_color'] ?? '';
         $data['heading_style'] = $data['heading_style'] ?? 'default';

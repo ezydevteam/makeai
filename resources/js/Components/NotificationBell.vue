@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { CSSProperties } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { disconnectNotificationEcho, getNotificationEcho, resolveNotificationChannel } from '@/echo'
@@ -16,22 +17,23 @@ interface NotificationItem {
     is_read: boolean
 }
 
+interface NotificationBellUi {
+    wrapperClass?: string
+    triggerClass?: string
+    triggerStyle?: CSSProperties
+    dropdownClass?: string
+    iconClass?: string
+    iconStyle?: CSSProperties
+}
+
 const props = withDefaults(defineProps<{
     context?: 'user' | 'admin'
     label?: string
-    rootClass?: string
-    buttonClass?: string
-    dropdownClass?: string
-    iconClass?: string
-    iconStyle?: Record<string, string>
+    ui?: NotificationBellUi
 }>(), {
     context: 'user',
     label: '',
-    rootClass: '',
-    buttonClass: '',
-    dropdownClass: '',
-    iconClass: '',
-    iconStyle: () => ({}),
+    ui: () => ({}),
 })
 
 const { t } = useTranslate()
@@ -45,9 +47,14 @@ let timer: number | undefined
 let subscribedChannel: { notification: (callback: (payload: unknown) => void) => void } | null = null
 
 const enabled = computed(() => Boolean((page.props.notifications as any)?.enabled))
+const shouldRender = computed(() => enabled.value || unreadCount.value > 0 || items.value.length > 0)
 const notificationLabel = computed(() => props.label || t('Notifications'))
-const notificationButtonClass = computed(() => props.buttonClass || 'relative flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700 dark:hover:text-white')
-const notificationDropdownClass = computed(() => props.dropdownClass || 'absolute right-0 z-50 mt-2 w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900 rtl:left-0 rtl:right-auto')
+const notificationWrapperClass = computed(() => props.ui?.wrapperClass || '')
+const notificationButtonClass = computed(() => props.ui?.triggerClass || 'relative flex h-8 w-8 items-center justify-center rounded-lg bg-gray-50 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700 dark:hover:text-white')
+const notificationButtonStyle = computed(() => props.ui?.triggerStyle ?? {})
+const notificationDropdownClass = computed(() => props.ui?.dropdownClass || 'absolute right-0 z-50 mt-2 w-[360px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900 rtl:left-0 rtl:right-auto')
+const notificationIconClass = computed(() => props.ui?.iconClass || 'ti ti-bell')
+const notificationIconStyle = computed(() => props.ui?.iconStyle ?? {})
 const interval = computed(() => Number((page.props.notifications as any)?.polling_interval ?? 30000))
 const realtime = computed(() => (page.props.notifications as any)?.realtime ?? null)
 const actorId = computed(() => {
@@ -163,12 +170,12 @@ const levelClasses = (level: NotificationItem['level']) => ({
     info: 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-300',
 }[level] ?? 'bg-secondary-100 text-secondary-700')
 
-const levelIcon = (level: NotificationItem['level']) => ({
-    success: 'M4.5 12.75l6 6 9-13.5',
-    warning: 'M12 9v3.75m0 3.75h.008v.008H12v-.008zM10.29 3.86L1.82 18a1.875 1.875 0 001.61 2.83h17.14A1.875 1.875 0 0022.18 18L13.71 3.86a1.875 1.875 0 00-3.42 0z',
-    error: 'M6 18L18 6M6 6l12 12',
-    info: 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z',
-}[level] ?? 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z')
+const levelIconClass = (level: NotificationItem['level']) => ({
+    success: 'ti ti-check',
+    warning: 'ti ti-alert-triangle',
+    error: 'ti ti-x',
+    info: 'ti ti-info-circle',
+}[level] ?? 'ti ti-bell')
 
 const timeAgo = (value: string | null) => {
     if (!value) return ''
@@ -209,17 +216,15 @@ watch(realtime, () => {
 </script>
 
 <template>
-    <div v-if="enabled" :class="['relative', props.rootClass]" @click.stop>
+    <div v-if="shouldRender" :class="['relative', notificationWrapperClass]" @click.stop>
         <button
             type="button"
             :class="notificationButtonClass"
+            :style="notificationButtonStyle"
             :aria-label="notificationLabel"
             @click="open = !open"
         >
-            <i v-if="props.iconClass" :class="[props.iconClass, 'text-[20px] leading-none']" :style="props.iconStyle" aria-hidden="true" />
-            <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022 23.848 23.848 0 005.454 1.31m5.715 0a3 3 0 11-5.715 0" />
-            </svg>
+            <i :class="[notificationIconClass, 'text-[18px] leading-none']" :style="notificationIconStyle" aria-hidden="true" />
             <span v-if="props.label" class="max-w-full truncate text-[11px] leading-none">{{ props.label }}</span>
             <span v-if="unreadCount > 0" class="absolute flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" :class="props.label ? 'right-2 top-1' : '-right-1 -top-1'">
                 {{ unreadCount > 99 ? '99+' : unreadCount }}
@@ -248,9 +253,7 @@ watch(realtime, () => {
                         @click="markRead(item)"
                     >
                         <span :class="levelClasses(item.level)" class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                                <path stroke-linecap="round" stroke-linejoin="round" :d="levelIcon(item.level)" />
-                            </svg>
+                            <i :class="[levelIconClass(item.level), 'text-base leading-none']" aria-hidden="true" />
                         </span>
                         <span class="min-w-0 flex-1">
                             <span class="flex items-start gap-2">
@@ -274,3 +277,28 @@ watch(realtime, () => {
         </Transition>
     </div>
 </template>
+
+<style scoped>
+.header-soft-icon-button {
+    background: var(--header-soft-icon-bg, var(--surface-card));
+    border-color: var(--header-soft-icon-border, transparent);
+}
+.header-soft-icon-button:hover {
+    color: var(--header-soft-icon-hover-color, var(--header-soft-icon-color, inherit));
+    background: var(--header-soft-icon-hover-bg, var(--color-primary-50));
+    border-color: var(--header-soft-icon-hover-border, var(--header-soft-icon-border, transparent));
+}
+.header-soft-icon-button--icon-only:hover {
+    background: var(--header-soft-icon-hover-bg, var(--color-gray-100)) !important;
+    border-color: transparent !important;
+}
+.dark .header-soft-icon-button:hover {
+    color: var(--header-soft-icon-hover-color, var(--header-soft-icon-color, inherit));
+    background: var(--header-soft-icon-hover-bg-dark, rgb(255 255 255 / 0.08));
+    border-color: var(--header-soft-icon-hover-border, var(--header-soft-icon-border, transparent));
+}
+.dark .header-soft-icon-button--icon-only:hover {
+    background: var(--header-soft-icon-hover-bg-dark, rgb(255 255 255 / 0.08)) !important;
+    border-color: transparent !important;
+}
+</style>

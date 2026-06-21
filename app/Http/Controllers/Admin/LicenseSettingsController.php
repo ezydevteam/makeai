@@ -20,7 +20,7 @@ class LicenseSettingsController extends Controller
             403
         );
 
-        return Inertia::render('Admin/License/Settings', [
+        return Inertia::render('Admin/License', [
             'status' => $this->licenseService->getStatus(),
             'item_id' => config('license.item_id'),
         ]);

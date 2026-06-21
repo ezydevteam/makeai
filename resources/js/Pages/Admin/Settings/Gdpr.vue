@@ -48,7 +48,7 @@ const saveSettings = () => {
 <template>
     <Head :title="t('GDPR Settings')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('GDPR & Cookie Consent') }}</h1>
@@ -156,20 +156,11 @@ const saveSettings = () => {
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Tune the banner surface, text, and primary button colors to match your branding.') }}</p>
                         </div>
 
-                        <div class="grid grid-cols-1 gap-5">
+                        <div class="grid md:grid-cols-2 gap-4">
                             <AppColorPicker v-model="form.banner_bg_color" :label="t('Background Color')" />
                             <AppColorPicker v-model="form.banner_text_color" :label="t('Text Color')" />
                             <AppColorPicker v-model="form.banner_button_color" :label="t('Button Color')" />
                             <AppColorPicker v-model="form.banner_button_text_color" :label="t('Button Text Color')" />
-                        </div>
-
-                        <div class="mt-5 rounded-2xl border border-gray-200 p-5 dark:border-surface-700" :style="{ backgroundColor: form.banner_bg_color, color: form.banner_text_color }">
-                            <p class="mb-2 text-sm font-bold">{{ form.banner_title || t('Cookie Preferences') }}</p>
-                            <p class="mb-4 text-xs">{{ form.banner_description || t('We use cookies to enhance your experience and analyze traffic.') }}</p>
-                            <div class="flex flex-wrap gap-2">
-                                <span class="rounded-lg px-3 py-1.5 text-xs font-bold" :style="{ backgroundColor: form.banner_button_color, color: form.banner_button_text_color }">{{ form.banner_accept_all_text || t('Accept All') }}</span>
-                                <span class="rounded-lg border px-3 py-1.5 text-xs font-bold" :style="{ borderColor: form.banner_text_color, color: form.banner_text_color }">{{ form.banner_customize_text || t('Customize') }}</span>
-                            </div>
                         </div>
                     </section>
 
@@ -185,7 +176,7 @@ const saveSettings = () => {
                                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Privacy & Cookie Policy links on banner') }}</span>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Add direct links so visitors can review your policies before accepting preferences.') }}</p>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="form.show_policy_links" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form.show_policy_links ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.show_policy_links = !form.show_policy_links">
+                                <button type="button" role="switch" :aria-checked="form.show_policy_links" class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition" :class="form.show_policy_links ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.show_policy_links = !form.show_policy_links">
                                     <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.show_policy_links ? 'translate-x-5' : 'translate-x-0.5'"></span>
                                 </button>
                             </label>

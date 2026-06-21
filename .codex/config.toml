@@ -13,3 +13,6 @@ approval_mode = "approve"
 
 [mcp_servers.brainsync.tools.sys_core_20]
 approval_mode = "approve"
+
+[mcp_servers.brainsync.tools.sys_core_31]
+approval_mode = "approve"

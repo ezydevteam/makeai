@@ -126,7 +126,7 @@ const isVisible = computed(() => {
             </div>
 
             <!-- Social Follow -->
-            <SocialFollow v-else-if="block.type === 'social_follow'" :style="block.config.display_mode || 'icons'" />
+            <SocialFollow v-else-if="block.type === 'social_follow'" :display-mode="block.config.display_mode || 'icons'" />
 
             <!-- Ad Zone -->
             <AdSection v-else-if="block.type === 'ad_zone'" :zone="block.config.zone_id || 'sidebar_top'" class="w-full" />

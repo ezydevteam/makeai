@@ -31,7 +31,6 @@ class Setting extends Model
         'app_favicon_ico'   => 'site_favicon_ico',
         'app_favicon_png'   => 'site_favicon_png',
         'app_og_image'      => 'site_og_image',
-        'app_copyright_text'=> 'site_copyright_text',
         'app_support_email' => 'site_support_email',
         'app_support_url'   => 'site_support_url',
         'app_terms_url'     => 'site_terms_url',

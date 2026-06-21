@@ -1,6 +1,35 @@
 <!DOCTYPE html>
 @php
     $isRtl = in_array(data_get($page, 'props.locale.is_rtl'), [true, 1, '1'], true);
+    $presetService = app(\App\Services\ThemeSettingsService::class);
+    $themeSettings = $presetService->getResolvedFrontendTheme();
+    $customCodeSettings = $presetService->getStoredCustomCodeSettings();
+    $themeCssTimestamp = \App\Models\Setting::query()
+        ->whereIn('key', [
+            'frontend_theme_settings',
+            'frontend_custom_code',
+        ])
+        ->max('updated_at')?->timestamp ?? time();
+    $selectedFonts = array_unique(array_filter([
+        $themeSettings['font_body'] ?? 'Inter',
+        $themeSettings['heading_font'] ?? 'Plus Jakarta Sans',
+        'Inter',
+        'Plus Jakarta Sans',
+    ]));
+    $systemFonts = ['system-ui', 'Arial', 'Georgia', 'serif', 'sans-serif'];
+    $fontFamilies = collect($selectedFonts)
+        ->reject(fn ($font) => in_array($font, $systemFonts, true))
+        ->map(function ($font) {
+            $slug = \Illuminate\Support\Str::of($font)
+                ->trim()
+                ->lower()
+                ->replaceMatches('/[^a-z0-9]+/', '-')
+                ->trim('-');
+
+            return "{$slug}:300,400,500,600,700,800";
+        })
+        ->unique()
+        ->implode('|');
 @endphp
 <html lang="{{ str_replace('_', '-', data_get($page, 'props.locale.code', app()->getLocale())) }}" dir="{{ $isRtl ? 'rtl' : 'ltr' }}" class="{{ $isRtl ? 'rtl' : '' }}">
 <head>
@@ -20,9 +49,11 @@
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.bunny.net">
-    <link href="https://fonts.bunny.net/css?family=inter:300,400,500,600,700,800|plus-jakarta-sans:400,500,600,700,800" rel="stylesheet" />
+    @if($fontFamilies !== '')
+        <link href="https://fonts.bunny.net/css?family={{ $fontFamilies }}" rel="stylesheet" />
+    @endif
 
-    <link rel="stylesheet" href="{{ route('theme-variables.css') }}" />
+    <link rel="stylesheet" href="{{ route('theme-variables.css') }}?v={{ $themeCssTimestamp }}" />
 
     @routes
     @if(settings('ads_auto_ads_enabled', false) && settings('adsense_publisher_id'))
@@ -37,11 +68,11 @@
         }
     @endphp
     @vite($viteEntries)
-    {!! theme_setting('custom_header_code') !!}
+    {!! $customCodeSettings['custom_header_code'] ?? '' !!}
     @inertiaHead
 </head>
 <body class="font-sans antialiased">
     @inertia
-    {!! theme_setting('custom_footer_code') !!}
+    {!! $customCodeSettings['custom_footer_code'] ?? '' !!}
 </body>
 </html>

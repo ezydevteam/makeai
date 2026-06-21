@@ -2,100 +2,419 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppearanceSetting;
-use Illuminate\Support\Facades\Cache;
+use App\Services\ThemeSettingsService;
+use Illuminate\Support\Str;
 
 class ThemeCssController extends Controller
 {
     public function __invoke()
     {
-        $css = Cache::remember('theme-variables-css', now()->addHours(24), function () {
-            $settings = AppearanceSetting::getForScope('theme_default');
+        $presetService = app(ThemeSettingsService::class);
+        $settings = $presetService->getResolvedFrontendTheme();
+        $customCode = $presetService->getStoredCustomCodeSettings();
+        $settings['custom_css'] = $customCode['custom_css'] ?? '';
 
-            $primary = $settings['primary_color'] ?? '#6366f1';
-            $secondary = $settings['secondary_color'] ?? '#6366f1';
-            $accent = $settings['accent_color'] ?? '#a855f7';
-            $bg = $settings['bg_color'] ?? '#f9fafb';
-            $surface = $settings['surface_color'] ?? '#ffffff';
-            $textPrimary = $settings['text_primary_color'] ?? '#111827';
-            $textSecondary = $settings['text_secondary_color'] ?? '#6b7280';
-            $link = $settings['link_color'] ?? $primary;
-            $button = $settings['button_color'] ?? $primary;
-            $buttonHover = $settings['button_hover_color'] ?? '#4338ca';
-            $headerBg = $settings['header_background'] ?? '#ffffff';
-            $footerBg = $settings['footer_background'] ?? '#f9fafb';
-            $fontBody = $settings['font_body'] ?? 'Inter';
-            $fontHeading = $settings['heading_font'] ?? ($settings['font_body'] ?? 'Inter');
-            $baseFontSize = $settings['base_font_size'] ?? '16px';
-            $headingWeight = $settings['heading_weight'] ?? '700';
-            $lineHeight = $settings['line_height'] ?? '1.5';
-            $letterSpacing = $settings['letter_spacing'] ?? 'normal';
-            $borderRadius = $settings['border_radius'] ?? '12px';
-            $containerWidth = $settings['container_width'] ?? '1280px';
-            $bgImage = $settings['bg_image'] ?? '';
-            $bgSize = $settings['bg_size'] ?? 'cover';
-            $bgRepeat = $settings['bg_repeat'] ?? 'no-repeat';
-            $bgAttachment = $settings['bg_attachment'] ?? 'scroll';
-            $bgPosition = $settings['bg_position'] ?? 'center';
-            $bgGradient = $settings['bg_gradient'] ?? '';
-            $bgGradientDir = $settings['bg_gradient_direction'] ?? 'to bottom';
+        $primary = $settings['primary_color'] ?? '#10b981';
+        $secondary = $settings['secondary_color'] ?? '#3b82f6';
+        $accent = $settings['accent_color'] ?? '#8b5cf6';
+        $background = $settings['bg_color'] ?? '#f0fdf8';
+        $backgroundImage = $settings['bg_image'] ?? '';
+        $gradientEnabled = filter_var($settings['gradient_scheme_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $gradientStart = $settings['gradient_start_color'] ?? $primary;
+        $gradientEnd = $settings['gradient_end_color'] ?? $secondary;
+        $gradientDirection = $settings['bg_gradient_direction'] ?? 'to right';
+        $fontBody = $settings['font_body'] ?? 'Inter';
+        $fontHeading = $settings['heading_font'] ?? 'Plus Jakarta Sans';
+        $baseFontSize = $settings['base_font_size'] ?? '15px';
+        $headingWeight = $settings['heading_weight'] ?? '700';
+        $lineHeight = $settings['line_height'] ?? '1.5';
+        $letterSpacing = $this->resolveLetterSpacing($settings['letter_spacing'] ?? 'normal');
+        $borderRadius = $settings['border_radius'] ?? '12px';
+        $containerWidth = $settings['container_width'] ?? '1280px';
 
-            $bodyBg = $bg;
-            if ($bgGradient) {
-                $bodyBg = "linear-gradient({$bgGradientDir}, {$bg}, {$bgGradient})";
-            }
+        $headingColor = $settings['heading_color'] ?? '#111827';
+        $bodyTextColor = $settings['body_text_color'] ?? '#374151';
+        $mutedTextColor = $settings['muted_text_color'] ?? '#6b7280';
+        $surface = '#ffffff';
+        $border = $settings['border_color'] ?? $this->mixColors($surface, $bodyTextColor, 14);
+        $primaryPalette = $this->buildPalette($primary);
+        $secondaryPalette = $this->buildPalette($secondary);
+        $accentPalette = $this->buildAccentPalette($accent);
+        $surfaceOverlay95 = $this->toRgba($surface, 0.95);
+        $surfaceOverlay90 = $this->toRgba($surface, 0.90);
+        $surfaceOverlay80 = $this->toRgba($surface, 0.80);
+        $softPrimary = $this->mixColors($primary, '#ffffff', 88);
+        $softSecondary = $this->mixColors($secondary, '#ffffff', 88);
+        $softAccent = $this->mixColors($accent, '#ffffff', 88);
+        $softGradientStart = $this->mixColors($gradientStart, '#ffffff', 90);
+        $softGradientEnd = $this->mixColors($gradientEnd, '#ffffff', 86);
+        $buttonGradient = "linear-gradient({$gradientDirection}, {$gradientStart}, {$gradientEnd})";
+        $softGradient = "linear-gradient({$gradientDirection}, {$softGradientStart}, {$softGradientEnd})";
+        $fontBodyStack = $this->fontStack($fontBody);
+        $fontHeadingStack = $this->fontStack($fontHeading, $fontBody);
 
-            $lines = [
-                ':root {',
-                "  --color-primary: {$primary};",
-                "  --color-secondary: {$secondary};",
-                "  --color-accent: {$accent};",
-                "  --color-bg: {$bg};",
-                "  --color-surface: {$surface};",
-                "  --color-text-primary: {$textPrimary};",
-                "  --color-text-secondary: {$textSecondary};",
-                "  --color-link: {$link};",
-                "  --color-button: {$button};",
-                "  --color-button-hover: {$buttonHover};",
-                "  --color-header-bg: {$headerBg};",
-                "  --color-footer-bg: {$footerBg};",
-                "  --font-body: '{$fontBody}', ui-sans-serif, system-ui, sans-serif;",
-                "  --font-heading: '{$fontHeading}', ui-sans-serif, system-ui, sans-serif;",
-                "  --base-font-size: {$baseFontSize};",
-                "  --heading-weight: {$headingWeight};",
-                "  --line-height: {$lineHeight};",
-                "  --letter-spacing: {$letterSpacing};",
-                "  --border-radius: {$borderRadius};",
-                "  --container-max-width: {$containerWidth};",
-                "}",
-                '',
-                'body {',
-                "  background: {$bodyBg};",
-            ];
+        $lines = [
+            '.frontend-theme {',
+            "  --color-primary: {$primary};",
+            "  --color-primary-50: {$primaryPalette[50]};",
+            "  --color-primary-100: {$primaryPalette[100]};",
+            "  --color-primary-200: {$primaryPalette[200]};",
+            "  --color-primary-300: {$primaryPalette[300]};",
+            "  --color-primary-400: {$primaryPalette[400]};",
+            "  --color-primary-500: {$primaryPalette[500]};",
+            "  --color-primary-600: {$primaryPalette[600]};",
+            "  --color-primary-700: {$primaryPalette[700]};",
+            "  --color-primary-800: {$primaryPalette[800]};",
+            "  --color-primary-900: {$primaryPalette[900]};",
+            "  --color-primary-950: {$primaryPalette[950]};",
+            "  --color-secondary: {$secondary};",
+            "  --color-secondary-50: {$secondaryPalette[50]};",
+            "  --color-secondary-100: {$secondaryPalette[100]};",
+            "  --color-secondary-200: {$secondaryPalette[200]};",
+            "  --color-secondary-300: {$secondaryPalette[300]};",
+            "  --color-secondary-400: {$secondaryPalette[400]};",
+            "  --color-secondary-500: {$secondaryPalette[500]};",
+            "  --color-secondary-600: {$secondaryPalette[600]};",
+            "  --color-secondary-700: {$secondaryPalette[700]};",
+            "  --color-secondary-800: {$secondaryPalette[800]};",
+            "  --color-secondary-900: {$secondaryPalette[900]};",
+            "  --color-secondary-950: {$secondaryPalette[950]};",
+            "  --color-accent: {$accent};",
+            "  --color-accent-400: {$accentPalette[400]};",
+            "  --color-accent-500: {$accentPalette[500]};",
+            "  --color-accent-600: {$accentPalette[600]};",
+            "  --color-bg: {$background};",
+            "  --color-surface: {$surface};",
+            "  --color-heading: {$headingColor};",
+            "  --color-text-primary: {$bodyTextColor};",
+            "  --color-text-secondary: {$mutedTextColor};",
+            "  --color-link: {$secondaryPalette[600]};",
+            "  --color-border: {$border};",
+            "  --font-body: {$fontBodyStack};",
+            "  --font-sans: {$fontBodyStack};",
+            "  --font-heading: {$fontHeadingStack};",
+            "  --base-font-size: {$baseFontSize};",
+            "  --heading-weight: {$headingWeight};",
+            "  --line-height: {$lineHeight};",
+            "  --letter-spacing: {$letterSpacing};",
+            "  --border-radius: {$borderRadius};",
+            "  --container-max-width: {$containerWidth};",
+            "  background-color: {$background} !important;",
+            "  color: {$bodyTextColor} !important;",
+            '  font-family: var(--font-sans);',
+            '  font-size: var(--base-font-size);',
+            '  line-height: var(--line-height);',
+            '  letter-spacing: var(--letter-spacing);',
+            '}',
+            '',
+            '.frontend-theme :where(h1, h2, h3, h4, h5, h6, .font-heading) {',
+            '  font-family: var(--font-heading);',
+            '  font-weight: var(--heading-weight);',
+            '  color: var(--color-heading) !important;',
+            '}',
+            '',
+            '.frontend-theme a:not(.btn-primary):not(.btn-secondary):not(.btn-outline):not(.btn-ghost) {',
+            '  color: var(--color-link);',
+            '}',
+            '',
+            '.frontend-theme input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),',
+            '.frontend-theme textarea,',
+            '.frontend-theme select {',
+            '  border-color: var(--color-border);',
+            '  color: var(--color-text-primary);',
+            '  background-color: var(--color-surface);',
+            '}',
+            '',
+            '.frontend-theme input:not([type="checkbox"]):not([type="radio"]):not([type="color"])::placeholder,',
+            '.frontend-theme textarea::placeholder {',
+            '  color: var(--color-text-secondary);',
+            '}',
+            '',
+            '.frontend-theme .bg-white,',
+            '.frontend-theme .bg-gray-50,',
+            '.frontend-theme .bg-gray-100 {',
+            '  background-color: var(--color-surface) !important;',
+            '}',
+            '',
+            '.frontend-theme .bg-primary-50 {',
+            "  background-color: {$softPrimary} !important;",
+            '}',
+            '',
+            '.frontend-theme .bg-secondary-50 {',
+            "  background-color: {$softSecondary} !important;",
+            '}',
+            '',
+            '.frontend-theme .bg-accent-50 {',
+            "  background-color: {$softAccent} !important;",
+            '}',
+            '',
+            '.frontend-theme .bg-white\\/95 {',
+            "  background-color: {$surfaceOverlay95} !important;",
+            '}',
+            '',
+            '.frontend-theme .bg-white\\/90,',
+            '.frontend-theme .bg-gray-50\\/90 {',
+            "  background-color: {$surfaceOverlay90} !important;",
+            '}',
+            '',
+            '.frontend-theme .bg-white\\/80 {',
+            "  background-color: {$surfaceOverlay80} !important;",
+            '}',
+            '',
+            '.frontend-theme .hover\\:bg-gray-200:hover,',
+            '.frontend-theme .bg-gray-200 {',
+            "  background-color: {$softPrimary} !important;",
+            '}',
+            '',
+            '.frontend-theme .text-gray-900,',
+            '.frontend-theme .text-gray-950,',
+            '.frontend-theme .text-slate-900 {',
+            '  color: var(--color-heading) !important;',
+            '}',
+            '',
+            '.frontend-theme .text-gray-200,',
+            '.frontend-theme .text-gray-300,',
+            '.frontend-theme .text-slate-300 {',
+            '  color: var(--color-text-secondary) !important;',
+            '}',
+            '',
+            '.frontend-theme .text-gray-700,',
+            '.frontend-theme .text-gray-600,',
+            '.frontend-theme .text-gray-800,',
+            '.frontend-theme .text-slate-800,',
+            '.frontend-theme .text-slate-600 {',
+            '  color: var(--color-text-primary) !important;',
+            '}',
+            '',
+            '.frontend-theme .text-gray-500,',
+            '.frontend-theme .text-gray-400,',
+            '.frontend-theme .text-slate-500 {',
+            '  color: var(--color-text-secondary) !important;',
+            '}',
+            '',
+            '.frontend-theme .hover\\:text-gray-900:hover,',
+            '.frontend-theme .hover\\:text-gray-950:hover {',
+            '  color: var(--color-heading) !important;',
+            '}',
+            '',
+            '.frontend-theme .hover\\:text-gray-700:hover,',
+            '.frontend-theme .hover\\:text-gray-600:hover {',
+            '  color: var(--color-text-primary) !important;',
+            '}',
+            '',
+            '.frontend-theme .placeholder\\:text-gray-400::placeholder,',
+            '.frontend-theme .placeholder\\:text-gray-500::placeholder {',
+            '  color: var(--color-text-secondary) !important;',
+            '}',
+            '',
+            '.frontend-theme .border-gray-300,',
+            '.frontend-theme .border-gray-200,',
+            '.frontend-theme .border-gray-100,',
+            '.frontend-theme .border-slate-200 {',
+            '  border-color: var(--color-border) !important;',
+            '}',
+            '',
+            '.frontend-theme .hover\\:border-gray-300:hover,',
+            '.frontend-theme .hover\\:border-gray-200:hover {',
+            '  border-color: var(--color-border) !important;',
+            '}',
+        ];
 
-            if ($bgImage) {
-                $lines[] = "  background-image: url('{$bgImage}');";
-                $lines[] = "  background-size: {$bgSize};";
-                $lines[] = "  background-repeat: {$bgRepeat};";
-                $lines[] = "  background-attachment: {$bgAttachment};";
-                $lines[] = "  background-position: {$bgPosition};";
-            }
-
+        if ($backgroundImage !== '') {
+            $lines[] = '';
+            $lines[] = '.frontend-theme {';
+            $lines[] = "  background-image: url('{$backgroundImage}') !important;";
+            $lines[] = '  background-size: cover !important;';
+            $lines[] = '  background-repeat: no-repeat !important;';
+            $lines[] = '  background-position: center !important;';
             $lines[] = '}';
+        }
 
-            $customCss = $settings['custom_css'] ?? '';
-            if ($customCss) {
-                $lines[] = '';
-                $lines[] = '/* Custom CSS start */';
-                $lines[] = $customCss;
-                $lines[] = '/* Custom CSS end */';
+        if ($gradientEnabled) {
+            $lines[] = '';
+            $lines[] = '.frontend-theme .text-gradient,';
+            $lines[] = '.frontend-theme .heading-gradient {';
+            $lines[] = "  background-image: {$buttonGradient};";
+            $lines[] = '  -webkit-background-clip: text;';
+            $lines[] = '  background-clip: text;';
+            $lines[] = '  color: transparent !important;';
+            $lines[] = '}';
+            $lines[] = '';
+            $lines[] = '.frontend-theme .btn-primary {';
+            $lines[] = "  background-image: {$buttonGradient} !important;";
+            $lines[] = "  background-color: {$gradientStart} !important;";
+            $lines[] = '  border-color: transparent !important;';
+            $lines[] = '}';
+            $lines[] = '';
+            $lines[] = '.frontend-theme .btn-primary:hover {';
+            $lines[] = "  background-image: linear-gradient({$gradientDirection}, {$this->mixColors($gradientStart, '#000000', 10)}, {$this->mixColors($gradientEnd, '#000000', 10)}) !important;";
+            $lines[] = '  border-color: transparent !important;';
+            $lines[] = '}';
+            $lines[] = '';
+            $lines[] = '.frontend-theme .btn-outline {';
+            $lines[] = "  border-image: {$buttonGradient} 1 !important;";
+            $lines[] = "  color: {$gradientStart} !important;";
+            $lines[] = '}';
+            $lines[] = '';
+            $lines[] = '.frontend-theme .bg-primary-50,';
+            $lines[] = '.frontend-theme .bg-secondary-50,';
+            $lines[] = '.frontend-theme .bg-accent-50,';
+            $lines[] = '.frontend-theme .bg-white\\/95,';
+            $lines[] = '.frontend-theme .bg-white\\/90,';
+            $lines[] = '.frontend-theme .bg-white\\/80,';
+            $lines[] = '.frontend-theme .bg-gray-50\\/90 {';
+            $lines[] = "  background-image: {$softGradient} !important;";
+            $lines[] = '}';
+        } else {
+            $lines[] = '';
+            $lines[] = '.frontend-theme .btn-primary {';
+            $lines[] = "  background-color: {$primary} !important;";
+            $lines[] = "  border-color: {$primary} !important;";
+            $lines[] = '}';
+            $lines[] = '';
+            $lines[] = '.frontend-theme .btn-primary:hover {';
+            $lines[] = "  background-color: {$primaryPalette[600]} !important;";
+            $lines[] = "  border-color: {$primaryPalette[600]} !important;";
+            $lines[] = '}';
+            $lines[] = '';
+            $lines[] = '.frontend-theme .btn-outline {';
+            $lines[] = "  border-color: {$primary} !important;";
+            $lines[] = "  color: {$primary} !important;";
+            $lines[] = '}';
+        }
+
+        $customCss = $settings['custom_css'] ?? '';
+        if ($customCss !== '') {
+            $lines[] = '';
+            $lines[] = '/* Custom CSS start */';
+            $lines[] = $customCss;
+            $lines[] = '/* Custom CSS end */';
+        }
+
+        return response(implode("\n", $lines), 200)
+            ->header('Content-Type', 'text/css; charset=utf-8')
+            ->header('Cache-Control', 'public, max-age=3600, must-revalidate');
+    }
+
+    private function buildPalette(string $base): array
+    {
+        return [
+            50 => $this->mixColors($base, '#ffffff', 92),
+            100 => $this->mixColors($base, '#ffffff', 82),
+            200 => $this->mixColors($base, '#ffffff', 68),
+            300 => $this->mixColors($base, '#ffffff', 52),
+            400 => $this->mixColors($base, '#ffffff', 28),
+            500 => $this->normalizeHex($base),
+            600 => $this->mixColors($base, '#000000', 14),
+            700 => $this->mixColors($base, '#000000', 26),
+            800 => $this->mixColors($base, '#000000', 38),
+            900 => $this->mixColors($base, '#000000', 50),
+            950 => $this->mixColors($base, '#000000', 64),
+        ];
+    }
+
+    private function buildAccentPalette(string $base): array
+    {
+        return [
+            400 => $this->mixColors($base, '#ffffff', 20),
+            500 => $this->normalizeHex($base),
+            600 => $this->mixColors($base, '#000000', 14),
+        ];
+    }
+
+    private function mixColors(string $base, string $target, int $percent): string
+    {
+        [$red1, $green1, $blue1] = $this->hexToRgb($base);
+        [$red2, $green2, $blue2] = $this->hexToRgb($target);
+        $ratio = max(0, min(100, $percent)) / 100;
+
+        return $this->rgbToHex(
+            (int) round($red1 + (($red2 - $red1) * $ratio)),
+            (int) round($green1 + (($green2 - $green1) * $ratio)),
+            (int) round($blue1 + (($blue2 - $blue1) * $ratio)),
+        );
+    }
+
+    private function toRgba(string $color, float $alpha): string
+    {
+        [$red, $green, $blue] = $this->hexToRgb($color);
+        $opacity = max(0, min(1, $alpha));
+
+        return "rgba({$red}, {$green}, {$blue}, {$opacity})";
+    }
+
+    private function hexToRgb(string $color): array
+    {
+        $hex = ltrim($this->normalizeHex($color), '#');
+
+        return [
+            hexdec(Str::substr($hex, 0, 2)),
+            hexdec(Str::substr($hex, 2, 2)),
+            hexdec(Str::substr($hex, 4, 2)),
+        ];
+    }
+
+    private function rgbToHex(int $red, int $green, int $blue): string
+    {
+        return sprintf('#%02x%02x%02x', $red, $green, $blue);
+    }
+
+    private function normalizeHex(string $color): string
+    {
+        $hex = trim($color);
+        if (! Str::startsWith($hex, '#')) {
+            $hex = "#{$hex}";
+        }
+
+        if (strlen($hex) === 4) {
+            $hex = sprintf(
+                '#%s%s%s%s%s%s',
+                $hex[1],
+                $hex[1],
+                $hex[2],
+                $hex[2],
+                $hex[3],
+                $hex[3],
+            );
+        }
+
+        return preg_match('/^#[0-9a-fA-F]{6}$/', $hex) ? strtolower($hex) : '#000000';
+    }
+
+    private function fontStack(string $primary, ?string $fallback = null): string
+    {
+        $fonts = array_filter([$primary, $fallback]);
+        $segments = [];
+
+        foreach ($fonts as $font) {
+            $value = trim($font);
+            if ($value === '') {
+                continue;
             }
 
-            return implode("\n", $lines);
-        });
+            $segments[] = $this->isGenericFont($value) ? $value : "'{$value}'";
+        }
 
-        return response($css, 200)
-            ->header('Content-Type', 'text/css; charset=utf-8')
-            ->header('Cache-Control', 'public, max-age=86400');
+        $segments[] = 'ui-sans-serif';
+        $segments[] = 'system-ui';
+        $segments[] = 'sans-serif';
+
+        return implode(', ', array_unique($segments));
+    }
+
+    private function isGenericFont(string $font): bool
+    {
+        return in_array(strtolower($font), ['serif', 'sans-serif', 'system-ui', 'ui-sans-serif', 'monospace'], true);
+    }
+
+    private function resolveLetterSpacing(string $value): string
+    {
+        return match ($value) {
+            'tighter' => '-0.05em',
+            'tight' => '-0.025em',
+            'wide' => '0.025em',
+            'wider' => '0.05em',
+            default => $value,
+        };
     }
 }

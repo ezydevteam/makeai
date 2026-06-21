@@ -32,7 +32,7 @@ useFlashToasts()
 </script>
 
 <template>
-    <div class="min-h-screen bg-gray-50 dark:bg-surface-950 flex flex-col transition-colors duration-300">
+    <div class="frontend-theme min-h-screen bg-gray-50 dark:bg-surface-950 flex flex-col transition-colors duration-300">
         <!-- ═══ Impersonation Banner ═══ -->
         <div v-if="user?.isImpersonating" class="bg-accent-600 text-white px-4 py-2 flex items-center justify-center gap-4 text-sm font-bold z-[60] sticky top-0">
             <div class="flex items-center gap-2">

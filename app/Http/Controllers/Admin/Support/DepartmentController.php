@@ -61,6 +61,5 @@ class DepartmentController extends Controller
 
     private function authorizeSupport(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('support.tickets'), 403);
     }
 }

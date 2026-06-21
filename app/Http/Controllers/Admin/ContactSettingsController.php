@@ -27,6 +27,5 @@ class ContactSettingsController extends Controller
 
     private function authorizeContact(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('content.pages'), 403);
     }
 }

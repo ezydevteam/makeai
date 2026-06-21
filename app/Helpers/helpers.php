@@ -12,6 +12,7 @@ use App\Models\Setting;
 use App\Models\Translation;
 use App\Models\User;
 use App\Services\AddonService;
+use App\Services\ThemeSettingsService;
 use App\Services\ThemeService;
 use App\Services\TranslationService;
 use App\Support\CountryCatalog;
@@ -308,16 +309,20 @@ if (! function_exists('theme_setting')) {
      */
     function theme_setting(string $key, mixed $default = null): mixed
     {
-        $value = app(ThemeService::class)->getSetting($key, $default);
+        $presetService = app(ThemeSettingsService::class);
 
-        if ($value === $default || $value === null) {
-            $appearance = \App\Models\AppearanceSetting::getForScope('theme_default');
-            if (array_key_exists($key, $appearance) && $appearance[$key] !== null) {
-                return $appearance[$key];
-            }
+        if (in_array($key, ['custom_css', 'custom_header_code', 'custom_footer_code'], true)) {
+            $customCode = $presetService->getStoredCustomCodeSettings();
+
+            return $customCode[$key] ?? $default;
         }
 
-        return $value;
+        $themeSettings = $presetService->getResolvedFrontendTheme();
+        if (array_key_exists($key, $themeSettings)) {
+            return $themeSettings[$key];
+        }
+
+        return app(ThemeService::class)->getSetting($key, $default);
     }
 }
 

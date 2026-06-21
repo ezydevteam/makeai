@@ -2,7 +2,11 @@
 
 use App\Http\Middleware\AdminAuth;
 use App\Http\Middleware\AdminPermission;
+use App\Http\Middleware\CheckAffiliateEnabled;
 use App\Http\Middleware\CheckCredits;
+use App\Http\Middleware\CheckBlogEnabled;
+use App\Http\Middleware\CheckContactEnabled;
+use App\Http\Middleware\CheckTicketsEnabled;
 use App\Http\Middleware\DemoMode;
 use App\Http\Middleware\DetectPricingCountry;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -55,8 +59,16 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             'admin.auth' => AdminAuth::class,
             'admin.permission' => AdminPermission::class,
             'admin.audit' => \App\Http\Middleware\AdminAuditLog::class,
+            'affiliate' => CheckAffiliateEnabled::class,
             'check.credits' => CheckCredits::class,
+            'tickets' => CheckTicketsEnabled::class,
+            'contact' => CheckContactEnabled::class,
+            'blog' => CheckBlogEnabled::class,
+            'notifications' => \App\Http\Middleware\CheckNotificationEnabled::class,
+            'register' => \App\Http\Middleware\CheckRegistrationEnabled::class,
+            'email.verify' => \App\Http\Middleware\CheckEmailVerificationEnabled::class,
             'not.banned' => NotBanned::class,
+            'premium' => \App\Http\Middleware\CheckPremium::class,
             'throttle' => ThrottleAiRequests::class,
         ]);
     })
@@ -98,3 +110,4 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && basename($_SERVER['SCRIPT_FILENAME']) 
 }
 
 return $app;
+app;

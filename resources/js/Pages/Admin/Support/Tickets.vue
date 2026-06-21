@@ -143,7 +143,6 @@ const bulkAssignOptions = computed(() => [
 ])
 
 const labels: Record<string, string> = {
-    tickets_enabled: 'Enable tickets',
     notify_admin_new_ticket: 'Notify admin on new ticket',
     notify_user_reply: 'Notify user on reply',
     satisfaction_rating_enabled: 'Enable satisfaction rating',
@@ -610,7 +609,7 @@ onBeforeUnmount(() => {
 
                             <div class="grid gap-4 md:grid-cols-2">
                                 <label
-                                    v-for="key in ['tickets_enabled', 'notify_admin_new_ticket', 'notify_user_reply', 'satisfaction_rating_enabled', 'ai_reply_suggestion']"
+                                    v-for="key in ['notify_admin_new_ticket', 'notify_user_reply', 'satisfaction_rating_enabled', 'ai_reply_suggestion']"
                                     :key="key"
                                     class="flex items-start justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800"
                                 >

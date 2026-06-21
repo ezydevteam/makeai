@@ -14,7 +14,6 @@ class SupportSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tickets_enabled' => ['required', 'boolean'],
             'max_attachments_per_reply' => ['required', 'integer', 'min:0', 'max:10'],
             'max_attachment_size_mb' => ['required', 'integer', 'min:1', 'max:50'],
             'allowed_attachment_types' => ['required', 'string', 'max:255'],

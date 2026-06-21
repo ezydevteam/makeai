@@ -16,7 +16,6 @@ class PlanController extends Controller
 {
     public function index(): Response
     {
-        abort_unless(isProAvailable(), 404);
 
         return Inertia::render('Admin/Premium/Plans/Index', [
             'plans' => Plan::with(['countryPrices' => fn ($query) => $query->orderBy('country_code')])
@@ -32,7 +31,6 @@ class PlanController extends Controller
 
     public function pricing(): Response
     {
-        abort_unless(isProAvailable(), 404);
 
         return Inertia::render('Admin/Premium/Plans/Pricing', [
             'currencies' => CountryCatalog::currencies(),
@@ -42,8 +40,6 @@ class PlanController extends Controller
 
     public function update(PlanPricingRequest $request, Plan $plan): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
-
         $data = $request->validated();
 
         logger()->info('admin.plans.update.payload', [
@@ -127,7 +123,6 @@ class PlanController extends Controller
 
     public function updateSettings(Request $request): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
 
         $data = $request->validate([
             'pricing_show_monthly' => ['boolean'],

@@ -3,20 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AppearanceSetting;
 use App\Services\AddonLicenseService;
 use App\Services\AddonService;
+use App\Services\ThemeSettingsService;
 use App\Services\ThemeService;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use ZipArchive;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Setting;
-use App\Http\Controllers\Admin\HeaderBuilderController;
-use App\Http\Controllers\Admin\HomepageBuilderController;
-use App\Http\Controllers\Admin\FooterBuilderController;
+use App\Models\Menu;
 
 /**
  * Admin Theme & Addon Management Controller.
@@ -26,6 +25,7 @@ class ThemeAddonController extends Controller
 {
     public function __construct(
         private ThemeService $themeService,
+        private ThemeSettingsService $frontendPresetService,
         private AddonService $addonService,
         private AddonLicenseService $addonLicenseService,
     ) {}
@@ -37,7 +37,7 @@ class ThemeAddonController extends Controller
      */
     public function themes()
     {
-        return Inertia::render('Admin/Themes', [
+        return Inertia::render('Admin/Appearance/Themes', [
             'themes' => $this->themeService->getAvailableThemes(),
             'activeTheme' => $this->themeService->getActiveTheme(),
         ]);
@@ -66,77 +66,33 @@ class ThemeAddonController extends Controller
         }
 
         if ($slug === 'default') {
-            // Header Builder props
-            $headerBuilder = app(HeaderBuilderController::class);
-            $headerConfigRaw = Setting::getValue('header_config');
-            $headerSavedConfig = $headerConfigRaw ? (is_array($headerConfigRaw) ? $headerConfigRaw : json_decode($headerConfigRaw, true) ?? []) : [];
-            $headerSavedConfig = $headerBuilder->migrateLegacyStickyConfig($headerSavedConfig);
-            $headerDefaults = $headerBuilder->getDefaults();
-            $headerConfig = $headerBuilder->normalizeBlockIds($headerSavedConfig ? array_replace_recursive($headerDefaults, $headerSavedConfig) : $headerDefaults);
-
-            // Homepage Builder props
-            $homepageBuilder = app(HomepageBuilderController::class);
-            $homepageConfigRaw = Setting::getValue('homepage_config');
-            $homepageSavedConfig = is_array($homepageConfigRaw) ? $homepageBuilder->normalizeStoredHomepageConfig($homepageConfigRaw) : null;
-            $homepageConfig = is_array($homepageSavedConfig) ? array_replace_recursive($homepageBuilder->getDefaults(), $homepageSavedConfig) : $homepageBuilder->getDefaults();
-            $activeHomepageTemplate = settings('homepage_template', 'default');
-            $availableTemplates = \App\Models\SiteTemplate::active()
-                ->where('slug', 'ai-chatbot')
-                ->orderBy('sort_order')
+            $menus = Menu::query()
                 ->orderBy('name')
-                ->get(['slug', 'name', 'requires_pro'])
-                ->map(fn ($t) => [
-                    'slug' => $t->slug,
-                    'name' => $t->name,
-                    'requires_pro' => (bool) $t->requires_pro,
-                ])
-                ->values();
-            $gridTemplates = \App\Models\SiteTemplate::active()
-                ->where('slug', '!=', 'ai-chatbot')
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(['slug', 'name', 'requires_pro'])
-                ->values();
-
-            // Footer Builder props
-            $footerBuilder = app(FooterBuilderController::class);
-            $footerConfigRaw = Setting::getValue('footer_config');
-            if ($footerConfigRaw) {
-                $footerSavedConfig = is_array($footerConfigRaw) ? $footerConfigRaw : json_decode($footerConfigRaw, true) ?? [];
-                $footerConfig = $footerBuilder->normalizeConfig($footerSavedConfig);
-            } else {
-                $footerConfig = $footerBuilder->normalizeConfig($footerBuilder->getDefaults());
-            }
-
-            // Shared builders metadata
-            $menus = \App\Models\Menu::orderBy('name')->get(['id', 'name', 'slug']);
-            $pages = \App\Models\Page::query()
-                ->published()
-                ->orderBy('title')
-                ->get(['id', 'title', 'slug']);
-            $aiCategories = \App\Models\Category::active()->aiTools()
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'tools_count']);
+                ->get(['id', 'name', 'slug']);
 
             return Inertia::render('Admin/Appearance/DefaultThemeSettings', [
                 'theme' => $config,
-                'settings' => AppearanceSetting::getForScope('theme_default'),
-                'headerConfig' => $headerConfig,
-                'headerDefaults' => $headerDefaults,
-                'homepageConfig' => $homepageConfig,
-                'sectionTypes' => HomepageBuilderController::SECTION_TYPES,
-                'activeHomepageTemplate' => $activeHomepageTemplate,
-                'availableTemplates' => $availableTemplates,
-                'gridTemplates' => $gridTemplates,
-                'footerConfig' => $footerConfig,
+                'settings' => array_merge(
+                    $this->frontendPresetService->getResolvedFrontendTheme(),
+                    [
+                        'site_logo_light'    => settings('site_logo_light', ''),
+                        'site_logo_dark'     => settings('site_logo_dark', ''),
+                        'site_favicon_ico'   => settings('site_favicon_ico', ''),
+                        'site_favicon_png'   => settings('site_favicon_png', ''),
+                        'site_og_image'      => settings('site_og_image', ''),
+                    ]
+                ),
+                'frontendThemeSettings' => $this->frontendPresetService->getStoredThemeSettings(),
+                'frontendHeaderSettings' => $this->frontendPresetService->getStoredHeaderSettings(),
+                'frontendFooterSettings' => $this->frontendPresetService->getStoredFooterSettings(),
+                'frontendHomepageSettings' => $this->frontendPresetService->getStoredHomepageSettings(),
+                'frontendHomepageConfig' => $this->frontendPresetService->getResolvedFrontendHomepageConfig(),
+                'frontendCustomCodeSettings' => $this->frontendPresetService->getStoredCustomCodeSettings(),
                 'menus' => $menus,
-                'pages' => $pages,
-                'aiCategories' => $aiCategories,
             ]);
         }
 
-        return Inertia::render('Admin/ThemeSettings', [
+        return Inertia::render('Admin/Appearance/ThemeSettings', [
             'theme' => $config,
             'settings' => $this->themeService->getThemeSettings($slug),
         ]);
@@ -153,15 +109,9 @@ class ThemeAddonController extends Controller
         }
 
         if ($slug === 'default') {
-            $validated = $request->validate([
-                'settings' => ['required', 'array'],
-                'settings.*' => ['nullable', 'max:50000'],
-            ]);
+            $request->merge(['section' => 'theme']);
 
-            $this->saveAppearanceScopeSettings('theme_default', $validated['settings']);
-            Cache::forget('theme-variables-css');
-
-            return back()->with('success', translate('Theme settings saved.'));
+            return $this->saveSimpleThemeSettings($request, $slug);
         }
 
         $this->themeService->saveThemeSettings($slug, $request->except('_token'));
@@ -169,82 +119,197 @@ class ThemeAddonController extends Controller
         return back()->with('success', translate('Theme settings saved.'));
     }
 
-    private function saveAppearanceScopeSettings(string $scope, array $settings): void
+    public function saveSimpleThemeSettings(Request $request, string $slug)
     {
-        $colorKeys = [
-            'primary_color', 'secondary_color', 'accent_color', 'bg_color',
-            'surface_color', 'sidebar_bg', 'sidebar_text_color',
-            'navbar_bg', 'navbar_text_color', 'text_primary_color',
-            'text_secondary_color', 'link_color', 'button_color',
-            'button_hover_color', 'header_background', 'footer_background',
-            'bg_gradient',
+        $this->ensureThemeExists($slug);
+
+        $validated = $request->validate([
+            'section' => ['required', 'string', 'in:theme,header,footer,homepage,custom_code'],
+            'settings' => ['required', 'array'],
+            'site_logo_light_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,svg,webp,avif', 'max:5120'],
+            'site_logo_dark_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,svg,webp,avif', 'max:5120'],
+            'site_favicon_ico_file' => ['nullable', 'file', 'mimes:ico', 'max:2048'],
+            'site_favicon_png_file' => ['nullable', 'file', 'mimes:png', 'max:2048'],
+            'site_og_image_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,avif', 'max:5120'],
+            'bg_image_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,avif', 'max:5120'],
+            'payment_icon_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,svg,webp,avif', 'max:4096'],
+            'hero_background_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,avif,mp4,webm,ogg', 'max:51200'],
+        ]);
+
+        $section = $validated['section'];
+        $settings = $validated['settings'];
+
+        if ($section === 'theme') {
+            $settings = $this->handleBrandingUploads($request, $settings);
+            $settings = $this->handleFrontendThemeBackgroundUpload($request, $settings);
+            $this->persistBrandingSettings($settings);
+            $this->frontendPresetService->saveThemeSettings($settings);
+            Cache::forget('theme-variables-css');
+        } elseif ($section === 'header') {
+            $this->frontendPresetService->saveHeaderSettings($settings);
+        } elseif ($section === 'footer') {
+            $settings = $this->handleFooterUploads($request, $settings);
+            $this->frontendPresetService->saveFooterSettings($settings);
+        } elseif ($section === 'homepage') {
+            $this->frontendPresetService->saveHomepageSettings($settings);
+            $homepageConfig = $request->input('homepage_config', []);
+            // forceFormData serializes nested objects as JSON strings — decode back to array
+            if (is_string($homepageConfig)) {
+                $homepageConfig = json_decode($homepageConfig, true) ?? [];
+            }
+
+            // Handle hero background file upload
+            if ($request->hasFile('hero_background_file')) {
+                $path = $request->file('hero_background_file')->store('theme/hero', 'public');
+                if (is_array($homepageConfig) && isset($homepageConfig['sections'])) {
+                    foreach ($homepageConfig['sections'] as &$section) {
+                        if (($section['type'] ?? '') === 'hero') {
+                            $section['config']['hero_background_url'] = $path;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (! empty($homepageConfig)) {
+                $this->frontendPresetService->saveHomepageConfig($homepageConfig);
+            }
+        } elseif ($section === 'custom_code') {
+            $this->frontendPresetService->saveCustomCodeSettings($settings);
+        }
+
+        Setting::flushCache();
+
+        return back()->with('success', translate('Frontend settings saved.'));
+    }
+
+    public function saveHomepageConfig(Request $request, string $slug): RedirectResponse
+    {
+        $this->ensureThemeExists($slug);
+
+        $config = $request->input('config', []);
+        if (is_array($config)) {
+            $this->frontendPresetService->saveHomepageConfig($config);
+            Setting::flushCache();
+        }
+
+        return back()->with('success', translate('Homepage section settings saved.'));
+    }
+
+    /**
+     * Restore default values for a theme settings section.
+     */
+    public function restoreThemeDefaults(Request $request, string $slug): RedirectResponse
+    {
+        $this->ensureThemeExists($slug);
+
+        $validated = $request->validate([
+            'section' => ['required', 'string', 'in:theme,header,footer,homepage,custom_code'],
+        ]);
+
+        $this->frontendPresetService->restoreDefaults($validated['section']);
+
+        Setting::flushCache();
+
+        if ($validated['section'] === 'theme') {
+            Cache::forget('theme-variables-css');
+        }
+
+        return back()->with('success', translate(':section defaults restored.', [
+            'section' => ucfirst($validated['section']),
+        ]));
+    }
+
+    private function ensureThemeExists(string $slug): void
+    {
+        abort_unless($this->themeService->getThemeConfig($slug) !== null, 404);
+    }
+
+    private function handleFrontendThemeBackgroundUpload(Request $request, array $settings): array
+    {
+        $storedThemeSettings = $this->frontendPresetService->getStoredThemeSettings();
+        $oldBackground = $storedThemeSettings['bg_image'] ?? null;
+
+        if ($request->hasFile('bg_image_file')) {
+            if ($oldBackground && Storage::disk('public')->exists($oldBackground)) {
+                Storage::disk('public')->delete($oldBackground);
+            }
+
+            $settings['bg_image'] = $request->file('bg_image_file')->store('theme/backgrounds', 'public');
+        } elseif (($settings['bg_image'] ?? null) === '') {
+            if ($oldBackground && Storage::disk('public')->exists($oldBackground)) {
+                Storage::disk('public')->delete($oldBackground);
+            }
+        }
+
+        return $settings;
+    }
+
+    private function handleFooterUploads(Request $request, array $settings): array
+    {
+        $storedFooterSettings = $this->frontendPresetService->getStoredFooterSettings();
+        $oldIcon = $storedFooterSettings['payment_icons'] ?? null;
+
+        if ($request->hasFile('payment_icon_file')) {
+            if (is_string($oldIcon) && $oldIcon !== '' && Storage::disk('public')->exists($oldIcon)) {
+                Storage::disk('public')->delete($oldIcon);
+            }
+
+            $settings['payment_icons'] = $request->file('payment_icon_file')->store('theme/footer/payments', 'public');
+        } elseif (($settings['payment_icons'] ?? null) === '') {
+            if (is_string($oldIcon) && $oldIcon !== '' && Storage::disk('public')->exists($oldIcon)) {
+                Storage::disk('public')->delete($oldIcon);
+            }
+        }
+
+        return $settings;
+    }
+
+    private function handleBrandingUploads(Request $request, array $settings): array
+    {
+        $brandingFileFields = [
+            'site_logo_light_file'  => 'site_logo_light',
+            'site_logo_dark_file'   => 'site_logo_dark',
+            'site_favicon_ico_file' => 'site_favicon_ico',
+            'site_favicon_png_file' => 'site_favicon_png',
+            'site_og_image_file'    => 'site_og_image',
         ];
 
-        $allowedBorderRadius = ['0px', '8px', '12px', '16px', '20px', '999px'];
-        $allowedFontSizes = ['12px', '13px', '14px', '15px', '16px', '18px', '20px'];
-        $allowedHeadingWeight = ['400', '500', '600', '700', '800'];
-        $allowedLineHeight = ['1.25', '1.375', '1.5', '1.625', '1.75', '2'];
-        $allowedLetterSpacing = ['tighter', 'tight', 'normal', 'wide', 'wider'];
-        $allowedContainerWidth = ['full', '1080px', '1280px', '1536px'];
-        $allowedBgSize = ['cover', 'contain', 'auto'];
-        $allowedBgRepeat = ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'];
-        $allowedBgAttachment = ['scroll', 'fixed'];
-        $allowedBgPosition = ['center', 'top', 'bottom', 'left', 'right', 'top left', 'top right', 'bottom left', 'bottom right'];
+        foreach ($brandingFileFields as $fileField => $settingKey) {
+            if ($request->hasFile($fileField)) {
+                $oldPath = settings($settingKey);
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
 
-        foreach ($settings as $key => $value) {
-            if ($value === null || $value === '') {
-                AppearanceSetting::where('scope', $scope)->where('key', $key)->delete();
-                continue;
+                $targetDirectory = $settingKey === 'site_og_image' ? 'branding/og' : 'branding';
+                $settings[$settingKey] = $request->file($fileField)->store($targetDirectory, 'public');
+            } elseif (($settings[$settingKey] ?? null) === '') {
+                $oldPath = settings($settingKey);
+                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                    Storage::disk('public')->delete($oldPath);
+                }
             }
+        }
 
-            if (in_array($key, $colorKeys, true) && ! preg_match('/^#[0-9a-fA-F]{3,8}$/', $value)) {
-                continue;
+        return $settings;
+    }
+
+    private function persistBrandingSettings(array &$settings): void
+    {
+        $globalKeys = [
+            'site_logo_light',
+            'site_logo_dark',
+            'site_favicon_ico',
+            'site_favicon_png',
+            'site_og_image',
+        ];
+
+        foreach ($globalKeys as $key) {
+            if (array_key_exists($key, $settings)) {
+                settings_set($key, $settings[$key], 'string', 'branding');
+                unset($settings[$key]);
             }
-
-            if ($key === 'border_radius' && ! in_array($value, $allowedBorderRadius, true)) {
-                continue;
-            }
-
-            if ($key === 'base_font_size' && ! in_array($value, $allowedFontSizes, true)) {
-                continue;
-            }
-
-            if ($key === 'heading_weight' && ! in_array($value, $allowedHeadingWeight, true)) {
-                continue;
-            }
-
-            if ($key === 'line_height' && ! in_array($value, $allowedLineHeight, true)) {
-                continue;
-            }
-
-            if ($key === 'letter_spacing' && ! in_array($value, $allowedLetterSpacing, true)) {
-                continue;
-            }
-
-            if ($key === 'container_width' && ! in_array($value, $allowedContainerWidth, true) && ! preg_match('/^\d+px$/', $value)) {
-                continue;
-            }
-
-            if ($key === 'bg_size' && ! in_array($value, $allowedBgSize, true)) {
-                continue;
-            }
-
-            if ($key === 'bg_repeat' && ! in_array($value, $allowedBgRepeat, true)) {
-                continue;
-            }
-
-            if ($key === 'bg_attachment' && ! in_array($value, $allowedBgAttachment, true)) {
-                continue;
-            }
-
-            if ($key === 'bg_position' && ! in_array($value, $allowedBgPosition, true)) {
-                continue;
-            }
-
-            AppearanceSetting::updateOrCreate(
-                ['scope' => $scope, 'key' => $key],
-                ['value' => $value]
-            );
         }
     }
 
@@ -267,7 +332,7 @@ class ThemeAddonController extends Controller
             return $addon;
         }, $addons);
 
-        return Inertia::render('Admin/Addons', [
+        return Inertia::render('Admin/Appearance/Addons', [
             'addons' => $addons,
         ]);
     }
@@ -299,14 +364,7 @@ class ThemeAddonController extends Controller
     public function activateAddon(Request $request, string $slug)
     {
         if ($this->addonService->activate($slug)) {
-            // Log activity
-            \DB::table('admin_audit_logs')->insert([
-                'admin_id' => auth('admin')->id(),
-                'action' => 'addon_activated',
-                'description' => "Activated addon: {$slug}",
-                'metadata' => json_encode(['addon_slug' => $slug]),
-                'created_at' => now(),
-            ]);
+            $this->logAddonAudit($request, 'addon_activated', $slug);
 
             return back()->with('success', translate('Addon :addon activated successfully.', ['addon' => $slug]));
         }
@@ -321,14 +379,7 @@ class ThemeAddonController extends Controller
     {
         $this->addonService->deactivate($slug);
 
-        // Log activity
-        \DB::table('admin_audit_logs')->insert([
-            'admin_id' => auth('admin')->id(),
-            'action' => 'addon_deactivated',
-            'description' => "Deactivated addon: {$slug}",
-            'metadata' => json_encode(['addon_slug' => $slug]),
-            'created_at' => now(),
-        ]);
+        $this->logAddonAudit($request, 'addon_deactivated', $slug);
 
         return back()->with('success', translate('Addon :addon deactivated.', ['addon' => $slug]));
     }
@@ -385,8 +436,12 @@ class ThemeAddonController extends Controller
             $rules = \Addons\AiAssistant\Models\AiAssistantRule::orderBy('id', 'desc')->get();
         }
 
-        // Resolve from either the generic page or the addon-specific page
-        return Inertia::render('Addons/' . $slug . '/Admin/Settings', [
+        $addonSpecificPage = resource_path('js/Pages/Addons/' . $slug . '/Admin/Settings.vue');
+        $page = file_exists($addonSpecificPage)
+            ? 'Addons/' . $slug . '/Admin/Settings'
+            : 'Admin/Appearance/AddonSettings';
+
+        return Inertia::render($page, [
             'addon' => $config,
             'settings' => $settings,
             'aiModels' => $aiModels,
@@ -588,14 +643,7 @@ class ThemeAddonController extends Controller
         foreach ($validated['slugs'] as $slug) {
             if ($this->addonService->activate($slug)) {
                 $activated++;
-
-                \DB::table('admin_audit_logs')->insert([
-                    'admin_id' => auth('admin')->id(),
-                    'action' => 'addon_activated',
-                    'description' => "Activated addon: {$slug}",
-                    'metadata' => json_encode(['addon_slug' => $slug]),
-                    'created_at' => now(),
-                ]);
+                $this->logAddonAudit($request, 'addon_activated', $slug);
             }
         }
 
@@ -616,14 +664,7 @@ class ThemeAddonController extends Controller
         foreach ($validated['slugs'] as $slug) {
             $this->addonService->deactivate($slug);
             $deactivated++;
-
-            \DB::table('admin_audit_logs')->insert([
-                'admin_id' => auth('admin')->id(),
-                'action' => 'addon_deactivated',
-                'description' => "Deactivated addon: {$slug}",
-                'metadata' => json_encode(['addon_slug' => $slug]),
-                'created_at' => now(),
-            ]);
+            $this->logAddonAudit($request, 'addon_deactivated', $slug);
         }
 
         return back()->with('success', translate(':count addon(s) deactivated.', ['count' => $deactivated]));
@@ -667,5 +708,23 @@ class ThemeAddonController extends Controller
             'type' => $result->type,
             'message' => translate('License verified for :buyer', ['buyer' => $result->buyer]),
         ]);
+    }
+
+    private function logAddonAudit(Request $request, string $action, string $slug): void
+    {
+        try {
+            \DB::table('admin_audit_logs')->insert([
+                'admin_id' => auth('admin')->id(),
+                'action' => $action,
+                'ip_address' => $request->ip() ?? '127.0.0.1',
+                'user_agent' => $request->userAgent(),
+                'payload' => json_encode([
+                    'addon_slug' => $slug,
+                ]),
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

@@ -64,6 +64,5 @@ class CannedResponseController extends Controller
 
     private function authorizeRespond(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('support.respond'), 403);
     }
 }

@@ -15,9 +15,6 @@ class PaymentGatewayController extends Controller
 {
     public function index(): Response
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.view'), 403);
-
         $definitions = config('payment-gateways', []);
         $gateways = PaymentGateway::query()
             ->orderBy('sort_order')
@@ -57,8 +54,6 @@ class PaymentGatewayController extends Controller
 
     public function update(PaymentGatewayRequest $request, PaymentGateway $gateway): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         $data = $request->validated();
         $credentials = $gateway->credentials ?: [];
@@ -88,8 +83,6 @@ class PaymentGatewayController extends Controller
 
     public function sort(Request $request): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         $data = $request->validate([
             'gateways' => ['required', 'array'],

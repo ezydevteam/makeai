@@ -15,8 +15,6 @@ class CouponController extends Controller
 {
     public function index(): Response
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         return Inertia::render('Admin/Premium/Payments/Coupons', [
             'coupons' => Coupon::with('plan:id,name')
@@ -30,8 +28,6 @@ class CouponController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         Coupon::create($this->validated($request));
 
@@ -40,8 +36,6 @@ class CouponController extends Controller
 
     public function update(Request $request, Coupon $coupon): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         $coupon->update($this->validated($request, $coupon));
 
@@ -50,8 +44,6 @@ class CouponController extends Controller
 
     public function destroy(Coupon $coupon): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         $coupon->delete();
 
@@ -60,8 +52,6 @@ class CouponController extends Controller
 
     public function toggleHeader(Coupon $coupon): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
 
         DB::transaction(function () use ($coupon) {
             $showInHeader = ! $coupon->show_in_header;

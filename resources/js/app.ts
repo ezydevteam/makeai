@@ -8,6 +8,7 @@ import AppSelect from './Components/AppSelect.vue'
 import AppColorPicker from './Components/AppColorPicker.vue'
 import ToastContainer from './Components/ToastContainer.vue'
 import ShortcutsReferenceModal from './Components/ShortcutsReferenceModal.vue'
+import PageLoader from './Components/PageLoader.vue'
 import { useGlobalShortcuts } from './Composables/useKeyboardShortcuts'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
@@ -37,6 +38,59 @@ function syncDocumentLocale(locale: unknown) {
     html.classList.toggle('rtl', isRtl)
 }
 
+function applyThemeDefaults(themeSettings: Record<string, string> | undefined) {
+    if (!themeSettings) return
+    const html = document.documentElement
+
+    // ── Theme Default Mode ──────────────────────────────────
+    const modeSetting = themeSettings.theme_default_mode
+    if (modeSetting === 'dark' || modeSetting === 'light') {
+        const stored = localStorage.getItem('vueuse-color-scheme')
+        if (stored === null) {
+            localStorage.setItem('vueuse-color-scheme', modeSetting === 'dark' ? 'dark' : '')
+        }
+    }
+
+    // ── Smooth Scroll ───────────────────────────────────────
+    const scroll = themeSettings.smooth_scroll
+    if (scroll === 'true' || scroll === '1') {
+        html.style.scrollBehavior = 'smooth'
+    } else {
+        html.style.scrollBehavior = ''
+    }
+
+    // ── Container Width ─────────────────────────────────────
+    // Apply a CSS rule that makes all frontend containers respect the setting
+    const isAdmin = window.location.pathname.startsWith('/admin')
+    const cw = themeSettings.container_width
+    const widthMap: Record<string, string> = {
+        full: '100%',
+        '1080px': '1080px',
+        '1280px': '1280px',
+        '1536px': '1536px',
+    }
+    const pageWidth = widthMap[cw] || '1280px'
+    html.style.setProperty('--page-width', pageWidth)
+    // Inject a live CSS rule scoped to non-admin pages
+    let styleTag = document.getElementById('theme-width-css') as HTMLStyleElement | null
+    if (!styleTag) {
+        styleTag = document.createElement('style')
+        styleTag.id = 'theme-width-css'
+        document.head.appendChild(styleTag)
+    }
+    styleTag.textContent = isAdmin ? '' : `
+        [style*="--page-width: ${pageWidth}"] .mx-auto {
+            max-width: var(--page-width) !important;
+        }
+        .max-w-7xl {
+            max-width: var(--page-width, 1280px) !important;
+        }
+    `
+
+    // ── Page Loading Animation ───────────────────────────────
+    html.dataset.pageLoading = !isAdmin ? (themeSettings.page_loading_animation || 'none') : 'none'
+}
+
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: async (name) => {
@@ -59,14 +113,25 @@ createInertiaApp({
         return (await page()).default
     },
     setup({ el, App, props, plugin }) {
-        syncDocumentLocale(props.initialPage.props.locale)
+        const initialProps = props.initialPage.props as Record<string, any>
+        syncDocumentLocale(initialProps.locale)
         router.on('navigate', (event) => syncDocumentLocale(event.detail.page.props.locale))
+
+        // Apply theme default settings on initial load
+        const themeSettings = initialProps.appearanceThemeSettings as Record<string, string> | undefined
+        applyThemeDefaults(themeSettings)
+
+        // Re-apply theme defaults after each navigation (for settings that may change)
+        router.on('navigate', (event) => {
+            const pageProps = event.detail.page.props as Record<string, any>
+            applyThemeDefaults(pageProps.appearanceThemeSettings as Record<string, string> | undefined)
+        })
 
         useGlobalShortcuts()
 
         const pinia = createPinia()
         const vueApp = createApp({
-            render: () => [h(App, props), h(ToastContainer), h(ShortcutsReferenceModal)],
+            render: () => [h(App, props), h(ToastContainer), h(ShortcutsReferenceModal), h(PageLoader)],
         })
 
         vueApp

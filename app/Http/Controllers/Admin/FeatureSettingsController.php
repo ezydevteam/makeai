@@ -15,15 +15,15 @@ class FeatureSettingsController extends Controller
 
         return Inertia::render('Admin/Settings/Features', [
             'features' => [
-                'scroll_to_top_enabled' => (bool) settings('scroll_to_top_enabled', true),
-                'ai_chat_enabled' => (bool) settings('ai_chat_enabled', true),
-                'ai_variations_enabled' => (bool) settings('ai_variations_enabled', true),
-                'social_sharing_enabled' => (bool) settings('social_sharing_enabled', true),
-                'document_editor_enabled' => (bool) settings('document_editor_enabled', true),
                 'favorites_enabled' => (bool) settings('favorites_enabled', true),
-                'reviews_enabled' => (bool) settings('reviews_enabled', true),
-                'recently_used_tools_enabled' => (bool) settings('recently_used_tools_enabled', true),
-                'estimated_generation_time_enabled' => (bool) settings('estimated_generation_time_enabled', true),
+                'subscriptions_enabled' => (bool) settings('subscriptions_enabled', false),
+                'affiliate_enabled' => (bool) settings('affiliate_enabled', false),
+                'tickets_enabled' => (bool) settings('tickets_enabled', true),
+                'contact_enabled' => (bool) settings('contact_enabled', true),
+                'blog_enabled' => (bool) settings('blog_enabled', true),
+                'notifications_enabled' => (bool) settings('notifications_enabled', true),
+                'registration_enabled' => (bool) settings('registration_enabled', true),
+                'email_verification_enabled' => (bool) settings('email_verification_enabled', true),
             ],
         ]);
     }
@@ -33,16 +33,14 @@ class FeatureSettingsController extends Controller
         $this->authorizeSettings();
 
         $features = [
-            'scroll_to_top_enabled',
-            'ai_chat_enabled',
-            'ai_variations_enabled',
-            'social_sharing_enabled',
-            'document_editor_enabled',
-            'favorites_enabled',
-            'reviews_enabled',
-            'recently_used_tools_enabled',
-            'estimated_generation_time_enabled',
             'subscriptions_enabled',
+            'affiliate_enabled',
+            'tickets_enabled',
+            'contact_enabled',
+            'blog_enabled',
+            'notifications_enabled',
+            'registration_enabled',
+            'email_verification_enabled',
         ];
 
         foreach ($features as $feature) {

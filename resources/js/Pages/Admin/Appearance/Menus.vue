@@ -80,6 +80,7 @@ const props = defineProps<{
     blogCategories: CategoryOption[]
     aiCategories: CategoryOption[]
     routeOptions: RouteOption[]
+    embed?: boolean
 }>()
 
 const { t } = useTranslate()
@@ -465,10 +466,10 @@ const importMenu = () => {
 </script>
 
 <template>
-    <Head :title="t('Menus - Admin')" />
+    <Head v-if="!props.embed" :title="t('Menus - Admin')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div :class="props.embed ? 'w-full' : 'w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10'">
+        <section v-if="!props.embed" class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Menu Builder') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Structure public navigation menus for headers, footers, mobile drawers, and sidebars.') }}</p>
@@ -492,7 +493,7 @@ const importMenu = () => {
             </div>
         </section>
 
-        <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <div :class="props.embed ? 'grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]' : 'mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]'">
             <aside class="space-y-6">
                 <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                     <div class="flex items-start justify-between gap-4">
@@ -587,7 +588,7 @@ const importMenu = () => {
                         <div class="flex flex-wrap items-center gap-2">
                             <Tooltip :content="t('Edit Menu')" placement="top">
                                 <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800" :aria-label="t('Edit Menu')" @click="openEditMenu(selectedMenu)">
-                                    <i class="ti ti-pencil text-base"></i>
+                                    <i class="ti ti-edit text-base"></i>
                                 </button>
                             </Tooltip>
                             <Tooltip :content="t('Delete')" placement="top">
@@ -637,11 +638,11 @@ const importMenu = () => {
 
         <Teleport to="body">
             <div v-if="showMenuModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showMenuModal = false">
-                <div class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                <div class="w-full max-w-md overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                         <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ editingMenuId ? t('Edit Menu') : t('New Menu') }}</h2>
                         <Tooltip :content="t('Close')" placement="top">
-                            <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showMenuModal = false">
+                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showMenuModal = false">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                             </button>
                         </Tooltip>
@@ -657,29 +658,29 @@ const importMenu = () => {
                             <input v-model="menuForm.slug" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('footer_links')" required @input="menuSlugTouched = true" @blur="markMenuSlugTouched">
                             <span v-if="menuForm.errors.slug" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.slug }}</span>
                         </label>
-                        <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-surface-800">
-                            <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showMenuModal = false">{{ t('Cancel') }}</button>
-                            <button type="submit" :disabled="menuForm.processing" class="rounded-lg btn-primary disabled:opacity-60">
-                                {{ menuForm.processing ? t('Saving...') : t('Save Menu') }}
-                            </button>
-                        </div>
                     </form>
+                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-950/60">
+                        <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showMenuModal = false">{{ t('Cancel') }}</button>
+                        <button type="button" :disabled="menuForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" @click="submitMenu">
+                            {{ menuForm.processing ? t('Saving...') : t('Save Menu') }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </Teleport>
 
         <Teleport to="body">
             <div v-if="showItemModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showItemModal = false">
-                <div class="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                <div class="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                         <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ editingItemId ? t('Edit Menu Item') : t('Add Menu Item') }}</h2>
                         <Tooltip :content="t('Close')" placement="top">
-                            <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showItemModal = false">
+                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showItemModal = false">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                             </button>
                         </Tooltip>
                     </div>
-                    <form class="grid max-h-[calc(92vh-72px)] grid-cols-1 gap-4 overflow-y-auto p-6 md:grid-cols-2" @submit.prevent="submitItem">
+                    <form class="grid max-h-[calc(92vh-132px)] grid-cols-1 gap-4 overflow-y-auto p-6 md:grid-cols-2" @submit.prevent="submitItem">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                             {{ t('Label') }}
                             <input v-model="itemForm.label" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('About Us')" required>
@@ -756,13 +757,13 @@ const importMenu = () => {
                                 <span v-if="itemForm.errors.mega_menu_content" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.mega_menu_content }}</span>
                             </label>
                         </div>
-                        <div class="flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-surface-800 md:col-span-2">
-                            <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showItemModal = false">{{ t('Cancel') }}</button>
-                            <button type="submit" :disabled="itemForm.processing" class="rounded-lg btn-primary disabled:opacity-60">
-                                {{ itemForm.processing ? t('Saving...') : t('Save Item') }}
-                            </button>
-                        </div>
                     </form>
+                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-950/60">
+                        <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showItemModal = false">{{ t('Cancel') }}</button>
+                        <button type="button" :disabled="itemForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" @click="submitItem">
+                            {{ itemForm.processing ? t('Saving...') : t('Save Item') }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </Teleport>
@@ -781,23 +782,23 @@ const importMenu = () => {
         <!-- Import Modal -->
         <Teleport to="body">
             <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showImportModal = false">
-                <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                <div class="w-full max-w-lg overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-surface-800">
                         <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Import Menu Items') }}</h2>
                         <Tooltip :content="t('Close')" placement="top">
-                            <button type="button" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showImportModal = false">
+                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showImportModal = false">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                             </button>
                         </Tooltip>
                     </div>
                     <div class="p-6 space-y-4">
                         <textarea v-model="importJsonText" rows="10" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Paste exported menu JSON here...')"></textarea>
-                        <div class="flex items-center justify-end gap-3">
-                            <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800" @click="showImportModal = false">{{ t('Cancel') }}</button>
-                            <button type="button" :disabled="importForm.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="importMenu">
-                                {{ importForm.processing ? t('Importing...') : t('Import') }}
-                            </button>
-                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-950/60">
+                        <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showImportModal = false">{{ t('Cancel') }}</button>
+                        <button type="button" :disabled="importForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" @click="importMenu">
+                            {{ importForm.processing ? t('Importing...') : t('Import') }}
+                        </button>
                     </div>
                 </div>
             </div>

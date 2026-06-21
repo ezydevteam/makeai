@@ -67,28 +67,6 @@ const submit = () => {
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div class="md:col-span-2 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable contact form') }}</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Turn the public contact page submission form on or off.') }}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="switch"
-                                    :aria-checked="Boolean(form.contact_form_enabled)"
-                                    @click="form.contact_form_enabled = !form.contact_form_enabled"
-                                    class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition"
-                                    :class="form.contact_form_enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                                >
-                                    <span
-                                        class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
-                                        :class="form.contact_form_enabled ? 'translate-x-5' : 'translate-x-0.5'"
-                                    ></span>
-                                </button>
-                            </div>
-                        </div>
-
                         <div>
                             <AppSelect
                                 v-model="form.contact_subject_mode"

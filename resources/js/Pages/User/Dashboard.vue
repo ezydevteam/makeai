@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, usePage, router } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import { computed, onMounted, ref, watch, nextTick } from 'vue'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -81,21 +81,27 @@ const page = usePage()
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
 const { formatNumber } = useNumberFormat()
-const props = page.props as unknown as PageProps
-
 const user = computed(() => page.props.auth?.user as any)
 
 const getProps = () => page.props as unknown as PageProps
 
 const stats = computed(() => getProps().stats)
-const usageChart = computed(() => getProps().usageChart)
-const chartPeriod = computed(() => getProps().chartPeriod)
 const recentTransactions = computed(() => getProps().recentTransactions)
 const quickTools = computed(() => getProps().quickTools)
 const recentConversations = computed(() => getProps().recentConversations)
 const recentDocuments = computed(() => getProps().recentDocuments)
 const plan = computed(() => getProps().plan)
 const referral = computed(() => getProps().referral)
+const usageChart = ref(getProps().usageChart)
+const chartPeriod = ref(getProps().chartPeriod)
+
+watch(() => getProps().usageChart, (value) => {
+    usageChart.value = value
+})
+
+watch(() => getProps().chartPeriod, (value) => {
+    chartPeriod.value = value
+})
 
 const txTypeLabel = (type: string) => {
     const map: Record<string, string> = {

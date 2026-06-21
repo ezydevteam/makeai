@@ -18,7 +18,7 @@ interface MailTemplate {
     category: string
     is_active: boolean
     is_system: boolean
-    requires_pro: boolean
+    access_level: string
 }
 
 interface SelectOption {
@@ -35,6 +35,7 @@ const { t } = useTranslate()
 const search = ref('')
 const category = ref('')
 const type = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
 const openActionMenuId = ref<number | null>(null)
 const actionMenuPosition = ref({ top: 0, left: 0 })
 const deleteTarget = ref<MailTemplate | null>(null)
@@ -75,12 +76,14 @@ const filteredTemplates = computed(() => {
             (type.value === 'custom' && !template.is_system) ||
             (type.value === 'active' && template.is_active) ||
             (type.value === 'disabled' && !template.is_active) ||
-            (type.value === 'pro' && template.requires_pro)
+            (type.value === 'pro' && (template.access_level === 'premium' || template.access_level?.startsWith('plan:')))
         )
 
         return matchesSearch && matchesCategory && matchesType
     })
 })
+
+const hasActiveFilters = computed(() => Boolean(search.value || category.value || type.value))
 
 const stats = computed(() => ({
     total: props.templates.length,
@@ -116,6 +119,18 @@ const closeActionMenu = () => {
     openActionMenuId.value = null
 }
 
+const focusSearch = async () => {
+    await nextTick()
+    searchInput.value?.focus()
+    searchInput.value?.select()
+}
+
+const clearFilters = () => {
+    search.value = ''
+    category.value = ''
+    type.value = ''
+}
+
 const requestDelete = (template: MailTemplate) => {
     closeActionMenu()
     deleteTarget.value = template
@@ -148,6 +163,27 @@ const handleViewportChange = () => {
     openActionMenuId.value = null
 }
 
+const handleKeydown = (event: KeyboardEvent) => {
+    const target = event.target
+    const targetTag = target instanceof HTMLElement ? target.tagName : ''
+    const isTypingTarget = target instanceof HTMLElement && (
+        target.isContentEditable ||
+        targetTag === 'INPUT' ||
+        targetTag === 'TEXTAREA' ||
+        targetTag === 'SELECT'
+    )
+
+    if (event.key === '/' && !isTypingTarget) {
+        event.preventDefault()
+        focusSearch()
+        return
+    }
+
+    if (event.key === 'Escape' && !deleteTarget.value && !openActionMenuId.value && hasActiveFilters.value) {
+        clearFilters()
+    }
+}
+
 const typeBadgeClass = (template: MailTemplate) => template.is_system
     ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
     : 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300'
@@ -158,12 +194,14 @@ const statusBadgeClass = (active: boolean) => active
 
 onMounted(() => {
     document.addEventListener('click', handleDocumentClick)
+    document.addEventListener('keydown', handleKeydown)
     window.addEventListener('resize', handleViewportChange)
     window.addEventListener('scroll', handleViewportChange, true)
 })
 
 onBeforeUnmount(() => {
     document.removeEventListener('click', handleDocumentClick)
+    document.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('resize', handleViewportChange)
     window.removeEventListener('scroll', handleViewportChange, true)
 })
@@ -172,9 +210,8 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Mail Templates')" />
 
-    <div class="px-6 py-8">
-        <div class="mx-auto max-w-7xl">
-            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div class="w-full space-y-6 px-4 py-8 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Templates') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage system notifications and custom email communications from one place.') }}</p>
@@ -182,64 +219,66 @@ onBeforeUnmount(() => {
 
                 <Link
                     :href="route('admin.mail.templates.create')"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('New Template') }}
                 </Link>
             </div>
 
-            <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">{{ t('Total Templates') }}</p>
-                    <p class="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{{ stats.total }}</p>
-                </div>
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">{{ t('Active') }}</p>
-                    <p class="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{{ stats.active }}</p>
-                </div>
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">{{ t('System') }}</p>
-                    <p class="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{{ stats.system }}</p>
-                </div>
-                <div class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <p class="text-xs font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500">{{ t('Custom') }}</p>
-                    <p class="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{{ stats.custom }}</p>
-                </div>
-            </div>
+            <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div class="w-full xl:max-w-md">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-search text-base"></i>
+                                </span>
+                                <input
+                                    ref="searchInput"
+                                    v-model="search"
+                                    type="text"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    :placeholder="t('Filter this table by template, slug, subject, or category...')"
+                                >
+                                <span
+                                    v-if="!search"
+                                    class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                                >
+                                    /
+                                </span>
+                                <button
+                                    v-if="search"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear search')"
+                                    :title="t('Clear search')"
+                                    @click="search = ''"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                            </div>
+                        </div>
 
-            <div class="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                <div class="w-full xl:max-w-md">
-                    <div class="relative">
-                        <i class="ti ti-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
-                        <input
-                            v-model="search"
-                            type="text"
-                            :placeholder="t('Search templates, slug, subject...')"
-                            class="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-11 pr-11 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
-                        >
-                        <button
-                            v-if="search"
-                            type="button"
-                            class="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800 dark:hover:text-gray-200"
-                            @click="search = ''"
-                        >
-                            <i class="ti ti-x text-sm"></i>
-                        </button>
+                        <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
+                            <div class="w-full md:w-56">
+                                <AppSelect v-model="category" :options="categoryOptions" :placeholder="t('All Categories')" />
+                            </div>
+                            <div class="w-full md:w-48">
+                                <AppSelect v-model="type" :options="typeOptions" :placeholder="t('All Types')" />
+                            </div>
+                            <button
+                                v-if="hasActiveFilters"
+                                type="button"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                @click="clearFilters"
+                            >
+                                <i class="ti ti-filter-off text-base"></i>
+                                {{ t('Clear') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
-
-                <div class="flex w-full flex-col gap-3 md:flex-row xl:w-auto">
-                    <div class="w-full md:w-56">
-                        <AppSelect v-model="category" :options="categoryOptions" :placeholder="t('All Categories')" />
-                    </div>
-                    <div class="w-full md:w-48">
-                        <AppSelect v-model="type" :options="typeOptions" :placeholder="t('All Types')" />
-                    </div>
-                </div>
-            </div>
-
-            <div class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-left text-sm text-gray-500 dark:text-gray-400">
                         <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
@@ -265,7 +304,7 @@ onBeforeUnmount(() => {
                                                 {{ template.is_system ? t('System') : t('Custom') }}
                                             </span>
                                             <span
-                                                v-if="template.requires_pro"
+                                                v-if="template.access_level === 'premium' || template.access_level?.startsWith('plan:')"
                                                 class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/20 dark:text-violet-300"
                                             >
                                                 {{ t('Pro') }}
@@ -345,8 +384,7 @@ onBeforeUnmount(() => {
                         </tbody>
                     </table>
                 </div>
-            </div>
-        </div>
+            </section>
     </div>
 
     <ActionConfirmModal

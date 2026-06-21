@@ -46,7 +46,7 @@
                 <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-surface-800 dark:text-gray-300">
                   {{ t(':count tools', { count: template.bundled_tool_count }) }}
                 </span>
-                <span v-if="template.requires_pro" class="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                <span v-if="template.access_level === 'premium' || template.access_level?.startsWith('plan:')" class="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
                   {{ t('Pro experience') }}
                 </span>
               </div>
@@ -103,7 +103,7 @@ type TemplateCard = {
   name: string
   tagline: string | null
   icon: string | null
-  requires_pro: boolean
+  access_level: string
   is_active: boolean
   bundled_tool_count: number
 }

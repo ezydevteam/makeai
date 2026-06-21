@@ -12,7 +12,6 @@ const form = useForm({ ...props.settings })
 const save = () => form.post(route('admin.support.settings.update'), { preserveScroll: true })
 
 const labels: Record<string, string> = {
-    tickets_enabled: 'Enable tickets',
     notify_admin_new_ticket: 'Notify admin on new ticket',
     notify_user_reply: 'Notify user on reply',
     satisfaction_rating_enabled: 'Enable satisfaction rating',
@@ -45,7 +44,7 @@ const label = (key: string) => t(labels[key] ?? key)
 
         <form @submit.prevent="save" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="grid gap-5 md:grid-cols-2">
-                <label v-for="key in ['tickets_enabled', 'notify_admin_new_ticket', 'notify_user_reply', 'satisfaction_rating_enabled', 'ai_reply_suggestion']" :key="key" class="flex items-center justify-between rounded-lg border border-gray-100 p-4 dark:border-surface-800">
+                <label v-for="key in ['notify_admin_new_ticket', 'notify_user_reply', 'satisfaction_rating_enabled', 'ai_reply_suggestion']" :key="key" class="flex items-center justify-between rounded-lg border border-gray-100 p-4 dark:border-surface-800">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ label(key) }}</span>
                     <button type="button" role="switch" :aria-checked="Boolean(form[key])" @click="form[key] = !form[key]" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form[key] ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"><span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form[key] ? 'translate-x-5' : 'translate-x-0.5'"></span></button>
                 </label>

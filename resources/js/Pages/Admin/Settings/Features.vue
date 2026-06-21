@@ -7,30 +7,28 @@ defineOptions({ layout: AdminLayout })
 
 const props = defineProps<{
     features: {
-        scroll_to_top_enabled: boolean
-        ai_chat_enabled: boolean
-        ai_variations_enabled: boolean
-        social_sharing_enabled: boolean
-        document_editor_enabled: boolean
-        favorites_enabled: boolean
-        reviews_enabled: boolean
-        recently_used_tools_enabled: boolean
-        estimated_generation_time_enabled: boolean
+        subscriptions_enabled: boolean
+        affiliate_enabled: boolean
+        tickets_enabled: boolean
+        contact_enabled: boolean
+        blog_enabled: boolean
+        notifications_enabled: boolean
+        registration_enabled: boolean
+        email_verification_enabled: boolean
     }
 }>()
 
 const { t } = useTranslate()
 
 const form = useForm({
-    scroll_to_top_enabled: props.features.scroll_to_top_enabled,
-    ai_chat_enabled: props.features.ai_chat_enabled,
-    ai_variations_enabled: props.features.ai_variations_enabled,
-    social_sharing_enabled: props.features.social_sharing_enabled,
-    document_editor_enabled: props.features.document_editor_enabled,
-    favorites_enabled: props.features.favorites_enabled,
-    reviews_enabled: props.features.reviews_enabled,
-    recently_used_tools_enabled: props.features.recently_used_tools_enabled,
-    estimated_generation_time_enabled: props.features.estimated_generation_time_enabled,
+    subscriptions_enabled: props.features.subscriptions_enabled,
+    affiliate_enabled: props.features.affiliate_enabled,
+    tickets_enabled: props.features.tickets_enabled,
+    contact_enabled: props.features.contact_enabled,
+    blog_enabled: props.features.blog_enabled,
+    notifications_enabled: props.features.notifications_enabled,
+    registration_enabled: props.features.registration_enabled,
+    email_verification_enabled: props.features.email_verification_enabled,
 })
 
 const submit = () => {
@@ -40,23 +38,21 @@ const submit = () => {
 }
 
 const featureToggles = [
-    { key: 'scroll_to_top_enabled', label: 'Scroll To Top', description: 'Show a floating button on the public homepage that scrolls visitors back to the top.' },
-    { key: 'ai_chat_enabled', label: 'AI Chat Assistant', description: 'Enable the AI chat assistant feature' },
-    { key: 'ai_variations_enabled', label: 'AI Variations', description: 'Allow users to generate multiple variations of AI output' },
-    { key: 'social_sharing_enabled', label: 'Social Sharing', description: 'Enable social media sharing buttons for content' },
-    { key: 'document_editor_enabled', label: 'Document Editor', description: 'Enable the built-in document editor' },
-    { key: 'favorites_enabled', label: 'Favorites', description: 'Allow users to favorite tools and content' },
-    { key: 'reviews_enabled', label: 'Reviews', description: 'Enable user reviews and ratings' },
-    { key: 'recently_used_tools_enabled', label: 'Recently Used Tools', description: 'Show recently used tools section' },
-    { key: 'estimated_generation_time_enabled', label: 'Estimated Generation Time', description: 'Show estimated time for AI generation' },
     { key: 'subscriptions_enabled', label: 'Premium Subscriptions', description: 'Enable the subscription/billing system for premium plans (requires Extended License).' },
+    { key: 'affiliate_enabled', label: 'Affiliate Program', description: 'Enable the affiliate/referral program system.' },
+    { key: 'tickets_enabled', label: 'Support Tickets', description: 'Enable the support ticket system for user inquiries.' },
+    { key: 'contact_enabled', label: 'Contact Form', description: 'Enable the public contact form for visitor inquiries.' },
+    { key: 'blog_enabled', label: 'Blog', description: 'Enable the blog system for publishing articles and posts.' },
+    { key: 'notifications_enabled', label: 'Notifications', description: 'Hide notification bells and stop delivery when disabled.' },
+    { key: 'registration_enabled', label: 'User Registration', description: 'Allow new users to register on the site.' },
+    { key: 'email_verification_enabled', label: 'Email Verification', description: 'Require email verification after registration.' },
 ] as const
 </script>
 
 <template>
     <Head :title="t('Features Settings')" />
 
-    <div class="mx-auto max-w-5xl px-6 py-8">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Features') }}</h1>
@@ -68,22 +64,24 @@ const featureToggles = [
         </section>
 
         <div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
-            <div class="space-y-4">
-                <div v-for="feature in featureToggles" :key="feature.key" class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
-                    <div>
-                        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t(feature.label) }}</h2>
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(feature.description) }}</p>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div v-for="feature in featureToggles" :key="feature.key" class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t(feature.label) }}</h2>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(feature.description) }}</p>
+                        </div>
+                        <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="(form as any)[feature.key]"
+                            class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition"
+                            :class="(form as any)[feature.key] ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                            @click="(form as any)[feature.key] = !(form as any)[feature.key]"
+                        >
+                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="(form as any)[feature.key] ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                        </button>
                     </div>
-                    <button 
-                        type="button" 
-                        role="switch" 
-                        :aria-checked="(form as any)[feature.key]" 
-                        class="relative inline-flex h-6 w-11 rounded-full transition" 
-                        :class="(form as any)[feature.key] ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" 
-                        @click="(form as any)[feature.key] = !(form as any)[feature.key]"
-                    >
-                        <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="(form as any)[feature.key] ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                    </button>
                 </div>
             </div>
         </div>

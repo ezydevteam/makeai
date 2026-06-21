@@ -13,8 +13,6 @@ class SubscriptionController extends Controller
 {
     public function cancel(Request $request, SubscriptionLifecycleService $lifecycle): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
-
         $subscription = GatewaySubscription::query()
             ->where('user_id', $request->user()->id)
             ->whereIn('status', ['active', 'trialing'])

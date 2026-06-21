@@ -15,7 +15,7 @@ class ContactSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'contact_form_enabled' => ['required', 'boolean'],
+
             'contact_subject_mode' => ['required', Rule::in(['text', 'dropdown'])],
             'contact_subject_options' => ['nullable', 'string', 'max:2000'],
             'contact_notification_email' => ['nullable', 'email', 'max:255'],

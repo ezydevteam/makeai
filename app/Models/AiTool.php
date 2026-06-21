@@ -223,7 +223,16 @@ class AiTool extends Model
         $level = $this->access_level ?? 'inherit';
 
         if ($level === 'inherit') {
-            return settings('default_tool_access_level', 'login_required');
+            // Check category first
+            if ($this->category) {
+                $categoryLevel = $this->category->getEffectiveAccessLevel();
+                if ($categoryLevel !== 'inherit') {
+                    return $categoryLevel;
+                }
+            }
+
+            // Fall back to global default
+            return settings('default_tool_access_level', 'login');
         }
 
         return $level;
@@ -231,8 +240,10 @@ class AiTool extends Model
 
     public function isProRequired(): bool
     {
-        return $this->access_level === 'pro_plan'
-            || ($this->category?->requires_pro ?? false);
+        $level = $this->getEffectiveAccessLevel();
+        $service = app(\App\Services\AccessLevelService::class);
+
+        return $service->requiresSubscription($level);
     }
 
     public function isSystem(): bool

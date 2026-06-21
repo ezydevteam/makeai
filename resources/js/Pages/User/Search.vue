@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { onUnmounted, ref, watch } from 'vue'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -31,7 +31,7 @@ interface Tool {
     description: string
     icon: string
     color: string
-    requires_pro: boolean
+    access_level: string
 }
 
 const props = defineProps<{
@@ -46,14 +46,37 @@ const { formatDate } = useDateFormat()
 const { formatNumber } = useNumberFormat()
 
 const searchQuery = ref(props.query)
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 const performSearch = () => {
-    if (searchQuery.value.trim().length >= 2) {
-        router.get(route('user.dashboard.search'), { q: searchQuery.value }, { preserveState: true })
-    }
+    const query = searchQuery.value.trim()
+
+    router.get(route('user.dashboard.search'), {
+        q: query.length >= 2 ? query : undefined,
+    }, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+    })
 }
 
 const totalResults = props.conversations.length + props.documents.length + props.tools.length
+
+watch(searchQuery, () => {
+    if (searchDebounce) {
+        clearTimeout(searchDebounce)
+    }
+
+    searchDebounce = setTimeout(() => {
+        performSearch()
+    }, 250)
+})
+
+onUnmounted(() => {
+    if (searchDebounce) {
+        clearTimeout(searchDebounce)
+    }
+})
 </script>
 
 <template>
@@ -136,7 +159,7 @@ const totalResults = props.conversations.length + props.documents.length + props
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
                             <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ tool.name }}</h3>
-                            <span v-if="tool.requires_pro" class="shrink-0 rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-bold text-violet-700 uppercase">{{ t('Pro') }}</span>
+                            <span v-if="tool.access_level === 'premium' || tool.access_level?.startsWith('plan:')" class="shrink-0 rounded-full bg-violet-100 px-1.5 py-px text-[10px] font-bold text-violet-700 uppercase">{{ t('Pro') }}</span>
                         </div>
                         <p class="mt-0.5 text-xs text-gray-500 line-clamp-2">{{ tool.description }}</p>
                     </div>

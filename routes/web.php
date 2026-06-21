@@ -186,8 +186,10 @@ Route::get('/css/theme-variables.css', \App\Http\Controllers\ThemeCssController:
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('login', [LoginController::class, 'login'])->name('login.attempt');
-    Route::get('register', [RegisterController::class, 'showRegistrationForm'])->name('register');
-    Route::post('register', [RegisterController::class, 'register'])->name('register.attempt');
+    Route::middleware('register')->group(function () {
+        Route::get('register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+        Route::post('register', [RegisterController::class, 'register'])->name('register.attempt');
+    });
     Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
         ->whereIn('provider', ['google', 'github', 'facebook', 'reddit', 'twitter'])
         ->middleware('throttle:social_auth')
@@ -212,9 +214,11 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [LoginController::class, 'logout'])->name('logout');
 
     // Email Verification
-    Route::get('verify-email', [VerificationController::class, 'notice'])->name('verification.notice');
-    Route::post('verify-email', [VerificationController::class, 'verify'])->name('verification.verify');
-    Route::post('verify-email/resend', [VerificationController::class, 'resend'])->name('verification.resend');
+    Route::middleware('email.verify')->group(function () {
+        Route::get('verify-email', [VerificationController::class, 'notice'])->name('verification.notice');
+        Route::post('verify-email', [VerificationController::class, 'verify'])->name('verification.verify');
+        Route::post('verify-email/resend', [VerificationController::class, 'resend'])->name('verification.resend');
+    });
 
     // Theme Preference (Accessible even if not verified)
     Route::post('/profile/theme', [ProfileController::class, 'updateTheme'])->name('profile.theme');
@@ -259,8 +263,10 @@ Route::middleware('auth')->group(function () {
             Route::post('/privacy/sign-out-all', [PrivacyController::class, 'signOutAllDevices'])->name('privacy.sign-out-all');
 
             // Notification Preferences
-            Route::get('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'index'])->name('notifications.preferences');
-            Route::put('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'update'])->name('notifications.preferences.update');
+            Route::middleware('notifications')->group(function () {
+                Route::get('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'index'])->name('notifications.preferences');
+                Route::put('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'update'])->name('notifications.preferences.update');
+            });
 
             // Profile actions (PUT endpoints, no UI page)
             Route::put('/profile', [UserSettingsController::class, 'updateProfile'])->name('profile.update');
@@ -276,9 +282,11 @@ Route::middleware('auth')->group(function () {
             Route::get('/billing', [\App\Http\Controllers\User\BillingController::class, 'index'])->name('billing');
 
             // Credit Top-Up
-            Route::get('/credit-topup', [CreditTopupController::class, 'index'])->name('credit-topup');
-            Route::post('/credit-topup/calculate', [CreditTopupController::class, 'calculate'])->name('credit-topup.calculate');
-            Route::post('/credit-topup/checkout', [CreditTopupController::class, 'checkout'])->name('credit-topup.checkout');
+            Route::middleware('premium')->group(function () {
+                Route::get('/credit-topup', [CreditTopupController::class, 'index'])->name('credit-topup');
+                Route::post('/credit-topup/calculate', [CreditTopupController::class, 'calculate'])->name('credit-topup.calculate');
+                Route::post('/credit-topup/checkout', [CreditTopupController::class, 'checkout'])->name('credit-topup.checkout');
+            });
 
             // Search
             Route::get('/search', [\App\Http\Controllers\User\SearchController::class, 'index'])->name('search');
@@ -288,9 +296,11 @@ Route::middleware('auth')->group(function () {
             Route::post('/account/delete/cancel', [UserSettingsController::class, 'cancelAccountDeletion'])->name('account.delete.cancel');
 
             // Affiliate
-            Route::get('/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate');
-            Route::post('/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
-            Route::post('/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
+            Route::middleware('affiliate')->group(function () {
+                Route::get('/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate');
+                Route::post('/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
+                Route::post('/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
+            });
 
             // Favorites
             Route::get('/favorites', [FavoriteController::class, 'index'])->name('favorites.index');
@@ -299,12 +309,14 @@ Route::middleware('auth')->group(function () {
             Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
 
             // Support
-            Route::get('/support', [SupportTicketController::class, 'index'])->name('support.index');
-            Route::post('/support/tickets', [SupportTicketController::class, 'store'])->middleware('throttle:public,5,3600')->name('support.tickets.store');
-            Route::get('/support/tickets/{ticket}', [SupportTicketController::class, 'show'])->name('support.tickets.show');
-            Route::post('/support/tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('support.tickets.reply');
-            Route::post('/support/tickets/{ticket}/resolve', [SupportTicketController::class, 'resolve'])->name('support.tickets.resolve');
-            Route::post('/support/tickets/{ticket}/rate', [SupportTicketController::class, 'rate'])->name('support.tickets.rate');
+            Route::middleware('tickets')->group(function () {
+                Route::get('/support', [SupportTicketController::class, 'index'])->name('support.index');
+                Route::post('/support/tickets', [SupportTicketController::class, 'store'])->middleware('throttle:public,5,3600')->name('support.tickets.store');
+                Route::get('/support/tickets/{ticket}', [SupportTicketController::class, 'show'])->name('support.tickets.show');
+                Route::post('/support/tickets/{ticket}/reply', [SupportTicketController::class, 'reply'])->name('support.tickets.reply');
+                Route::post('/support/tickets/{ticket}/resolve', [SupportTicketController::class, 'resolve'])->name('support.tickets.resolve');
+                Route::post('/support/tickets/{ticket}/rate', [SupportTicketController::class, 'rate'])->name('support.tickets.rate');
+            });
 
             // Generation History
             Route::prefix('history')->name('history.')->group(function () {
@@ -374,7 +386,7 @@ Route::middleware('auth')->group(function () {
             });
 
             // Notifications
-            Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::prefix('notifications')->name('notifications.')->middleware('notifications')->group(function () {
                 Route::get('/', [NotificationController::class, 'index'])->name('index');
                 Route::get('/latest', [NotificationController::class, 'latest'])->name('latest');
                 Route::post('/read-all', [NotificationController::class, 'markAllRead'])->name('read-all');
@@ -422,11 +434,13 @@ Route::post('/embed/{token}/run', [EmbedController::class, 'run'])->name('embed.
 Route::post('/embed/{token}/unlock', [EmbedController::class, 'unlock'])->name('embed.unlock')->middleware('throttle:public,5,900');
 
 // ─── Blog ───────────────────────────────────
-Route::get('/blog/rss', [BlogController::class, 'rss'])->name('blog.rss');
-Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
-Route::get('/blog/category/{slug}', [BlogController::class, 'category'])->name('blog.category');
-Route::get('/blog/tag/{slug}', [BlogController::class, 'tag'])->name('blog.tag');
-Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
+Route::middleware('blog')->group(function () {
+    Route::get('/blog/rss', [BlogController::class, 'rss'])->name('blog.rss');
+    Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+    Route::get('/blog/category/{slug}', [BlogController::class, 'category'])->name('blog.category');
+    Route::get('/blog/tag/{slug}', [BlogController::class, 'tag'])->name('blog.tag');
+    Route::get('/blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
+});
 
 // ─── Sitemap ────────────────────────────────
 Route::get('/sitemap.xml', [App\Http\Controllers\SitemapController::class, 'index'])->name('sitemap');
@@ -449,7 +463,7 @@ Route::post('/api/ads/{ad}/click', [AdController::class, 'trackClick'])->name('a
 Route::get('/ads/click/{ad}', [AdController::class, 'click'])->name('ads.click');
 
 // ─── Contact ────────────────────────────────
-Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:contact')->name('contact.store');
+Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:contact', 'contact'])->name('contact.store');
 
 // ─── Payment Webhooks ───────────────────────
 Route::post('/webhooks/stripe', [App\Http\Controllers\Billing\StripeWebhookController::class, 'handleWebhook'])->name('webhooks.stripe');
@@ -581,7 +595,7 @@ Route::get('/{slug}', function (string $slug) {
             ],
         ],
         'contactSettings' => $page->slug === 'contact' ? [
-            'enabled' => (bool) settings('contact_form_enabled', true),
+            'enabled' => (bool) settings('contact_enabled', true),
             'subject_mode' => settings('contact_subject_mode', 'text'),
             'subject_options' => collect(explode("\n", (string) settings('contact_subject_options', '')))
                 ->map(fn ($subject) => trim($subject))

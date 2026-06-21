@@ -79,15 +79,15 @@ const sendTest = () => {
 <template>
     <Head :title="t('Mail Settings')" />
 
-    <div class="px-6 py-8">
-        <div class="mx-auto max-w-7xl">
-            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <div class="py-6">
+        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Settings') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure your email delivery provider, sender identity, and test outgoing messages.') }}</p>
                 </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                     <Link
                         :href="route('admin.mail.templates.index')"
                         class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
@@ -102,6 +102,15 @@ const sendTest = () => {
                         <i class="ti ti-history text-base"></i>
                         {{ t('Logs') }}
                     </Link>
+                    <button
+                        type="button"
+                        :disabled="form.processing"
+                        class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="submit"
+                    >
+                        <i class="ti ti-device-floppy text-base"></i>
+                        {{ form.processing ? t('Saving...') : t('Save Configuration') }}
+                    </button>
                 </div>
             </div>
 
@@ -125,7 +134,7 @@ const sendTest = () => {
                                 <input
                                     v-model="form.mail_from_address"
                                     type="email"
-                                    placeholder="hello@example.com"
+                                    :placeholder="t('hello@example.com')"
                                     class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
                                 >
                                 <p v-if="form.errors.mail_from_address" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.mail_from_address }}</p>
@@ -220,7 +229,7 @@ const sendTest = () => {
                             </div>
                             <div>
                                 <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Region') }}</label>
-                                <input v-model="form.ses_region" type="text" placeholder="us-east-1" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                                <input v-model="form.ses_region" type="text" :placeholder="t('us-east-1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                             </div>
                             <div class="md:col-span-2">
                                 <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Secret Access Key') }}</label>
@@ -263,17 +272,6 @@ const sendTest = () => {
                             >
                         </div>
                     </div>
-
-                    <div class="flex justify-start">
-                        <button
-                            type="submit"
-                            :disabled="form.processing"
-                            class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <i class="ti ti-device-floppy text-base"></i>
-                            {{ form.processing ? t('Saving...') : t('Save Configuration') }}
-                        </button>
-                    </div>
                 </form>
 
                 <div class="space-y-6">
@@ -303,7 +301,7 @@ const sendTest = () => {
                                 <input
                                     v-model="testForm.email"
                                     type="email"
-                                    placeholder="test@example.com"
+                                    :placeholder="t('test@example.com')"
                                     class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
                                 >
                                 <p v-if="testForm.errors.email" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ testForm.errors.email }}</p>

@@ -7,9 +7,17 @@ namespace App\Services\AI;
 use App\DTO\AccessResult;
 use App\Models\AiTool;
 use App\Models\User;
+use App\Services\AccessLevelService;
 
 class ToolAccessService
 {
+    protected AccessLevelService $accessLevelService;
+
+    public function __construct(AccessLevelService $accessLevelService)
+    {
+        $this->accessLevelService = $accessLevelService;
+    }
+
     public function effectiveLevel(AiTool $tool): string
     {
         return $tool->getEffectiveAccessLevel();
@@ -17,22 +25,31 @@ class ToolAccessService
 
     public function requiresAuth(AiTool $tool): bool
     {
-        return $this->effectiveLevel($tool) !== 'public'
-            || $tool->isProRequired()
-            || ($tool->category?->requires_login ?? false);
+        $level = $this->effectiveLevel($tool);
+
+        return $this->accessLevelService->requiresAuth($level);
     }
 
     public function checkAccess(AiTool $tool, ?User $user): AccessResult
     {
-        if (($tool->category?->requires_login ?? false) && ! $user) {
+        $level = $this->effectiveLevel($tool);
+
+        // Check if premium features are available
+        if ($this->accessLevelService->requiresSubscription($level) && ! isProAvailable()) {
+            return AccessResult::deny('pro_unavailable');
+        }
+
+        // Use the AccessLevelService to check access
+        if ($this->accessLevelService->checkAccess($level, $user)) {
+            return AccessResult::allow(truncate: $level === 'guest');
+        }
+
+        // Determine the specific denial reason
+        if ($this->accessLevelService->requiresAuth($level) && ! $user) {
             return AccessResult::deny('login', 401);
         }
 
-        if ($tool->isProRequired()) {
-            if (! isProAvailable()) {
-                return AccessResult::deny('pro_unavailable');
-            }
-
+        if ($this->accessLevelService->requiresSubscription($level)) {
             if (! $user) {
                 return AccessResult::deny('login', 401);
             }
@@ -40,38 +57,18 @@ class ToolAccessService
             if (! $user->isPro()) {
                 return AccessResult::deny('upgrade');
             }
+
+            // Check if specific plan is required
+            if ($this->accessLevelService->isPlanLevel($level)) {
+                $requiredPlanSlug = $this->accessLevelService->getPlanSlugFromLevel($level);
+
+                if ($requiredPlanSlug && $user->plan && $user->plan->slug !== $requiredPlanSlug) {
+                    return AccessResult::deny('upgrade');
+                }
+            }
         }
 
-        $level = $this->effectiveLevel($tool);
-
-        return match ($level) {
-            'public' => AccessResult::allow(truncate: true),
-            'login_required' => $user
-                ? AccessResult::allow()
-                : AccessResult::deny('login', 401),
-            'free_plan' => $user && $user->credits > 0
-                ? AccessResult::allow()
-                : AccessResult::deny($user ? 'credits' : 'login', $user ? 402 : 401),
-            'pro_plan' => $this->resolveProPlanAccess($user),
-            default => AccessResult::deny('unknown'),
-        };
-    }
-
-    private function resolveProPlanAccess(?User $user): AccessResult
-    {
-        if (! isProAvailable()) {
-            return AccessResult::deny('pro_unavailable');
-        }
-
-        if (! $user) {
-            return AccessResult::deny('login', 401);
-        }
-
-        if (! $user->isPro()) {
-            return AccessResult::deny('upgrade');
-        }
-
-        return AccessResult::allow();
+        return AccessResult::deny('unknown');
     }
 
     public function assertCanUse(AiTool $tool, ?User $user): void

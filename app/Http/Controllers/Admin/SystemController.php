@@ -480,7 +480,6 @@ class SystemController extends Controller
 
     private function authorizeSystem(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('settings.manage'), 403);
     }
 
     public function checkUpdates()

@@ -12,8 +12,7 @@ interface Category {
     description: string
     icon: string
     color: string
-    requires_login: boolean
-    requires_pro?: boolean
+    access_level: string
 }
 
 interface Template {
@@ -23,9 +22,8 @@ interface Template {
     description: string
     icon: string
     color: string
-    requires_login: boolean
     is_featured: boolean
-    access_level?: string
+    access_level: string
 }
 
 const props = defineProps<{
@@ -35,7 +33,15 @@ const props = defineProps<{
 
 const { t } = useTranslate()
 
-const isProTool = (tool: Template) => tool.access_level === 'pro_plan' || Boolean(category.requires_pro)
+const isProTool = (tool: Template) => {
+    const level = tool.access_level || 'inherit'
+    if (level === 'premium' || level.startsWith('plan:')) return true
+    if (level === 'inherit' && category.access_level) {
+        const catLevel = category.access_level
+        return catLevel === 'premium' || catLevel.startsWith('plan:')
+    }
+    return false
+}
 </script>
 
 <template>
@@ -80,7 +86,7 @@ const isProTool = (tool: Template) => tool.access_level === 'pro_plan' || Boolea
             >
                 <!-- Badges -->
                 <div v-if="isProTool(tool)" class="absolute top-3 right-3 px-2 py-0.5 bg-gradient-to-r from-primary-500/20 to-accent-500/20 text-accent-400 text-[10px] font-bold uppercase rounded-full border border-accent-500/20 shadow-sm shadow-accent-500/10">PRO</div>
-                <div v-else-if="tool.requires_login" class="absolute top-3 right-3 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20">LOGIN</div>
+                <div v-else-if="tool.access_level === 'login'" class="absolute top-3 right-3 px-2 py-0.5 bg-sky-500/15 text-sky-400 text-[10px] font-bold uppercase rounded-full border border-sky-500/20">LOGIN</div>
 
                 <!-- Icon -->
                 <div

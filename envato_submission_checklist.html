@@ -1,0 +1,336 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.wrap { padding: 1rem 0; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 8px; }
+.header h2 { font-size: 18px; font-weight: 500; color: var(--color-text-primary); }
+.progress-bar { background: var(--color-background-secondary); border-radius: 99px; height: 8px; width: 200px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 99px; background: #10b981; transition: width 0.3s; }
+.progress-text { font-size: 13px; color: var(--color-text-secondary); }
+.section { margin-bottom: 1.25rem; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; }
+.section-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--color-background-secondary); cursor: pointer; user-select: none; }
+.section-header .icon { font-size: 16px; color: var(--color-text-secondary); }
+.section-header .title { font-size: 14px; font-weight: 500; color: var(--color-text-primary); flex: 1; }
+.section-header .count { font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 99px; padding: 2px 8px; }
+.section-header .chevron { font-size: 14px; color: var(--color-text-secondary); transition: transform 0.2s; }
+.section-header.open .chevron { transform: rotate(180deg); }
+.items { display: none; padding: 8px 0; }
+.items.open { display: block; }
+.item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 14px; cursor: pointer; transition: background 0.15s; }
+.item:hover { background: var(--color-background-secondary); }
+.item input[type=checkbox] { margin-top: 2px; accent-color: #10b981; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
+.item label { font-size: 13px; color: var(--color-text-primary); line-height: 1.5; cursor: pointer; flex: 1; }
+.item.done label { text-decoration: line-through; color: var(--color-text-tertiary); }
+.badge { display: inline-block; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 99px; margin-left: 6px; }
+.badge.critical { background: #fee2e2; color: #991b1b; }
+.badge.important { background: #fef3c7; color: #92400e; }
+.actions { display: flex; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.btn { font-size: 12px; padding: 5px 12px; border-radius: var(--border-radius-md); border: 0.5px solid var(--color-border-secondary); background: var(--color-background-primary); color: var(--color-text-primary); cursor: pointer; }
+.btn:hover { background: var(--color-background-secondary); }
+.btn.green { background: #10b981; color: white; border-color: #10b981; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 1.25rem; }
+.stat { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 12px; text-align: center; }
+.stat .num { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+.stat .lbl { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+</style>
+
+<div class="wrap">
+<h2 class="sr-only">Envato CodeCanyon Submission Checklist for MakeAI</h2>
+
+<div class="header">
+  <h2><i class="ti ti-checklist" aria-hidden="true" style="margin-right:6px;color:#10b981"></i>Envato Submission Checklist</h2>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="progress-bar"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
+    <span class="progress-text" id="ptxt">0 / 0</span>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="num" id="s-done">0</div><div class="lbl">Done</div></div>
+  <div class="stat"><div class="num" id="s-left">0</div><div class="lbl">Remaining</div></div>
+  <div class="stat"><div class="num" id="s-crit">0</div><div class="lbl">Critical left</div></div>
+  <div class="stat"><div class="num" id="s-pct">0%</div><div class="lbl">Complete</div></div>
+</div>
+
+<div class="actions">
+  <button class="btn" onclick="expandAll()">সব খোলো</button>
+  <button class="btn" onclick="collapseAll()">সব বন্ধ করো</button>
+  <button class="btn" onclick="resetAll()">Reset</button>
+  <button class="btn green" onclick="exportStatus()">কপি করো ↗</button>
+</div>
+
+<div id="sections"></div>
+</div>
+
+<script>
+const data = [
+  {
+    icon: "ti-box",
+    title: "ZIP & File Structure",
+    items: [
+      { text: "public/ contents → zip root; Laravel app/ subfolder", critical: true },
+      { text: "index.php paths modified to point to app/ subfolder", critical: true },
+      { text: ".htaccess blocks ^app/ directory access", critical: true },
+      { text: ".env excluded from zip completely", critical: true },
+      { text: ".env.example included with all variables + comments", critical: true },
+      { text: "vendor/ excluded (buyers run composer install)", important: true },
+      { text: "node_modules/ excluded", important: true },
+      { text: "composer install --no-dev tested successfully", important: true },
+      { text: "npm run build produces clean production assets", important: true },
+      { text: "storage/ writable dirs exist with .gitkeep", },
+      { text: "demo.sql file included (or one-click demo seed)", },
+    ]
+  },
+  {
+    icon: "ti-code",
+    title: "Code Quality",
+    items: [
+      { text: "Zero console.log() in any .ts / .vue file", critical: true },
+      { text: "Zero dd(), dump(), ray() in any .php file", critical: true },
+      { text: "PSR-12 passes: ./vendor/bin/pint --test", important: true },
+      { text: "PestPHP suite green: ./vendor/bin/pest --parallel", important: true },
+      { text: "Zero hardcoded 'MakeAI' string — grep করে verify", critical: true },
+      { text: "All strings use translate() helper — no raw English", important: true },
+      { text: "All AI calls via AiService / CompletionRequest DTO — no LLPhant reference", critical: true },
+      { text: "PHP 8.3 compatibility verified", important: true },
+      { text: "PHP 8.4 compatibility verified", important: true },
+      { text: "No unused imports in Vue/TS files", },
+    ]
+  },
+  {
+    icon: "ti-lock",
+    title: "License & Branding",
+    items: [
+      { text: "get_license_type() returns 1 or 2 correctly", critical: true },
+      { text: "isProAvailable() hides subscription UI when false (not disabled — hidden)", critical: true },
+      { text: "License tied to domain — mismatch shows warning", important: true },
+      { text: "Grace period 72h on re-verify fail → then features deactivated", important: true },
+      { text: "Weekly license re-verify scheduled job active", important: true },
+      { text: "settings('app_name') used everywhere — never hardcoded", critical: true },
+      { text: "Logo upload → all favicon sizes auto-generated", important: true },
+      { text: "Dark/light logo swap works in admin + frontend", },
+      { text: "manifest.json reflects dynamic app name + icon", },
+      { text: "OG image correct in social share meta tags", },
+    ]
+  },
+  {
+    icon: "ti-download",
+    title: "Installation Wizard",
+    items: [
+      { text: "7-step wizard works on fresh install (no existing DB)", critical: true },
+      { text: "/install returns 404 after INSTALLED=true", critical: true },
+      { text: "Step 1: PHP version, extensions, writable dirs check", important: true },
+      { text: "Step 2: DB connection test before proceeding", important: true },
+      { text: "Step 4: Envato purchase code → API verify → stores encrypted", critical: true },
+      { text: "Step 6: migrations run without error on clean DB", important: true },
+      { text: "Step 6: demo.sql conflict handling if demo imported", important: true },
+      { text: "APP_KEY generated automatically in wizard", important: true },
+      { text: "Tested on fresh cPanel shared hosting", important: true },
+      { text: "Tested on fresh Ubuntu 22.04 VPS", important: true },
+    ]
+  },
+  {
+    icon: "ti-activity",
+    title: "Core Features",
+    items: [
+      { text: "OTP 6-box: auto-advance, paste, auto-submit, shake on error", important: true },
+      { text: "OTP countdown timer + resend after cooldown works", important: true },
+      { text: "5 wrong OTP attempts → 10-min lockout", important: true },
+      { text: "Streaming: POST + ReadableStream only (no EventSource/GET)", critical: true },
+      { text: "X-Accel-Buffering: no header on all SSE responses", critical: true },
+      { text: "finally blocks on all streaming controllers", critical: true },
+      { text: "Credit guard: before + after every AI request, even on error", important: true },
+      { text: "All 9 named queues configured: otp, ai, media, emails, webhooks, social, embeddings, default, low", important: true },
+      { text: "Horizon dashboard works (/horizon)", important: true },
+      { text: "Laravel Reverb WebSocket connects on page load", important: true },
+      { text: "In-app notifications real-time (unread badge updates)", },
+      { text: "RTL works: dir=rtl + Tailwind rtl: variants", },
+      { text: "Dark mode works via .dark class on <html>", important: true },
+    ]
+  },
+  {
+    icon: "ti-presentation",
+    title: "Demo Mode",
+    items: [
+      { text: "Demo mode middleware blocks all writes", important: true },
+      { text: "AI generation works in demo (rate-limited)", important: true },
+      { text: "Demo banner visible with 'Buy Now' link to Envato item", critical: true },
+      { text: "Demo credentials shown on login page", important: true },
+      { text: "Demo seeder: 50 users, 200 docs, 12 months revenue data", },
+      { text: "php artisan demo:reset works (cleans old content)", },
+      { text: "Live demo site accessible before submission", critical: true },
+    ]
+  },
+  {
+    icon: "ti-refresh",
+    title: "One-click Update",
+    items: [
+      { text: "Update checker hits version endpoint (cached 6h)", },
+      { text: "Update skips: .env, storage/, addons/, resources/themes/", critical: true },
+      { text: "php artisan migrate --force runs after update", important: true },
+      { text: "24h rollback available post-update", },
+    ]
+  },
+  {
+    icon: "ti-file-text",
+    title: "Documentation",
+    items: [
+      { text: "Installation guide (cPanel + VPS both covered)", critical: true },
+      { text: "Admin guide (all settings explained)", important: true },
+      { text: "Addon development guide included", important: true },
+      { text: "Theme development guide included", },
+      { text: "API reference for Developer API Keys", },
+      { text: "CHANGELOG.md ready with version history", important: true },
+    ]
+  },
+  {
+    icon: "ti-photo",
+    title: "Envato Assets",
+    items: [
+      { text: "Preview image: 590×300px (main screenshot)", critical: true },
+      { text: "Thumbnail: 80×80px", critical: true },
+      { text: "Feature screenshots (admin panel, user dashboard, tools, etc.)", important: true },
+      { text: "Video preview: 90 seconds showing key features", important: true },
+      { text: "Item description written (features list, requirements, changelog)", critical: true },
+      { text: "Tags selected (php, laravel, saas, ai, chatbot, etc.)", important: true },
+      { text: "Regular vs Extended license description set", important: true },
+      { text: "Support email configured and active", critical: true },
+      { text: "Compatible browsers listed", },
+      { text: "Demo URL added to item listing", critical: true },
+    ]
+  },
+  {
+    icon: "ti-shield-check",
+    title: "Security",
+    items: [
+      { text: "API keys encrypted with Crypt::encryptString() — never plaintext in DB", critical: true },
+      { text: "system_prompt never exposed via Inertia shared data", critical: true },
+      { text: "custom_api_key never exposed to frontend", critical: true },
+      { text: "ULID used as public-facing user ID (no integer IDs in URLs)", important: true },
+      { text: "SQL injection: no raw queries with string interpolation", critical: true },
+      { text: "Rate limiting active on all AI + auth endpoints", important: true },
+      { text: "Auto-ban IP after 20 failed logins/hr", important: true },
+      { text: "Admin middleware: admin.permission:slug on all admin routes", important: true },
+    ]
+  },
+  {
+    icon: "ti-world",
+    title: "SEO & Schema",
+    items: [
+      { text: "Inertia SSR renders all <head> tags server-side", important: true },
+      { text: "SoftwareApplication schema on tool pages", },
+      { text: "FAQPage, HowTo, BreadcrumbList schemas", },
+      { text: "OG + Twitter card meta correct on all pages", important: true },
+      { text: "sitemap.xml auto-generated", },
+    ]
+  }
+];
+
+let checks = {};
+const STORAGE_KEY = 'envato_cl_v1';
+
+function load() {
+  try { checks = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch(e) { checks = {}; }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(checks)); } catch(e) {}
+}
+function getKey(si, ii) { return `${si}_${ii}`; }
+
+function render() {
+  const container = document.getElementById('sections');
+  container.innerHTML = '';
+  data.forEach((sec, si) => {
+    const div = document.createElement('div');
+    div.className = 'section';
+    const doneCount = sec.items.filter((_, ii) => checks[getKey(si,ii)]).length;
+    div.innerHTML = `
+      <div class="section-header" id="sh${si}" onclick="toggle(${si})">
+        <i class="ti ${sec.icon} icon" aria-hidden="true"></i>
+        <span class="title">${sec.title}</span>
+        <span class="count">${doneCount}/${sec.items.length}</span>
+        <i class="ti ti-chevron-down chevron"></i>
+      </div>
+      <div class="items" id="it${si}">
+        ${sec.items.map((item, ii) => {
+          const k = getKey(si,ii);
+          const checked = checks[k] ? 'checked' : '';
+          const done = checks[k] ? 'done' : '';
+          const badge = item.critical ? '<span class="badge critical">Critical</span>' :
+                        item.important ? '<span class="badge important">Important</span>' : '';
+          return `<div class="item ${done}" onclick="toggle2(event,${si},${ii})">
+            <input type="checkbox" id="c${k}" ${checked} onclick="toggle2(event,${si},${ii})">
+            <label for="c${k}">${item.text}${badge}</label>
+          </div>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(div);
+  });
+  updateStats();
+}
+
+function toggle(si) {
+  const hdr = document.getElementById(`sh${si}`);
+  const items = document.getElementById(`it${si}`);
+  hdr.classList.toggle('open');
+  items.classList.toggle('open');
+}
+function toggle2(e, si, ii) {
+  e.stopPropagation();
+  const k = getKey(si,ii);
+  checks[k] = !checks[k];
+  save();
+  render();
+  // keep same section open
+}
+
+function updateStats() {
+  let total = 0, done = 0, critLeft = 0;
+  data.forEach((sec, si) => {
+    sec.items.forEach((item, ii) => {
+      total++;
+      if (checks[getKey(si,ii)]) done++;
+      else if (item.critical) critLeft++;
+    });
+  });
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('pbar').style.width = pct + '%';
+  document.getElementById('ptxt').textContent = `${done} / ${total}`;
+  document.getElementById('s-done').textContent = done;
+  document.getElementById('s-left').textContent = total - done;
+  document.getElementById('s-crit').textContent = critLeft;
+  document.getElementById('s-pct').textContent = pct + '%';
+}
+
+function expandAll() {
+  data.forEach((_,si) => {
+    document.getElementById(`sh${si}`).classList.add('open');
+    document.getElementById(`it${si}`).classList.add('open');
+  });
+}
+function collapseAll() {
+  data.forEach((_,si) => {
+    document.getElementById(`sh${si}`).classList.remove('open');
+    document.getElementById(`it${si}`).classList.remove('open');
+  });
+}
+function resetAll() {
+  if (confirm('সব checkbox reset করবে?')) { checks = {}; save(); render(); }
+}
+function exportStatus() {
+  let lines = ['# Envato Submission Checklist\n'];
+  data.forEach((sec, si) => {
+    const doneC = sec.items.filter((_,ii) => checks[getKey(si,ii)]).length;
+    lines.push(`\n## ${sec.title} (${doneC}/${sec.items.length})`);
+    sec.items.forEach((item, ii) => {
+      const mark = checks[getKey(si,ii)] ? '[x]' : '[ ]';
+      lines.push(`${mark} ${item.text}`);
+    });
+  });
+  navigator.clipboard.writeText(lines.join('\n')).then(() => alert('Clipboard এ copy হয়েছে!'));
+}
+
+load();
+render();
+</script>

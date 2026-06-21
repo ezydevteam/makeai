@@ -28,7 +28,6 @@ class CheckoutController extends Controller
 {
     public function show(Request $request, PlanPriceResolver $resolver, PaymentGatewayManager $gateways): Response
     {
-        abort_unless(isProAvailable(), 404);
 
         $validated = $request->validate([
             'plan' => ['required', 'string', 'max:120'],
@@ -82,7 +81,6 @@ class CheckoutController extends Controller
 
     public function createSession(CheckoutSessionRequest $request, PlanPriceResolver $resolver, PaymentGatewayManager $gateways): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
 
         $data = $request->validated();
         $gateway = PaymentGateway::query()
@@ -178,7 +176,6 @@ class CheckoutController extends Controller
 
     public function previewCoupon(Request $request, PlanPriceResolver $resolver, PaymentGatewayManager $gateways): JsonResponse
     {
-        abort_unless(isProAvailable(), 404);
 
         $data = $request->validate([
             'plan' => ['required', 'string', 'max:120', 'exists:plans,slug'],
@@ -224,7 +221,6 @@ class CheckoutController extends Controller
 
     public function bankInstructions(Payment $payment): Response
     {
-        abort_unless(isProAvailable(), 404);
         abort_unless($payment->user_id === auth()->id() && $payment->gateway === 'bank_transfer', 404);
 
         $gateway = PaymentGateway::where('slug', 'bank_transfer')->where('is_enabled', true)->firstOrFail();
@@ -237,7 +233,6 @@ class CheckoutController extends Controller
 
     public function uploadBankProof(BankPaymentProofRequest $request, Payment $payment): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
         abort_unless($payment->user_id === $request->user()->id && $payment->gateway === 'bank_transfer', 404);
         abort_unless($payment->status === 'pending', 422);
 
@@ -263,7 +258,6 @@ class CheckoutController extends Controller
 
     public function pending(Payment $payment): Response
     {
-        abort_unless(isProAvailable(), 404);
         abort_unless($payment->user_id === auth()->id(), 404);
 
         return Inertia::render('Checkout/Pending', [
@@ -273,7 +267,6 @@ class CheckoutController extends Controller
 
     public function paypalReturn(Request $request, Payment $payment, PaymentActivationService $activation): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
         abort_unless($payment->user_id === $request->user()->id && $payment->gateway === 'paypal', 404);
 
         if ($payment->status === 'completed') {

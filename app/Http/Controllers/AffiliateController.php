@@ -29,7 +29,6 @@ class AffiliateController extends Controller
 
     public function dashboard(Request $request): Response
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
 
         $user = $request->user();
         $program = $this->affiliate->program();
@@ -104,7 +103,6 @@ class AffiliateController extends Controller
 
     public function storePayout(AffiliatePayoutRequest $request): RedirectResponse|JsonResponse
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
         abort_unless((bool) $this->affiliate->program()->payouts_enabled, 404);
 
         $user = $request->user();
@@ -145,7 +143,6 @@ class AffiliateController extends Controller
 
     public function updateAlias(AffiliateAliasRequest $request): RedirectResponse
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
         abort_unless((bool) $this->affiliate->program()->allow_custom_alias, 404);
 
         $request->user()->update([
@@ -157,7 +154,6 @@ class AffiliateController extends Controller
 
     public function api(Request $request): array
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
 
         return [
             'success' => true,
@@ -172,7 +168,6 @@ class AffiliateController extends Controller
 
     public function referralsApi(Request $request): array
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
 
         return [
             'success' => true,
@@ -186,7 +181,6 @@ class AffiliateController extends Controller
 
     public function commissionsApi(Request $request): array
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
 
         return [
             'success' => true,
@@ -200,7 +194,6 @@ class AffiliateController extends Controller
 
     public function payoutsApi(Request $request): array
     {
-        abort_unless($this->affiliate->isEnabled(), 404);
 
         return [
             'success' => true,

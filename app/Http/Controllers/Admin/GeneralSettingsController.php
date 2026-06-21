@@ -7,7 +7,6 @@ use App\Http\Requests\Admin\GeneralSettingsRequest;
 use App\Models\Currency;
 use App\Models\Language;
 use App\Models\SiteTemplate;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class GeneralSettingsController extends Controller
@@ -18,22 +17,14 @@ class GeneralSettingsController extends Controller
 
         return Inertia::render('Admin/Settings/General', [
             'settings' => [
-                // Branding
                 'site_name'          => settings('site_name', translate('Application')),
                 'site_tagline'       => settings('site_tagline', ''),
                 'site_description'   => settings('site_description', ''),
-                'site_logo_light'    => settings('site_logo_light', ''),
-                'site_logo_dark'     => settings('site_logo_dark', ''),
-                'site_favicon_ico'   => settings('site_favicon_ico', ''),
-                'site_favicon_png'   => settings('site_favicon_png', ''),
-                'site_og_image'      => settings('site_og_image', ''),
-                'site_copyright_text'=> settings('site_copyright_text', ''),
                 'site_support_email' => settings('site_support_email', ''),
                 'site_support_url'   => settings('site_support_url', ''),
                 'site_terms_url'     => settings('site_terms_url', ''),
                 'site_privacy_url'   => settings('site_privacy_url', ''),
 
-                // General
                 'site_url'          => settings('site_url', url('/')),
                 'default_language'  => settings('default_language', 'en'),
                 'default_currency'  => settings('default_currency', 'USD'),
@@ -71,29 +62,6 @@ class GeneralSettingsController extends Controller
     {
         $validated = $request->validated();
 
-        // File uploads — store locally and save the relative path
-        $fileFields = [
-            'site_logo_light_file'  => 'site_logo_light',
-            'site_logo_dark_file'   => 'site_logo_dark',
-            'site_favicon_ico_file' => 'site_favicon_ico',
-            'site_favicon_png_file' => 'site_favicon_png',
-            'site_og_image_file'    => 'site_og_image',
-        ];
-
-        foreach ($fileFields as $fileField => $settingKey) {
-            if ($request->hasFile($fileField)) {
-                // Delete the old file if one exists
-                $oldPath = settings($settingKey);
-                if ($oldPath && Storage::disk('public')->exists($oldPath)) {
-                    Storage::disk('public')->delete($oldPath);
-                }
-
-                $validated[$settingKey] = $request->file($fileField)->store('branding', 'public');
-            }
-
-            unset($validated[$fileField]);
-        }
-
         foreach ($validated as $key => $value) {
             $type = match (true) {
                 is_int($value) => 'integer',
@@ -103,9 +71,6 @@ class GeneralSettingsController extends Controller
 
             $brandingKeys = [
                 'site_name', 'site_tagline', 'site_description',
-                'site_logo_light', 'site_logo_dark',
-                'site_favicon_ico', 'site_favicon_png', 'site_og_image',
-                'site_copyright_text',
                 'site_support_email', 'site_support_url',
                 'site_terms_url', 'site_privacy_url',
             ];

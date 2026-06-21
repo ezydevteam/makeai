@@ -12,7 +12,6 @@ class CreditSettingsController extends Controller
 {
     public function index(): Response
     {
-        abort_unless(is_extended_license(), 404);
 
         return Inertia::render('Admin/Premium/CreditSettings', [
             'settings' => $this->creditSettings(),
@@ -21,7 +20,6 @@ class CreditSettingsController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
-        abort_unless(is_extended_license(), 404);
 
         $data = $request->validate([
             'credit_price_per_unit' => ['required', 'numeric', 'min:0.0001', 'max:999.9999'],

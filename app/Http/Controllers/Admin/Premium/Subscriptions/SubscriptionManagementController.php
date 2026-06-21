@@ -18,8 +18,6 @@ class SubscriptionManagementController extends Controller
 {
     public function index(Request $request): Response
     {
-        abort_unless(isProAvailable(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.view'), 403);
 
         $filters = [
             'status' => trim((string) $request->string('status')->value()),
@@ -160,9 +158,6 @@ class SubscriptionManagementController extends Controller
 
     public function deactivate(User $user): RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
-        abort_unless(auth('admin')->user()?->hasPermission('payments.gateways'), 403);
-
         $subscription = GatewaySubscription::query()
             ->where('user_id', $user->id)
             ->whereIn('status', ['active', 'trialing', 'past_due', 'cancelled', 'canceled'])

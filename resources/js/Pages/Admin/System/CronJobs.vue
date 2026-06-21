@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -32,7 +32,6 @@ type CronStatus = {
 
 const props = defineProps<{
     cron: CronStatus
-    logs: string[]
 }>()
 
 const { t } = useTranslate()
@@ -54,23 +53,37 @@ const runCronTask = (taskKey: string) => {
 <template>
     <Head :title="t('Cron Jobs')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
-        <div class="mb-8">
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Cron Jobs') }}</h1>
-            <p class="mt-1 text-sm text-gray-500">{{ t('Cron jobs, environment info, and platform logs.') }}</p>
-        </div>
-
-        <div class="space-y-6">
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Cron Jobs') }}</h2>
-                        <p class="mt-1 text-sm text-gray-500">{{ t('Configure Laravel scheduler so renewals, reminders, counters, and automation run on time.') }}</p>
+    <div class="py-6">
+        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Cron Jobs') }}</h1>
+                        <span :class="cron.is_configured ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'" class="inline-flex rounded-full px-3 py-1 text-xs font-medium">
+                            {{ cron.is_configured ? t('Configured') : t('Setup Required') }}
+                        </span>
                     </div>
-                    <span :class="cron.is_configured ? 'bg-primary-100 text-primary-700' : 'bg-amber-100 text-amber-700'" class="inline-flex rounded-full px-3 py-1 text-xs font-semibold">
-                        {{ cron.is_configured ? t('Configured') : t('Setup Required') }}
-                    </span>
+                    <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Cron jobs, environment info, and platform logs.') }}</p>
                 </div>
+
+                <div class="flex flex-wrap gap-3">
+                    <Link
+                        :href="route('admin.system.index')"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                        <i class="ti ti-arrow-left text-base"></i>
+                        {{ t('Back') }}
+                    </Link>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Cron Jobs') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure Laravel scheduler so renewals, reminders, counters, and automation run on time.') }}</p>
+                </div>
+
+                <div class="p-6">
 
                 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
@@ -139,26 +152,9 @@ const runCronTask = (taskKey: string) => {
                         </div>
                     </div>
                 </div>
+                </div>
             </section>
 
-            <section class="rounded-xl bg-gray-900 p-6 shadow-xl">
-                <div class="mb-5 flex items-center justify-between">
-                    <h2 class="text-sm font-bold uppercase tracking-wide text-white">{{ t('Recent Logs') }}</h2>
-                    <span class="font-mono text-xs text-gray-500">storage/logs/laravel.log</span>
-                </div>
-                <div class="h-80 overflow-y-auto font-mono text-xs text-gray-400">
-                    <div v-if="logs.length === 0" class="flex h-full flex-col items-center justify-center text-center">
-                        <svg class="mb-2 h-8 w-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <p class="text-sm font-medium text-gray-500">{{ t('No recent logs found.') }}</p>
-                        <p class="mt-1 text-xs text-gray-600">{{ t('Logs will appear here after cron tasks or system events run.') }}</p>
-                    </div>
-                    <div v-else v-for="(log, index) in logs" :key="index" class="border-b border-white/5 py-1 last:border-none">
-                        <span :class="log.includes('ERROR') ? 'text-danger-400' : (log.includes('INFO') ? 'text-primary-400' : 'text-gray-500')">{{ log }}</span>
-                    </div>
-                </div>
-            </section>
         </div>
     </div>
 </template>

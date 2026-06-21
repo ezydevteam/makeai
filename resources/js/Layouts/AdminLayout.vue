@@ -15,6 +15,12 @@ const { t } = useTranslate()
 const page = usePage()
 useFlashToasts()
 
+const appearanceThemeSettings = computed(() => (page.props.appearanceThemeSettings as Record<string, string>) || {})
+const themeAllowToggle = computed(() => {
+    const val = appearanceThemeSettings.value.theme_allow_user_toggle
+    return val === undefined || val === '' || val === 'true' || val === '1'
+})
+
 const mobileSidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const profileOpen = ref(false)
@@ -79,6 +85,8 @@ const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 const cronStatus = computed(() => page.props.cronStatus as { is_configured?: boolean; setup_url?: string; last_run_at?: string | null } | undefined)
 const showCronBanner = computed(() => Boolean(admin.value && cronStatus.value && cronStatus.value.is_configured === false))
+const shellInsetClass = 'px-4 sm:px-5 lg:px-5 xl:px-6 2xl:px-6'
+const contentInsetClass = 'p-4 sm:p-5 lg:p-5 xl:p-6 2xl:p-6'
 
 const can = (perm: string) => {
     if (isSuperAdmin.value) return true
@@ -185,7 +193,7 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <div v-if="showCronBanner" class="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <div v-if="showCronBanner" :class="shellInsetClass" class="border-b border-amber-200 bg-amber-50 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
                 <div class="flex flex-col gap-3 text-sm font-medium lg:flex-row lg:items-center lg:justify-between">
                     <span>{{ t('Cron job is not configured. Scheduled tasks, renewals, and automation may not run.') }}</span>
                     <Link :href="cronStatus?.setup_url || route('admin.system.index')" class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">
@@ -195,7 +203,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Header -->
-            <header class="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-gray-200 bg-white/95 px-4 backdrop-blur-sm shrink-0 transition-colors duration-300 dark:border-gray-700 dark:bg-[#161b22]/95 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <header :class="shellInsetClass" class="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-gray-200 bg-white/95 backdrop-blur-sm shrink-0 transition-colors duration-300 dark:border-gray-700 dark:bg-[#161b22]/95">
                 <div class="flex min-w-0 items-center gap-3">
                     <!-- Mobile hamburger -->
                     <button class="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-surface-800 transition-colors" @click="mobileSidebarOpen = true">
@@ -256,7 +264,7 @@ onUnmounted(() => {
                         </Transition>
                     </div>
 
-                    <button @click="toggleDark()" class="w-9 h-9 lg:w-10 lg:h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-surface-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 transition-all">
+                    <button v-if="themeAllowToggle" @click="toggleDark()" class="w-9 h-9 lg:w-10 lg:h-10 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-surface-800 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-surface-700 transition-all">
                         <svg v-if="isDark" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         <svg v-else class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
                     </button>
@@ -299,7 +307,7 @@ onUnmounted(() => {
             </header>
 
             <!-- Content -->
-            <main class="flex-1 p-4 lg:p-6">
+            <main :class="contentInsetClass" class="flex-1">
                 <slot />
             </main>
         </div>

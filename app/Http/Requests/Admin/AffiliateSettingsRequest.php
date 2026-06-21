@@ -14,7 +14,6 @@ class AffiliateSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'is_active' => ['boolean'],
             'commission_type' => ['required', 'in:percentage,fixed'],
             'commission_value' => ['required', 'numeric', 'min:0', 'max:999999.99'],
             'commission_on' => ['required', 'in:first_purchase,all_purchases,subscription'],

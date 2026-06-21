@@ -16,31 +16,14 @@ class GeneralSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Branding — text fields
             'site_name'           => ['required', 'string', 'max:120'],
             'site_tagline'        => ['nullable', 'string', 'max:200'],
             'site_description'    => ['nullable', 'string', 'max:500'],
-            'site_copyright_text' => ['nullable', 'string', 'max:500'],
             'site_support_email'  => ['nullable', 'email', 'max:255'],
             'site_support_url'    => ['nullable', 'url', 'max:255'],
             'site_terms_url'      => ['nullable', 'url', 'max:255'],
             'site_privacy_url'    => ['nullable', 'url', 'max:255'],
 
-            // Branding — file uploads
-            'site_logo_light_file'  => ['nullable', 'image', 'mimes:png,svg,jpg,jpeg,webp', 'max:2048'],
-            'site_logo_dark_file'   => ['nullable', 'image', 'mimes:png,svg,jpg,jpeg,webp', 'max:2048'],
-            'site_favicon_ico_file' => ['nullable', 'file', 'mimes:ico,x-icon', 'max:512'],
-            'site_favicon_png_file' => ['nullable', 'image', 'mimes:png', 'max:512'],
-            'site_og_image_file'    => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
-
-            // Branding — current path keepers
-            'site_logo_light'  => ['nullable', 'string', 'max:500'],
-            'site_logo_dark'   => ['nullable', 'string', 'max:500'],
-            'site_favicon_ico' => ['nullable', 'string', 'max:500'],
-            'site_favicon_png' => ['nullable', 'string', 'max:500'],
-            'site_og_image'    => ['nullable', 'string', 'max:500'],
-
-            // General
             'site_url'           => ['nullable', 'url', 'max:255'],
             'default_language'   => ['required', 'string', 'max:20', Rule::exists('languages', 'code')],
             'default_currency'   => ['required', 'string', 'size:3', Rule::exists('currencies', 'code')],

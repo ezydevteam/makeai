@@ -15,8 +15,6 @@ class StripeController extends Controller
 {
     public function checkout(Request $request, PlanPriceResolver $resolver): Response|RedirectResponse
     {
-        abort_unless(isProAvailable(), 404);
-
         $validated = $request->validate([
             'plan' => ['required', 'string', 'max:120'],
             'billing' => ['required', 'string', 'in:monthly,yearly,lifetime'],

@@ -1,42 +1,39 @@
 <?php
 
-use App\Http\Controllers\Admin\AdController;
+use App\Http\Controllers\Admin\Marketing\Advertisements\AdController;
+use App\Http\Controllers\Admin\Activity\AdminLogController;
+use App\Http\Controllers\Admin\Activity\UserLogController;
 use App\Http\Controllers\Admin\Roles\Admins\AdminController;
-use App\Http\Controllers\Admin\AdminAuditLogController;
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminNoteController;
 use App\Http\Controllers\Admin\AdminTwoFactorController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
-use App\Http\Controllers\Admin\AffiliateController;
-use App\Http\Controllers\Admin\AI\Access\AiAccessController;
-use App\Http\Controllers\Admin\AI\Providers\AiManagementController;
-use App\Http\Controllers\Admin\AI\Categories\AiToolCategoryController;
-use App\Http\Controllers\Admin\AI\Tools\AiToolController;
-use App\Http\Controllers\Admin\AI\Logs\AiUsageLogController;
-use App\Http\Controllers\Admin\AppearanceController;
+use App\Http\Controllers\Admin\Marketing\AffiliateController;
+use App\Http\Controllers\Admin\AI\AiAccessController;
+use App\Http\Controllers\Admin\AI\AiManagementController;
+use App\Http\Controllers\Admin\AI\AiToolCategoryController;
+use App\Http\Controllers\Admin\AI\AiToolController;
+use App\Http\Controllers\Admin\AI\AiUsageLogController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogCategoryController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogPostController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogSettingsController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogTagController;
-use App\Http\Controllers\Admin\CMS\AnnouncementController;
+use App\Http\Controllers\Admin\Marketing\AnnouncementController;
 use App\Http\Controllers\Admin\CMS\Blog\CommentModerationController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use App\Http\Controllers\Admin\ContactSettingsController;
 use App\Http\Controllers\Admin\FeatureSettingsController;
 use App\Http\Controllers\Admin\ExportCenterController;
 use App\Http\Controllers\Admin\CMS\FaqController;
-use App\Http\Controllers\Admin\FooterBuilderController;
 use App\Http\Controllers\Admin\GdprSettingsController;
 use App\Http\Controllers\Admin\GeneralSettingsController;
-use App\Http\Controllers\Admin\HeaderBuilderController;
-use App\Http\Controllers\Admin\HomepageBuilderController;
 use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\LicenseSettingsController;
 use App\Http\Controllers\Admin\MailController;
 use App\Http\Controllers\Admin\MailLogController;
 use App\Http\Controllers\Admin\MailTemplateController;
 use App\Http\Controllers\Admin\MenuController;
-use App\Http\Controllers\Admin\NewsletterController;
+use App\Http\Controllers\Admin\Marketing\NewsletterController;
 use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Admin\CMS\PageController;
 use App\Http\Controllers\Admin\Premium\CreditSettingsController;
@@ -44,16 +41,19 @@ use App\Http\Controllers\Admin\Premium\Payments\CouponController;
 use App\Http\Controllers\Admin\Premium\Payments\PaymentGatewayController;
 use App\Http\Controllers\Admin\Premium\Plans\PlanController;
 use App\Http\Controllers\Admin\Premium\Subscriptions\SubscriptionManagementController;
-use App\Http\Controllers\Admin\RateLimitController;
 use App\Http\Controllers\Admin\Roles\Admins\RoleController;
+use App\Http\Controllers\Admin\Settings\NotificationSettingsController;
+use App\Http\Controllers\Admin\Settings\OAuthSettingsController;
+use App\Http\Controllers\Admin\Settings\SocialCountersController;
 use App\Http\Controllers\Admin\SidebarBuilderController;
-use App\Http\Controllers\Admin\AI\Templates\SiteTemplateController;
-use App\Http\Controllers\Admin\SocialSettingsController;
+use App\Http\Controllers\Admin\AI\SiteTemplateController;
 use App\Http\Controllers\Admin\Support\CannedResponseController as SupportCannedResponseController;
 use App\Http\Controllers\Admin\Support\DepartmentController as SupportDepartmentController;
 use App\Http\Controllers\Admin\Support\SettingsController as SupportSettingsController;
 use App\Http\Controllers\Admin\Support\TicketController as SupportTicketController;
 use App\Http\Controllers\Admin\SystemController;
+use App\Http\Controllers\Admin\System\CustomStyleController;
+use App\Http\Controllers\Admin\System\RateLimitController;
 use App\Http\Controllers\Admin\CMS\TestimonialController;
 use App\Http\Controllers\Admin\ThemeAddonController;
 use App\Http\Controllers\Admin\TranslationController;
@@ -94,11 +94,11 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     // Dashboard
     Route::middleware('admin.permission:dashboard.view')->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('admin.dashboard');
-        Route::get('activity', [AdminDashboardController::class, 'activity'])->name('admin.activity.index');
+        Route::get('activity/user-logs', [UserLogController::class, 'index'])->name('admin.activity.user-logs.index');
     });
 
     // Audit Logs (Super Admin only - enforced in controller)
-    Route::get('audit-logs', [AdminAuditLogController::class, 'index'])->name('admin.audit-logs.index');
+    Route::get('activity/admin-logs', [AdminLogController::class, 'index'])->name('admin.activity.admin-logs.index');
 
     // Admin Notes
     Route::get('notes', [AdminNoteController::class, 'index'])->name('admin.notes.index');
@@ -112,21 +112,24 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('appearance/themes/{slug}/activate', [ThemeAddonController::class, 'activateTheme'])->name('admin.themes.activate');
         Route::get('appearance/themes/{slug}/settings', [ThemeAddonController::class, 'themeSettings'])->name('admin.themes.settings');
         Route::post('appearance/themes/{slug}/settings', [ThemeAddonController::class, 'saveThemeSettings'])->name('admin.themes.settings.save');
+        Route::post('appearance/themes/{slug}/settings/save-simple', [ThemeAddonController::class, 'saveSimpleThemeSettings'])->name('admin.themes.settings.simple.save');
+        Route::post('appearance/themes/{slug}/settings/save-homepage-config', [ThemeAddonController::class, 'saveHomepageConfig'])->name('admin.themes.settings.save-homepage-config');
+        Route::post('appearance/themes/{slug}/settings/restore-defaults', [ThemeAddonController::class, 'restoreThemeDefaults'])->name('admin.themes.settings.restore-defaults');
 
         // Addons
-        Route::get('addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
-        Route::get('addons/{slug}/logo', [ThemeAddonController::class, 'addonLogo'])->name('admin.addons.logo');
-        Route::post('addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:public,5,60');
-        Route::post('addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
-        Route::post('addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
-        Route::delete('addons/{slug}', [ThemeAddonController::class, 'deleteAddon'])->name('admin.addons.delete');
-        Route::post('addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
-        Route::get('addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
-        Route::post('addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
+        Route::get('appearance/addons', [ThemeAddonController::class, 'addons'])->name('admin.addons');
+        Route::get('appearance/addons/{slug}/logo', [ThemeAddonController::class, 'addonLogo'])->name('admin.addons.logo');
+        Route::post('appearance/addons/{slug}/verify-license', [ThemeAddonController::class, 'verifyAddonLicense'])->name('admin.addons.verify-license')->middleware('throttle:public,5,60');
+        Route::post('appearance/addons/{slug}/activate', [ThemeAddonController::class, 'activateAddon'])->name('admin.addons.activate');
+        Route::post('appearance/addons/{slug}/deactivate', [ThemeAddonController::class, 'deactivateAddon'])->name('admin.addons.deactivate');
+        Route::delete('appearance/addons/{slug}', [ThemeAddonController::class, 'deleteAddon'])->name('admin.addons.delete');
+        Route::post('appearance/addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
+        Route::get('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
+        Route::post('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
         
         // Bulk actions
-        Route::post('addons/bulk-activate', [ThemeAddonController::class, 'bulkActivate'])->name('admin.addons.bulk-activate');
-        Route::post('addons/bulk-deactivate', [ThemeAddonController::class, 'bulkDeactivate'])->name('admin.addons.bulk-deactivate');
+        Route::post('appearance/addons/bulk-activate', [ThemeAddonController::class, 'bulkActivate'])->name('admin.addons.bulk-activate');
+        Route::post('appearance/addons/bulk-deactivate', [ThemeAddonController::class, 'bulkDeactivate'])->name('admin.addons.bulk-deactivate');
     });
 
     // Users Management
@@ -199,34 +202,39 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('localization/translations/{language}/ai-all', [TranslationController::class, 'aiTranslateAll'])->name('admin.translations.ai_all');
     });
 
-    // Plans (Pro only controller — uses isProAvailable() internally, guard with plans.view)
-    Route::middleware('admin.permission:plans.view')->group(function () {
+    // Premium routes (plans, gateways, subscriptions, coupons, credit settings, affiliate)
+    Route::middleware(['premium', 'admin.permission:plans.view'])->group(function () {
         Route::get('premium/plans', [PlanController::class, 'index'])->name('admin.plans.index');
         Route::get('premium/plans/pricing', [PlanController::class, 'pricing'])->name('admin.plans.pricing');
         Route::post('premium/plans/settings', [PlanController::class, 'updateSettings'])->name('admin.plans.settings');
         Route::put('premium/plans/{plan}', [PlanController::class, 'update'])->name('admin.plans.update');
     });
 
-    Route::get('premium/gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
-    Route::post('premium/gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
-    Route::post('premium/gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
-    Route::get('premium/subscriptions', [SubscriptionManagementController::class, 'index'])->name('admin.subscriptions.index');
-    Route::post('premium/subscriptions/{user}/deactivate', [SubscriptionManagementController::class, 'deactivate'])->name('admin.subscriptions.deactivate');
-    Route::get('premium/coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
-    Route::post('premium/coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
-    Route::post('premium/coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
-    Route::post('premium/coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
-    Route::delete('premium/coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
+    Route::middleware('premium')->group(function () {
+        Route::get('premium/gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
+        Route::post('premium/gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
+        Route::post('premium/gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
+        Route::get('premium/subscriptions', [SubscriptionManagementController::class, 'index'])->name('admin.subscriptions.index');
+        Route::post('premium/subscriptions/{user}/deactivate', [SubscriptionManagementController::class, 'deactivate'])->name('admin.subscriptions.deactivate');
+        Route::get('premium/coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
+        Route::post('premium/coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
+        Route::post('premium/coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
+        Route::post('premium/coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
+        Route::delete('premium/coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
 
-    // Credit Settings
-    Route::get('premium/credit-settings', [CreditSettingsController::class, 'index'])->name('admin.credit-settings.index');
-    Route::put('premium/credit-settings', [CreditSettingsController::class, 'update'])->name('admin.credit-settings.update');
+        // Credit Settings
+        Route::get('premium/credit-settings', [CreditSettingsController::class, 'index'])->name('admin.credit-settings.index');
+        Route::put('premium/credit-settings', [CreditSettingsController::class, 'update'])->name('admin.credit-settings.update');
+    });
 
-    Route::get('marketing/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
-    Route::post('marketing/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
-    Route::post('marketing/affiliate/commissions/{commission}/approve', [AffiliateController::class, 'approveCommission'])->name('admin.affiliate.commissions.approve');
-    Route::post('marketing/affiliate/commissions/{commission}/reject', [AffiliateController::class, 'rejectCommission'])->name('admin.affiliate.commissions.reject');
-    Route::post('marketing/affiliate/payouts/{payout}', [AffiliateController::class, 'processPayout'])->name('admin.affiliate.payouts.process');
+    // Affiliate (independent of premium)
+    Route::middleware('affiliate')->group(function () {
+        Route::get('marketing/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
+        Route::post('marketing/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
+        Route::post('marketing/affiliate/commissions/{commission}/approve', [AffiliateController::class, 'approveCommission'])->name('admin.affiliate.commissions.approve');
+        Route::post('marketing/affiliate/commissions/{commission}/reject', [AffiliateController::class, 'rejectCommission'])->name('admin.affiliate.commissions.reject');
+        Route::post('marketing/affiliate/payouts/{payout}', [AffiliateController::class, 'processPayout'])->name('admin.affiliate.payouts.process');
+    });
 
     // Export Center
     Route::middleware('admin.permission:reports.export')->group(function () {
@@ -264,18 +272,21 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::delete('content/pages/{page}', [PageController::class, 'destroy'])->name('admin.pages.delete');
     });
 
-    Route::middleware('admin.permission:content.pages')->group(function () {
+    Route::middleware(['contact', 'admin.permission:contact.messages'])->group(function () {
         Route::get('contact/messages/export', [ContactMessageController::class, 'export'])->name('admin.contact.messages.export');
         Route::get('contact/messages', [ContactMessageController::class, 'index'])->name('admin.contact.messages.index');
         Route::post('contact/messages/{message}/read', [ContactMessageController::class, 'markRead'])->name('admin.contact.messages.read');
         Route::post('contact/messages/{message}/reply', [ContactMessageController::class, 'reply'])->name('admin.contact.messages.reply');
         Route::delete('contact/messages/{message}', [ContactMessageController::class, 'destroy'])->name('admin.contact.messages.delete');
+    });
+
+    Route::middleware(['contact', 'admin.permission:content.pages'])->group(function () {
         Route::get('cms/contact/settings', [ContactSettingsController::class, 'edit'])->name('admin.contact.settings.edit');
         Route::post('cms/contact/settings', [ContactSettingsController::class, 'update'])->name('admin.contact.settings.update');
     });
 
     // Support Ticket System (PART 24)
-    Route::prefix('support/tickets')->name('admin.support.tickets.')->middleware('admin.permission:support.tickets')->group(function () {
+    Route::prefix('support/tickets')->name('admin.support.tickets.')->middleware(['tickets', 'admin.permission:support.tickets'])->group(function () {
         Route::get('/', [SupportTicketController::class, 'index'])->name('index');
         Route::get('/export', [SupportTicketController::class, 'export'])->name('export');
         Route::post('/bulk', [SupportTicketController::class, 'bulkAction'])->name('bulk');
@@ -288,7 +299,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::delete('/{ticket}', [SupportTicketController::class, 'destroy'])->name('delete');
     });
 
-    Route::prefix('support')->name('admin.support.')->middleware('admin.permission:support.tickets')->group(function () {
+    Route::prefix('support')->name('admin.support.')->middleware(['tickets', 'admin.permission:support.tickets'])->group(function () {
 
         Route::resource('departments', SupportDepartmentController::class)->except(['create', 'show', 'edit']);
         Route::resource('canned-responses', SupportCannedResponseController::class)->except(['create', 'show', 'edit'])->parameters([
@@ -314,25 +325,8 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
 
     // Appearance: Settings
     Route::middleware('admin.permission:settings.manage')->group(function () {
-        Route::get('system/style', [AppearanceController::class, 'index'])->name('admin.appearance.index');
-        Route::post('system/style', [AppearanceController::class, 'update'])->name('admin.appearance.update');
-
-        // Appearance: Homepage Builder
-        Route::get('appearance/themes/{slug}/homepage', [HomepageBuilderController::class, 'index'])->name('admin.homepage.index');
-        Route::post('appearance/themes/{slug}/homepage', [HomepageBuilderController::class, 'update'])->name('admin.homepage.update');
-        Route::post('appearance/themes/{slug}/homepage/set', [HomepageBuilderController::class, 'setHomepage'])->name('admin.homepage.set');
-        Route::post('appearance/themes/{slug}/homepage/upload-media', [HomepageBuilderController::class, 'upload'])->name('admin.homepage.upload');
-
-        // Appearance: Header Builder
-        Route::get('appearance/themes/{slug}/header', [HeaderBuilderController::class, 'index'])->name('admin.header.index');
-        Route::post('appearance/themes/{slug}/header', [HeaderBuilderController::class, 'update'])->name('admin.header.update');
-        Route::post('appearance/themes/{slug}/header/reset/{section}', [HeaderBuilderController::class, 'resetSection'])->name('admin.header.reset');
-        Route::get('appearance/themes/{slug}/header/export', [HeaderBuilderController::class, 'export'])->name('admin.header.export');
-        Route::post('appearance/themes/{slug}/header/upload-logo', [HeaderBuilderController::class, 'upload'])->name('admin.header.upload');
-
-        // Appearance: Footer Builder
-        Route::get('appearance/themes/{slug}/footer', [FooterBuilderController::class, 'index'])->name('admin.footer.index');
-        Route::post('appearance/themes/{slug}/footer', [FooterBuilderController::class, 'update'])->name('admin.footer.update');
+        Route::get('system/style', [CustomStyleController::class, 'index'])->name('admin.appearance.index');
+        Route::post('system/style', [CustomStyleController::class, 'update'])->name('admin.appearance.update');
 
         // Appearance: Sidebar Builder
         Route::get('appearance/sidebar', [SidebarBuilderController::class, 'index'])->name('admin.sidebar.index');
@@ -363,12 +357,12 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('marketing/ads/{ad}/toggle', [AdController::class, 'toggle'])->name('admin.ads.toggle');
     });
 
-    // Social Media
+    // Social Counters + OAuth
     Route::middleware('admin.permission:settings.manage')->group(function () {
-        Route::get('marketing/social', [SocialSettingsController::class, 'editFollow'])->name('admin.social.settings.edit');
-        Route::post('marketing/social', [SocialSettingsController::class, 'updateFollow'])->name('admin.social.settings.update');
-        Route::get('settings/oauth', [SocialSettingsController::class, 'editOAuth'])->name('admin.oauth.settings.edit');
-        Route::post('settings/oauth', [SocialSettingsController::class, 'updateOAuth'])->name('admin.oauth.settings.update');
+        Route::get('settings/social-counters', [SocialCountersController::class, 'editFollow'])->name('admin.social-counters.settings.edit');
+        Route::post('settings/social-counters', [SocialCountersController::class, 'updateFollow'])->name('admin.social-counters.settings.update');
+        Route::get('settings/oauth', [OAuthSettingsController::class, 'edit'])->name('admin.oauth.settings.edit');
+        Route::post('settings/oauth', [OAuthSettingsController::class, 'update'])->name('admin.oauth.settings.update');
     });
 
     // General Settings
@@ -410,13 +404,17 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     });
 
     // In-App Notifications (PART 23)
-    Route::get('notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
-    Route::get('notifications/latest', [AdminNotificationController::class, 'latest'])->name('admin.notifications.latest');
-    Route::post('notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('admin.notifications.read-all');
-    Route::post('notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
-    Route::get('notifications/settings', [AdminNotificationController::class, 'settings'])->name('admin.notifications.settings');
-    Route::post('notifications/settings', [AdminNotificationController::class, 'updateSettings'])->name('admin.notifications.settings.update');
-    Route::post('notifications/test', [AdminNotificationController::class, 'testConnection'])->name('admin.notifications.test');
+    Route::middleware('admin.permission:settings.general')->group(function () {
+        Route::middleware('notifications')->group(function () {
+            Route::get('notifications', [AdminNotificationController::class, 'index'])->name('admin.notifications.index');
+            Route::get('notifications/latest', [AdminNotificationController::class, 'latest'])->name('admin.notifications.latest');
+            Route::post('notifications/read-all', [AdminNotificationController::class, 'markAllRead'])->name('admin.notifications.read-all');
+            Route::post('notifications/{notification}/read', [AdminNotificationController::class, 'markRead'])->name('admin.notifications.read');
+            Route::get('settings/notifications', [NotificationSettingsController::class, 'edit'])->name('admin.notifications.settings');
+            Route::post('settings/notifications', [NotificationSettingsController::class, 'update'])->name('admin.notifications.settings.update');
+            Route::post('settings/notifications/test', [NotificationSettingsController::class, 'test'])->name('admin.notifications.test');
+        });
+    });
 
     // Mail System
     Route::middleware('admin.permission:settings.mail')->group(function () {
@@ -484,7 +482,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     });
 
     // Content: Blog (PART 16)
-    Route::prefix('content/blog')->name('admin.blog.')->middleware('admin.permission:content.blog')->group(function () {
+    Route::prefix('content/blog')->name('admin.blog.')->middleware(['admin.permission:content.blog', 'blog'])->group(function () {
         Route::get('posts/export', [BlogPostController::class, 'export'])->name('posts.export');
         Route::post('posts/bulk', [BlogPostController::class, 'bulk'])->name('posts.bulk');
         Route::post('posts/ai-assist', [BlogPostController::class, 'aiAssist'])->name('posts.ai-assist');
@@ -540,8 +538,6 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::delete('/tools/{tool}/force-delete', [AiToolController::class, 'forceDelete'])->withTrashed()->name('tools.force-delete');
         Route::post('/tools/reviews/{review}/action', [AiToolController::class, 'reviewAction'])->name('tools.reviews.action');
         Route::post('/categories/{category}/toggle-active', [AiToolCategoryController::class, 'toggleActive'])->name('categories.toggle-active');
-        Route::post('/categories/{category}/toggle-pro', [AiToolCategoryController::class, 'togglePro'])->name('categories.toggle-pro');
-        Route::post('/categories/{category}/toggle-login', [AiToolCategoryController::class, 'toggleLogin'])->name('categories.toggle-login');
         Route::resource('categories', AiToolCategoryController::class)->except(['create', 'show', 'edit']);
         Route::resource('tools', AiToolController::class)->except(['show']);
     });

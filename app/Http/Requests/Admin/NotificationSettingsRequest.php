@@ -18,7 +18,6 @@ class NotificationSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'notifications_enabled' => ['required', 'boolean'],
             'notifications_driver' => ['required', 'string', Rule::in(['reverb', 'pusher', 'polling'])],
             'notifications_polling_interval' => ['required', 'integer', 'min:10000', 'max:300000'],
             'reverb.app_id' => ['nullable', 'string', 'max:255'],

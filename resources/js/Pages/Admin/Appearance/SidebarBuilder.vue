@@ -9,6 +9,8 @@ import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 
+defineOptions({ layout: AdminLayout })
+
 type SidebarBlockType =
     | 'search_box'
     | 'categories_list'
@@ -45,6 +47,7 @@ const props = defineProps<{
         show_on_pages?: string[];
     } | null;
     availablePages: { key: string; label: string }[];
+    embed?: boolean;
 }>();
 
 const { t } = useTranslate()
@@ -90,6 +93,7 @@ const editingBlock = ref<{ index: number; data: SidebarBlock } | null>(null);
 const confirmRemoveOpen = ref(false);
 const removeIndex = ref<number | null>(null);
 const resetProcessing = ref(false);
+const settingsModalOpen = ref(false);
 
 const openAddBlockModal = () => {
     addBlockModalOpen.value = true;
@@ -211,11 +215,10 @@ const importConfig = () => {
 </script>
 
 <template>
-    <AdminLayout>
-        <Head :title="t('Sidebar Builder — Admin')" />
+        <Head v-if="!props.embed" :title="t('Sidebar Builder — Admin')" />
 
-        <div class="mx-auto max-w-7xl px-6 py-8">
-            <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div :class="props.embed ? 'w-full' : 'w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10'">
+            <section v-if="!props.embed" class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Sidebar Builder') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure widgets, visibility, and layout behavior for the application sidebar.') }}</p>
@@ -243,8 +246,8 @@ const importConfig = () => {
                 </div>
             </section>
 
-            <div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-                <aside class="space-y-6">
+            <div :class="props.embed ? 'grid grid-cols-1 gap-5' : 'mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]'">
+                <aside v-if="!props.embed" class="space-y-6">
                     <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                         <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout') }}</h2>
                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose where the sidebar appears and when it stays visible.') }}</p>
@@ -256,12 +259,12 @@ const importConfig = () => {
                                 :options="positionOptions.map((option) => ({ value: option.value, label: t(option.label) }))"
                             />
 
-                            <div class="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
                                 <div>
                                     <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Sticky Sidebar') }}</div>
                                     <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Keep the sidebar visible while the page scrolls.') }}</div>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="form.sticky" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form.sticky ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.sticky = !form.sticky">
+                                <button type="button" role="switch" :aria-checked="form.sticky" class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition" :class="form.sticky ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.sticky = !form.sticky">
                                     <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.sticky ? 'translate-x-5' : 'translate-x-0.5'"></span>
                                 </button>
                             </div>
@@ -297,13 +300,19 @@ const importConfig = () => {
                 <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Active Widgets') }}</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Drag to reorder widgets and open each item to configure its content.') }}</p>
+                            <h2 class="font-heading text-md font-bold text-gray-700 dark:text-white">{{ t('Active Widgets') }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Drag to reorder widgets and open each item to configure its content.') }}</p>
                         </div>
-                        <button type="button" @click="openAddBlockModal" class="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 dark:bg-gray-800">
-                            <i class="ti ti-plus text-base"></i>
-                            {{ t('Add Widget') }}
-                        </button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button v-if="props.embed" type="button" @click="settingsModalOpen = true" class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
+                                <i class="ti ti-adjustments text-base"></i>
+                                {{ t('Settings') }}
+                            </button>
+                            <button type="button" @click="openAddBlockModal" class="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 dark:bg-gray-800">
+                                <i class="ti ti-plus text-base"></i>
+                                {{ t('Add Widget') }}
+                            </button>
+                        </div>
                     </div>
 
                     <div class="mt-6">
@@ -328,7 +337,7 @@ const importConfig = () => {
                                     <p class="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{{ block.config.title || t('No title set') }}</p>
                                 </div>
 
-                                <div class="flex shrink-0 items-center gap-2">
+                                <div class="flex shrink-0 items-center gap-3">
                                     <Tooltip :content="t('Settings')" placement="top">
                                         <button type="button" @click="editBlock(Number(index))" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
                                             <i class="ti ti-settings text-base"></i>
@@ -351,11 +360,11 @@ const importConfig = () => {
             <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                     <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Add Widget') }}</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose a widget to add to the sidebar layout.') }}</p>
+                        <h3 class="text-md font-bold text-gray-900 dark:text-white">{{ t('Add Widget') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose a widget to add to the sidebar layout.') }}</p>
                     </div>
-                    <button type="button" class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="addBlockModalOpen = false">
-                        <i class="ti ti-x text-xl"></i>
+                    <button type="button" class="rounded-full w-8 h-8 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="addBlockModalOpen = false">
+                        <i class="ti ti-x text-base"></i>
                     </button>
                 </div>
                 <div class="grid max-h-[70vh] grid-cols-1 gap-3 overflow-y-auto p-6 sm:grid-cols-2">
@@ -372,14 +381,80 @@ const importConfig = () => {
             </div>
         </div>
 
+        <div v-if="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+            <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Sidebar Settings') }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure sidebar layout, sticky behavior, and page visibility.') }}</p>
+                    </div>
+                    <button type="button" class="rounded-full w-8 h-8 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="settingsModalOpen = false">
+                        <i class="ti ti-x text-base"></i>
+                    </button>
+                </div>
+                <div class="grid gap-6 overflow-y-auto p-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                        <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout') }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose where the sidebar appears and when it stays visible.') }}</p>
+
+                        <div class="mt-5 space-y-5">
+                            <AppSelect
+                                v-model="form.position"
+                                :label="t('Position')"
+                                :options="positionOptions.map((option) => ({ value: option.value, label: t(option.label) }))"
+                            />
+
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Sticky Sidebar') }}</div>
+                                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Keep the sidebar visible while the page scrolls.') }}</div>
+                                </div>
+                                <button type="button" role="switch" :aria-checked="form.sticky" class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition" :class="form.sticky ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.sticky = !form.sticky">
+                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.sticky ? 'translate-x-5' : 'translate-x-0.5'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Show On Pages') }}</h2>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Leave all pages unselected to show the sidebar everywhere.') }}</p>
+                            </div>
+                            <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ form.show_on_pages.length }}</span>
+                        </div>
+
+                        <div class="mt-4 flex max-h-72 flex-wrap gap-2 overflow-y-auto">
+                            <button
+                                v-for="page in availablePages"
+                                :key="page.key"
+                                type="button"
+                                class="inline-flex items-center rounded-full border px-3 py-2 text-xs font-semibold transition"
+                                :class="form.show_on_pages.includes(page.key)
+                                    ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300'
+                                    : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:border-primary-900/40'"
+                                @click="togglePage(page.key)"
+                            >
+                                {{ page.label }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
+                    <button type="button" @click="settingsModalOpen = false" class="btn-primary">{{ t('Done') }}</button>
+                </div>
+            </div>
+        </div>
+
         <div v-if="blockModalOpen && editingBlock" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
             <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                     <div>
                         <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t(getBlockLabel(editingBlock.data.type)) }}</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Adjust the widget content and behavior for this sidebar block.') }}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Adjust the widget content and behavior for this sidebar block.') }}</p>
                     </div>
-                    <button type="button" class="rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="blockModalOpen = false">
+                    <button type="button" class="rounded-full w-8 h-8 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" @click="blockModalOpen = false">
                         <i class="ti ti-x text-xl"></i>
                     </button>
                 </div>
@@ -491,5 +566,4 @@ const importConfig = () => {
                 </div>
             </div>
         </div>
-    </AdminLayout>
 </template>

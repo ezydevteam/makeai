@@ -20,7 +20,7 @@ class AffiliateService
 
     public function isEnabled(): bool
     {
-        return isProAvailable() && $this->program()->is_active;
+        return (bool) settings('affiliate_enabled', false);
     }
 
     public function captureVisit(Request $request, string $code): ?AffiliateReferral

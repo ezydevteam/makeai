@@ -17,6 +17,7 @@ const props = defineProps<{
     categories: any[]
     aiModels?: any[]
     reviews?: any[]
+    accessLevels?: Array<{ value: string; label: string; description?: string }>
 }>()
 
 const isEditing = computed(() => !!props.tool)
@@ -134,13 +135,25 @@ const categoryOptions = computed(() => [
     ...props.categories.map((c: any) => ({ value: c.id, label: c.name })),
 ])
 
-const accessLevelOptions = [
-    { value: 'inherit', label: t('Inherit') },
-    { value: 'public', label: t('Public') },
-    { value: 'login_required', label: t('Login Required') },
-    { value: 'free_plan', label: t('Free Plan') },
-    { value: 'pro_plan', label: t('Pro Plan') },
-]
+const accessLevelOptions = computed(() => {
+    if (props.accessLevels) {
+        return props.accessLevels
+    }
+    
+    // Fallback: only include premium if isProAvailable
+    const isProAvailable = page.props.isProAvailable ?? false
+    const options = [
+        { value: 'inherit', label: t('Inherit (Default)') },
+        { value: 'guest', label: t('Guest (Free)') },
+        { value: 'login', label: t('Login Required') },
+    ]
+    
+    if (isProAvailable) {
+        options.push({ value: 'premium', label: t('Premium (Any Plan)') })
+    }
+    
+    return options
+})
 
 const outputTypeOptions = [
     { value: 'text', label: t('Text') },

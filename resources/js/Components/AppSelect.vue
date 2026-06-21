@@ -13,7 +13,7 @@ export interface SelectOption {
 
 const props = withDefaults(defineProps<{
     modelValue?: string | number | null | (string | number)[]
-    options: SelectOption[]
+    options?: SelectOption[]
     placeholder?: string
     label?: string
     error?: string
@@ -31,6 +31,7 @@ const props = withDefaults(defineProps<{
     virtualThreshold?: number
 }>(), {
     modelValue: undefined,
+    options: () => [],
     placeholder: '',
     label: '',
     error: '',
@@ -62,6 +63,7 @@ const triggerRef = ref<HTMLButtonElement | null>(null)
 const wrapperRef = ref<HTMLElement | null>(null)
 const placement = ref<'bottom' | 'top'>('bottom')
 const listScrollTop = ref(0)
+const safeOptions = computed(() => props.options ?? [])
 
 const selectedValues = computed<(string | number)[]>(() => {
     if (props.multiple) {
@@ -73,9 +75,9 @@ const selectedValues = computed<(string | number)[]>(() => {
 const isSelected = (value: string | number) => selectedValues.value.includes(value)
 
 const filtered = computed(() => {
-    if (!searchQuery.value.trim()) return props.options
+    if (!searchQuery.value.trim()) return safeOptions.value
     const q = searchQuery.value.toLowerCase()
-    return props.options.filter(
+    return safeOptions.value.filter(
         (o) => o.label.toLowerCase().includes(q) || String(o.value).toLowerCase().includes(q),
     )
 })
@@ -84,10 +86,10 @@ const useVirtual = computed(() => {
     return (props.liveSearch || props.multiple) && filtered.value.length > props.virtualThreshold
 })
 
-const showSearch = computed(() => props.liveSearch && (props.options.length > props.size || props.multiple))
+const showSearch = computed(() => props.liveSearch && (safeOptions.value.length > props.size || props.multiple))
 
 const selectedOptions = computed(() =>
-    props.options.filter((o) => isSelected(o.value)),
+    safeOptions.value.filter((o) => isSelected(o.value)),
 )
 
 const optionToneClass = (option: SelectOption) => {

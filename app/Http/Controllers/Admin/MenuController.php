@@ -17,6 +17,11 @@ use Inertia\Inertia;
 
 class MenuController extends Controller
 {
+    public function getRouteOptions(): array
+    {
+        return $this->routeOptions();
+    }
+
     public function index()
     {
         return Inertia::render('Admin/Appearance/Menus', [

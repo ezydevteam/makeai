@@ -16,7 +16,7 @@ class Category extends Model
     protected $fillable = [
         'name', 'slug', 'description', 'icon', 'color',
         'type', 'parent_id',
-        'is_active', 'is_system', 'requires_pro', 'requires_login',
+        'is_active', 'is_system', 'requires_pro', 'requires_login', 'access_level',
         'sort_order', 'tools_count',
         'meta_title', 'meta_description',
     ];

@@ -12,8 +12,6 @@ class CreditTopupController extends Controller
 {
     public function index(PaymentGatewayManager $gateways)
     {
-        abort_unless(isProAvailable(), 404);
-
         $pricePerUnit = (float) settings('credit_price_per_unit', 0.01);
         $minimum = (float) settings('credit_topup_minimum', 1.00);
         $quickAmounts = settings('credit_topup_quick_amounts', [5, 10, 25, 50, 100]);

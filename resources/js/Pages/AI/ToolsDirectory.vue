@@ -20,7 +20,7 @@ interface Category {
     slug: string
     icon: string
     color: string
-    requires_pro?: boolean
+    access_level: string
     active_tools_count?: number
 }
 
@@ -34,8 +34,7 @@ interface Tool {
     icon: string
     color: string
     is_featured: boolean
-    requires_login: boolean
-    access_level?: string
+    access_level: string
     tags?: string[]
     views_count?: number
     avg_latency_ms?: number
@@ -106,7 +105,13 @@ function formatViews(views: number): string {
 }
 
 function isProTool(tool: Tool): boolean {
-    return tool.access_level === 'pro_plan' || Boolean(tool.category?.requires_pro)
+    const level = tool.access_level || 'inherit'
+    if (level === 'premium' || level.startsWith('plan:')) return true
+    if (level === 'inherit' && tool.category?.access_level) {
+        const catLevel = tool.category.access_level
+        return catLevel === 'premium' || catLevel.startsWith('plan:')
+    }
+    return false
 }
 
 function onFeaturedSwiper(swiper: SwiperClass) {

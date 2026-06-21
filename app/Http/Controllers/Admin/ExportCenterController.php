@@ -45,7 +45,7 @@ class ExportCenterController extends Controller
             ->sortByDesc('modified')
             ->values();
 
-        return Inertia::render('Admin/Reports/ExportCenter', [
+        return Inertia::render('Admin/Reports', [
             'recentExports' => $files,
             'exportTypes' => [
                 ['value' => 'users', 'label' => translate('Users')],

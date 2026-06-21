@@ -3,25 +3,17 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AdSection from '@/Components/AdSection.vue'
 import CreditAlertBanner from '@/Components/CreditAlertBanner.vue'
 import OnboardingModal from '@/Components/OnboardingModal.vue'
 
 const page = usePage()
 const { t } = useTranslate()
 const affiliateEnabled = computed(() => Boolean(page.props.affiliateEnabled))
+const ticketsEnabled = computed(() => Boolean(page.props.ticketsEnabled))
 const referralUser = computed(() => page.props.auth?.user as any)
 
 const sidebarOpen = ref(false)
 const onboardingOpen = ref(false)
-const sidebarSearchQuery = ref('')
-
-function performSidebarSearch() {
-    const query = sidebarSearchQuery.value.trim()
-    if (query.length >= 2) {
-        window.location.href = route('user.dashboard.search', { q: query })
-    }
-}
 
 function onOnboardingClosed() {
     onboardingOpen.value = false
@@ -64,7 +56,6 @@ const navItems = computed<NavItem[]>(() => {
     const is = (name: string) => route().current(name)
     const items: NavItem[] = [
         { label: t('Dashboard'), routeName: 'user.dashboard', active: is('user.dashboard'), icon: 'ti ti-dashboard' },
-        { label: t('AI Tools'), routeName: 'ai.tools.index', active: is('ai.tools.*'), icon: 'ti ti-tools' },
         {
             label: t('Workspace'),
             icon: 'ti ti-building-factory',
@@ -137,7 +128,7 @@ const navItems = computed<NavItem[]>(() => {
             ],
         },
         { label: t('Notifications'), routeName: 'user.dashboard.notifications.index', active: is('user.dashboard.notifications.*'), icon: 'ti ti-bell' },
-        { label: t('Support'), routeName: 'user.dashboard.support.index', active: is('user.dashboard.support.*'), icon: 'ti ti-message-circle' },
+        ...(ticketsEnabled.value ? [{ label: t('Support'), routeName: 'user.dashboard.support.index', active: is('user.dashboard.support.*'), icon: 'ti ti-message-circle' }] : []),
     ]
     return items
 })
@@ -164,7 +155,7 @@ function toggleSection(key: string) {
 
 <template>
     <UserLayout>
-        <div class="min-h-screen bg-white py-8 dark:bg-surface-950">
+        <div class="min-h-screen py-8">
             <div class="mx-auto max-w-7xl px-6">
                 <!-- Mobile hamburger -->
                 <button class="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 lg:hidden" @click="sidebarOpen = !sidebarOpen">
@@ -180,26 +171,10 @@ function toggleSection(key: string) {
                     <aside
                         :class="[
                             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-                            'fixed left-4 top-4 z-50 w-[260px] flex flex-col rounded-xl border border-gray-200 bg-white shadow-sm transition-transform duration-200 dark:border-gray-800 dark:bg-gray-900 lg:static lg:left-auto lg:top-auto lg:z-auto lg:translate-x-0 lg:max-h-none lg:shadow-sm',
-                            { 'max-h-[calc(100vh-2rem)] overflow-hidden': !sidebarOpen }
+                            'fixed left-4 top-4 z-50 w-[260px] rounded-xl border border-gray-200 bg-white shadow-sm transition-transform duration-200 dark:border-gray-800 dark:bg-gray-900 lg:static lg:left-auto lg:top-auto lg:z-auto lg:translate-x-0 lg:self-start lg:shadow-sm'
                         ]"
                     >
-                        <!-- Search Box -->
-                        <div class="p-3 border-b border-gray-100 dark:border-gray-800">
-                            <form @submit.prevent="performSidebarSearch" class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <i class="ti ti-search text-base"></i>
-                                </span>
-                                <input
-                                    v-model="sidebarSearchQuery"
-                                    type="text"
-                                    :placeholder="t('Search...')"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500"
-                                />
-                            </form>
-                        </div>
-
-                        <nav class="flex-1 overflow-y-auto p-3 space-y-1">
+                        <nav class="p-3 space-y-1">
                             <template v-for="item in navItems" :key="item.label">
                                 <!-- Section header (collapsible) -->
                                 <button

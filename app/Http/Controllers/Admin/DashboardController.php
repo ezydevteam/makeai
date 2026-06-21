@@ -34,7 +34,7 @@ class DashboardController extends Controller
             return $this->buildDashboardData($period);
         });
 
-        return Inertia::render('Admin/Dashboard', $data);
+        return Inertia::render('Admin/Dashboard/Index', $data);
     }
 
     private function buildDashboardData(string $period): array
@@ -665,19 +665,6 @@ class DashboardController extends Controller
             'activity' => $activity,
             'addonStats' => $addonStats,
         ];
-    }
-
-    public function activity()
-    {
-        $now = now();
-        $start = $now->copy()->subDays(29)->startOfDay();
-        $activities = $this->getRecentActivityCollection($start, $now);
-        $paginated = $this->paginateActivityCollection($activities, 20);
-
-        return Inertia::render('Admin/Activity/Index', [
-            'activity' => $paginated,
-            'rangeLabel' => translate('Last 30 days'),
-        ]);
     }
 
     private function buildSeriesFromQuery(

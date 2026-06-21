@@ -24,12 +24,11 @@ interface ToolData {
     name: string
     slug: string
     description: string
-    category?: { name: string; slug: string; icon?: string; color?: string; requires_pro?: boolean }
+    category?: { name: string; slug: string; icon?: string; color?: string; access_level?: string }
     icon?: string
     color?: string
     output_type?: string
-    requires_login?: boolean
-    access_level?: string
+    access_level: string
     fields: ToolField[] | string | Record<string, ToolField>
     about_content?: string
     how_it_works?: Array<{ step?: number; icon?: string; title: string; description: string }> | string | Record<string, unknown>
@@ -260,12 +259,15 @@ const canSubmit = computed(() => {
 })
 
 const needsLogin = computed(() => {
-    return (props.tool.requires_login || (props.tool.access_level && props.tool.access_level !== 'public')) && !props.authUser?.id
+    const level = props.tool.access_level || 'inherit'
+    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    return (effectiveLevel === 'login' || effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) && !props.authUser?.id
 })
 
 const needsPro = computed(() => {
     const level = props.tool.access_level || 'inherit'
-    if (!Boolean(props.tool.category?.requires_pro) && level !== 'pro_plan') return false
+    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    if (effectiveLevel !== 'premium' && !effectiveLevel.startsWith('plan:')) return false
     if (!isProAvailable.value) return false
     if (!props.authUser?.id) return true
     return !props.authUser.is_pro
@@ -344,18 +346,19 @@ const hasUsageExamples = computed(() => props.tool.show_usage_examples && usageE
 const hasFaqs = computed(() => props.tool.show_faqs && faqItems.value.some(f => String(f.question || '').trim() !== '' || String(f.answer || '').trim() !== ''))
 const accessBadgeLabel = computed(() => {
     const level = props.tool.access_level || 'inherit'
-    if (Boolean(props.tool.category?.requires_pro) || level === 'pro_plan') return t('Pro')
-    if (level === 'login_required') return t('Login')
-    if (level === 'free_plan') return t('Free')
+    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    if (effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) return t('Pro')
+    if (effectiveLevel === 'login') return t('Login')
     return t('Free')
 })
 
 const accessBadgeClass = computed(() => {
     const level = props.tool.access_level || 'inherit'
-    if (Boolean(props.tool.category?.requires_pro) || level === 'pro_plan') {
+    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    if (effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) {
         return 'border-accent-500/20 bg-gradient-to-r from-accent-500 to-primary-500 text-white shadow-sm'
     }
-    if (level === 'login_required') {
+    if (effectiveLevel === 'login') {
         return 'border-sky-500/20 bg-sky-500/15 text-sky-800 dark:text-sky-200'
     }
     return 'border-emerald-500/20 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
@@ -450,10 +453,10 @@ watch(activeTab, (newTab) => {
 
 const runGenerate = () => {
     if (!canSubmit.value || !canGenerate.value) return
-    const accessLevel = props.tool.access_level || 'inherit'
-    if (!props.authUser?.id && accessLevel !== 'public') { showLoginModal.value = true; return }
-    if (props.tool.requires_login && !props.authUser?.id) { showLoginModal.value = true; return }
-    if (accessLevel === 'pro_plan' || Boolean(props.tool.category?.requires_pro)) { showUpgradeModal.value = true; return }
+    const level = props.tool.access_level || 'inherit'
+    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    if (!props.authUser?.id && effectiveLevel !== 'guest') { showLoginModal.value = true; return }
+    if (effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) { showUpgradeModal.value = true; return }
 
     const modelField = fields.value.find(f => f.type === 'model_select')
     const model = modelField ? String(formValues.value[fieldName(modelField)] || '') : ''
@@ -463,10 +466,10 @@ const runGenerate = () => {
 
 const generateVariations = async () => {
     if (isAnyStreaming.value || !canGenerate.value) return
-    const accessLevel = props.tool.access_level || 'inherit'
-    if (!props.authUser?.id && accessLevel !== 'public') { showLoginModal.value = true; return }
-    if (props.tool.requires_login && !props.authUser?.id) { showLoginModal.value = true; return }
-    if (accessLevel === 'pro_plan' || Boolean(props.tool.category?.requires_pro)) { showUpgradeModal.value = true; return }
+    const level = props.tool.access_level || 'inherit'
+    const effectiveLevel = level === 'inherit' ? (props.tool.category?.access_level || 'guest') : level
+    if (!props.authUser?.id && effectiveLevel !== 'guest') { showLoginModal.value = true; return }
+    if (effectiveLevel === 'premium' || effectiveLevel.startsWith('plan:')) { showUpgradeModal.value = true; return }
 
     isVariationsMode.value = true
     activeVariationTab.value = 0

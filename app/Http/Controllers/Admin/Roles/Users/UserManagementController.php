@@ -220,7 +220,6 @@ class UserManagementController extends Controller
 
     public function disableTwoFactor(User $user)
     {
-        abort_unless(auth('admin')->user()?->hasPermission('users.edit'), 403);
 
         if (! $user->hasTotpEnabled()) {
             return back()->with('info', translate('Two-factor authentication is not enabled for this user.'));

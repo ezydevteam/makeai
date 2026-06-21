@@ -69,6 +69,5 @@ class BlogSettingsController extends Controller
 
     private function authorizeBlog(): void
     {
-        abort_unless(auth('admin')->user()?->hasPermission('content.blog'), 403);
     }
 }
