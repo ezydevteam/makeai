@@ -5,6 +5,8 @@ import { router } from '@inertiajs/vue3'
 const loading = ref(false)
 let startHandler: (() => void) | null = null
 let finishHandler: (() => void) | null = null
+let startUnsubscribe: (() => void) | null = null
+let finishUnsubscribe: (() => void) | null = null
 
 const getAnimation = (): string => {
     // Never show on admin pages
@@ -23,13 +25,13 @@ onMounted(() => {
         loading.value = false
     }
 
-    router.on('start', startHandler)
-    router.on('finish', finishHandler)
+    startUnsubscribe = router.on('start', startHandler)
+    finishUnsubscribe = router.on('finish', finishHandler)
 })
 
 onUnmounted(() => {
-    if (startHandler) router.off('start', startHandler)
-    if (finishHandler) router.off('finish', finishHandler)
+    if (startUnsubscribe) startUnsubscribe()
+    if (finishUnsubscribe) finishUnsubscribe()
 })
 </script>
 

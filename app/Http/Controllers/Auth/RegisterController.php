@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
 use App\Services\AffiliateService;
+use App\Services\CaptchaService;
 use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,6 +26,8 @@ class RegisterController extends Controller
 
     public function register(RegisterRequest $request, AffiliateService $affiliate)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,

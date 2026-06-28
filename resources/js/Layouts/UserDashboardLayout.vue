@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -14,6 +14,25 @@ const referralUser = computed(() => page.props.auth?.user as any)
 
 const sidebarOpen = ref(false)
 const onboardingOpen = ref(false)
+const isDesktopViewport = ref(false)
+
+function syncViewportState() {
+    isDesktopViewport.value = window.innerWidth >= 1024
+}
+
+function closeSidebar() {
+    sidebarOpen.value = false
+}
+
+function onKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && sidebarOpen.value) {
+        closeSidebar()
+    }
+}
+
+watch(sidebarOpen, (open) => {
+    document.body.classList.toggle('overflow-hidden', open)
+})
 
 function onOnboardingClosed() {
     onboardingOpen.value = false
@@ -21,20 +40,27 @@ function onOnboardingClosed() {
 
 onMounted(() => {
     const props = page.props as any
+
+    syncViewportState()
+
     if (props.showOnboarding) {
         onboardingOpen.value = true
     }
     window.addEventListener('onboarding:closed', onOnboardingClosed)
+    window.addEventListener('keydown', onKeydown)
+    window.addEventListener('resize', syncViewportState)
 })
 
 onUnmounted(() => {
     window.removeEventListener('onboarding:closed', onOnboardingClosed)
+    window.removeEventListener('keydown', onKeydown)
+    window.removeEventListener('resize', syncViewportState)
+    document.body.classList.remove('overflow-hidden')
 })
 
 const workspaceOpen = ref(route().current('user.dashboard.playground.*') || route().current('user.dashboard.chains.*') || route().current('user.dashboard.embeds.*'))
-const libraryOpen = ref(route().current('user.dashboard.collections.*') || route().current('user.dashboard.favorites.*') || route().current('user.dashboard.history.*') || Boolean(route().current()?.startsWith('user.dashboard.documents.') || route().current()?.startsWith('documents.')))
+const libraryOpen = ref(route().current('user.dashboard.collections.*') || route().current('user.dashboard.favorites.*') || route().current('user.dashboard.history.*') || Boolean(route().current('user.dashboard.documents.*') || route().current('documents.*')))
 const accountOpen = ref(route().current('user.dashboard.profile*') || route().current('user.dashboard.security*') || route().current('user.dashboard.api-keys*') || route().current('user.dashboard.billing*') || route().current('user.dashboard.privacy*') || route().current('user.dashboard.credit-topup*'))
-const notificationsOpen = ref(route().current('notifications.*') || route().current('user.dashboard.notifications.*'))
 const socialOpen = ref(route().current('addon.social.user.*'))
 const videoOpen = ref(route().current('addon.video.user.*'))
 const voiceoverOpen = ref(route().current('addon.vo.user.*'))
@@ -51,6 +77,31 @@ interface NavItem {
 const socialScheduler = computed(() => (page.props.socialScheduler as any) ?? { enabled: false })
 const videoCreator = computed(() => (page.props.videoCreator as any) ?? { enabled: false })
 const voiceover = computed(() => (page.props.voiceover as any) ?? { enabled: false })
+const frontendHeaderSettings = computed(() => (page.props as any).frontendHeaderSettings ?? {})
+const mobileBottomHeaderHeight = computed(() => {
+    const mobileBottom = frontendHeaderSettings.value?.mobile_bottom ?? {}
+
+    if (mobileBottom.enabled !== true) {
+        return 0
+    }
+
+    return mobileBottom.hide_menu_labels === true ? 48 : 60
+})
+const dashboardShellStyle = computed(() => ({
+    paddingTop: 'calc(var(--header-height, 64px) + 0rem)',
+    paddingBottom: `${32 + mobileBottomHeaderHeight.value}px`,
+}))
+const mobileSidebarInsetStyle = computed(() => ({
+    top: 'var(--header-height, 64px)',
+    bottom: `${mobileBottomHeaderHeight.value}px`,
+    height: `calc(100dvh - var(--header-height, 64px) - ${mobileBottomHeaderHeight.value}px)`,
+}))
+const mobileSidebarOverlayStyle = computed(() => ({
+    top: 'var(--header-height, 64px)',
+    bottom: `${mobileBottomHeaderHeight.value}px`,
+}))
+const appliedMobileSidebarInsetStyle = computed(() => (isDesktopViewport.value ? undefined : mobileSidebarInsetStyle.value))
+const appliedMobileSidebarOverlayStyle = computed(() => (isDesktopViewport.value ? undefined : mobileSidebarOverlayStyle.value))
 
 const navItems = computed<NavItem[]>(() => {
     const is = (name: string) => route().current(name)
@@ -70,10 +121,10 @@ const navItems = computed<NavItem[]>(() => {
         {
             label: t('Library'),
             icon: 'ti ti-books',
-            active: is('user.dashboard.collections.*') || is('user.dashboard.favorites.*') || is('user.dashboard.history.*') || Boolean(route().current()?.startsWith('user.dashboard.documents.') || route().current()?.startsWith('documents.')),
+            active: is('user.dashboard.collections.*') || is('user.dashboard.favorites.*') || is('user.dashboard.history.*') || Boolean(is('user.dashboard.documents.*') || is('documents.*')),
             sectionKey: 'library',
             children: [
-                { label: t('Documents'), routeName: 'user.dashboard.documents.index', active: Boolean(route().current()?.startsWith('user.dashboard.documents.') || route().current()?.startsWith('documents.')) },
+                { label: t('Documents'), routeName: 'user.dashboard.documents.index', active: Boolean(is('user.dashboard.documents.*') || is('documents.*')) },
                 { label: t('Collections'), routeName: 'user.dashboard.collections.index', active: is('user.dashboard.collections.*') },
                 { label: t('Favorites'), routeName: 'user.dashboard.favorites.index', active: is('user.dashboard.favorites.*') },
                 { label: t('History'), routeName: 'user.dashboard.history.index', active: is('user.dashboard.history.*') },
@@ -155,32 +206,48 @@ function toggleSection(key: string) {
 
 <template>
     <UserLayout>
-        <div class="min-h-screen py-8">
+        <div class="min-h-screen" :style="dashboardShellStyle">
             <div class="mx-auto max-w-7xl px-6">
                 <!-- Mobile hamburger -->
-                <button class="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 lg:hidden" @click="sidebarOpen = !sidebarOpen">
+                <button class="mb-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-800 lg:hidden" @click="sidebarOpen = !sidebarOpen">
                     <i class="ti ti-menu-2 text-lg"></i>
                     {{ t('Menu') }}
                 </button>
 
                 <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
                     <!-- Mobile overlay -->
-                    <div v-if="sidebarOpen" class="fixed inset-0 z-40 bg-black/40 lg:hidden" @click="sidebarOpen = false" />
+                    <div
+                        v-if="sidebarOpen"
+                        class="fixed inset-x-0 z-30 bg-slate-950/50 backdrop-blur-sm lg:hidden dark:bg-black/60"
+                        :style="appliedMobileSidebarOverlayStyle"
+                        @click="closeSidebar"
+                    />
 
                     <!-- Sidebar -->
                     <aside
                         :class="[
                             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-                            'fixed left-4 top-4 z-50 w-[260px] rounded-xl border border-gray-200 bg-white shadow-sm transition-transform duration-200 dark:border-gray-800 dark:bg-gray-900 lg:static lg:left-auto lg:top-auto lg:z-auto lg:translate-x-0 lg:self-start lg:shadow-sm'
+                            'fixed left-0 z-40 flex w-[min(18rem,calc(100vw-1.5rem))] max-w-full flex-col border-r border-gray-200 bg-white shadow-xl transition-transform duration-200 dark:border-gray-700 dark:bg-gray-950 dark:shadow-black/30 lg:static lg:h-auto lg:w-[260px] lg:translate-x-0 lg:self-start lg:rounded-xl lg:border lg:shadow-sm'
                         ]"
+                        :style="appliedMobileSidebarInsetStyle"
                     >
-                        <nav class="p-3 space-y-1">
+                        <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800 lg:hidden">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Dashboard Menu') }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Navigate your workspace') }}</p>
+                            </div>
+                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-white" :aria-label="t('Close menu')" @click="closeSidebar">
+                                <i class="ti ti-x text-lg" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <nav class="flex-1 space-y-1 overflow-y-auto p-3 dark:bg-gray-950/60">
                             <template v-for="item in navItems" :key="item.label">
                                 <!-- Section header (collapsible) -->
                                 <button
                                     v-if="item.children && item.children.length"
                                     @click="toggleSection(item.sectionKey!)"
-                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'"
+                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-500/15 dark:text-primary-200' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 dark:hover:text-white'"
                                     class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition"
                                 >
                                     <i :class="item.icon" class="text-lg shrink-0"></i>
@@ -189,14 +256,14 @@ function toggleSection(key: string) {
                                 </button>
 
                                 <!-- Collapsible children -->
-                                <div v-if="item.children && isSectionOpen(item.sectionKey!)" class="ml-4 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-700">
+                                <div v-if="item.children && isSectionOpen(item.sectionKey!)" class="ml-4 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-700/80">
                                     <Link
                                         v-for="child in item.children"
                                         :key="child.routeName"
                                         :href="route(child.routeName)"
-                                        :class="child.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'"
+                                        :class="child.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-500/15 dark:text-primary-200' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/80 dark:hover:text-white'"
                                         class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition"
-                                        @click="sidebarOpen = false"
+                                        @click="closeSidebar"
                                     >
                                         <span>{{ child.label }}</span>
                                     </Link>
@@ -206,9 +273,9 @@ function toggleSection(key: string) {
                                 <Link
                                     v-else-if="item.routeName"
                                     :href="route(item.routeName)"
-                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-900/20 dark:text-primary-300' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white'"
+                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-500/15 dark:text-primary-200' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 dark:hover:text-white'"
                                     class="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition"
-                                    @click="sidebarOpen = false"
+                                    @click="closeSidebar"
                                 >
                                     <i :class="item.icon" class="text-lg shrink-0"></i>
                                     <span>{{ item.label }}</span>
@@ -216,14 +283,14 @@ function toggleSection(key: string) {
                             </template>
                         </nav>
 
-                        <div class="shrink-0 border-t border-gray-100 p-3 dark:border-gray-700">
+                        <div class="shrink-0 border-t border-gray-100 bg-white/90 p-3 dark:border-gray-800 dark:bg-gray-950">
                             <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">{{ t('Credit Balance') }}</p>
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-lg font-bold text-gray-900 dark:text-white">{{ referralUser?.credits ?? 0 }}</div>
-                                    <div class="text-[10px] text-gray-500">{{ t('credits available') }}</div>
+                                    <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('credits available') }}</div>
                                 </div>
-                                <Link :href="route('user.dashboard.credit-topup')" class="inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 transition-colors">
+                                <Link :href="route('user.dashboard.credit-topup')" class="inline-flex items-center gap-1 rounded-full bg-primary-600 px-3 py-1.5 text-xs font-semibold !text-white hover:bg-primary-700 transition-colors">
                                     <i class="ti ti-plus text-sm"></i>
                                     {{ t('Top Up') }}
                                 </Link>

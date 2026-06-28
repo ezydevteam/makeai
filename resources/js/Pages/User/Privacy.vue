@@ -45,6 +45,11 @@ const deleteForm = useForm({ confirmation: '', otp: '' })
 const preferencesForm = useForm({
     email_marketing: props.user?.email_marketing ?? true,
     allow_data_improve: props.user?.allow_data_improve ?? true,
+    cookie_consent: {
+        functional: props.user?.cookie_consent?.functional ?? true,
+        analytics: props.user?.cookie_consent?.analytics ?? false,
+        marketing: props.user?.cookie_consent?.marketing ?? false,
+    } as Record<string, boolean> | null
 })
 
 const showDeleteModal = ref(false)
@@ -230,14 +235,14 @@ const exportedCookieConsent = computed(() => {
 
             <div v-if="sessions.length > 0" class="mt-5 space-y-2">
                 <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Recent Sessions') }}</h3>
-                <div v-for="session in sessions.slice(0, 10)" :key="session.id" class="flex items-center justify-between rounded-lg bg-gray-50 px-4 py-2.5 text-sm dark:bg-surface-800">
-                    <div class="flex flex-col gap-0.5">
-                        <span class="text-gray-700 dark:text-gray-300">{{ session.ip }} <span v-if="session.city" class="text-gray-400">· {{ session.city }}{{ session.country ? ', ' + session.country : '' }}</span></span>
-                        <span class="text-[11px] text-gray-400 truncate max-w-[300px]">{{ session.user_agent }}</span>
+                <div v-for="session in sessions.slice(0, 10)" :key="session.id" class="flex flex-col gap-3 rounded-lg bg-gray-50 px-4 py-3 text-sm dark:bg-surface-800 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="min-w-0 flex flex-col gap-0.5">
+                        <span class="break-all text-gray-700 dark:text-gray-300">{{ session.ip }} <span v-if="session.city" class="text-gray-400">· {{ session.city }}{{ session.country ? ', ' + session.country : '' }}</span></span>
+                        <span class="break-words text-[11px] text-gray-400 sm:max-w-[300px]">{{ session.user_agent }}</span>
                         <span class="text-[11px] text-gray-400">{{ new Date(session.last_seen).toLocaleString() }}</span>
                     </div>
-                    <button v-if="showRevokeConfirm !== session.id" @click="showRevokeConfirm = session.id" class="text-xs text-red-500 hover:text-red-700 transition-colors">{{ t('Revoke') }}</button>
-                    <div v-else class="flex items-center gap-2">
+                    <button v-if="showRevokeConfirm !== session.id" @click="showRevokeConfirm = session.id" class="self-start text-xs text-red-500 transition-colors hover:text-red-700 sm:self-auto">{{ t('Revoke') }}</button>
+                    <div v-else class="flex flex-wrap items-center gap-2">
                         <span class="text-xs text-red-500">{{ t('Confirm?') }}</span>
                         <button @click="revokeSession(session.id); showRevokeConfirm = null" class="text-xs font-bold text-red-600">{{ t('Yes') }}</button>
                         <button @click="showRevokeConfirm = null" class="text-xs text-gray-500">{{ t('No') }}</button>
@@ -251,8 +256,8 @@ const exportedCookieConsent = computed(() => {
     <ActionConfirmModal :open="showDeleteModal" :title="t('Delete Your Account')" :message="t('This action is permanent. All your data will be deleted after a 30-day grace period. You can cancel during this time by logging in.')" :confirm-label="t('Schedule Deletion')" :variant="'danger'" :processing="deleteForm.processing" @confirm="scheduleDeletion" @cancel="showDeleteModal = false">
         <div class="space-y-4 pt-3">
             <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('Type DELETE to confirm and enter the OTP sent to your email.') }}</p>
-            <input v-model="deleteForm.confirmation" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" placeholder="DELETE" />
-            <input v-model="deleteForm.otp" type="text" maxlength="6" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono text-center tracking-[0.5em] dark:border-surface-700 dark:bg-surface-800 dark:text-white" placeholder="000000" />
+            <input v-model="deleteForm.confirmation" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('DELETE')" />
+            <input v-model="deleteForm.otp" type="text" maxlength="6" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono text-center tracking-[0.5em] dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('000000')" />
         </div>
     </ActionConfirmModal>
 </template>

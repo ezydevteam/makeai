@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin\Auth;
 
+use App\Services\CaptchaService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -17,7 +18,7 @@ class AdminForgotPasswordRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'email' => [
                 'required',
                 'email:rfc',
@@ -25,6 +26,12 @@ class AdminForgotPasswordRequest extends FormRequest
                 Rule::exists('admins', 'email')->where('is_active', true),
             ],
         ];
+
+        if (CaptchaService::fromSettings()->isEnabled()) {
+            $rules['captcha_token'] = ['required', 'string'];
+        }
+
+        return $rules;
     }
 
     /**

@@ -56,6 +56,7 @@ const selected = ref<ContactMessage | null>(props.messages.data[0] ?? null)
 const search = ref(props.filters.search ?? '')
 const status = ref(props.filters.status ?? '')
 const deleteTarget = ref<ContactMessage | null>(null)
+const isDeleting = ref(false)
 const searchInput = ref<HTMLInputElement | null>(null)
 const showSettingsModal = ref(props.openSettings)
 const filterDebounce = ref<number | null>(null)
@@ -171,7 +172,7 @@ const confirmDelete = (message: ContactMessage) => {
 }
 
 const closeDeleteModal = () => {
-    if (router.processing) return
+    if (isDeleting.value) return
     deleteTarget.value = null
 }
 
@@ -182,6 +183,12 @@ const remove = () => {
 
     router.delete(route('admin.contact.messages.delete', deletingId), {
         preserveScroll: true,
+        onStart: () => {
+            isDeleting.value = true
+        },
+        onFinish: () => {
+            isDeleting.value = false
+        },
         onSuccess: () => {
             deleteTarget.value = null
         },
@@ -632,7 +639,7 @@ onBeforeUnmount(() => {
             :confirm-label="t('Delete')"
             :cancel-label="t('Cancel')"
             @confirm="remove"
-            @update:open="(value) => { if (!value) closeDeleteModal() }"
+            @update:open="(value: boolean) => { if (!value) closeDeleteModal() }"
         />
     </div>
 </template>

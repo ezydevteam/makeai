@@ -150,9 +150,9 @@ const summaryText = computed(() => {
                 :is="prevLink?.url ? Link : 'div'"
                 v-if="prevLink"
                 :href="prevLink.url ?? undefined"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm transition-all"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition-all"
                 :class="prevLink.url
-                    ? 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800'
+                    ? 'border-gray-200 bg-white text-gray-500 shadow-sm hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
                     : 'border-gray-100 bg-gray-50 text-gray-300 dark:border-surface-800 dark:bg-surface-900/60 dark:text-gray-600'"
             >
                 <i class="ti ti-chevron-left text-base"></i>
@@ -169,10 +169,10 @@ const summaryText = computed(() => {
                     v-else
                     :is="item.url && !item.active ? Link : 'div'"
                     :href="item.url ?? undefined"
-                    class="inline-flex h-9 min-w-[36px] items-center justify-center rounded-xl px-3 text-sm font-semibold transition-all"
+                    class="inline-flex h-9 min-w-[36px] items-center justify-center rounded-full px-4 text-sm font-semibold transition-all"
                     :class="item.active
-                        ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/20'
-                        : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800'"
+                        ? 'border border-primary-500 bg-primary-500 text-white shadow-lg shadow-primary-500/20'
+                        : 'border border-gray-200 bg-white text-gray-600 shadow-sm hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'"
                 >
                     {{ item.pageNumber }}
                 </component>
@@ -182,9 +182,9 @@ const summaryText = computed(() => {
                 :is="nextLink?.url ? Link : 'div'"
                 v-if="nextLink"
                 :href="nextLink.url ?? undefined"
-                class="inline-flex h-9 w-9 items-center justify-center rounded-xl border text-sm transition-all"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition-all"
                 :class="nextLink.url
-                    ? 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800'
+                    ? 'border-gray-200 bg-white text-gray-500 shadow-sm hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
                     : 'border-gray-100 bg-gray-50 text-gray-300 dark:border-surface-800 dark:bg-surface-900/60 dark:text-gray-600'"
             >
                 <i class="ti ti-chevron-right text-base"></i>

@@ -51,7 +51,9 @@ interface LabelValue { label: string; credits?: number; cost?: number; tokens?: 
 interface DashboardMetricItem {
     label: string
     tool_slug?: string
+    tool_name?: string
     model?: string
+    model_name?: string
     count?: number
     cost?: number
     tokens?: number
@@ -282,6 +284,7 @@ const periodLabels: Record<ChartPeriod, string> = { today: 'Today', '7d': 'This 
 const comparisonWindowLabels: Record<Exclude<ChartPeriod, 'lifetime'>, string> = {
     today: 'vs yesterday',
     '7d': 'vs last week',
+    '30d': 'vs last month',
     '90d': 'vs last 90 days',
 }
 const periodOptions: ChartPeriod[] = ['today', '7d', '30d', '90d', 'lifetime']
@@ -295,8 +298,9 @@ interface StatSeriesCard {
     value: string
     sparkline: number[]
     comparison?: string
+    comparisonDetail?: string
     comparisonType?: 'up' | 'down' | 'neutral'
-    color: 'primary' | 'accent' | 'success' | 'warning' | 'danger'
+    color: 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'pink'
     icon: 'users' | 'dollar' | 'spark' | 'shield' | 'credits' | 'plans' | 'ticket'
     metric: string
     visible: boolean
@@ -639,7 +643,7 @@ async function drawAllCharts() {
 
     await drawChart('signups', chartRefs.signups, () => ({
         type: 'bar', data: { labels: timeLabels(getPeriodSeries(dashboardCharts.value.signupsChart, period)), datasets: [{ data: getPeriodSeries(dashboardCharts.value.signupsChart, period).map(d => d.value), backgroundColor: 'rgba(31, 117, 254, 0.62)', borderColor: 'rgba(31, 117, 254, 0.92)', borderWidth: 1, borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.72, maxBarThickness: 18 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor, drawBorder: false }, ticks: { callback: (value) => (typeof value === 'number' && value % 1 === 0 ? value : ''), stepSize: 1 } }, x: { offset: true, border: { display: false }, grid: { display: false }, ...xAxis } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor, drawBorder: false }, ticks: { callback: (value: string | number) => (typeof value === 'number' && value % 1 === 0 ? value : ''), stepSize: 1 } }, x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true } } },
     }))
 
     await drawChart('revenue', chartRefs.revenue, () => ({
@@ -776,10 +780,10 @@ async function drawAllCharts() {
                 },
                 scales: {
                     x: {
-                        offset: true,
                         border: { display: false },
                         grid: { display: false },
                         ...xAxis,
+                        offset: true,
                     },
                     y: {
                         min: -(scaleMax + gap),
@@ -858,7 +862,7 @@ async function drawAllCharts() {
                     },
                 },
                 scales: {
-                    x: { offset: true, border: { display: false }, grid: { display: false }, ...xAxis },
+                    x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true },
                     y: {
                         beginAtZero: true,
                         grid: { color: chartGridColor, drawBorder: false },
@@ -1070,7 +1074,7 @@ async function drawAllCharts() {
                         },
                     },
                     scales: {
-                        x: { offset: true, border: { display: false }, grid: { display: false }, ...xAxis },
+                        x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true },
                         y: {
                             beginAtZero: true,
                             grid: { color: chartGridColor, drawBorder: false },

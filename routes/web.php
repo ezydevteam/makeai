@@ -201,10 +201,10 @@ Route::middleware('guest')->group(function () {
 
     // Password Reset
     Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-    Route::post('forgot-password', [PasswordResetController::class, 'sendResetOtp'])->middleware('throttle:otp,3,3600')->name('password.email');
+    Route::post('forgot-password', [PasswordResetController::class, 'sendResetOtp'])->name('password.email');
     Route::get('reset-password', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-    Route::post('reset-password/verify', [PasswordResetController::class, 'verifyResetOtp'])->middleware('throttle:otp,5,900')->name('password.verify');
-    Route::post('reset-password', [PasswordResetController::class, 'resetPassword'])->middleware('throttle:otp,5,900')->name('password.update');
+    Route::post('reset-password/verify', [PasswordResetController::class, 'verifyResetOtp'])->name('password.verify');
+    Route::post('reset-password', [PasswordResetController::class, 'resetPassword'])->name('password.update');
     Route::get('two-factor', [TwoFactorLoginController::class, 'show'])->name('two-factor.show');
     Route::post('two-factor', [TwoFactorLoginController::class, 'verify'])->middleware('throttle:otp,5,900')->name('two-factor.verify');
 });

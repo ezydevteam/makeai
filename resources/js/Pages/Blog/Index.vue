@@ -45,7 +45,7 @@ const props = defineProps<{
 
 const { t } = useTranslate()
 const search = ref(props.filters.search ?? '')
-const sort = ref(props.filters.sort ?? 'latest')
+const currentSort = ref(props.filters.sort ?? 'latest')
 
 const sortOptions = computed(() => [
     { value: 'latest', label: t('Latest') },
@@ -54,7 +54,7 @@ const sortOptions = computed(() => [
 ])
 
 const applyFilters = () => {
-    router.get(window.location.pathname, { search: search.value || undefined, sort: sort.value === 'latest' ? undefined : sort.value }, {
+    router.get(window.location.pathname, { search: search.value || undefined, sort: currentSort.value === 'latest' ? undefined : currentSort.value }, {
         preserveState: true,
         replace: true,
     })
@@ -88,7 +88,7 @@ const formatDate = (value: string | null) => {
                         <label class="sr-only" for="blog-search">{{ t('Search') }}</label>
                         <input id="blog-search" v-model="search" @keyup.enter="applyFilters" type="search" :placeholder="t('Search articles')" class="flex-1 rounded-lg border border-gray-200 dark:border-surface-700 bg-gray-50 dark:bg-surface-800 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:border-primary-400 focus:ring-primary-400">
                         <label class="sr-only" for="blog-sort">{{ t('Sort') }}</label>
-                        <AppSelect id="blog-sort" v-model="sort" :options="sortOptions" @update:model-value="applyFilters" />
+                        <AppSelect id="blog-sort" v-model="currentSort" :options="sortOptions" @update:model-value="applyFilters" />
                         <button @click="applyFilters" type="button" class="rounded-lg btn-primary transition-colors">
                             {{ t('Filter') }}
                         </button>
@@ -105,7 +105,7 @@ const formatDate = (value: string | null) => {
                             <div class="p-5">
                                 <div class="flex flex-wrap gap-2 mb-3">
                                     <span v-if="post.is_featured" class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">{{ t('Featured') }}</span>
-                                    <span v-for="category in post.categories" :key="category.id" class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">{{ category.name }}</span>
+                                    <span v-if="post.categories && post.categories.length > 0" class="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-medium text-primary-700">{{ post.categories[0].name }}</span>
                                 </div>
                                 <h2 class="text-lg font-bold text-gray-900 dark:text-white group-hover:text-primary-600 transition-colors">{{ post.title }}</h2>
                                 <p class="mt-2 text-sm text-gray-600 dark:text-gray-400 line-clamp-3">{{ post.excerpt }}</p>

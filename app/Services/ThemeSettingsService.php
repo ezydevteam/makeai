@@ -132,7 +132,7 @@ class ThemeSettingsService
             if (isset($storedByType[$type])) {
                 $mergedSections[] = [
                     'type' => $type,
-                    'config' => array_replace_recursive($config, $storedByType[$type]),
+                    'config' => $this->replaceConfigRecursive($config, $storedByType[$type]),
                 ];
                 unset($storedByType[$type]);
             } else {
@@ -270,5 +270,26 @@ class ThemeSettingsService
         if ($section === 'homepage') {
             settings_set(self::HOMEPAGE_CONFIG_KEY, null, 'json', 'appearance');
         }
+    }
+
+    /**
+     * Recursively replace config, but completely overwrite sequential arrays (lists)
+     * instead of merging them index-by-index.
+     */
+    private function replaceConfigRecursive(array $default, array $stored): array
+    {
+        $result = $default;
+        foreach ($stored as $key => $value) {
+            if (is_array($value) && isset($default[$key]) && is_array($default[$key])) {
+                if (array_is_list($value)) {
+                    $result[$key] = $value;
+                } else {
+                    $result[$key] = $this->replaceConfigRecursive($default[$key], $value);
+                }
+            } else {
+                $result[$key] = $value;
+            }
+        }
+        return $result;
     }
 }

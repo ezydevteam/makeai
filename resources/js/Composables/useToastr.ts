@@ -56,7 +56,7 @@ export function useFlashToasts() {
     const toast = useToastr()
 
     watch(
-        () => page.props.flash as Record<string, string | null>,
+        () => page.props.flash as any,
         (flash) => {
             if (flash?.success) toast.success(flash.success)
             if (flash?.error) toast.error(flash.error)

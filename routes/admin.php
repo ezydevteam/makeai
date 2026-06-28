@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\Marketing\Advertisements\AdController;
+use App\Http\Controllers\Admin\AccountSettingsController;
 use App\Http\Controllers\Admin\Activity\AdminLogController;
 use App\Http\Controllers\Admin\Activity\UserLogController;
 use App\Http\Controllers\Admin\Roles\Admins\AdminController;
@@ -90,6 +91,10 @@ Route::middleware('guest:admin')->group(function () {
 // ─── Authenticated ──────────────────────────────────
 Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     Route::post('logout', [AdminLoginController::class, 'logout'])->name('admin.logout');
+    Route::get('account/settings', [AccountSettingsController::class, 'edit'])->name('admin.account.settings');
+    Route::post('account/settings/profile', [AccountSettingsController::class, 'updateProfile'])->name('admin.account.profile.update');
+    Route::post('account/settings/password', [AccountSettingsController::class, 'updatePassword'])->name('admin.account.password.update');
+    Route::post('account/settings/avatar', [AccountSettingsController::class, 'updateAvatar'])->name('admin.account.avatar.update');
 
     // Dashboard
     Route::middleware('admin.permission:dashboard.view')->group(function () {

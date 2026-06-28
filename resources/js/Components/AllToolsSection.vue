@@ -249,6 +249,11 @@ function formatCount(n: number | undefined): string {
   color: var(--color-primary-600);
 }
 
+:global(.dark) .category-chip:hover {
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-400);
+}
+
 .category-chip-active {
   background: var(--color-primary-500) !important;
   color: #fff !important;
@@ -278,6 +283,11 @@ function formatCount(n: number | undefined): string {
 .tab-btn:hover {
   border-color: var(--color-primary-300);
   color: var(--color-primary-600);
+}
+
+:global(.dark) .tab-btn:hover {
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-400);
 }
 
 .tab-count {

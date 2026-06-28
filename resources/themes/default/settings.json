@@ -45,10 +45,11 @@
         },
         "header": {
             "desktop": {
-                "layout": "classic",
                 "sticky": true,
                 "sticky_behavior": "always",
                 "shadow_style": "border_small",
+                "menu_position": "center",
+                "menu_hover_style": "rounded_soft_bg",
                 "show_notification_bell": true,
                 "notification_button_style": "rounded_soft_bg",
                 "show_social_icons": false,
@@ -87,38 +88,108 @@
             "mobile_top": {
                 "enabled": true,
                 "layout": "compact",
-                "sticky": true,
+                "height": 64,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "none",
+                "sticky_behavior": "always",
                 "show_logo": true,
                 "show_hamburger": true,
-                "show_dark_mode_toggle": true
+                "show_dark_mode_toggle": true,
+                "show_notification_bell": false,
+                "show_search_icon": false,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": false
             },
             "mobile_bottom": {
                 "enabled": false,
-                "layout": "tabs",
+                "hide_menu_labels": false,
+                "show_glassmorphism": true,
                 "show_home": true,
+                "show_search_icon": false,
                 "show_tools": true,
-                "show_dashboard": true,
+                "show_notification_bell": false,
+                "show_hamburger": false,
                 "show_profile": true
             }
         },
         "footer": {
-            "layout": "columns",
+            "layout": "default",
+            "style_columns": {
+                "default": {
+                    "col_1": ["about_text"],
+                    "col_2": ["menu_links_1"],
+                    "col_3": ["contact_info"],
+                    "col_4": ["custom_text_1"]
+                },
+                "centered": {
+                    "col_1": ["about_text"],
+                    "col_2": ["menu_links_1"],
+                    "col_3": ["contact_info"]
+                },
+                "spotlight": {
+                    "col_1": ["menu_links_1"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text_1"]
+                },
+                "card_grid": {
+                    "col_1": ["menu_links_1"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text_1"]
+                },
+                "split_band": {
+                    "col_1": ["menu_links_1"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text_1"],
+                    "col_4": ["tool_categories_1"]
+                },
+                "floating_panel": {
+                    "col_1": ["menu_links_1"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text_1"]
+                }
+            },
             "brand_title": "",
             "brand_description": "",
-            "show_newsletter": false,
+            "show_newsletter": true,
             "newsletter_title": "",
             "newsletter_description": "",
             "newsletter_placeholder": "",
             "newsletter_button_label": "",
+            "newsletter_button_style": "primary",
             "show_social_icons": true,
             "contact_title": "",
             "contact_email": "",
             "contact_phone": "",
             "contact_address": "",
             "contact_details": "",
+            "menu_title_1": "",
+            "menu_column_1": "footer-company",
+            "menu_title_2": "",
+            "menu_column_2": "footer-support",
+            "menu_title_3": "",
+            "menu_column_3": "footer-legal",
+            "custom_title_1": "",
+            "custom_text_1": "",
+            "custom_title_2": "",
+            "custom_text_2": "",
+            "tool_categories_title_1": "",
+            "tool_categories_items_1": [],
+            "tool_categories_title_2": "",
+            "tool_categories_items_2": [],
+            "footer_bg_color": "",
+            "footer_text_color": "",
+            "footer_heading_color": "",
+            "footer_heading_text_case": "capitalize",
+            "container_width": "1280px",
+            "disable_logo_about": false,
+            "disable_card_style": false,
+            "footer_vertical_padding": 56,
             "show_payment_icons": true,
             "payment_icons": "",
             "show_bottom_social_icons": false,
+            "show_bottom_language_selector": false,
             "show_back_to_top": true,
             "back_to_top_label": "",
             "back_to_top_icon": "ti ti-arrow-up",
@@ -130,13 +201,8 @@
             "bottom_bar_bg_color": "",
             "bottom_bar_text_color": "",
             "bottom_bar_padding": 32,
-            "copyright_text": "",
-            "menu_title_1": "",
-            "menu_title_2": "",
-            "menu_title_3": "",
-            "menu_column_1": "footer-company",
-            "menu_column_2": "footer-support",
-            "menu_column_3": "footer-legal"
+            "bottom_bar_centered": false,
+            "copyright_text": ""
         },
         "homepage": {
             "hero_variant": "centered-gradient",
@@ -153,6 +219,9 @@
             "show_custom_html": false,
             "show_richtext": false,
             "show_ad_slot": false,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": false,
             "show_hero": true
         },
         "homepage_config": {
@@ -200,6 +269,7 @@
                         "hero_gradient_palette": "aurora",
                         "hero_gradient_direction": "to bottom right",
                         "show_hero_background": false,
+                        "show_search_box": true,
                         "trust_badge_text": "Trusted by 50,000+ creators",
                         "stats": [
                             {
@@ -219,7 +289,9 @@
                                 "label": "Expert Support"
                             }
                         ],
-                        "sort_order": 0
+                        "sort_order": 0,
+                        "display_categories": [],
+                        "display_tool_slugs": []
                     }
                 },
                 {
@@ -229,6 +301,7 @@
                         "subtitle": "Everything you need to build the future, powered by AI.",
                         "layout": "3-column",
                         "card_style": "bordered",
+                        "disable_card_style": false,
                         "items": [
                             {
                                 "icon": "ti ti-pencil",
@@ -336,6 +409,8 @@
                         "subheading": "Our numbers speak for themselves.",
                         "icon": "ti ti-chart-bar",
                         "show_stats_separator": true,
+                        "show_stats": true,
+                        "show_brands": false,
                         "stats": [
                             {
                                 "number": "50K+",
@@ -354,6 +429,7 @@
                                 "label": "Countries"
                             }
                         ],
+                        "brands": [],
                         "sort_order": 7
                     }
                 },
@@ -365,9 +441,15 @@
                         "primary_text": "Get Started for Free",
                         "primary_link": "/register",
                         "primary_style": "white",
+                        "primary_shape": "rounded_xl",
+                        "primary_icon": "",
+                        "primary_access_level": "all",
                         "secondary_text": "View Pricing",
                         "secondary_link": "/pricing",
                         "secondary_style": "outline",
+                        "secondary_shape": "rounded_xl",
+                        "secondary_icon": "",
+                        "secondary_access_level": "all",
                         "width": "contained",
                         "background_style": "gradient-1",
                         "sort_order": 8
@@ -383,9 +465,12 @@
                         "layout": "grid",
                         "card_style": "bordered",
                         "max_items": 3,
+                        "show_button": true,
+                        "show_description": true,
                         "button_text": "Visit Blog",
                         "button_link": "/blog",
                         "button_style": "outline",
+                        "button_icon": "",
                         "sort_order": 9
                     }
                 },
@@ -426,6 +511,36 @@
                         "title": "",
                         "subtitle": "",
                         "zone": ""
+                    }
+                },
+                {
+                    "type": "ad_slot_2",
+                    "config": {
+                        "sort_order": 14,
+                        "title": "",
+                        "subtitle": "",
+                        "zone": ""
+                    }
+                },
+                {
+                    "type": "ad_slot_3",
+                    "config": {
+                        "sort_order": 15,
+                        "title": "",
+                        "subtitle": "",
+                        "zone": ""
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "sort_order": 16,
+                        "title": "",
+                        "subtitle": "",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "items": []
                     }
                 }
             ]

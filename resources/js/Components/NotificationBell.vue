@@ -3,10 +3,12 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { CSSProperties } from 'vue'
 import { Link, router, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
+import { resolveNotificationIconClass } from '@/Composables/useNotifications'
 import { disconnectNotificationEcho, getNotificationEcho, resolveNotificationChannel } from '@/echo'
 
 interface NotificationItem {
     id: string
+    icon: string | null
     title: string
     message: string
     level: 'info' | 'success' | 'warning' | 'error'
@@ -44,7 +46,7 @@ const loading = ref(false)
 const unreadCount = ref(Number((page.props.notifications as any)?.unread_count ?? 0))
 const items = ref<NotificationItem[]>(((page.props.notifications as any)?.items ?? []) as NotificationItem[])
 let timer: number | undefined
-let subscribedChannel: { notification: (callback: (payload: unknown) => void) => void } | null = null
+let subscribedChannel: any = null
 
 const enabled = computed(() => Boolean((page.props.notifications as any)?.enabled))
 const shouldRender = computed(() => enabled.value || unreadCount.value > 0 || items.value.length > 0)
@@ -103,6 +105,7 @@ const refresh = async () => {
 
 const normalizeBroadcast = (payload: any): NotificationItem => ({
     id: String(payload.id ?? crypto.randomUUID()),
+    icon: payload.icon ?? payload.data?.icon ?? null,
     title: String(payload.title ?? payload.data?.title ?? t('Notification')),
     message: String(payload.message ?? payload.data?.message ?? ''),
     level: (payload.level ?? payload.data?.level ?? 'info') as NotificationItem['level'],
@@ -164,18 +167,11 @@ const markAllRead = async () => {
 }
 
 const levelClasses = (level: NotificationItem['level']) => ({
-    success: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300',
-    warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-    error: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-    info: 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-300',
-}[level] ?? 'bg-secondary-100 text-secondary-700')
-
-const levelIconClass = (level: NotificationItem['level']) => ({
-    success: 'ti ti-check',
-    warning: 'ti ti-alert-triangle',
-    error: 'ti ti-x',
-    info: 'ti ti-info-circle',
-}[level] ?? 'ti ti-bell')
+    success: 'border border-primary-200 bg-primary-100 text-primary-600 dark:border-primary-800/70 dark:bg-primary-900/20 dark:text-primary-300',
+    warning: 'border border-primary-200 bg-primary-100 text-amber-600 dark:border-primary-800/70 dark:bg-primary-900/20 dark:text-amber-300',
+    error: 'border border-primary-200 bg-primary-100 text-red-600 dark:border-primary-800/70 dark:bg-primary-900/20 dark:text-red-300',
+    info: 'border border-primary-200 bg-primary-100 text-blue-600 dark:border-primary-800/70 dark:bg-primary-900/20 dark:text-secondary-300',
+}[level] ?? 'border border-primary-200 bg-primary-100 text-secondary-600')
 
 const timeAgo = (value: string | null) => {
     if (!value) return ''
@@ -252,16 +248,18 @@ watch(realtime, () => {
                         :class="!item.is_read ? 'bg-primary-50/40 dark:bg-primary-900/10' : ''"
                         @click="markRead(item)"
                     >
-                        <span :class="levelClasses(item.level)" class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                            <i :class="[levelIconClass(item.level), 'text-base leading-none']" aria-hidden="true" />
+                        <span :class="levelClasses(item.level)" class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                            <i :class="[resolveNotificationIconClass(item), 'text-base leading-none']" aria-hidden="true" />
                         </span>
                         <span class="min-w-0 flex-1">
                             <span class="flex items-start gap-2">
                                 <span class="line-clamp-1 text-sm font-semibold text-gray-900 dark:text-white">{{ item.title }}</span>
                                 <span v-if="!item.is_read" class="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary-500"></span>
                             </span>
-                            <span class="mt-0.5 line-clamp-2 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ item.message }}</span>
-                            <span class="mt-1 block text-[11px] text-gray-400">{{ timeAgo(item.created_at) }}</span>
+                            <span class="flex items-start justify-between gap-3">
+                                <span class="line-clamp-2 min-w-0 flex-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ item.message }}</span>
+                                <span class="shrink-0 whitespace-nowrap pt-0.5 text-[11px] text-gray-400">{{ timeAgo(item.created_at) }}</span>
+                            </span>
                         </span>
                     </button>
 

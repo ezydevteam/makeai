@@ -3,16 +3,25 @@
 namespace Database\Seeders;
 
 use App\Models\Ad;
+use App\Models\AffiliateCommission;
+use App\Models\AffiliatePayout;
+use App\Models\AffiliateProgram;
 use App\Models\AffiliateReferral;
 use App\Models\Admin;
 use App\Models\AdminRole;
 use App\Models\AiChat;
 use App\Models\AiChatMessage;
+use App\Models\AiTool;
 use App\Models\AiUsageLog;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Models\BlogTag;
 use App\Models\Comment;
+use App\Models\Conversation;
+use App\Models\ConversationMessage;
+use App\Models\CreditTransaction;
+use App\Models\Document;
+use App\Models\Favorite;
 use App\Models\LoginHistory;
 use App\Models\Menu;
 use App\Models\Payment;
@@ -22,6 +31,8 @@ use App\Models\Plan;
 use App\Models\SupportDepartment;
 use App\Models\SupportTicket;
 use App\Models\User;
+use App\Models\UserCollection;
+use App\Models\UserCollectionTool;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -51,8 +62,8 @@ class DemoSeeder extends Seeder
         ]);
 
         // ─── 2. Demo User ──────────────────────────────────────────────
-        User::updateOrCreate(['email' => 'user@demo.com'], [
-            'name' => 'Demo User',
+        User::updateOrCreate(['email' => 'demo@demo.com'], [
+            'name' => 'Demo Creator',
             'password' => Hash::make('demo12345'),
             'credits' => 500,
             'is_active' => true,
@@ -100,6 +111,10 @@ class DemoSeeder extends Seeder
 
         $plans = [$freePlan->id, $proPlan->id, $unlimitedPlan->id];
         $planNames = ['free', 'pro', 'unlimited'];
+
+        AffiliateProgram::current()->update([
+            'allow_custom_alias' => true,
+        ]);
 
         // ─── 4. 50 Sample Users ────────────────────────────────────────
         $demoUsers = [];
@@ -194,6 +209,12 @@ class DemoSeeder extends Seeder
                 ],
                 'created_at' => now()->subDays(random_int(0, 180))->subHours(random_int(0, 23)),
             ]);
+        }
+
+        $showcaseUser = User::where('email', 'demo@demo.com')->first();
+
+        if ($showcaseUser) {
+            $this->seedShowcaseUserExperience($showcaseUser, $unlimitedPlan, $toolSlugs);
         }
 
         // ─── 6. AI Chats (10 chatbots with messages) ────────────────────
@@ -740,6 +761,459 @@ class DemoSeeder extends Seeder
             'mega_menu_content' => null,
             'sort_order' => 2,
         ]);
+    }
+
+    private function seedShowcaseUserExperience(User $user, Plan $plan, array $toolSlugs): void
+    {
+        $user->forceFill([
+            'name' => 'Demo Creator',
+            'referral_code' => 'DEMOAFF1',
+            'affiliate_custom_slug' => 'demo-creator-affiliate',
+            'plan_id' => $plan->id,
+            'subscription_status' => 'active',
+            'subscription_ends_at' => now()->addMonths(11),
+            'daily_limit' => 1200,
+            'monthly_limit' => 15000,
+            'referral_earnings' => 1425.75,
+            'referral_count' => 6,
+            'use_case' => 'marketing',
+            'onboarding_completed_at' => now()->subDays(20),
+            'last_login_at' => now()->subMinutes(18),
+            'last_login_ip' => '203.76.120.45',
+            'theme_preference' => 'system',
+            'email_marketing' => true,
+        ])->save();
+
+        $this->seedShowcaseCreditTimeline($user);
+        $documents = $this->seedShowcaseDocuments($user, $toolSlugs);
+        $this->seedShowcaseConversations($user);
+        $this->seedShowcaseUsageLogs($user, $toolSlugs);
+        $this->seedShowcaseCollections($user, $toolSlugs);
+        $this->seedShowcaseFavorites($user, $documents, $toolSlugs);
+        $this->seedShowcaseAffiliateExperience($user);
+    }
+
+    private function seedShowcaseAffiliateExperience(User $user): void
+    {
+        AffiliateReferral::where('referrer_id', $user->id)->delete();
+        AffiliateCommission::where('referrer_id', $user->id)->delete();
+        AffiliatePayout::where('user_id', $user->id)->delete();
+
+        $referrals = [
+            ['user' => User::where('email', 'iris9@demo.com')->first(), 'days' => 18, 'converted' => true, 'commission' => 185.50, 'status' => 'approved'],
+            ['user' => User::where('email', 'jack10@demo.com')->first(), 'days' => 16, 'converted' => true, 'commission' => 240.00, 'status' => 'approved'],
+            ['user' => User::where('email', 'karen11@demo.com')->first(), 'days' => 14, 'converted' => true, 'commission' => 165.25, 'status' => 'paid'],
+            ['user' => User::where('email', 'leo12@demo.com')->first(), 'days' => 11, 'converted' => true, 'commission' => 310.00, 'status' => 'approved'],
+            ['user' => User::where('email', 'maria13@demo.com')->first(), 'days' => 9, 'converted' => true, 'commission' => 225.00, 'status' => 'pending'],
+            ['user' => User::where('email', 'nick14@demo.com')->first(), 'days' => 6, 'converted' => true, 'commission' => 300.00, 'status' => 'approved'],
+            ['user' => User::where('email', 'olivia15@demo.com')->first(), 'days' => 4, 'converted' => false, 'commission' => null, 'status' => null],
+            ['user' => User::where('email', 'paul16@demo.com')->first(), 'days' => 2, 'converted' => false, 'commission' => null, 'status' => null],
+        ];
+
+        $commissionIndex = 1;
+
+        foreach ($referrals as $index => $entry) {
+            $referredUser = $entry['user'];
+            if (! $referredUser) {
+                continue;
+            }
+
+            $landedAt = now()->subDays($entry['days'])->setTime(10 + ($index % 6), 12 + (($index * 9) % 35));
+            $convertedAt = $entry['converted'] ? $landedAt->copy()->addHours(6 + $index) : null;
+
+            $referral = AffiliateReferral::updateOrCreate(
+                ['referrer_id' => $user->id, 'referral_code' => $user->referral_code, 'ip_address' => '198.51.100.' . (20 + $index)],
+                [
+                    'referred_id' => $referredUser->id,
+                    'landed_at' => $landedAt,
+                    'converted_at' => $convertedAt,
+                    'created_at' => $landedAt,
+                    'updated_at' => $landedAt,
+                ]
+            );
+
+            $referredUser->forceFill([
+                'referred_by' => $user->id,
+                'created_at' => $landedAt->copy()->subHours(3),
+            ])->save();
+
+            if (! $entry['converted']) {
+                continue;
+            }
+
+            $payment = Payment::updateOrCreate(
+                ['gateway_payment_id' => 'demo-aff-pay-' . str_pad((string) $commissionIndex, 3, '0', STR_PAD_LEFT)],
+                [
+                    'user_id' => $referredUser->id,
+                    'plan_id' => $referredUser->plan_id,
+                    'gateway' => 'stripe',
+                    'amount' => $entry['commission'] * 5,
+                    'currency' => 'USD',
+                    'status' => 'completed',
+                    'type' => 'subscription',
+                    'metadata' => ['demo' => true, 'affiliate' => true, 'referral_code' => $user->referral_code],
+                    'created_at' => $convertedAt->copy()->addMinutes($index * 7),
+                ]
+            );
+
+            $commission = AffiliateCommission::updateOrCreate(
+                ['order_id' => $payment->id],
+                [
+                    'referrer_id' => $user->id,
+                    'referred_id' => $referredUser->id,
+                    'amount' => $entry['commission'],
+                    'status' => $entry['status'],
+                    'approved_at' => in_array($entry['status'], ['approved', 'paid'], true) ? $convertedAt->copy()->addHours(2) : null,
+                    'paid_at' => $entry['status'] === 'paid' ? $convertedAt->copy()->addDays(3) : null,
+                    'notes' => 'Demo showcase affiliate commission #' . $commissionIndex,
+                    'created_at' => $convertedAt,
+                    'updated_at' => $convertedAt,
+                ]
+            );
+
+            if ($entry['status'] === 'paid') {
+                $commission->forceFill([
+                    'paid_at' => $convertedAt->copy()->addDays(3),
+                ])->save();
+            }
+
+            $commissionIndex++;
+        }
+
+        AffiliatePayout::updateOrCreate(
+            ['user_id' => $user->id, 'amount' => 250.00, 'method' => 'paypal', 'status' => 'pending'],
+            [
+                'payout_details' => [
+                    'account' => 'demo@payments.example',
+                    'note' => 'Demo showcase payout request',
+                ],
+                'created_at' => now()->subDays(3),
+                'updated_at' => now()->subDays(3),
+            ]
+        );
+
+        AffiliatePayout::updateOrCreate(
+            ['user_id' => $user->id, 'amount' => 180.00, 'method' => 'credits', 'status' => 'paid'],
+            [
+                'payout_details' => [
+                    'account' => 'In-app credits',
+                    'note' => 'Demo showcase payout completed',
+                ],
+                'processed_at' => now()->subDays(8),
+                'created_at' => now()->subDays(10),
+                'updated_at' => now()->subDays(8),
+            ]
+        );
+    }
+
+    private function seedShowcaseCreditTimeline(User $user): void
+    {
+        CreditTransaction::where('user_id', $user->id)
+            ->where('description', 'like', 'Demo showcase:%')
+            ->delete();
+
+        $entries = [
+            ['days' => 36, 'amount' => 12000, 'type' => 'purchase', 'description' => 'Demo showcase: Annual Studio access'],
+            ['days' => 28, 'amount' => 4000, 'type' => 'bonus', 'description' => 'Demo showcase: Launch bonus credits'],
+            ['days' => 20, 'amount' => -360, 'type' => 'usage', 'description' => 'Demo showcase: Brand voice sprint'],
+            ['days' => 14, 'amount' => -285, 'type' => 'usage', 'description' => 'Demo showcase: SEO article workflow'],
+            ['days' => 7, 'amount' => -190, 'type' => 'usage', 'description' => 'Demo showcase: Client proposal drafts'],
+            ['days' => 6, 'amount' => -240, 'type' => 'usage', 'description' => 'Demo showcase: Social content batch'],
+            ['days' => 5, 'amount' => 750, 'type' => 'referral', 'description' => 'Demo showcase: Partner referral payout'],
+            ['days' => 4, 'amount' => -310, 'type' => 'usage', 'description' => 'Demo showcase: Landing page rewrite'],
+            ['days' => 3, 'amount' => -275, 'type' => 'usage', 'description' => 'Demo showcase: Outreach sequence'],
+            ['days' => 2, 'amount' => -220, 'type' => 'usage', 'description' => 'Demo showcase: Product teaser kit'],
+            ['days' => 1, 'amount' => -198, 'type' => 'usage', 'description' => 'Demo showcase: Ad copy remix'],
+            ['days' => 0, 'amount' => -156, 'type' => 'usage', 'description' => 'Demo showcase: Daily ops assistant'],
+        ];
+
+        $runningBalance = 0.0;
+
+        foreach ($entries as $index => $entry) {
+            $runningBalance += $entry['amount'];
+            $createdAt = now()->subDays($entry['days'])->setTime(9 + ($index % 6), 10 + (($index * 7) % 45));
+
+            $transaction = CreditTransaction::create([
+                'user_id' => $user->id,
+                'amount' => $entry['amount'],
+                'balance_after' => $runningBalance,
+                'type' => $entry['type'],
+                'description' => $entry['description'],
+                'meta' => ['demo_showcase' => true],
+            ]);
+
+            $transaction->forceFill([
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ])->save();
+        }
+
+        $usedToday = (float) CreditTransaction::where('user_id', $user->id)
+            ->where('type', 'usage')
+            ->whereDate('created_at', now()->toDateString())
+            ->sum(DB::raw('ABS(amount)'));
+
+        $usedMonth = (float) CreditTransaction::where('user_id', $user->id)
+            ->where('type', 'usage')
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->sum(DB::raw('ABS(amount)'));
+
+        $user->forceFill([
+            'credits' => $runningBalance,
+            'credits_used_today' => $usedToday,
+            'credits_used_month' => $usedMonth,
+        ])->save();
+    }
+
+    /**
+     * @return array<int, Document>
+     */
+    private function seedShowcaseDocuments(User $user, array $toolSlugs): array
+    {
+        $documents = [];
+        $documentRows = [
+            [
+                'title' => 'Q3 AI Launch Campaign',
+                'tool_slug' => $toolSlugs[0] ?? 'blog-article-generator',
+                'content' => '<h1>Q3 AI Launch Campaign</h1><p>Position MakeAI as the fastest way for founders to turn ideas into launch-ready assets.</p><p>Focus on polished outputs, premium visuals, and speed-to-value for buyers.</p>',
+                'days' => 3,
+            ],
+            [
+                'title' => 'Premium Dashboard Value Pitch',
+                'tool_slug' => $toolSlugs[1] ?? 'seo-meta-description-generator',
+                'content' => '<h1>Premium Dashboard Value Pitch</h1><p>Lead with clarity, momentum, and polished analytics.</p><p>Showcase believable activity so buyers can imagine running a real SaaS from day one.</p>',
+                'days' => 2,
+            ],
+            [
+                'title' => 'Founder Outreach Sequence',
+                'tool_slug' => $toolSlugs[2] ?? 'email-subject-line-generator',
+                'content' => '<h1>Founder Outreach Sequence</h1><p>Use outcome-first messaging with short, confident calls to action.</p><p>Keep tone consultative and premium.</p>',
+                'days' => 1,
+            ],
+            [
+                'title' => 'Weekly Content Operations',
+                'tool_slug' => $toolSlugs[3] ?? 'product-description-writer',
+                'content' => '<h1>Weekly Content Operations</h1><p>Bundle blog, email, and social outputs into one repeatable workflow.</p><p>Measure production speed, approval rate, and content reuse.</p>',
+                'days' => 0,
+            ],
+        ];
+
+        foreach ($documentRows as $row) {
+            $createdAt = now()->subDays($row['days'])->setTime(11 + $row['days'], 20);
+
+            $document = Document::updateOrCreate(
+                ['user_id' => $user->id, 'title' => $row['title']],
+                [
+                    'content' => $row['content'],
+                    'tool_slug' => $row['tool_slug'],
+                    'word_count' => Document::calculateWordCount($row['content']),
+                ]
+            );
+
+            $document->forceFill([
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ])->save();
+
+            $documents[] = $document;
+        }
+
+        return $documents;
+    }
+
+    private function seedShowcaseConversations(User $user): void
+    {
+        $conversations = [
+            [
+                'title' => 'Homepage conversion refresh',
+                'model' => 'gpt-4o',
+                'message_count' => 6,
+                'days' => 0,
+                'messages' => [
+                    ['role' => 'user', 'content' => 'Give me a sharper hero angle for an AI SaaS script on Envato.'],
+                    ['role' => 'assistant', 'content' => 'Lead with launch speed, premium polish, and ready-to-sell workflows for agencies and founders.'],
+                    ['role' => 'user', 'content' => 'Now make it feel more premium and buyer-focused.'],
+                    ['role' => 'assistant', 'content' => 'Position the product as a revenue-ready AI business with polished dashboards, fast setup, and believable demo data.'],
+                ],
+            ],
+            [
+                'title' => 'Client proposal packaging',
+                'model' => 'claude-sonnet-4-6',
+                'message_count' => 4,
+                'days' => 1,
+                'messages' => [
+                    ['role' => 'user', 'content' => 'Draft a proposal outline for an AI content automation package.'],
+                    ['role' => 'assistant', 'content' => 'Start with goals, workflow scope, deliverables, ROI checkpoints, and an executive summary.'],
+                ],
+            ],
+            [
+                'title' => 'SEO content engine',
+                'model' => 'gemini-3.5-flash',
+                'message_count' => 5,
+                'days' => 2,
+                'messages' => [
+                    ['role' => 'user', 'content' => 'Plan a content cluster around AI workflow templates.'],
+                    ['role' => 'assistant', 'content' => 'Build one pillar page, five comparison articles, and supporting FAQ content with product-led CTAs.'],
+                ],
+            ],
+        ];
+
+        foreach ($conversations as $conversationRow) {
+            $lastMessageAt = now()->subDays($conversationRow['days'])->setTime(15, 10);
+
+            $conversation = Conversation::updateOrCreate(
+                ['user_id' => $user->id, 'title' => $conversationRow['title']],
+                [
+                    'model' => $conversationRow['model'],
+                    'message_count' => $conversationRow['message_count'],
+                    'total_tokens' => 3200 + ($conversationRow['days'] * 180),
+                    'total_credits' => 120 + ($conversationRow['days'] * 12),
+                    'last_message_at' => $lastMessageAt,
+                    'is_pinned' => $conversationRow['days'] === 0,
+                ]
+            );
+
+            ConversationMessage::where('conversation_id', $conversation->id)->delete();
+
+            foreach ($conversationRow['messages'] as $index => $message) {
+                $conversationMessage = ConversationMessage::create([
+                    'conversation_id' => $conversation->id,
+                    'role' => $message['role'],
+                    'content' => $message['content'],
+                    'model' => $conversationRow['model'],
+                    'input_tokens' => $message['role'] === 'user' ? 120 + ($index * 12) : 0,
+                    'output_tokens' => $message['role'] === 'assistant' ? 260 + ($index * 20) : 0,
+                    'credits_charged' => $message['role'] === 'assistant' ? 18 + $index : 0,
+                    'attachments' => [],
+                ]);
+
+                $messageTime = $lastMessageAt->copy()->subMinutes((count($conversationRow['messages']) - $index) * 4);
+
+                $conversationMessage->forceFill([
+                    'created_at' => $messageTime,
+                ])->save();
+            }
+        }
+    }
+
+    private function seedShowcaseUsageLogs(User $user, array $toolSlugs): void
+    {
+        $usageRows = [
+            ['days' => 10, 'provider' => 'openai', 'model' => 'gpt-4o', 'tool_slug' => $toolSlugs[0] ?? 'blog-article-generator', 'credits' => 210],
+            ['days' => 8, 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'tool_slug' => $toolSlugs[1] ?? 'seo-meta-description-generator', 'credits' => 180],
+            ['days' => 6, 'provider' => 'google', 'model' => 'gemini-3.5-flash', 'tool_slug' => $toolSlugs[2] ?? 'email-subject-line-generator', 'credits' => 142],
+            ['days' => 4, 'provider' => 'openai', 'model' => 'gpt-4o-mini', 'tool_slug' => $toolSlugs[3] ?? 'product-description-writer', 'credits' => 118],
+            ['days' => 3, 'provider' => 'deepseek', 'model' => 'deepseek-v4-pro', 'tool_slug' => $toolSlugs[4] ?? ($toolSlugs[0] ?? 'blog-article-generator'), 'credits' => 156],
+            ['days' => 1, 'provider' => 'meta', 'model' => 'llama-4-scout-17b', 'tool_slug' => $toolSlugs[5] ?? ($toolSlugs[1] ?? 'seo-meta-description-generator'), 'credits' => 96],
+        ];
+
+        foreach ($usageRows as $index => $row) {
+            $createdAt = now()->subDays($row['days'])->setTime(10 + $index, 15);
+
+            $usageLog = AiUsageLog::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'tool_slug' => $row['tool_slug'],
+                    'created_at' => $createdAt,
+                ],
+                [
+                    'provider' => $row['provider'],
+                    'model' => $row['model'],
+                    'type' => 'text_generation',
+                    'input_tokens' => 900 + ($index * 110),
+                    'output_tokens' => 520 + ($index * 65),
+                    'cost_usd' => round(0.042 + ($index * 0.006), 6),
+                    'credits_used' => $row['credits'],
+                    'response_time_ms' => 1100 + ($index * 180),
+                    'status' => 'completed',
+                    'metadata' => ['demo_showcase' => true],
+                ]
+            );
+
+            $usageLog->forceFill([
+                'created_at' => $createdAt,
+                'updated_at' => $createdAt,
+            ])->save();
+        }
+    }
+
+    private function seedShowcaseCollections(User $user, array $toolSlugs): void
+    {
+        $collectionRows = [
+            [
+                'name' => 'Launch Campaigns',
+                'description' => 'Go-to tools for landing pages, ads, and launch copy.',
+                'icon' => 'ti ti-rocket',
+                'color' => '#1f75fe',
+                'is_featured' => true,
+                'tools' => array_slice($toolSlugs, 0, 3),
+            ],
+            [
+                'name' => 'Daily Client Ops',
+                'description' => 'Templates for repeatable client work and content delivery.',
+                'icon' => 'ti ti-briefcase',
+                'color' => '#8b5cf6',
+                'is_featured' => false,
+                'tools' => array_slice($toolSlugs, 3, 3),
+            ],
+        ];
+
+        foreach ($collectionRows as $sortOrder => $row) {
+            $collection = UserCollection::updateOrCreate(
+                ['user_id' => $user->id, 'name' => $row['name']],
+                [
+                    'description' => $row['description'],
+                    'icon' => $row['icon'],
+                    'color' => $row['color'],
+                    'is_featured' => $row['is_featured'],
+                    'sort_order' => $sortOrder,
+                ]
+            );
+
+            UserCollectionTool::where('collection_id', $collection->id)->delete();
+
+            foreach (array_values(array_filter($row['tools'])) as $index => $toolSlug) {
+                UserCollectionTool::create([
+                    'collection_id' => $collection->id,
+                    'tool_slug' => $toolSlug,
+                    'sort_order' => $index,
+                    'added_at' => now()->subDays(5 - min($index, 4)),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<int, Document>  $documents
+     */
+    private function seedShowcaseFavorites(User $user, array $documents, array $toolSlugs): void
+    {
+        $favoriteToolIds = AiTool::query()
+            ->whereIn('slug', array_slice($toolSlugs, 0, 3))
+            ->pluck('id')
+            ->all();
+
+        foreach ($favoriteToolIds as $toolId) {
+            Favorite::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'favoriteable_type' => AiTool::class,
+                    'favoriteable_id' => $toolId,
+                ],
+                []
+            );
+        }
+
+        foreach (array_slice($documents, 0, 2) as $document) {
+            Favorite::updateOrCreate(
+                [
+                    'user_id' => $user->id,
+                    'favoriteable_type' => Document::class,
+                    'favoriteable_id' => $document->id,
+                ],
+                []
+            );
+        }
     }
 
     private function loremParagraph(): string

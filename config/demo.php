@@ -15,7 +15,7 @@
 |   DEMO_ENVATO_URL=https://codecanyon.net/item/...
 |   DEMO_ADMIN_EMAIL=admin@demo.com
 |   DEMO_ADMIN_PASSWORD=demo12345
-|   DEMO_USER_EMAIL=user@demo.com
+|   DEMO_USER_EMAIL=demo@demo.com
 |   DEMO_USER_PASSWORD=demo12345
 |
 */
@@ -62,7 +62,7 @@ return [
 
     'admin_password' => env('DEMO_ADMIN_PASSWORD', 'demo12345'),
 
-    'user_email' => env('DEMO_USER_EMAIL', 'user@demo.com'),
+    'user_email' => env('DEMO_USER_EMAIL', 'demo@demo.com'),
 
     'user_password' => env('DEMO_USER_PASSWORD', 'demo12345'),
 

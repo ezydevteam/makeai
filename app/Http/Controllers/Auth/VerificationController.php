@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
+use App\Services\CaptchaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +24,15 @@ class VerificationController extends Controller
 
     public function verify(Request $request)
     {
-        $request->validate(['code' => 'required|string|size:6']);
+        $captcha = CaptchaService::fromSettings();
+
+        $rules = ['code' => 'required|string|size:6'];
+        if ($captcha->isEnabled()) {
+            $rules['captcha_token'] = 'required|string';
+        }
+
+        $request->validate($rules);
+        $captcha->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
 
         $user = Auth::user();
 

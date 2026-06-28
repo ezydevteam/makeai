@@ -15,7 +15,9 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use ZipArchive;
 use Illuminate\Support\Facades\Storage;
+use App\Models\AiTool;
 use App\Models\Menu;
+use App\Models\Category;
 
 /**
  * Admin Theme & Addon Management Controller.
@@ -71,6 +73,7 @@ class ThemeAddonController extends Controller
                 ->get(['id', 'name', 'slug']);
 
             return Inertia::render('Admin/Appearance/DefaultThemeSettings', [
+                'adZones' => config('ads.zones'),
                 'theme' => $config,
                 'settings' => array_merge(
                     $this->frontendPresetService->getResolvedFrontendTheme(),
@@ -89,6 +92,27 @@ class ThemeAddonController extends Controller
                 'frontendHomepageConfig' => $this->frontendPresetService->getResolvedFrontendHomepageConfig(),
                 'frontendCustomCodeSettings' => $this->frontendPresetService->getStoredCustomCodeSettings(),
                 'menus' => $menus,
+                'aiCategories' => Category::aiTools()
+                    ->active()
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'slug']),
+                'allTools' => AiTool::active()
+                    ->with('category:id,name')
+                    ->orderBy('name')
+                    ->get(['slug', 'name', 'description', 'icon', 'color', 'category_id'])
+                    ->map(function (AiTool $tool): array {
+                        return [
+                            'slug' => $tool->slug,
+                            'name' => $tool->name,
+                            'description' => $tool->description,
+                            'icon' => $tool->icon,
+                            'color' => $tool->color,
+                            'category' => $tool->category?->name,
+                        ];
+                    })
+                    ->values()
+                    ->toArray(),
             ]);
         }
 
@@ -134,6 +158,9 @@ class ThemeAddonController extends Controller
             'bg_image_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,avif', 'max:5120'],
             'payment_icon_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,svg,webp,avif', 'max:4096'],
             'hero_background_file' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,avif,mp4,webm,ogg', 'max:51200'],
+            'hero_split_image_file' => ['nullable', 'file', 'mimes:png,svg', 'max:5120'],
+            'brand_logo_*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,svg,webp,avif', 'max:5120'],
+            'carousel_item_image_*' => ['nullable', 'file', 'mimes:jpg,jpeg,png,svg,webp,avif', 'max:5120'],
         ]);
 
         $section = $validated['section'];
@@ -166,6 +193,209 @@ class ThemeAddonController extends Controller
                         if (($section['type'] ?? '') === 'hero') {
                             $section['config']['hero_background_url'] = $path;
                             break;
+                        }
+                    }
+                    unset($section);
+                }
+            }
+
+            // Handle split-gradient right side image upload
+            if ($request->hasFile('hero_split_image_file')) {
+                // Delete old file if exists
+                if (is_array($homepageConfig) && isset($homepageConfig['sections'])) {
+                    foreach ($homepageConfig['sections'] as &$section) {
+                        if (($section['type'] ?? '') === 'hero') {
+                            $oldPath = $section['config']['hero_split_image_url'] ?? null;
+                            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                                Storage::disk('public')->delete($oldPath);
+                            }
+                            break;
+                        }
+                    }
+                    unset($section);
+                }
+                $path = $request->file('hero_split_image_file')->store('theme/hero-split', 'public');
+                if (is_array($homepageConfig) && isset($homepageConfig['sections'])) {
+                    foreach ($homepageConfig['sections'] as &$section) {
+                        if (($section['type'] ?? '') === 'hero') {
+                            $section['config']['hero_split_image_url'] = $path;
+                            break;
+                        }
+                    }
+                    unset($section);
+                }
+            } elseif (is_array($homepageConfig) && isset($homepageConfig['sections'])) {
+                // Handle removal — delete old file when url is cleared
+                foreach ($homepageConfig['sections'] as &$section) {
+                    if (($section['type'] ?? '') === 'hero') {
+                        $currentUrl = $section['config']['hero_split_image_url'] ?? null;
+                        if ($currentUrl === '' || $currentUrl === null) {
+                            $oldPath = null;
+                            // Find old path from stored config
+                            $storedConfig = settings('frontend_homepage_config', []);
+                            if (is_array($storedConfig) && isset($storedConfig['sections'])) {
+                                foreach ($storedConfig['sections'] as $storedSection) {
+                                    if (($storedSection['type'] ?? '') === 'hero') {
+                                        $oldPath = $storedSection['config']['hero_split_image_url'] ?? null;
+                                        break;
+                                    }
+                                }
+                            }
+                            if ($oldPath && Storage::disk('public')->exists($oldPath)) {
+                                Storage::disk('public')->delete($oldPath);
+                            }
+                        }
+                        break;
+                    }
+                }
+                unset($section);
+            }
+
+            // Handle brand logos upload for stats_bar section
+            $uploadedBrandFiles = [];
+            foreach ($request->allFiles() as $key => $file) {
+                if (preg_match('/^brand_logo_(\d+)$/', $key, $matches)) {
+                    $index = (int)$matches[1];
+                    $uploadedBrandFiles[$index] = $file;
+                }
+            }
+
+            $statsBarSectionIndex = null;
+            if (is_array($homepageConfig) && isset($homepageConfig['sections'])) {
+                foreach ($homepageConfig['sections'] as $idx => $sec) {
+                    if (($sec['type'] ?? '') === 'stats_bar') {
+                        $statsBarSectionIndex = $idx;
+                        break;
+                    }
+                }
+            }
+
+            if ($statsBarSectionIndex !== null) {
+                // Fetch old brands config for file cleanup comparison
+                $oldBrands = [];
+                $storedConfig = settings('frontend_homepage_config', []);
+                if (is_array($storedConfig) && isset($storedConfig['sections'])) {
+                    foreach ($storedConfig['sections'] as $storedSection) {
+                        if (($storedSection['type'] ?? '') === 'stats_bar') {
+                            $oldBrands = $storedSection['config']['brands'] ?? [];
+                            break;
+                        }
+                    }
+                }
+
+                $newBrands = &$homepageConfig['sections'][$statsBarSectionIndex]['config']['brands'];
+                if (is_array($newBrands)) {
+                    foreach ($newBrands as $idx => &$brand) {
+                        if (isset($uploadedBrandFiles[$idx])) {
+                            // Delete old image if it existed and is replaced
+                            $oldImgPath = $brand['image'] ?? null;
+                            if ($oldImgPath && Storage::disk('public')->exists($oldImgPath)) {
+                                Storage::disk('public')->delete($oldImgPath);
+                            }
+                            // Store new file
+                            $path = $uploadedBrandFiles[$idx]->store('theme/brands', 'public');
+                            $brand['image'] = $path;
+                        }
+                    }
+                    unset($brand);
+                }
+
+                // Clean up any other orphaned image files
+                $oldImages = [];
+                foreach ($oldBrands as $b) {
+                    if (!empty($b['image'])) {
+                        $oldImages[] = $b['image'];
+                    }
+                }
+
+                $newImages = [];
+                if (is_array($newBrands)) {
+                    foreach ($newBrands as $b) {
+                        if (!empty($b['image'])) {
+                            $newImages[] = $b['image'];
+                        }
+                    }
+                }
+
+                foreach ($oldImages as $oldPath) {
+                    if (!in_array($oldPath, $newImages)) {
+                        if (Storage::disk('public')->exists($oldPath)) {
+                            Storage::disk('public')->delete($oldPath);
+                        }
+                    }
+                }
+            }
+
+            // Handle carousel item images upload
+            $uploadedCarouselFiles = [];
+            foreach ($request->allFiles() as $key => $file) {
+                if (preg_match('/^carousel_item_image_(\d+)$/', $key, $matches)) {
+                    $index = (int)$matches[1];
+                    $uploadedCarouselFiles[$index] = $file;
+                }
+            }
+
+            $carouselSectionIndex = null;
+            if (is_array($homepageConfig) && isset($homepageConfig['sections'])) {
+                foreach ($homepageConfig['sections'] as $idx => $sec) {
+                    if (($sec['type'] ?? '') === 'image_carousel') {
+                        $carouselSectionIndex = $idx;
+                        break;
+                    }
+                }
+            }
+
+            if ($carouselSectionIndex !== null) {
+                // Fetch old items for file cleanup comparison
+                $oldItems = [];
+                $storedConfig = settings('frontend_homepage_config', []);
+                if (is_array($storedConfig) && isset($storedConfig['sections'])) {
+                    foreach ($storedConfig['sections'] as $storedSection) {
+                        if (($storedSection['type'] ?? '') === 'image_carousel') {
+                            $oldItems = $storedSection['config']['items'] ?? [];
+                            break;
+                        }
+                    }
+                }
+
+                $newItems = &$homepageConfig['sections'][$carouselSectionIndex]['config']['items'];
+                if (is_array($newItems)) {
+                    foreach ($newItems as $idx => &$item) {
+                        if (isset($uploadedCarouselFiles[$idx])) {
+                            // Delete old image if it existed and is replaced
+                            $oldImgPath = $item['image_url'] ?? null;
+                            if ($oldImgPath && Storage::disk('public')->exists($oldImgPath)) {
+                                Storage::disk('public')->delete($oldImgPath);
+                            }
+                            // Store new file
+                            $path = $uploadedCarouselFiles[$idx]->store('theme/carousel', 'public');
+                            $item['image_url'] = $path;
+                        }
+                    }
+                    unset($item);
+                }
+
+                // Clean up any other orphaned image files
+                $oldImages = [];
+                foreach ($oldItems as $item) {
+                    if (!empty($item['image_url'])) {
+                        $oldImages[] = $item['image_url'];
+                    }
+                }
+
+                $newImages = [];
+                if (is_array($newItems)) {
+                    foreach ($newItems as $item) {
+                        if (!empty($item['image_url'])) {
+                            $newImages[] = $item['image_url'];
+                        }
+                    }
+                }
+
+                foreach ($oldImages as $oldPath) {
+                    if (!in_array($oldPath, $newImages)) {
+                        if (Storage::disk('public')->exists($oldPath)) {
+                            Storage::disk('public')->delete($oldPath);
                         }
                     }
                 }

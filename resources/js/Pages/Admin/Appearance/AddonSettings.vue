@@ -9,7 +9,7 @@ defineOptions({ layout: AdminLayout })
 
 interface Setting { key: string; label: string; type: string; default: unknown; value: unknown; options?: string[]; description?: string }
 interface AddonConfig { name: string; slug: string; version: string }
-type FormValue = string | number | boolean | null
+type FormValue = string | number | boolean | null | (string | number)[]
 
 const props = defineProps<{ addon: AddonConfig; settings: Setting[] }>()
 const { t } = useTranslate()

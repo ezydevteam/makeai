@@ -139,9 +139,9 @@ function submit() {
         }
         emit('submit', form)
     } else if ((props.sourceType === 'url' || props.sourceType === 'youtube') && url.value) {
-        emit('submit', { url: url.value, title: title.value || undefined })
+        emit('submit', { url: url.value, title: title.value || '' })
     } else if (props.sourceType === 'collection' && knowledgeBaseId.value) {
-        emit('submit', { knowledge_base_id: knowledgeBaseId.value.toString(), title: title.value || undefined })
+        emit('submit', { knowledge_base_id: knowledgeBaseId.value.toString(), title: title.value || '' })
     }
 }
 

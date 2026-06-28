@@ -33,24 +33,24 @@ function toggleProject(ulid: string) {
 <template>
     <Head :title="t('Video Library')" />
 
-    <div class="p-6 space-y-6">
-        <div class="flex items-center justify-between">
+    <div class="space-y-6 p-4 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h1 class="text-xl font-semibold">{{ t('Video Library') }}</h1>
-            <Link :href="route('addon.video.user.create')" class="btn btn-sm btn-emerald">
+            <Link :href="route('addon.video.user.create')" class="btn btn-sm btn-emerald w-full justify-center sm:w-auto">
                 + {{ t('New Video') }}
             </Link>
         </div>
 
-        <div class="flex gap-6">
-            <aside class="w-56 shrink-0 space-y-1">
+        <div class="flex flex-col gap-6 lg:flex-row">
+            <aside class="w-full shrink-0 space-y-1 lg:w-56">
                 <button @click="activeFolder = null"
-                        class="block w-full text-left px-3 py-1.5 rounded text-sm font-medium"
+                        class="block w-full rounded px-3 py-2 text-left text-sm font-medium lg:py-1.5"
                         :class="!activeFolder ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-gray-50'">
                     📁 {{ t('All Videos') }}
                 </button>
                 <button v-for="folder in folders" :key="folder.id"
                         @click="activeFolder = folder.id"
-                        class="flex items-center gap-2 w-full px-3 py-1.5 rounded text-sm"
+                        class="flex w-full items-center gap-2 rounded px-3 py-2 text-sm lg:py-1.5"
                         :class="activeFolder === folder.id ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-gray-50'">
                     <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: folder.color }"></span>
                     <span class="flex-1 truncate">{{ folder.name }}</span>
@@ -64,13 +64,13 @@ function toggleProject(ulid: string) {
                 </div>
 
                 <div v-for="project in projects.data" :key="project.ulid" class="card p-4 space-y-3">
-                    <div class="flex items-center justify-between cursor-pointer" @click="toggleProject(project.ulid)">
-                        <div class="flex items-center gap-2">
+                    <div class="flex cursor-pointer flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" @click="toggleProject(project.ulid)">
+                        <div class="flex min-w-0 items-center gap-2">
                             <span class="w-3 h-3 rounded-full" :style="{ backgroundColor: project.color || '#6366f1' }"></span>
-                            <span class="font-medium">{{ project.name }}</span>
-                            <span class="text-xs text-gray-400">{{ project.renders_count }} {{ t('renders') }}</span>
+                            <span class="truncate font-medium">{{ project.name }}</span>
+                            <span class="shrink-0 text-xs text-gray-400">{{ project.renders_count }} {{ t('renders') }}</span>
                         </div>
-                        <i class="ti ti-chevron-down text-sm transition-transform"
+                        <i class="ti ti-chevron-down self-end text-sm transition-transform sm:self-auto"
                            :class="{ 'rotate-180': expandedProject === project.ulid }"></i>
                     </div>
 

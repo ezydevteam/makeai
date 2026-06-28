@@ -25,6 +25,15 @@ class SupportTicketController extends Controller
         $tickets = SupportTicket::query()
             ->with(['department:id,name', 'assignedAdmin:id,name'])
             ->where('user_id', $request->user()->id)
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = trim($request->string('search')->toString());
+
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery->where('ticket_number', 'like', "%{$search}%")
+                        ->orWhere('subject', 'like', "%{$search}%")
+                        ->orWhereHas('department', fn ($department) => $department->where('name', 'like', "%{$search}%"));
+                });
+            })
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->latest('last_reply_at')
             ->paginate(15)
@@ -32,7 +41,7 @@ class SupportTicketController extends Controller
 
         return Inertia::render('Support/Index', [
             'tickets' => $tickets,
-            'filters' => $request->only(['status']),
+            'filters' => $request->only(['status', 'search']),
             'departments' => SupportDepartment::active()->orderBy('sort_order')->get(['id', 'name']),
             'settings' => $this->settings(),
         ]);
@@ -61,7 +70,7 @@ class SupportTicketController extends Controller
 
         $this->tickets->sendNewTicketNotification($ticket);
 
-        return redirect()->route('support.tickets.show', $ticket)->with('success', translate('Support ticket created.'));
+        return redirect()->route('user.dashboard.support.tickets.show', $ticket)->with('success', translate('Support ticket created.'));
     }
 
     public function show(Request $request, SupportTicket $ticket)

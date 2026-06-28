@@ -17,6 +17,11 @@ interface NotificationItem {
     is_read: boolean
 }
 
+export interface NotificationIconSource {
+    icon: string | null
+    level: string
+}
+
 interface BroadcastingConfig {
     driver: 'reverb' | 'pusher' | 'polling'
     key?: string
@@ -25,6 +30,20 @@ interface BroadcastingConfig {
     scheme?: string
     cluster?: string
     interval_seconds?: number
+}
+
+export const resolveNotificationIconClass = (item: NotificationIconSource) => {
+    const icon = item.icon?.trim()
+    if (icon) {
+        return icon
+    }
+
+    return ({
+        success: 'ti ti-badge-check',
+        warning: 'ti ti-alert-triangle',
+        error: 'ti ti-bell-ringing',
+        info: 'ti ti-bell',
+    }[item.level] ?? 'ti ti-bell')
 }
 
 export function useNotifications(context: 'user' | 'admin' = 'user') {

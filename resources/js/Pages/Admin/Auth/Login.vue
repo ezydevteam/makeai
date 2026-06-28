@@ -1,17 +1,42 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
 import { useFlashToasts } from '@/Composables/useToastr'
+import { useTheme } from '@/Composables/useTheme'
+import { useTranslate } from '@/Composables/useTranslate'
 
 useFlashToasts()
+
+interface PageProps {
+    branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
+    captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
+    appearanceAdminSettings?: Record<string, string>
+}
+
+const page = usePage()
+const { isDark } = useTheme()
+const { t } = useTranslate()
 
 const form = useForm({
     email: '',
     password: '',
     remember: false,
+    captcha_token: '',
 })
 
 const showPassword = ref(false)
+const branding = computed(() => (page.props as unknown as PageProps).branding)
+const appearanceAdminSettings = computed(() => (page.props as unknown as PageProps).appearanceAdminSettings ?? {})
+const appName = computed(() => String(branding.value?.site_name || page.props.appName || t('Application')))
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
+const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => (page.props as unknown as PageProps).captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
+const adminAuthStyle = computed(() => ({
+    '--admin-auth-primary': appearanceAdminSettings.value.primary_color || appearanceAdminSettings.value.button_color || '',
+    '--admin-auth-accent': appearanceAdminSettings.value.accent_color || appearanceAdminSettings.value.primary_color || '',
+}))
 
 const submit = () => {
     form.post(route('admin.login.attempt'), {
@@ -23,34 +48,21 @@ const submit = () => {
 <template>
     <Head :title="$t('Admin Login')" />
 
-    <div class="min-h-screen bg-surface-950 flex items-center justify-center p-4">
-        <!-- Ambient glow -->
-        <div class="fixed inset-0 -z-10">
-            <div class="absolute inset-0 bg-gradient-to-br from-surface-950 via-primary-950/30 to-surface-950"></div>
-            <div class="absolute top-1/4 left-1/3 w-80 h-80 bg-primary-600/8 rounded-full blur-3xl"></div>
-            <div class="absolute bottom-1/4 right-1/3 w-80 h-80 bg-accent-500/8 rounded-full blur-3xl"></div>
-        </div>
-
+    <div class="auth-page admin-auth-page" :style="adminAuthStyle">
         <div class="w-full max-w-md">
-            <!-- Logo -->
             <div class="text-center mb-8">
-                <div class="inline-flex items-center gap-3 mb-4">
-                    <div class="w-12 h-12 bg-gradient-to-br from-primary-500 to-accent-500 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/25">
-                        <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-                        </svg>
-                    </div>
-                </div>
-                <h1 class="text-2xl font-bold text-white font-heading">{{ $t('Admin Panel') }}</h1>
-                <p class="text-gray-500 mt-1 text-sm">{{ $t('Sign in to manage :app', { app: $page.props.appName }) }}</p>
+                <Link :href="route('home')" class="mb-5 inline-flex items-center justify-center text-gray-950 no-underline dark:text-white">
+                    <img v-if="authLogo" :src="authLogo" :alt="appName" class="h-11 w-auto max-w-[180px] object-contain">
+                    <span v-else class="font-heading text-[1.75rem] font-bold">{{ appName }}</span>
+                </Link>
+                <h1 class="font-heading text-2xl font-bold text-gray-950 dark:text-white">{{ $t('Welcome back! Sign In') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('Enter your details to manage :app', { app: $page.props.appName }) }}</p>
             </div>
 
-            <!-- Login Card -->
-            <div class="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
+            <div class="auth-card p-8">
                 <form @submit.prevent="submit" class="space-y-5">
-                    <!-- Email -->
                     <div>
-                        <label for="email" class="block text-sm font-medium text-gray-300 mb-1.5">{{ $t('Email') }}</label>
+                        <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Email') }}</label>
                         <input
                             id="email"
                             v-model="form.email"
@@ -58,15 +70,14 @@ const submit = () => {
                             required
                             autofocus
                             autocomplete="email"
-                            class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-200"
-                            placeholder="admin@example.com"
+                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 transition-all duration-200 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-gray-500"
+                            :placeholder="$t('admin@example.com')"
                         />
                         <p v-if="form.errors.email" class="mt-1.5 text-sm text-danger-500">{{ form.errors.email }}</p>
                     </div>
 
-                    <!-- Password -->
                     <div>
-                        <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">{{ $t('Password') }}</label>
+                        <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Password') }}</label>
                         <div class="relative">
                             <input
                                 id="password"
@@ -74,13 +85,13 @@ const submit = () => {
                                 :type="showPassword ? 'text' : 'password'"
                                 required
                                 autocomplete="current-password"
-                                class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500/50 transition-all duration-200 pr-12"
-                                placeholder="••••••••"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 pr-12 text-gray-900 transition-all duration-200 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-gray-500"
+                                :placeholder="$t('••••••••')"
                             />
                             <button
                                 type="button"
                                 @click="showPassword = !showPassword"
-                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                             >
                                 <svg v-if="!showPassword" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
@@ -94,26 +105,31 @@ const submit = () => {
                         <p v-if="form.errors.password" class="mt-1.5 text-sm text-danger-500">{{ form.errors.password }}</p>
                     </div>
 
-                    <!-- Remember + Forgot -->
                     <div class="flex items-center justify-between">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input
                                 v-model="form.remember"
                                 type="checkbox"
-                                class="w-4 h-4 rounded border-white/20 bg-white/5 text-primary-500 focus:ring-primary-500/50 focus:ring-offset-0"
+                                class="h-4 w-4 rounded"
                             />
-                            <span class="text-sm text-gray-400">{{ $t('Remember me') }}</span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">{{ $t('Remember me') }}</span>
                         </label>
-                        <Link :href="route('admin.password.request')" class="text-sm font-medium text-primary-400 transition-colors hover:text-primary-300">
+                        <Link :href="route('admin.password.request')" class="text-sm font-medium text-primary-600 transition-colors hover:text-primary-700 dark:text-primary-300 dark:hover:text-primary-200">
                             {{ $t('Forgot password?') }}
                         </Link>
                     </div>
 
-                    <!-- Submit -->
+                    <AuthCaptchaField
+                        v-if="captcha.enabled"
+                        v-model="form.captcha_token"
+                        :config="captcha"
+                        :error="form.errors.captcha_token"
+                    />
+
                     <button
                         type="submit"
                         :disabled="form.processing"
-                        class="w-full py-3 bg-gradient-to-r from-primary-600 to-accent-600 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-primary-600/25 hover:shadow-xl hover:shadow-primary-500/30 hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 flex items-center justify-center gap-2"
+                        class="auth-primary-button flex items-center justify-center gap-2"
                     >
                         <svg v-if="form.processing" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -124,16 +140,9 @@ const submit = () => {
                 </form>
             </div>
 
-            <!-- Footer -->
-            <p class="text-center mt-6 text-xs text-gray-600">
+            <p class="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
                 &copy; 2026 {{ $page.props.appName }}. {{ $t('Admin access only.') }}
             </p>
         </div>
     </div>
 </template>
-
-<style scoped>
-.font-heading {
-    font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
-</style>

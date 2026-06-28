@@ -151,7 +151,7 @@ class TicketController extends Controller
 
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer', 'exists:support_tickets,id'],
+            'ids.*' => ['integer', 'exists:mysql.support_tickets,id'],
             'action' => ['required', 'string', Rule::in(['assign', 'status', 'priority', 'delete'])],
             'assigned_to' => ['required_if:action,assign', 'nullable', 'integer', 'exists:admins,id'],
             'status' => ['required_if:action,status', 'string', Rule::in(['open', 'in_progress', 'waiting_user', 'resolved', 'closed'])],
@@ -177,7 +177,7 @@ class TicketController extends Controller
         $this->authorizeSupport();
 
         $validated = $request->validate([
-            'target_ticket_number' => ['required', 'string', 'exists:support_tickets,ticket_number'],
+            'target_ticket_number' => ['required', 'string', 'exists:mysql.support_tickets,ticket_number'],
         ]);
 
         abort_if($ticket->ticket_number === $validated['target_ticket_number'], 422, translate('Cannot merge a ticket into itself.'));

@@ -1,21 +1,36 @@
 <script setup lang="ts">
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useFlashToasts } from '@/Composables/useToastr'
+import { useTheme } from '@/Composables/useTheme'
+import { useTranslate } from '@/Composables/useTranslate'
 
 useFlashToasts()
 
 interface PageProps {
     twoFactorMethod?: string
     userOtpExpiresAt?: string | null
+    branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
+    captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
 }
 
 const page = usePage()
 const props = page.props as unknown as PageProps
+const { isDark } = useTheme()
+const { t } = useTranslate()
+
 const isOtp = computed(() => props.twoFactorMethod === 'otp')
+const branding = computed(() => props.branding)
+const appName = computed(() => String(branding.value?.site_name || t('Application')))
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
+const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => props.captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
 
 const form = useForm({
     code: '',
+    captcha_token: '',
 })
 
 const submit = () => {
@@ -28,29 +43,29 @@ const submit = () => {
 <template>
     <Head :title="$t('Two-Factor Verification')" />
 
-    <div class="auth-page">
-        <div class="auth-glow">
-            <div class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/20 to-white"></div>
-            <div class="absolute top-1/4 left-1/3 w-80 h-80 bg-primary-100/40 rounded-full blur-3xl"></div>
-        </div>
-
-        <div class="w-full max-w-md relative z-10">
-            <div class="text-center mb-8">
-                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-500/10">
-                    <i v-if="isOtp" class="ti ti-mail text-3xl text-primary-600"></i>
-                    <i v-else class="ti ti-shield-lock text-3xl text-primary-600"></i>
+    <div class="auth-page p-4 lg:p-8">
+        <div class="mx-auto max-w-md">
+            <div class="auth-card mx-auto rounded-2xl border border-gray-200 bg-white px-6 py-7 shadow-none dark:border-white/10 dark:bg-surface-950 sm:px-7">
+                <div class="auth-brand-block mb-8">
+                    <Link :href="route('home')" class="mb-8 inline-flex items-center justify-center text-gray-950 no-underline dark:text-white">
+                        <img v-if="authLogo" :src="authLogo" :alt="appName" class="h-11 w-auto max-w-[180px] object-contain">
+                        <span v-else class="font-heading text-[1.75rem] font-bold">{{ appName }}</span>
+                    </Link>
+                    <h1 class="mt-2 font-heading text-[2rem] font-bold tracking-tight text-gray-950 dark:text-white">
+                        {{ $t('2FA Verification') }}
+                    </h1>
+                    <p class="mt-2 max-w-sm text-sm leading-6 text-gray-500 dark:text-gray-400">
+                        <template v-if="isOtp">
+                            {{ $t('Enter the 6-digit verification code sent to your email address to finish signing in.') }}
+                        </template>
+                        <template v-else>
+                            {{ $t('Enter the current code from your authenticator app or use one of your recovery codes.') }}
+                        </template>
+                    </p>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ $t('Two-Factor Verification') }}</h1>
-                <p v-if="isOtp" class="text-gray-500 mt-2 text-sm">{{ $t('Enter the 6-digit verification code sent to your email.') }}</p>
-                <p v-else class="text-gray-500 mt-2 text-sm">{{ $t('Enter your authenticator app code or a recovery code.') }}</p>
-            </div>
 
-            <div class="auth-card">
                 <form class="space-y-5" @submit.prevent="submit">
-                    <div>
-                        <label for="code" class="auth-label">
-                            {{ isOtp ? $t('Verification code') : $t('Authenticator or recovery code') }}
-                        </label>
+                    <div class="auth-floating-group">
                         <input
                             id="code"
                             v-model="form.code"
@@ -59,23 +74,37 @@ const submit = () => {
                             autofocus
                             :inputmode="isOtp ? 'numeric' : 'text'"
                             autocomplete="one-time-code"
-                            class="auth-input text-center text-lg font-bold tracking-widest"
-                            :placeholder="isOtp ? $t('000000') : $t('123456 or ABCDE-FGHIJ')"
+                            placeholder=" "
+                            :class="['auth-floating-input text-center font-semibold tracking-[0.28em]', { 'is-invalid': Boolean(form.errors.code) }]"
                             :maxlength="isOtp ? 6 : 32"
-                        />
-                        <p v-if="form.errors.code" class="auth-error">{{ form.errors.code }}</p>
+                        >
+                        <label for="code" class="auth-floating-label">
+                            {{ isOtp ? $t('Verification Code') : $t('Authenticator or Recovery Code') }}
+                        </label>
                     </div>
+                    <p v-if="form.errors.code" class="auth-error">{{ form.errors.code }}</p>
 
-                    <button type="submit" :disabled="form.processing || form.code.length < 6" class="auth-btn">
-                        <span>{{ form.processing ? $t('Verifying...') : $t('Verify Code') }}</span>
+                    <AuthCaptchaField
+                        v-if="captcha.enabled"
+                        v-model="form.captcha_token"
+                        :config="captcha"
+                        :error="form.errors.captcha_token"
+                    />
+
+                    <button type="submit" :disabled="form.processing || form.code.length < 6" class="auth-primary-button">
+                        <span v-if="!form.processing">{{ $t('Verify Code') }}</span>
+                        <span v-else class="inline-flex items-center gap-2">
+                            <i class="ti ti-loader-2 animate-spin text-lg"></i>
+                            {{ $t('Verifying...') }}
+                        </span>
                     </button>
 
-                    <p v-if="isOtp" class="text-center text-sm text-gray-500">
-                        {{ $t('Didn\'t receive the code? Check your spam folder.') }}
+                    <p v-if="isOtp" class="text-center text-sm text-gray-500 dark:text-gray-400">
+                        {{ $t("Didn't receive the code? Check your spam folder and try again.") }}
                     </p>
 
-                    <p class="text-center text-sm text-gray-500">
-                        <Link :href="route('login')" class="text-primary-600 hover:text-primary-700 font-semibold">
+                    <p class="text-center text-sm text-gray-500 dark:text-gray-400">
+                        <Link :href="route('login')" class="auth-inline-link">
                             {{ $t('Back to login') }}
                         </Link>
                     </p>

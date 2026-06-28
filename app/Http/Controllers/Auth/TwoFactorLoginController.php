@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginTwoFactorRequest;
 use App\Models\User;
+use App\Services\CaptchaService;
 use App\Services\NotificationEventService;
 use App\Services\Security\TotpService;
 use Illuminate\Http\Request;
@@ -49,6 +50,8 @@ class TwoFactorLoginController extends Controller
 
     public function verify(LoginTwoFactorRequest $request, TotpService $totp)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $userId = $request->session()->get('user_2fa_id');
         $method = $request->session()->get('user_2fa_method', 'totp');
 

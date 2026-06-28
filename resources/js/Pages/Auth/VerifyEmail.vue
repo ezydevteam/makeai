@@ -1,29 +1,60 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3'
-import { ref, onMounted } from 'vue'
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import { computed, onMounted, ref } from 'vue'
+import { useTranslate } from '@/Composables/useTranslate'
 import { useFlashToasts } from '@/Composables/useToastr'
+import { useTheme } from '@/Composables/useTheme'
 
 useFlashToasts()
 
-const form = useForm({ code: '' })
+interface PageProps {
+    branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
+    captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
+}
+
+const { t } = useTranslate()
+const { isDark } = useTheme()
+const page = usePage()
+const props = page.props as unknown as PageProps
+
+const branding = computed(() => props.branding)
+const appName = computed(() => String(branding.value?.site_name || t('Application')))
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
+const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => props.captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
+
+const form = useForm({ code: '', captcha_token: '' })
 const digits = ref(['', '', '', '', '', ''])
 const inputs = ref<HTMLInputElement[]>([])
 
 const handleInput = (index: number, event: Event) => {
-    const val = (event.target as HTMLInputElement).value.replace(/\D/g, '')
-    if (val.length > 1) {
-        val.split('').slice(0, 6).forEach((c, i) => { if (i < 6) digits.value[i] = c })
+    const value = (event.target as HTMLInputElement).value.replace(/\D/g, '')
+
+    if (value.length > 1) {
+        value.split('').slice(0, 6).forEach((char, i) => {
+            if (i < 6) {
+                digits.value[i] = char
+            }
+        })
         form.code = digits.value.join('')
-        inputs.value[Math.min(val.length - 1, 5)]?.focus()
+        inputs.value[Math.min(value.length - 1, 5)]?.focus()
         return
     }
-    digits.value[index] = val
+
+    digits.value[index] = value
     form.code = digits.value.join('')
-    if (val && index < 5) inputs.value[index + 1]?.focus()
+
+    if (value && index < 5) {
+        inputs.value[index + 1]?.focus()
+    }
 }
 
-const handleKeydown = (index: number, e: KeyboardEvent) => {
-    if (e.key === 'Backspace' && !digits.value[index] && index > 0) inputs.value[index - 1]?.focus()
+const handleKeydown = (index: number, event: KeyboardEvent) => {
+    if (event.key === 'Backspace' && !digits.value[index] && index > 0) {
+        inputs.value[index - 1]?.focus()
+    }
 }
 
 const submit = () => form.post(route('verification.verify'))
@@ -33,34 +64,63 @@ onMounted(() => inputs.value[0]?.focus())
 </script>
 
 <template>
-    <Head title="Verify Email" />
-    <div class="auth-page">
-        <div class="auth-glow">
-            <div class="absolute inset-0 bg-gradient-to-br from-surface-950 via-primary-950/20 to-surface-950"></div>
-        </div>
-        <div class="w-full max-w-md relative z-10">
-            <div class="text-center mb-8">
-                <div class="w-16 h-16 mx-auto mb-4 bg-primary-500/10 rounded-2xl flex items-center justify-center">
-                    <svg class="w-8 h-8 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+    <Head :title="t('Verify Email')" />
+
+    <div class="auth-page p-4 lg:p-8">
+        <div class="mx-auto max-w-md">
+            <div class="auth-card mx-auto rounded-2xl border border-gray-200 bg-white px-6 py-7 shadow-none dark:border-white/10 dark:bg-surface-950 sm:px-7">
+                <div class="auth-brand-block mb-8">
+                    <Link :href="route('home')" class="mb-8 inline-flex items-center justify-center text-gray-950 no-underline dark:text-white">
+                        <img v-if="authLogo" :src="authLogo" :alt="appName" class="h-11 w-auto max-w-[180px] object-contain">
+                        <span v-else class="font-heading text-[1.75rem] font-bold">{{ appName }}</span>
+                    </Link>
+
+                    <h1 class="font-heading text-[2rem] font-bold tracking-tight text-gray-950 dark:text-white">
+                        {{ t('Verify your email') }}
+                    </h1>
+                    <p class="mt-2 max-w-sm text-sm leading-6 text-gray-500 dark:text-gray-400">
+                        {{ t('A 6-digit verification code has been sent to your email.') }}
+                    </p>
                 </div>
-                <h1 class="text-2xl font-bold text-white">Verify your email</h1>
-                <p class="text-gray-500 mt-2 text-sm">Enter the 6-digit code we sent to your email</p>
-            </div>
 
-            <div class="auth-card">
-                <form @submit.prevent="submit" class="space-y-6">
-                    <div class="flex justify-center gap-3">
-                        <input v-for="(_, i) in 6" :key="i" :ref="(el) => { if (el) inputs[i] = el as HTMLInputElement }" :value="digits[i]" @input="handleInput(i, $event)" @keydown="handleKeydown(i, $event)" type="text" inputmode="numeric" maxlength="6" class="w-12 h-14 text-center text-xl font-bold bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all" />
+                <form @submit.prevent="submit" class="space-y-5">
+                    <div class="flex justify-center gap-2.5">
+                        <input
+                            v-for="(_, i) in 6"
+                            :key="i"
+                            :ref="(el) => { if (el) inputs[i] = el as HTMLInputElement }"
+                            :value="digits[i]"
+                            type="text"
+                            inputmode="numeric"
+                            maxlength="6"
+                            class="h-12 w-11 rounded-2xl border border-gray-200 bg-white text-center text-lg font-bold text-gray-900 transition-all duration-200 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-white/10 dark:bg-white/[0.03] dark:text-white"
+                            @input="handleInput(i, $event)"
+                            @keydown="handleKeydown(i, $event)"
+                        />
                     </div>
-                    <p v-if="form.errors.code" class="text-center text-sm text-danger-500">{{ form.errors.code }}</p>
+                    <p v-if="form.errors.code" class="mt-2 text-center text-sm text-danger-500">{{ form.errors.code }}</p>
 
-                    <button type="submit" :disabled="form.processing || form.code.length !== 6" class="auth-btn">
-                        <span>Verify Email</span>
+                    <AuthCaptchaField
+                        v-if="captcha.enabled"
+                        v-model="form.captcha_token"
+                        :config="captcha"
+                        :error="form.errors.captcha_token"
+                    />
+
+                    <button type="submit" :disabled="form.processing || form.code.length !== 6" class="auth-primary-button auth-primary-button--reverse">
+                        <span v-if="!form.processing">{{ $t('Verify Email') }}</span>
+                        <span v-else class="inline-flex items-center gap-2">
+                            <i class="ti ti-loader-2 animate-spin text-lg"></i>
+                            {{ $t('Verifying...') }}
+                        </span>
                     </button>
 
-                    <button type="button" @click="resend" class="w-full text-center text-sm text-gray-500 hover:text-primary-400 transition-colors">
-                        Didn't receive the code? Resend
-                    </button>
+                    <div class="flex items-center justify-center gap-2">
+                        <p class="text-sm text-gray-500 dark:text-gray-300">{{ t("Didn't receive the code?") }}</p>
+                        <button type="button" @click="resend" :disabled="form.processing" class="auth-inline-link text-sm">
+                            {{ t("Resend") }}
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>

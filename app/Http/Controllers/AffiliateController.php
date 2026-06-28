@@ -38,7 +38,6 @@ class AffiliateController extends Controller
             : null;
         $totalReferrals = AffiliateReferral::where('referrer_id', $user->id)->whereNotNull('referred_id')->count();
         $conversions = AffiliateCommission::where('referrer_id', $user->id)->distinct('referred_id')->count('referred_id');
-        $totalClicks = AffiliateReferral::where('referrer_id', $user->id)->count();
 
         return Inertia::render('Affiliate/Dashboard', [
             'program' => [
@@ -54,13 +53,12 @@ class AffiliateController extends Controller
                     'url' => route('page.show', $termsPage->slug),
                 ] : null,
             ],
+            'availableBalance' => $availableBalance,
             'stats' => [
-                'total_earnings' => (float) AffiliateCommission::where('referrer_id', $user->id)->whereIn('status', ['approved', 'paid'])->sum('amount'),
-                'pending_earnings' => (float) AffiliateCommission::where('referrer_id', $user->id)->where('status', 'pending')->sum('amount'),
-                'available_balance' => $availableBalance,
+                'total_earnings' => format_currency((float) AffiliateCommission::where('referrer_id', $user->id)->whereIn('status', ['approved', 'paid'])->sum('amount')),
+                'pending_earnings' => format_currency((float) AffiliateCommission::where('referrer_id', $user->id)->where('status', 'pending')->sum('amount')),
                 'total_referrals' => $totalReferrals,
                 'successful_conversions' => $conversions,
-                'conversion_rate' => $totalClicks > 0 ? round(($conversions / $totalClicks) * 100, 2) : 0,
             ],
             'referral' => [
                 'code' => $user->referral_code,
@@ -84,20 +82,39 @@ class AffiliateController extends Controller
                     'email' => $referral->referred ? $this->maskEmail($referral->referred->email) : translate('Pending'),
                     'joined_at' => $referral->converted_at?->toDateString(),
                     'status' => $referral->referred_id ? 'registered' : 'clicked',
-                    'commission' => (float) AffiliateCommission::where('referrer_id', $user->id)
+                    'commission' => format_currency((float) AffiliateCommission::where('referrer_id', $user->id)
                         ->where('referred_id', $referral->referred_id)
-                        ->sum('amount'),
+                        ->sum('amount')),
                 ]),
-            'commissions' => AffiliateCommission::query()
+            'commissions' => tap(AffiliateCommission::query()
                 ->with('payment:id,ulid,amount,currency')
                 ->where('referrer_id', $user->id)
                 ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
                 ->latest()
-                ->paginate(10),
-            'payouts' => AffiliatePayout::query()
+                ->paginate(10), function ($paginator) {
+                    $paginator->getCollection()->transform(fn (AffiliateCommission $commission) => [
+                        'id' => $commission->id,
+                        'amount' => format_currency((float) $commission->amount),
+                        'status' => $commission->status,
+                        'created_at' => $commission->created_at?->toIso8601String(),
+                        'payment' => $commission->payment ? [
+                            'amount' => format_currency((float) $commission->payment->amount, $commission->payment->currency),
+                            'currency' => $commission->payment->currency,
+                        ] : null,
+                    ]);
+                }),
+            'payouts' => tap(AffiliatePayout::query()
                 ->where('user_id', $user->id)
                 ->latest()
-                ->paginate(10),
+                ->paginate(10), function ($paginator) {
+                    $paginator->getCollection()->transform(fn (AffiliatePayout $payout) => [
+                        'id' => $payout->id,
+                        'amount' => format_currency((float) $payout->amount),
+                        'method' => $payout->method,
+                        'status' => $payout->status,
+                        'created_at' => $payout->created_at?->toIso8601String(),
+                    ]);
+                }),
         ]);
     }
 

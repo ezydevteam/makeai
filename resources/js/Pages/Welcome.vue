@@ -6,7 +6,7 @@ import { sectionComponentMap } from '@/Components/Home'
 import { useTranslate } from '@/Composables/useTranslate'
 
 type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
-type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'integrations' | 'custom_html' | 'all_tools' | 'richtext' | 'image_carousel' | 'ad_slot' | 'announcement'
+type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'custom_html' | 'all_tools' | 'richtext' | 'image_carousel' | 'ad_slot' | 'ad_slot_2' | 'ad_slot_3' | 'announcement'
 
 interface Testimonial { id: number; name: string; role: string | null; company: string | null; avatar: string | null; content: string; rating: number; is_featured: boolean; source: string }
 interface Faq { id: number; question: string; answer: string; category_id: number | null; sort_order: number; category?: { id: number; name: string; sort_order: number } | null }
@@ -52,19 +52,29 @@ const pricingSettings = computed<PricingSettings>(() => ({
 
 const defaultHomepage: HomepageConfig = {
     sections: [
-        { id: 'hero', type: 'hero', enabled: true, core: true, config: { layout: 'center', headline: t('One Platform. Every AI Tool.'), subheadline: t('Unleash your creativity with the world\'s most powerful AI models.', { app: appName.value }), primary_cta_text: t('Get Started for Free'), primary_cta_link: '/register', primary_cta_style: 'primary_filled', secondary_cta_text: t('View Pricing'), secondary_cta_link: '/pricing', secondary_cta_style: 'outline', hero_background_type: 'image', show_hero_gradient_overlay: true, show_stats_separator: true, hero_vertical_padding: 48, hero_heading_size: 'lg', hero_heading_color: 'dark', hero_subheading_color: 'light', stats_number_color: 'dark', stats_label_color: 'light', trust_badge_text: t('Trusted by 50,000+ creators'), stats: [{ number: '50K+', label: t('Users Trusted') }, { number: '10M+', label: t('Assets Generated') }, { number: '99.9%', label: t('Uptime SLA') }, { number: '24/7', label: t('Expert Support') }] } },
+        { id: 'hero', type: 'hero', enabled: true, core: true, config: { layout: 'center', headline: t('One Platform. Every AI Tool.'), subheadline: t('Unleash your creativity with the world\'s most powerful AI models.', { app: appName.value }), primary_cta_text: t('Get Started for Free'), primary_cta_link: '/register', primary_cta_style: 'primary_filled', secondary_cta_text: t('View Pricing'), secondary_cta_link: '/pricing', secondary_cta_style: 'outline', hero_background_type: 'image', show_hero_gradient_overlay: true, show_stats_separator: true, hero_vertical_padding: 48, hero_heading_size: 'lg', hero_heading_color: 'dark', hero_subheading_color: 'light', stats_number_color: 'dark', stats_label_color: 'light', trust_badge_text: t('Trusted by 50,000+ creators'), display_categories: [], display_tool_slugs: [], stats: [{ number: '50K+', label: t('Users Trusted') }, { number: '10M+', label: t('Assets Generated') }, { number: '99.9%', label: t('Uptime SLA') }, { number: '24/7', label: t('Expert Support') }] } },
         { id: 'features', type: 'features', enabled: true, core: true, config: { title: t('Supercharge your workflow'), subtitle: t('Everything you need to build the future, powered by AI.'), layout: '3-column', card_style: 'bordered', heading_color: 'dark', subheading_color: 'light', learn_more_text: t('Learn more'), items: [{ icon: 'ti ti-pencil', title: t('AI Writer'), description: t('Generate blogs, ads, and emails in seconds.') }, { icon: 'ti ti-photo', title: t('AI Images'), description: t('Turn text into masterpiece images.') }, { icon: 'ti ti-message-2', title: t('AI Chat'), description: t('Smart assistants for research or support.') }, { icon: 'ti ti-code', title: t('AI Code'), description: t('Code faster with AI companionship.') }] } },
         { id: 'tools_showcase', type: 'tools_showcase', enabled: true, core: true, config: { title: t('AI Tools Showcase'), subtitle: t('Explore the tools buyers can launch immediately after signup.'), layout: '3-column', card_style: 'bordered', source: 'all', max_items: 6, heading_color: 'white', subheading_color: 'white', primary_text: t('View all tools'), primary_link: '/ai-tools', primary_style: 'primary_filled', background_style: 'gradient-1', width: 'contained' } },
         { id: 'how_it_works', type: 'how_it_works', enabled: true, core: true, config: { heading: t('How It Works'), subheading: t('Help buyers explain the product flow in three simple steps.'), icon: 'ti ti-route', step_card_style: 'bordered', items: [{ icon: 'ti ti-user-plus', title: t('Create your account'), description: t('Sign up in seconds.') }, { icon: 'ti ti-adjustments-bolt', title: t('Choose the right AI tool'), description: t('Pick from writing, image, chat, and productivity tools.') }, { icon: 'ti ti-sparkles', title: t('Generate and refine results'), description: t('Review the output and keep iterating.') }] } },
         { id: 'pricing', type: 'pricing', enabled: true, core: true, config: { heading: t('Simple Pricing'), subheading: t('Present your plans clearly.'), icon: 'ti ti-credit-card', source: 'all' } },
-        { id: 'cta_banner', type: 'cta_banner', enabled: true, core: true, config: { headline: t('Ready to create with AI?'), subheadline: t('Start with the tools your audience needs most.'), primary_text: t('Get Started for Free'), primary_link: '/register', primary_style: 'primary_filled', secondary_text: t('View Pricing'), secondary_link: '/pricing', secondary_style: 'outline', width: 'contained', background_style: 'gradient-1', access: 'everyone' } },
-        { id: 'testimonials', type: 'testimonials', enabled: true, core: true, config: { heading: t('What Our Users Say'), subheading: t('Show real customer feedback to build trust.'), icon: 'ti ti-message-2-heart', source: 'all', card_style: 'bordered', max_items: 6 } },
+        { id: 'cta_banner', type: 'cta_banner', enabled: true, core: true, config: { headline: t('Ready to create with AI?'), subheadline: t('Start with the tools your audience needs most.'), primary_text: t('Get Started for Free'), primary_link: '/register', primary_style: 'primary_filled', primary_shape: 'rounded_xl', primary_icon: '', primary_access_level: 'all', secondary_text: t('View Pricing'), secondary_link: '/pricing', secondary_style: 'outline', secondary_shape: 'rounded_xl', secondary_icon: '', secondary_access_level: 'all', width: 'contained', background_style: 'gradient-1', access: 'everyone' } },
+        { id: 'testimonials', type: 'testimonials', enabled: true, core: true, config: { heading: t('What Our Users Say'), subheading: t('Show real customer feedback to build trust.'), icon: 'ti ti-message-2-heart', source: 'all', card_style: 'bordered', max_items: 6, slider_columns: '3', hide_controls: '0', autoplay_enabled: '0' } },
         { id: 'faq', type: 'faq', enabled: true, core: true, config: { heading: t('Frequently Asked Questions'), subheading: t('Answer common questions.'), icon: 'ti ti-help-circle', max_items: 8 } },
-        { id: 'stats_bar', type: 'stats_bar', enabled: true, core: true, config: { heading: t('Social Proof'), subheading: t('Show your best numbers.'), icon: 'ti ti-chart-bar', show_stats_separator: true, stats_number_color: 'dark', stats_label_color: 'light', stats: [{ number: '50K+', label: t('Users Trusted') }, { number: '10M+', label: t('Assets Generated') }, { number: '99.9%', label: t('Uptime SLA') }] } },
-        { id: 'latest_posts', type: 'latest_posts', enabled: true, core: true, config: { title: t('Latest from the Blog'), subtitle: t('Keep the homepage fresh.'), icon: 'ti ti-article', source: 'recent', layout: 'grid', card_style: 'bordered', max_items: 3, button_text: t('Visit Blog'), button_link: '/blog', button_style: 'outline' } },
-        { id: 'newsletter', type: 'newsletter', enabled: true, core: true, config: { heading: t('Stay in the Loop'), subheading: t('Collect email subscribers.'), icon: 'ti ti-mail-star', layout: 'inline', placeholder_text: t('Enter your email address'), button_text: t('Subscribe'), button_style: 'primary_filled', privacy_text: t('No spam. Unsubscribe anytime.') } },
+        { id: 'stats_bar', type: 'stats_bar', enabled: true, core: true, config: { heading: t('Social Proof'), subheading: t('Show your best numbers.'), icon: 'ti ti-chart-bar', show_stats_separator: true, show_stats: true, show_brands: false, stats_number_color: 'dark', stats_label_color: 'light', stats: [{ number: '50K+', label: t('Users Trusted') }, { number: '10M+', label: t('Assets Generated') }, { number: '99.9%', label: t('Uptime SLA') }], brands: [] } },
+        { id: 'latest_posts', type: 'latest_posts', enabled: true, core: true, config: { title: t('Latest from the Blog'), subtitle: t('Keep the homepage fresh.'), icon: 'ti ti-article', source: 'recent', layout: 'grid', card_style: 'bordered', max_items: 3, show_button: true, show_description: true, button_text: t('Visit Blog'), button_link: '/blog', button_style: 'outline', button_icon: '' } },
+        { id: 'newsletter', type: 'newsletter', enabled: true, core: true, config: { heading: t('Stay in the Loop'), subheading: t('Collect email subscribers.'), icon: 'ti ti-mail-star', layout: 'inline', placeholder_text: t('Enter your email address'), button_text: t('Subscribe'), button_style: 'primary_filled', background_style: 'white', newsletter_style: 'inline', privacy_text: t('No spam. Unsubscribe anytime.') } },
     ],
     settings: { seo: { meta_title: t(':app — The Ultimate AI Platform', { app: appName.value }), meta_description: t('Create content, images, chat responses, and code with one powerful AI platform.'), og_image: '' }, scroll_to_top: { enabled: true, position: 'right', show_after_px: 500 }, chat_widget_embed: '' },
+}
+
+const isEnabled = (val: unknown, fallback = true): boolean => {
+    if (val === undefined || val === null || val === '') return fallback
+    if (typeof val === 'boolean') return val
+    if (typeof val === 'number') return val !== 0
+    const str = String(val).trim().toLowerCase()
+    if (['0', 'false', 'no', 'off'].includes(str)) return false
+    if (['1', 'true', 'yes', 'on'].includes(str)) return true
+    return fallback
 }
 
 const buildSimpleHomepageConfig = (): HomepageConfig => {
@@ -76,13 +86,23 @@ const buildSimpleHomepageConfig = (): HomepageConfig => {
     if (heroSection) heroSection.config.layout = String(simpleSettings.hero_variant || 'centered-gradient')
     const ordered: HomepageSection[] = []
     const push = (type: SectionType, enabled = true) => { const s = sectionMap.get(type); if (s) { s.enabled = enabled; ordered.push(s) } }
-    push('hero', simpleSettings.show_hero !== false); push('features', simpleSettings.show_features !== false); push('tools_showcase', simpleSettings.show_tools !== false)
-    push('how_it_works', simpleSettings.show_steps !== false); push('pricing', simpleSettings.show_pricing === true)
-    push('testimonials', simpleSettings.show_testimonials !== false); push('faq', simpleSettings.show_faq !== false)
-    push('stats_bar', simpleSettings.show_social_proof !== false); push('cta_banner', simpleSettings.show_cta !== false)
-    push('latest_posts', simpleSettings.show_blog !== false); push('newsletter', simpleSettings.show_newsletter !== false)
-    push('custom_html', simpleSettings.show_custom_html === true); push('richtext', simpleSettings.show_richtext === true)
-    push('ad_slot', simpleSettings.show_ad_slot === true)
+    push('hero', isEnabled(simpleSettings.show_hero, true))
+    push('features', isEnabled(simpleSettings.show_features, true))
+    push('tools_showcase', isEnabled(simpleSettings.show_tools, true))
+    push('how_it_works', isEnabled(simpleSettings.show_steps, true))
+    push('pricing', isEnabled(simpleSettings.show_pricing, false))
+    push('testimonials', isEnabled(simpleSettings.show_testimonials, true))
+    push('faq', isEnabled(simpleSettings.show_faq, true))
+    push('stats_bar', isEnabled(simpleSettings.show_social_proof, true))
+    push('cta_banner', isEnabled(simpleSettings.show_cta, true))
+    push('latest_posts', isEnabled(simpleSettings.show_blog, true))
+    push('newsletter', isEnabled(simpleSettings.show_newsletter, true))
+    push('custom_html', isEnabled(simpleSettings.show_custom_html, false))
+    push('richtext', isEnabled(simpleSettings.show_richtext, false))
+    push('image_carousel', isEnabled(simpleSettings.show_image_carousel, false))
+    push('ad_slot', isEnabled(simpleSettings.show_ad_slot, false))
+    push('ad_slot_2', isEnabled(simpleSettings.show_ad_slot_2, false))
+    push('ad_slot_3', isEnabled(simpleSettings.show_ad_slot_3, false))
     const sorted = ordered.filter((s) => s.enabled).sort((a, b) => {
         const ao = Number((a.config as Record<string, unknown>).sort_order ?? 0)
         const bo = Number((b.config as Record<string, unknown>).sort_order ?? 0)
@@ -96,12 +116,23 @@ const buildSimpleHomepageConfig = (): HomepageConfig => {
 }
 
 const homepageConfig = computed<HomepageConfig>(() => props.homepage ?? buildSimpleHomepageConfig())
-const enabledSections = computed(() => homepageConfig.value.sections.filter((s) => s.enabled))
+const enabledSections = computed(() => homepageConfig.value.sections.filter((s) => isEnabled(s.enabled, true)))
 const showScrollButton = ref(false)
+interface SimpleHeaderSettings {
+    mobile_bottom?: {
+        enabled?: boolean
+    }
+}
+
 const themeShowBackToTop = computed(() => {
     const settings = (page.props.appearanceThemeSettings as Record<string, string>) || {}
     const val = settings.show_back_to_top
     return val === undefined || val === '' || val === 'true' || val === '1'
+})
+
+const isMobileBottomHeaderEnabled = computed(() => {
+    const headerSettings = (page.props.frontendHeaderSettings as SimpleHeaderSettings | undefined) ?? {}
+    return headerSettings.mobile_bottom?.enabled === true
 })
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -127,7 +158,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             :faqs="section.type === 'faq' ? faqs : undefined"
             :pricing-plans="section.type === 'pricing' ? pricingPlans : undefined"
             :pricing-settings="section.type === 'pricing' ? pricingSettings : undefined"
-            :all-tools="(section.type === 'tools_showcase' || section.type === 'all_tools') ? (allTools || []) : undefined"
+            :all-tools="(section.type === 'hero' || section.type === 'tools_showcase' || section.type === 'all_tools') ? (allTools || []) : undefined"
             :all-tool-categories="section.type === 'all_tools' ? (allToolCategories || []) : undefined"
             :recent-posts="section.type === 'latest_posts' ? (recentBlogPosts || []) : undefined"
             :announcements="section.type === 'announcement' ? allAnnouncements : undefined"
@@ -137,8 +168,11 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
             v-if="showScrollButton && themeShowBackToTop"
             @click="scrollToTop"
             type="button"
-            :class="homepageConfig.settings.scroll_to_top.position === 'left' ? 'left-6' : 'right-6'"
-            class="fixed bottom-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-white shadow-xl shadow-primary-600/30 transition-colors"
+            :class="[
+                homepageConfig.settings.scroll_to_top.position === 'left' ? 'left-6' : 'right-6',
+                isMobileBottomHeaderEnabled ? 'mobile-bottom-nav-shift md:bottom-6' : 'bottom-6'
+            ]"
+            class="fixed z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary-500 text-white shadow-xl shadow-primary-600/30 transition-colors"
             :aria-label="t('Scroll to top')"
         >
             <i class="ti ti-arrow-up text-lg"></i>
@@ -147,3 +181,11 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
         <div v-if="homepageConfig.settings.chat_widget_embed" v-html="homepageConfig.settings.chat_widget_embed"></div>
     </Layout>
 </template>
+
+<style scoped>
+@media (max-width: 767px) {
+    .mobile-bottom-nav-shift {
+        bottom: calc(var(--mobile-bottom-height, 60px) + 24px) !important;
+    }
+}
+</style>

@@ -25,7 +25,7 @@ const editInputRef = ref<HTMLInputElement | HTMLInputElement[] | null>(null)
 
 function startEdit(s: Session) {
     editingSessionId.value = s.id
-    editTitle.value = s.title || s.source_meta?.filename || s.source_meta?.url || ''
+    editTitle.value = String(s.title || s.source_meta?.filename || s.source_meta?.url || '')
     nextTick(() => {
         const el = Array.isArray(editInputRef.value) ? editInputRef.value[0] : editInputRef.value
         el?.focus()

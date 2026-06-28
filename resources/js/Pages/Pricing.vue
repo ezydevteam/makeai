@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import Layout from '@/Layouts/AppLayout.vue'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -29,7 +29,7 @@ interface Plan {
     description: string
     bottom_info_text: string | null
     credits: number | string
-    features: string[]
+    features: string[] | string
     is_featured: boolean
     is_free: boolean
     yearly_savings: number
@@ -158,7 +158,7 @@ const planFeatures = (plan: Plan) => {
     const features = Array.isArray(plan.features)
         ? [...plan.features]
         : typeof plan.features === 'string'
-            ? plan.features.split(/[\r\n,]+/).map((feature) => feature.trim()).filter(Boolean)
+            ? plan.features.split(/[\r\n,]+/).map((feature: string) => feature.trim()).filter(Boolean)
             : []
 
     if (Number(plan.credits) > 0) {
@@ -180,17 +180,45 @@ const planActionUrl = (plan: Plan) => {
 
 const planCardClass = (plan: Plan) => [
     plan.is_featured
-        ? 'border-primary-200 bg-white shadow-2xl shadow-primary-500/10 ring-1 ring-primary-100'
-        : 'border-gray-100 bg-white hover:border-gray-200',
-    'relative flex flex-col rounded-3xl border p-8 transition-all duration-300 hover:-translate-y-1',
+        ? 'border-primary-300 bg-gradient-to-b from-primary-500/10 via-white to-white shadow-2xl shadow-primary-500/10 ring-1 ring-primary-100 dark:border-primary-500/40 dark:from-primary-500/10 dark:via-surface-900 dark:to-surface-900 dark:ring-primary-500/20'
+        : 'border-gray-100 bg-gradient-to-b from-primary-500/5 via-white to-white hover:border-primary-400 dark:border-surface-800 dark:from-primary-500/5 dark:via-surface-900 dark:to-surface-900 dark:hover:border-primary-500/30',
+    'relative flex flex-col rounded-[2rem] border p-8 transition-all duration-300 hover:-translate-y-1',
 ]
 
 const planButtonClass = (plan: Plan) => [
     'inline-flex w-full items-center justify-center rounded-2xl px-5 py-3.5 text-sm font-black leading-none transition-all duration-200 ease-out hover:-translate-y-0.5',
     plan.is_featured
-        ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-xl shadow-primary-600/20 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-600/25'
-        : 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+        ? 'bg-gradient-to-r from-primary-600 to-primary-500 !text-white shadow-xl shadow-primary-600/20 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-600/25'
+        : 'border border-gray-200 bg-white text-gray-800 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-400 dark:hover:text-primary-400 dark:hover:bg-primary-500/10',
 ]
+
+const tabRefs = ref<Record<number, HTMLElement>>({})
+const activeTabWidth = ref(0)
+const activeTabOffset = ref(0)
+
+const activeIndex = computed(() => billingCycles.value.indexOf(billing.value))
+
+const updatePill = () => {
+    const activeIdx = activeIndex.value
+    const el = tabRefs.value[activeIdx]
+    if (el) {
+        activeTabWidth.value = el.offsetWidth
+        activeTabOffset.value = el.offsetLeft
+    }
+}
+
+watch(activeIndex, () => {
+    setTimeout(updatePill, 0)
+}, { flush: 'post' })
+
+onMounted(() => {
+    setTimeout(updatePill, 100)
+})
+
+const slidingPillStyle = computed(() => ({
+    width: `${activeTabWidth.value}px`,
+    transform: `translateX(${activeTabOffset.value - 4}px)`,
+}))
 </script>
 
 <template>
@@ -199,25 +227,35 @@ const planButtonClass = (plan: Plan) => [
     <Layout>
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16">
             <div class="text-center mb-16">
-                <h1 class="text-4xl sm:text-5xl font-black text-gray-900 mb-4 tracking-tight">
+                <h1 class="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">
                     {{ t('Simple, transparent') }} <span class="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">{{ t('pricing') }}</span>
                 </h1>
-                <p class="text-gray-500 text-lg max-w-2xl mx-auto font-medium">{{ t('Choose the plan that fits your needs. Prices are shown for :country when available.', { country: pricingCountryLabel }) }}</p>
+                <p class="text-gray-500 dark:text-gray-400 text-lg max-w-2xl mx-auto font-medium">{{ t('Choose the plan that fits your needs. Prices are shown for :country when available.', { country: pricingCountryLabel }) }}</p>
 
-                <div v-if="billingCycles.length > 1" class="inline-flex items-center justify-center gap-1 mt-10 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
+                <div v-if="billingCycles.length > 1" class="relative mt-10 inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-surface-700 dark:bg-surface-800">
+                    <!-- Sliding background pill -->
+                    <div
+                        class="absolute top-1 bottom-1 left-1 rounded-full bg-primary-600 transition-all duration-300 ease-out dark:bg-primary-500"
+                        :style="slidingPillStyle"
+                    ></div>
                     <button
-                        v-for="cycle in billingCycles"
+                        v-for="(cycle, idx) in billingCycles"
                         :key="cycle"
+                        :ref="(el) => { if (el) tabRefs[idx] = el as HTMLElement }"
                         type="button"
                         @click="billing = cycle"
-                        :class="billing === cycle ? 'btn-primary shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'"
-                        class="rounded-xl px-5 py-2 text-sm font-bold transition"
+                        :class="[
+                            billing === cycle
+                                ? 'text-white'
+                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white',
+                            'relative z-10 rounded-full px-5 py-2 text-sm font-bold transition-colors duration-200'
+                        ]"
                     >
                         {{ billingLabels[cycle] }}
                     </button>
                 </div>
                 <div v-else class="mt-10 flex justify-center">
-                    <span class="rounded-full border border-primary-200 bg-primary-50 px-5 py-2 text-sm font-bold text-primary-700">
+                    <span class="rounded-full border border-primary-200 bg-primary-50 px-5 py-2 text-sm font-bold text-primary-700 dark:border-primary-900/50 dark:bg-primary-500/10 dark:text-primary-400">
                         {{ activeCycleLabel }}
                     </span>
                 </div>
@@ -229,33 +267,33 @@ const planButtonClass = (plan: Plan) => [
                         {{ settings.pricing_featured_label_text }}
                     </div>
 
-                    <h3 class="text-xl font-black text-gray-900 mb-1">{{ plan.name }}</h3>
-                    <p class="text-sm text-gray-500 font-medium mb-6 leading-relaxed">{{ plan.description }}</p>
+                    <h3 class="text-xl font-black text-gray-900 mb-1 dark:text-white">{{ plan.name }}</h3>
+                    <p class="text-sm text-gray-500 font-medium mb-6 leading-relaxed dark:text-gray-400">{{ plan.description }}</p>
 
                     <div class="mb-6">
                         <div class="flex flex-wrap items-end gap-2">
-                            <span v-if="activeCycle(plan).original_formatted && Number(activeCycle(plan).original_amount) > activeCycle(plan).subtotal_amount" class="mb-1 text-lg font-bold text-gray-400 line-through">
+                            <span v-if="activeCycle(plan).original_formatted && Number(activeCycle(plan).original_amount) > activeCycle(plan).subtotal_amount" class="mb-1 text-lg font-bold text-gray-400 dark:text-gray-500 line-through">
                                 {{ activeCycle(plan).original_formatted }}
                             </span>
-                            <span class="text-4xl font-black text-gray-900 tracking-tight">
+                            <span class="text-4xl font-black text-gray-900 dark:text-white tracking-tight">
                                 {{ displayPrice(plan) }}
                             </span>
-                            <span v-if="priceSuffix(plan)" class="text-sm text-gray-400 font-bold mb-1">{{ priceSuffix(plan) }}</span>
+                            <span v-if="priceSuffix(plan)" class="text-sm text-gray-400 dark:text-gray-500 font-bold mb-1">{{ priceSuffix(plan) }}</span>
                         </div>
-                        <p v-if="activeCycle(plan).is_trial" class="text-xs text-primary-600 font-bold mt-1">
+                        <p v-if="activeCycle(plan).is_trial" class="text-xs text-primary-600 dark:text-primary-400 font-bold mt-1">
                             {{ t(':days days trial, then renews at :price', { days: String(activeCycle(plan).trial_days ?? 0), price: activeCycle(plan).formatted }) }}
                         </p>
-                        <p v-else-if="billing === 'yearly' && savingsText(plan)" class="text-xs font-bold mt-1 text-success-600">{{ savingsText(plan) }}</p>
-                        <p v-else-if="billing === 'lifetime'" class="text-xs font-bold mt-1 text-success-600">{{ t('One-time lifetime access') }}</p>
-                        <p v-if="billing === 'lifetime' && savingsText(plan)" class="text-xs font-bold mt-1 text-success-600">{{ savingsText(plan) }}</p>
-                        <p v-if="activeCycle(plan).vat_percentage > 0" class="text-xs text-gray-500 font-semibold mt-1">
+                        <p v-else-if="billing === 'yearly' && savingsText(plan)" class="text-xs font-bold mt-1 text-success-600 dark:text-success-400">{{ savingsText(plan) }}</p>
+                        <p v-else-if="billing === 'lifetime'" class="text-xs font-bold mt-1 text-success-600 dark:text-success-400">{{ t('One-time lifetime access') }}</p>
+                        <p v-if="billing === 'lifetime' && savingsText(plan)" class="text-xs font-bold mt-1 text-success-600 dark:text-success-400">{{ savingsText(plan) }}</p>
+                        <p v-if="activeCycle(plan).vat_percentage > 0" class="text-xs text-gray-500 dark:text-gray-400 font-semibold mt-1">
                             {{ t('Includes :percentage% VAT (:amount)', { percentage: String(activeCycle(plan).vat_percentage), amount: activeCycle(plan).vat_formatted }) }}
                         </p>
-                        <p v-if="plan.pricing.source === 'country'" class="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-2">{{ t('Country price') }}</p>
+                        <p v-if="plan.pricing.source === 'country'" class="text-[10px] text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest mt-2">{{ t('Country price') }}</p>
                     </div>
 
                     <ul class="space-y-3.5 flex-1 mb-8">
-                            <li v-for="feature in planFeatures(plan)" :key="feature" class="flex items-start gap-3 text-sm text-gray-600 font-medium leading-tight">
+                        <li v-for="feature in planFeatures(plan)" :key="feature" class="flex items-start gap-3 text-sm text-gray-600 dark:text-gray-300 font-medium leading-tight">
                             <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 shadow-sm shadow-primary-500/20">
                                 <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -269,7 +307,7 @@ const planButtonClass = (plan: Plan) => [
                         {{ activeCycle(plan).is_trial ? settings.pricing_trial_button_text : settings.pricing_checkout_button_text }}
                     </Link>
 
-                    <p v-if="plan.bottom_info_text" class="mt-4 text-center text-xs font-semibold text-gray-500">
+                    <p v-if="plan.bottom_info_text" class="mt-4 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
                         {{ plan.bottom_info_text }}
                     </p>
                 </div>
@@ -277,4 +315,3 @@ const planButtonClass = (plan: Plan) => [
         </div>
     </Layout>
 </template>
-ate>

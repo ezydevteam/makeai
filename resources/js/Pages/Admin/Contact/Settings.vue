@@ -9,11 +9,27 @@ defineOptions({ layout: AdminLayout })
 
 declare const route: (name: string, params?: unknown) => string
 
-const props = defineProps<{ settings: Record<string, unknown> }>()
+interface ContactSettings {
+    contact_subject_mode: string
+    contact_success_message: string
+    contact_subject_options: string
+    contact_notification_email: string
+    contact_auto_reply_enabled: boolean
+    contact_auto_reply_subject: string
+    contact_auto_reply_message: string
+}
+
+const props = defineProps<{ settings: ContactSettings }>()
 const { t } = useTranslate()
 
 const form = useForm({
-    ...props.settings,
+    contact_subject_mode: props.settings.contact_subject_mode,
+    contact_success_message: props.settings.contact_success_message,
+    contact_subject_options: props.settings.contact_subject_options,
+    contact_notification_email: props.settings.contact_notification_email,
+    contact_auto_reply_enabled: props.settings.contact_auto_reply_enabled,
+    contact_auto_reply_subject: props.settings.contact_auto_reply_subject,
+    contact_auto_reply_message: props.settings.contact_auto_reply_message,
 })
 
 const subjectModeOptions = computed(() => [

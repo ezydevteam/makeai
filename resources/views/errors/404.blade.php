@@ -2,7 +2,12 @@
     $appName = settings('app_name', 'Application');
     $primaryColor = settings('primary_color', '#6366f1');
     $logoUrl = settings('app_logo_light') ? Storage::url(settings('app_logo_light')) : null;
-    $pageTitle = 'Page Not Found';
+    $isAdminError = request()->is('admin') || request()->is('admin/*');
+    $pageTitle = translate('Page Not Found');
+    $primaryActionUrl = $isAdminError ? route('admin.dashboard') : url('/');
+    $primaryActionLabel = $isAdminError ? translate('Back to Dashboard') : translate('Go to Homepage');
+    $secondaryActionUrl = $isAdminError ? route('admin.login') : url('/ai-tools');
+    $secondaryActionLabel = $isAdminError ? translate('Admin Sign In') : translate('Search Tools');
 @endphp
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -10,7 +15,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
-    <title>{{ $pageTitle }} — {{ $appName }}</title>
+    <title>{{ $pageTitle }} - {{ $appName }}</title>
     <style>
         :root {
             --p: {{ $primaryColor }};
@@ -19,21 +24,47 @@
             --radius: 16px;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            min-height: 100vh; display: grid; place-items: center; padding: 24px;
-            background: linear-gradient(135deg, #f8f7ff, #f0f5ff);
-            color: var(--t2); font-family: Inter, system-ui, sans-serif;
+        body { background: linear-gradient(135deg, #f8f7ff, #f0f5ff); color: var(--t2); font-family: Inter, system-ui, sans-serif; }
+        .page-shell {
+            min-height: 100vh; min-height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            padding: 24px;
         }
         .panel {
             width: min(560px, 100%); border: 1px solid var(--border);
             border-radius: var(--radius); background: var(--card);
             box-shadow: 0 20px 60px color-mix(in srgb, var(--p) 8%, transparent); padding: 40px 36px; text-align: center;
         }
-        .brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 32px; }
-        .logo-img { max-height: 36px; max-width: 160px; object-fit: contain; }
+        .brand { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; margin-bottom: 32px; }
+        .logo-img { display: block; height: 36px; max-width: 160px; object-fit: contain; }
         .logo-fallback { background: var(--p); color: #fff; font-weight: 700; font-size: 16px;
             width: 40px; height: 40px; border-radius: 10px; display: inline-grid; place-items: center; }
-        .code { font-size: 72px; font-weight: 800; color: var(--p); line-height: 1; margin-bottom: 8px; }
+        .code {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.04em;
+            min-height: 88px;
+            font-size: 72px; font-weight: 800; color: var(--p); line-height: 1; margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .code-digit {
+            display: inline-block;
+            opacity: 0;
+            will-change: transform, opacity;
+        }
+        .code-digit-first { animation: code-enter-left 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards; }
+        .code-digit-middle { animation: code-enter-top 0.58s cubic-bezier(0.22, 1, 0.36, 1) 0.24s forwards; }
+        .code-digit-last { animation: code-enter-right 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.12s forwards; }
+        @keyframes code-enter-left {
+            from { opacity: 0; transform: translateX(-42px) rotate(-8deg) scale(0.92); }
+            to { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+        }
+        @keyframes code-enter-right {
+            from { opacity: 0; transform: translateX(42px) rotate(8deg) scale(0.92); }
+            to { opacity: 1; transform: translateX(0) rotate(0) scale(1); }
+        }
+        @keyframes code-enter-top {
+            from { opacity: 0; transform: translateY(-34px) scale(0.78); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
         h1 { font-size: clamp(22px,4vw,28px); font-weight: 700; color: var(--t1); margin-bottom: 12px; }
         p { font-size: 15px; line-height: 1.65; margin-bottom: 28px; }
         .actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
@@ -46,6 +77,7 @@
     </style>
 </head>
 <body>
+<div class="page-shell">
 <main class="panel">
     <div class="brand">
         @if($logoUrl)
@@ -54,13 +86,18 @@
             <div class="logo-fallback">{{ Str::of($appName)->substr(0, 2)->upper() }}</div>
         @endif
     </div>
-    <div class="code">404</div>
+    <div class="code" aria-label="404">
+        <span class="code-digit code-digit-first">4</span>
+        <span class="code-digit code-digit-middle">0</span>
+        <span class="code-digit code-digit-last">4</span>
+    </div>
     <h1>{{ translate('Page not found') }}</h1>
     <p>{{ translate("The page you're looking for doesn't exist or has been moved. Let's get you back on track.") }}</p>
     <div class="actions">
-        <a href="{{ url('/') }}" class="btn btn-primary">🏠 {{ translate('Go to Homepage') }}</a>
-        <a href="{{ url('/ai-tools') }}" class="btn btn-outline">🔍 {{ translate('Search Tools') }}</a>
+        <a href="{{ $primaryActionUrl }}" class="btn btn-primary">🏠 {{ $primaryActionLabel }}</a>
+        <a href="{{ $secondaryActionUrl }}" class="btn btn-outline">🔍 {{ $secondaryActionLabel }}</a>
     </div>
 </main>
+</div>
 </body>
 </html>

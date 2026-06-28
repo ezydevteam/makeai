@@ -30,15 +30,13 @@
 # vue
 - When merging defaults with props/API data via spread (`{ ...defaults, ...data }`), filter out `undefined` values from the data source first using `Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined))`, otherwise `undefined` values in data override the defaults. Confidence: 0.70
 - When updating a `<select>`/`AppSelect` dropdown's values (e.g., changing from `'default'` to `'1280px'`), update the options array in addition to the default value — changing only the default without updating available options leaves stale/deprecated values in the UI. Confidence: 0.70
+- In toggle `@click` handlers for config values that may be `undefined` (not yet saved), use `!(value ?? defaultValue)` instead of `!value` — `!undefined` is `true`, so the first click just initializes to `true` instead of toggling off. Match the same default used in `aria-checked`. Confidence: 0.70
 
 # architecture
 - Addon access should be admin-configurable (all, logged-in, pro users) rather than hard-coded to Pro-only via `isProAvailable()`. Confidence: 0.70
 
 # code-style
-- Use theme primary color variables (e.g., `text-primary-500`, `bg-primary-500`) instead of hardcoded green color shades or hex values. Confidence: 0.75
-- Prefer simple, proven solutions (existing tools, libraries, shell commands) over custom-built implementations that are prone to bugs. Confidence: 0.80
-- When implementing a module or feature, ensure all parts are complete — don't omit sub-features like admin article editors (Tiptap), required UI components, or supporting functionality that the prompt/context clearly implies. Confidence: 0.70
-
+See [code-style/taste.md](code-style/taste.md)
 # browser-compat
 - `crypto.randomUUID()` requires secure context (HTTPS or localhost); use `Math.random().toString(36) + Date.now().toString(36)` as a fallback for non-secure origins. Confidence: 0.70
 
@@ -48,6 +46,9 @@
 
 # admin-sidebar
 - For addons with multiple `admin_menu` items, the sidebar renders a grouped dropdown — the group header uses `addon_name` (from addon.json `name` field), and sub-items use their individual `label` fields. For single-item addons, the `label` is rendered directly as the link text (no group header). When renaming an addon in the sidebar, update both `name` for the group header AND each `label` in `admin_menu` entries — but keep sub-item labels distinct (e.g., "Overview", "Settings") rather than duplicating the addon name. Confidence: 0.70
+
+# admin-hero
+- For the homepage hero variant with category grid + featured tools marquee, make category and featured tool selections admin-configurable via AppSelect multiselect dropdowns (with a DB fallback for featured tools when none are selected), rather than deriving them programmatically from tool data. Show these settings conditionally — only when the relevant hero variant is selected. Confidence: 0.70
 
 # admin-rbac
 - Admin permissions use a pivot table (`admin_role_permissions` with `role_id` + `permission_id`) rather than a JSON column on `admin_roles`. Use `DB::table('admin_role_permissions')->updateOrInsert(...)` to grant permissions, not `json_encode` on a `permissions` column. Confidence: 0.70

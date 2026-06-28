@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AiTool;
+use App\Models\BlogPost;
 use App\Models\Faq;
 use App\Models\Plan;
 use App\Models\Testimonial;
@@ -31,6 +32,7 @@ class HomepageController extends Controller
 
         $allTools = [];
         $allToolCategories = [];
+        $recentPosts = [];
         $pricingPlans = [];
         $pricingCountry = null;
         $pricingSettings = [
@@ -44,16 +46,34 @@ class HomepageController extends Controller
         ];
 
         $shouldLoadAllTools = (bool) ($resolvedHomepageSettings['show_tools'] ?? true);
+        $heroVariant = $resolvedHomepageSettings['hero_variant'] ?? 'centered-gradient';
+
+        // Always load allTools when the hero variant is tools-grid or featured — they need tool data
+        if ($heroVariant === 'tools-grid' || $heroVariant === 'featured') {
+            $shouldLoadAllTools = true;
+        }
         $shouldLoadPricing = (bool) ($resolvedHomepageSettings['show_pricing'] ?? false);
+        $shouldLoadBlog = (bool) ($resolvedHomepageSettings['show_blog'] ?? true);
 
         if ($shouldLoadAllTools) {
+            $userId = auth()->id();
+            $userFavoriteToolIds = $userId
+                ? \App\Models\Favorite::where('user_id', $userId)
+                    ->where('favoriteable_type', \App\Models\AiTool::class)
+                    ->pluck('favoriteable_id')
+                    ->toArray()
+                : [];
+
             $allTools = AiTool::active()
                 ->with('category:id,name')
+                ->withCount('favorites')
                 ->orderBy('name')
-                ->get(['slug', 'name', 'description', 'icon', 'color', 'category_id', 'tags', 'usage_count', 'avg_rating', 'is_featured', 'created_at'])
-                ->map(function (AiTool $tool): array {
+                ->get(['id', 'slug', 'name', 'description', 'icon', 'color', 'category_id', 'tags', 'usage_count', 'avg_rating', 'is_featured', 'created_at'])
+                ->map(function (AiTool $tool) use ($userFavoriteToolIds): array {
                     $data = $tool->toArray();
                     $data['category'] = $tool->category?->name;
+                    $data['is_favorited'] = in_array($tool->id, $userFavoriteToolIds);
+                    $data['favorites_count'] = $tool->favorites_count ?? 0;
 
                     return $data;
                 })
@@ -77,11 +97,30 @@ class HomepageController extends Controller
             )->values()->toArray();
         }
 
+        if ($shouldLoadBlog) {
+            $recentPosts = BlogPost::published()
+                ->with('categories:id,name')
+                ->latest('published_at')
+                ->limit(12)
+                ->get(['id', 'title', 'slug', 'excerpt', 'published_at', 'featured_image', 'is_featured'])
+                ->map(fn (BlogPost $post) => [
+                    'title' => $post->title,
+                    'slug' => $post->slug,
+                    'excerpt' => $post->excerpt,
+                    'published_at' => $post->published_at?->toDateString(),
+                    'image' => $post->featured_image,
+                    'is_featured' => $post->is_featured,
+                    'category' => $post->categories->first()?->name,
+                ])
+                ->toArray();
+        }
+
         return Inertia::render('Welcome', [
             'testimonials' => $testimonials,
             'faqs' => $faqs,
             'allTools' => $allTools,
             'allToolCategories' => $allToolCategories,
+            'recentPosts' => $recentPosts,
             'pricingPlans' => $pricingPlans,
             'pricingCountry' => $pricingCountry,
             'pricingSettings' => $pricingSettings,

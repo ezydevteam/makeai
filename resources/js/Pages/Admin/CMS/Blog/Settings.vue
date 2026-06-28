@@ -57,7 +57,7 @@ interface BlogSettingsForm {
     comments_poll_seconds: number | string
     comments_akismet_key: string
     comments_akismet_configured: boolean
-    [key: string]: unknown
+    [key: string]: string | number | boolean | string[] | null | undefined
 }
 
 const props = defineProps<{
@@ -261,7 +261,7 @@ const submit = () => form
                                     <button
                                         type="button"
                                         role="switch"
-                                        :aria-checked="String(form[setting.key])"
+                                        :aria-checked="Boolean(form[setting.key])"
                                         class="app-switch"
                                         @click="form[setting.key] = !form[setting.key]"
                                     >
@@ -293,7 +293,7 @@ const submit = () => form
                                     <button
                                         type="button"
                                         role="switch"
-                                        :aria-checked="String(form[setting.key])"
+                                        :aria-checked="Boolean(form[setting.key])"
                                         class="app-switch"
                                         @click="form[setting.key] = !form[setting.key]"
                                     >

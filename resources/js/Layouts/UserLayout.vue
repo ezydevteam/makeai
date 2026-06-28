@@ -23,6 +23,19 @@ const showFooter = computed(() => {
     const tool = page.props.tool as any
     return tool?.show_footer !== false
 })
+const frontendHeaderSettings = computed(() => (page.props as any).frontendHeaderSettings ?? {})
+const mobileBottomHeaderHeight = computed(() => {
+    const mobileBottom = frontendHeaderSettings.value?.mobile_bottom ?? {}
+
+    if (mobileBottom.enabled !== true) {
+        return 0
+    }
+
+    return mobileBottom.hide_menu_labels === true ? 48 : 60
+})
+const mobileBottomInsetStyle = computed(() => ({
+    paddingBottom: `${mobileBottomHeaderHeight.value}px`,
+}))
 
 const close = () => { profileOpen.value = false }
 onMounted(() => document.addEventListener('click', close))
@@ -55,7 +68,7 @@ useFlashToasts()
         <AdSection v-if="showHeader" zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
 
         <!-- Content -->
-        <main class="flex-1 flex flex-col">
+        <main class="flex-1 flex flex-col md:pb-0" :style="mobileBottomInsetStyle">
             <AdSection zone="content_top" class="mx-auto mt-4 w-full max-w-7xl px-6" />
             <slot />
             <AdSection zone="content_bottom" class="mx-auto mb-4 w-full max-w-7xl px-6" />

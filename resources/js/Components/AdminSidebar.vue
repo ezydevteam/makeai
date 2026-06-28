@@ -4,6 +4,7 @@ import { usePage, Link } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useTheme } from '@/Composables/useTheme'
 import Tooltip from '@/Components/UI/Tooltip.vue'
+import LiveSearch from '@/Components/LiveSearch.vue'
 
 const page = usePage()
 const { t } = useTranslate()
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const menuGroups = ref<Record<string, boolean>>({})
+const mobileSearchOpen = ref(false)
 
 const isSuperAdmin = computed(() => (page.props.admin as any)?.isSuperAdmin ?? false)
 const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
@@ -158,23 +160,38 @@ for (const item of addonMenuItems.value) {
 <template>
   <aside :class="[collapsed ? 'sidebar-mini' : 'sidebar-expanded']" class="admin-sidebar">
     <!-- Logo + Collapse -->
+    <div class="sidebar-logo-wrap">
     <div class="sidebar-logo">
       <div class="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
         <img v-if="sidebarLogo" :src="sidebarLogo" :alt="branding.site_name || $page.props.appName" class="h-8 w-auto max-w-32 object-contain shrink-0" />
         <span v-else class="text-[15px] font-semibold text-[#111827] dark:text-white truncate">{{ $page.props.appName }}</span>
       </div>
-      <Tooltip :content="t('Toggle sidebar')" placement="right" class="inline-flex">
+      <div class="flex items-center gap-2">
         <button
-          @click="emit('toggle')"
-          class="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/5"
+          type="button"
+          class="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/5 lg:hidden"
+          :aria-label="mobileSearchOpen ? t('Hide search') : t('Open search')"
+          @click="mobileSearchOpen = !mobileSearchOpen"
         >
-          <i
-            :class="collapsed ? 'ti ti-layout-sidebar-left-expand' : 'ti ti-layout-sidebar-left-collapse'"
-            class="text-[18px]"
-            aria-hidden="true"
-          ></i>
+          <i class="ti ti-search text-[18px]" aria-hidden="true"></i>
         </button>
-      </Tooltip>
+        <Tooltip :content="t('Toggle sidebar')" placement="right" class="inline-flex">
+          <button
+            @click="emit('toggle')"
+            class="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/5"
+          >
+            <i
+              :class="collapsed ? 'ti ti-layout-sidebar-left-expand' : 'ti ti-layout-sidebar-left-collapse'"
+              class="text-[18px]"
+              aria-hidden="true"
+            ></i>
+          </button>
+        </Tooltip>
+      </div>
+    </div>
+    <div v-if="mobileSearchOpen" class="border-t border-gray-100 px-4 py-3 lg:hidden dark:border-surface-700">
+      <LiveSearch context="admin" compact />
+    </div>
     </div>
 
     <!-- Navigation -->
@@ -381,6 +398,18 @@ for (const item of addonMenuItems.value) {
 
       <!-- === Marketing === -->
       <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Marketing') }}</div>
+      <Tooltip v-if="can('payments.gateways') && affiliateEnabled" :content="t('Affiliate')" placement="right" :full-width="true" :disabled="!collapsed">
+        <Link :href="route('admin.affiliate.index')" class="sidebar-item" :class="{ active: isActive('admin.affiliate.*') }">
+          <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+          <span v-show="!collapsed">{{ t('Affiliate') }}</span>
+        </Link>
+      </Tooltip>
+      <Tooltip v-if="can('users.manage')" :content="t('Newsletter')" placement="right" :full-width="true" :disabled="!collapsed">
+        <Link :href="route('admin.newsletter.index')" class="sidebar-item" :class="{ active: isNewsletterActive() }">
+          <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          <span v-show="!collapsed">{{ t('Newsletter') }}</span>
+        </Link>
+      </Tooltip>
       <Tooltip v-if="can('settings.manage')" :content="t('Advertisements')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.ads.index')" class="sidebar-item" :class="{ active: isMarketingAdsActive() }">
           <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.213m5.102-4c0-1.315-.152-2.593-.44-3.815a.75.75 0 01.527-.895l.896-.24a.75.75 0 01.917.54C19.875 9.92 21 12.33 21 15s-1.125 5.08-3.264 7.605a.75.75 0 01-.917.54l-.896-.24a.75.75 0 01-.527-.895A21.036 21.036 0 0015.5 15c0-1.315-.152-2.593-.44-3.815z" /></svg>
@@ -391,18 +420,6 @@ for (const item of addonMenuItems.value) {
         <Link :href="route('admin.announcements.index')" class="sidebar-item" :class="{ active: isActive('admin.announcements.*') }">
           <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46" /></svg>
           <span v-show="!collapsed">{{ t('Announcements') }}</span>
-        </Link>
-      </Tooltip>
-      <Tooltip v-if="can('users.manage')" :content="t('Newsletter')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.newsletter.index')" class="sidebar-item" :class="{ active: isNewsletterActive() }">
-          <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-          <span v-show="!collapsed">{{ t('Newsletter') }}</span>
-        </Link>
-      </Tooltip>
-      <Tooltip v-if="can('payments.gateways') && affiliateEnabled" :content="t('Affiliate')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.affiliate.index')" class="sidebar-item" :class="{ active: isActive('admin.affiliate.*') }">
-          <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-          <span v-show="!collapsed">{{ t('Affiliate') }}</span>
         </Link>
       </Tooltip>
 

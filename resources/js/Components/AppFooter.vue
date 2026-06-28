@@ -1,67 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { usePage, Link } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useTheme } from '@/Composables/useTheme'
-import LanguageSwitcher from '@/Components/LanguageSwitcher.vue'
 import SocialFollow from '@/Components/SocialFollow.vue'
+import LanguageSwitcher from '@/Components/LanguageSwitcher.vue'
 
-type FooterBlockType = 'about_text' | 'menu_list' | 'contact_info' | 'social_icons' | 'newsletter' | 'custom_html' | 'recent_blog_posts' | 'ai_tool_categories' | 'legal_links' | 'custom_link' | 'image' | 'language_switcher' | 'dark_mode' | 'trust_badges' | 'store_badges' | 'divider' | 'copyright_text' | 'payment_icons' | 'back_to_top'
-type ConfigValue = string | number | boolean | null | string[]
-type SocialDisplayMode = 'icons' | 'counts' | 'cards'
-type HeadingStyle = 'default' | 'accent' | 'minimal'
-
-interface FooterBlock {
-    id: string
-    type: FooterBlockType
-    enabled?: boolean
-    config: Record<string, ConfigValue>
-}
-
-interface FooterColumn {
-    id?: string
-    title?: string
-    subtitle?: string
-    blocks?: FooterBlock[]
-}
-
-interface FooterBottomColumn {
-    id?: string
-    title?: string
-    blocks?: FooterBlock[]
-}
-
-interface FooterConfig {
-    layout?: number
-    background?: { color?: string; image_url?: string; overlay_opacity?: number }
-    custom_css?: string
-    container_width?: string
-    column_flex?: string
-    text_color?: string
-    heading_style?: HeadingStyle
-    heading_color?: string
-    heading_font_weight?: string
-    heading_text_transform?: string
-    heading_font_size?: string
-    columns?: Array<FooterColumn | FooterBlock[]>
-    bottom_blocks?: FooterBlock[]
-    bottom_columns?: FooterBottomColumn[]
-    bottom_bar?: {
-        copyright_text?: string
-        menu_slug?: string | null
-        show_social_icons?: boolean
-        show_payment_icons?: boolean
-        payment_icons?: string[]
-        show_back_to_top?: boolean
-        border_top?: boolean
-        border_color?: string
-        border_width?: number
-        padding?: number
-        bg_color?: string
-        text_color?: string
-        column_flex?: string
-    }
-}
+type FooterStyle = 'default' | 'centered' | 'spotlight' | 'card_grid' | 'split_band' | 'floating_panel'
+type FooterContentKey = 'about_text' | 'logo_light' | 'logo_dark' | 'menu_links_1' | 'menu_links_2' | 'menu_links_3' | 'contact_info' | 'custom_text_1' | 'custom_text_2' | 'tool_categories_1' | 'tool_categories_2' | 'newsletter'
+type ConfigValue = string | number | boolean | null
 
 interface MenuItem {
     id: number | string
@@ -71,17 +18,16 @@ interface MenuItem {
     final_url?: string
     parent_id?: number | string | null
     target?: string
+    icon?: string | null
+    badge_text?: string | null
+    badge_color?: string | null
+    is_active?: boolean
+    requires_auth?: string | null
 }
 
-interface MenuOption {
+interface GlobalMenu {
     slug: string
     items: MenuItem[]
-}
-
-interface FooterPost {
-    title: string
-    slug: string
-    published_at?: string | null
 }
 
 interface FooterAiCategory {
@@ -91,8 +37,20 @@ interface FooterAiCategory {
 }
 
 interface FooterData {
-    recentPosts?: FooterPost[]
     aiCategories?: FooterAiCategory[]
+}
+
+interface SocialFollowProfile {
+    platform: string
+    label: string
+    url: string
+    count?: number
+    unit?: string
+}
+
+interface SocialFollowPayload {
+    display_mode?: string
+    profiles?: SocialFollowProfile[]
 }
 
 interface Branding {
@@ -101,6 +59,84 @@ interface Branding {
     site_logo_light?: string
     site_logo_dark?: string
 }
+
+interface SimpleFooterSettings {
+    layout?: string
+    style_columns?: Record<string, Record<string, FooterContentKey | FooterContentKey[] | string | string[]>>
+    brand_title?: string
+    brand_description?: string
+    show_newsletter?: boolean
+    newsletter_title?: string
+    newsletter_description?: string
+    newsletter_placeholder?: string
+    newsletter_button_label?: string
+    newsletter_button_style?: string
+    show_social_icons?: boolean
+    contact_title?: string
+    contact_email?: string
+    contact_phone?: string
+    contact_address?: string
+    contact_details?: string
+    menu_title_1?: string
+    menu_column_1?: string
+    menu_title_2?: string
+    menu_column_2?: string
+    menu_title_3?: string
+    menu_column_3?: string
+    custom_title_1?: string
+    custom_text_1?: string
+    custom_title_2?: string
+    custom_text_2?: string
+    tool_categories_title_1?: string
+    tool_categories_items_1?: string[]
+    tool_categories_title_2?: string
+    tool_categories_items_2?: string[]
+    footer_bg_color?: string
+    footer_text_color?: string
+    footer_heading_color?: string
+    footer_heading_text_case?: string
+    container_width?: string
+    disable_logo_about?: boolean
+    disable_card_style?: boolean
+    footer_vertical_padding?: number
+    show_payment_icons?: boolean
+    payment_icons?: string
+    show_bottom_social_icons?: boolean
+    show_bottom_language_selector?: boolean
+    show_back_to_top?: boolean
+    back_to_top_label?: string
+    back_to_top_icon?: string
+    back_to_top_shape?: string
+    bottom_menu?: string
+    bottom_bar_show_border?: boolean
+    bottom_bar_border_color?: string
+    bottom_bar_border_width?: number
+    bottom_bar_bg_color?: string
+    bottom_bar_text_color?: string
+    bottom_bar_padding?: number
+    bottom_bar_centered?: boolean
+    copyright_text?: string
+}
+
+const page = usePage()
+const { t } = useTranslate()
+const { isDark } = useTheme()
+
+interface SimpleHeaderSettings {
+    mobile_bottom?: {
+        enabled?: boolean
+    }
+}
+
+const branding = computed(() => (page.props.branding as Branding | undefined) ?? {})
+const frontendFooterSettings = computed(() => (page.props.frontendFooterSettings as SimpleFooterSettings | undefined) ?? {})
+const globalMenus = computed(() => (page.props.globalMenus as GlobalMenu[] | undefined) ?? [])
+const footerData = computed(() => (page.props.footerData as FooterData | undefined) ?? {})
+const socialFollow = computed(() => (page.props.socialFollow as SocialFollowPayload | undefined) ?? { profiles: [] })
+const appName = computed(() => String(page.props.appName || ''))
+const frontendHeaderSettings = computed(() => (page.props.frontendHeaderSettings as SimpleHeaderSettings | undefined) ?? {})
+const isMobileBottomHeaderEnabled = computed(() => frontendHeaderSettings.value.mobile_bottom?.enabled === true)
+const currentYear = new Date().getFullYear()
 
 const isTruthySetting = (value: unknown, fallback = false) => {
     if (typeof value === 'boolean') return value
@@ -114,53 +150,158 @@ const isTruthySetting = (value: unknown, fallback = false) => {
     return fallback
 }
 
-interface SimpleFooterSettings {
-    layout?: string
-    brand_title?: string
-    brand_description?: string
-    show_newsletter?: boolean
-    newsletter_title?: string
-    newsletter_description?: string
-    newsletter_placeholder?: string
-    newsletter_button_label?: string
-    show_social_icons?: boolean
-    contact_title?: string
-    contact_email?: string
-    contact_phone?: string
-    contact_address?: string
-    contact_details?: string
-    show_payment_icons?: boolean
-    payment_icons?: string
-    show_bottom_social_icons?: boolean
-    show_back_to_top?: boolean
-    back_to_top_label?: string
-    back_to_top_icon?: string
-    back_to_top_shape?: string
-    bottom_menu?: string
-    bottom_bar_show_border?: boolean
-    bottom_bar_border_color?: string
-    bottom_bar_border_width?: number
-    bottom_bar_bg_color?: string
-    bottom_bar_text_color?: string
-    bottom_bar_padding?: number
-    copyright_text?: string
-    menu_title_1?: string
-    menu_title_2?: string
-    menu_title_3?: string
-    menu_column_1?: string
-    menu_column_2?: string
-    menu_column_3?: string
+const footerStyle = computed<FooterStyle>(() => {
+    const value = String(frontendFooterSettings.value.layout || 'default')
+    if (['default', 'centered', 'spotlight', 'card_grid', 'split_band', 'floating_panel'].includes(value)) {
+        return value as FooterStyle
+    }
+
+    return 'default'
+})
+
+const defaultFooterStyleColumns: Record<FooterStyle, Record<string, FooterContentKey[]>> = {
+    default: { col_1: ['about_text'], col_2: ['menu_links_1'], col_3: ['contact_info'], col_4: ['custom_text_1'] },
+    centered: { col_1: ['about_text'], col_2: ['menu_links_1'], col_3: ['contact_info'] },
+    spotlight: { col_1: ['menu_links_1'], col_2: ['menu_links_2'], col_3: ['contact_info'], col_4: ['tool_categories_1'], full_width: ['custom_text_1'] },
+    card_grid: { col_1: ['about_text'], col_2: ['menu_links_1'], col_3: ['menu_links_2'], col_4: ['contact_info'], col_5: ['tool_categories_1'] },
+    split_band: { col_1: ['menu_links_1'], col_2: ['contact_info'], col_3: ['custom_text_1'], col_4: ['tool_categories_1'] },
+    floating_panel: { col_1: ['menu_links_1'], col_2: ['contact_info'], col_3: ['custom_text_1'], col_4: ['tool_categories_1'] },
 }
 
-const page = usePage()
-const { t } = useTranslate()
-const { isDark, toggleDark } = useTheme()
+const styleColumnDefinitions: Record<FooterStyle, string[]> = {
+    default: ['col_1', 'col_2', 'col_3', 'col_4'],
+    centered: ['col_1', 'col_2', 'col_3'],
+    spotlight: ['col_1', 'col_2', 'col_3', 'col_4', 'full_width'],
+    card_grid: ['col_1', 'col_2', 'col_3', 'col_4', 'col_5'],
+    split_band: ['col_1', 'col_2', 'col_3', 'col_4'],
+    floating_panel: ['col_1', 'col_2', 'col_3', 'col_4'],
+}
 
-const blockFilter = (block: FooterBlock) => block.enabled !== false
-const bottomBarBlockTypes: FooterBlockType[] = ['copyright_text', 'social_icons', 'payment_icons', 'back_to_top']
+const brandTitle = computed(() => frontendFooterSettings.value.brand_title?.trim() || '')
+const brandDescription = computed(() => frontendFooterSettings.value.brand_description?.trim() || branding.value.site_description || '')
+const menuTitle1 = computed(() => frontendFooterSettings.value.menu_title_1?.trim() || '')
+const menuTitle2 = computed(() => frontendFooterSettings.value.menu_title_2?.trim() || '')
+const menuTitle3 = computed(() => frontendFooterSettings.value.menu_title_3?.trim() || '')
+const customTitle1 = computed(() => frontendFooterSettings.value.custom_title_1?.trim() || '')
+const customText1 = computed(() => frontendFooterSettings.value.custom_text_1?.trim() || '')
+const customTitle2 = computed(() => frontendFooterSettings.value.custom_title_2?.trim() || '')
+const customText2 = computed(() => frontendFooterSettings.value.custom_text_2?.trim() || '')
+const toolCategoriesTitle1 = computed(() => frontendFooterSettings.value.tool_categories_title_1?.trim() || '')
+const toolCategoriesTitle2 = computed(() => frontendFooterSettings.value.tool_categories_title_2?.trim() || '')
+const contactTitle = computed(() => frontendFooterSettings.value.contact_title?.trim() || '')
+const contactEmail = computed(() => frontendFooterSettings.value.contact_email?.trim() || branding.value.site_support_email || '')
+const newsletterTitle = computed(() => frontendFooterSettings.value.newsletter_title?.trim() || t('Stay Updated'))
+const newsletterColumnTitle = computed(() => frontendFooterSettings.value.newsletter_title?.trim() || '')
+const newsletterDescription = computed(() => frontendFooterSettings.value.newsletter_description?.trim() || t('Get product news and launch updates in your inbox.'))
+const newsletterPlaceholder = computed(() => frontendFooterSettings.value.newsletter_placeholder?.trim() || t('Enter your email'))
+const newsletterButtonLabel = computed(() => frontendFooterSettings.value.newsletter_button_label?.trim() || t('Subscribe'))
+const newsletterButtonStyle = computed(() => String(frontendFooterSettings.value.newsletter_button_style || 'primary'))
+const showNewsletter = computed(() => isTruthySetting(frontendFooterSettings.value.show_newsletter, true))
+const showSocialIcons = computed(() => isTruthySetting(frontendFooterSettings.value.show_social_icons, true))
+const showLogoAbout = computed(() => {
+    if (footerStyle.value === 'default' || footerStyle.value === 'card_grid') {
+        return true
+    }
 
-const branding = computed(() => (page.props.branding as Branding | undefined) ?? {})
-const frontendFooterSettings = computed(() => (page.props.frontendFooterSettings as SimpleFooterSettings | undefined) ?? {})
+    return !isTruthySetting(frontendFooterSettings.value.disable_logo_about, false)
+})
+const disableCardStyle = computed(() => isTruthySetting(frontendFooterSettings.value.disable_card_style, false))
+const normalizeFooterContentItems = (value: unknown, fallback: FooterContentKey[]) => {
+    if (Array.isArray(value)) {
+        const filtered = value.filter((item): item is FooterContentKey => typeof item === 'string' && item.length > 0)
+        return filtered.length ? filtered : [...fallback]
+    }
+
+    if (typeof value === 'string' && value.length > 0) {
+        return [value as FooterContentKey]
+    }
+
+    return [...fallback]
+}
+
+const footerStyleColumns = computed<Record<FooterStyle, Record<string, FooterContentKey[]>>>(() => {
+    const stored = frontendFooterSettings.value.style_columns ?? {}
+
+    return {
+        default: Object.fromEntries(styleColumnDefinitions.default.map((slot) => [slot, normalizeFooterContentItems(stored.default?.[slot], defaultFooterStyleColumns.default[slot])])) as Record<string, FooterContentKey[]>,
+        centered: Object.fromEntries(styleColumnDefinitions.centered.map((slot) => [slot, normalizeFooterContentItems(stored.centered?.[slot], defaultFooterStyleColumns.centered[slot])])) as Record<string, FooterContentKey[]>,
+        spotlight: Object.fromEntries(styleColumnDefinitions.spotlight.map((slot) => [slot, normalizeFooterContentItems(stored.spotlight?.[slot], defaultFooterStyleColumns.spotlight[slot])])) as Record<string, FooterContentKey[]>,
+        card_grid: Object.fromEntries(styleColumnDefinitions.card_grid.map((slot) => [slot, normalizeFooterContentItems(stored.card_grid?.[slot], defaultFooterStyleColumns.card_grid[slot])])) as Record<string, FooterContentKey[]>,
+        split_band: Object.fromEntries(styleColumnDefinitions.split_band.map((slot) => [slot, normalizeFooterContentItems(stored.split_band?.[slot], defaultFooterStyleColumns.split_band[slot])])) as Record<string, FooterContentKey[]>,
+        floating_panel: Object.fromEntries(styleColumnDefinitions.floating_panel.map((slot) => [slot, normalizeFooterContentItems(stored.floating_panel?.[slot], defaultFooterStyleColumns.floating_panel[slot])])) as Record<string, FooterContentKey[]>,
+    }
+})
+
+const footerLogo = computed(() => isDark.value
+    ? (branding.value.site_logo_dark || branding.value.site_logo_light || '')
+    : (branding.value.site_logo_light || branding.value.site_logo_dark || ''))
+
+const footerContainerClass = computed(() => {
+    const cw = frontendFooterSettings.value.container_width ?? '1280px'
+    if (cw === 'full') return 'w-full px-4 sm:px-6'
+    if (cw === '1080px' || cw === 'boxed') return 'mx-auto w-full max-w-[1080px] px-4 sm:px-6'
+    if (cw === '1536px') return 'mx-auto w-full max-w-[1536px] px-4 sm:px-6'
+    return 'mx-auto w-full max-w-7xl px-4 sm:px-6'
+})
+
+const footerRootStyle = computed<Record<string, string>>(() => {
+    const backgroundColor = frontendFooterSettings.value.footer_bg_color?.trim() || '#0f172a'
+    const textColor = frontendFooterSettings.value.footer_text_color?.trim() || '#cbd5e1'
+    const headingColor = frontendFooterSettings.value.footer_heading_color?.trim() || '#ffffff'
+    const headingTextCase = String(frontendFooterSettings.value.footer_heading_text_case || 'capitalize')
+    const padding = Number(frontendFooterSettings.value.footer_vertical_padding ?? 56)
+
+    // For floating panel with active newsletter, remove the root padding-top so the floating band aligns exactly on the border (50/50)
+    const isFloatingWithNewsletter = footerStyle.value === 'floating_panel' && showNewsletter.value
+    const resolvedPaddingTop = isFloatingWithNewsletter ? '0px' : `${Math.max(24, padding)}px`
+
+    return {
+        backgroundColor,
+        color: textColor,
+        '--footer-text-color': textColor,
+        '--footer-text-muted': `color-mix(in srgb, ${textColor} 74%, transparent)`,
+        '--footer-text-soft': `color-mix(in srgb, ${textColor} 62%, transparent)`,
+        '--footer-text-subtle': `color-mix(in srgb, ${textColor} 46%, transparent)`,
+        '--footer-input-placeholder': `color-mix(in srgb, ${textColor} 42%, transparent)`,
+        '--footer-heading-color': headingColor,
+        '--footer-heading-transform': ['lowercase', 'uppercase', 'capitalize'].includes(headingTextCase) ? headingTextCase : 'capitalize',
+        '--footer-panel-border': 'rgb(255 255 255 / 0.12)',
+        '--footer-panel-bg': 'rgb(255 255 255 / 0.06)',
+        '--footer-panel-bg-strong': 'rgb(255 255 255 / 0.1)',
+        '--footer-floating-shell-bg': `color-mix(in srgb, ${backgroundColor} 88%, #0f172a 12%)`,
+        '--footer-floating-shell-edge': `color-mix(in srgb, ${backgroundColor} 72%, #0f172a 28%)`,
+        '--footer-floating-shell-shadow': '0 -24px 80px rgba(15, 23, 42, 0.14)',
+        '--footer-soft-text': 'inherit',
+        '--footer-bottom-gap': `${Math.max(24, Math.round(padding * 0.72))}px`,
+        paddingTop: resolvedPaddingTop,
+        paddingBottom: '0px',
+    }
+})
+
+const topSocialIconStyle = computed<Record<string, string>>(() => ({
+    color: 'inherit',
+    borderColor: 'rgb(255 255 255 / 0.12)',
+    background: 'rgb(255 255 255 / 0.06)',
+}))
+
+const cardGridSocialIconStyle = computed<Record<string, string>>(() => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '2.7rem',
+    height: '2.7rem',
+    border: '1px solid color-mix(in srgb, var(--color-primary-500, #10b981) 22%, white)',
+    borderRadius: '9999px',
+    backgroundColor: 'color-mix(in srgb, var(--color-primary-500, #10b981) 12%, white)',
+    color: 'var(--color-primary-600, #059669)',
+    boxShadow: '0 10px 26px color-mix(in srgb, var(--color-primary-500, #10b981) 14%, transparent)',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+}))
+
+const cardGridSocialIconInnerStyle = computed<Record<string, string>>(() => ({
+    color: 'var(--color-primary-600, #059669)',
+}))
+
 const resolveFooterMenuSlug = (value: string | undefined, fallback: string) => {
     if (!value) return fallback
     if (value === 'company') return 'footer-company'
@@ -168,439 +309,218 @@ const resolveFooterMenuSlug = (value: string | undefined, fallback: string) => {
     if (value === 'legal') return 'footer-legal'
     return value
 }
-const footerMenuTitle = (value: string | undefined, fallback: string) => value?.trim() || fallback
-const footerTextOrFallback = (value: string | undefined, fallback: string) => value?.trim() || fallback
-const paymentIconList = (value: string | undefined) => {
-    if (typeof value !== 'string') return []
-    const icon = value.trim()
-    return icon ? [icon] : []
-}
-const buildSimplifiedFooterConfig = (settings: SimpleFooterSettings): FooterConfig => {
-    const layout = settings.layout ?? 'columns'
-    const showNewsletter = isTruthySetting(settings.show_newsletter, false)
-    const showSocialIcons = isTruthySetting(settings.show_social_icons, true)
-    const showPaymentIcons = isTruthySetting(settings.show_payment_icons, true)
-    const showBottomSocialIcons = isTruthySetting(settings.show_bottom_social_icons, false)
-    const showBackToTop = isTruthySetting(settings.show_back_to_top, true)
-    const showBottomMenu = Boolean(settings.bottom_menu?.trim())
-    const copyrightText = settings.copyright_text || t('© {year} :app. All rights reserved.', { app: String(page.props.appName || '') })
-    const paymentIcons = paymentIconList(settings.payment_icons)
-    const brandTitle = settings.brand_title?.trim() || ''
-    const brandDescription = footerTextOrFallback(
-        settings.brand_description,
-        branding.value.site_description || '',
-    )
-    const contactTitle = footerTextOrFallback(settings.contact_title, t('Contact'))
-    const contactEmail = settings.contact_email?.trim() || branding.value.site_support_email || ''
-    const newsletterTitle = footerTextOrFallback(settings.newsletter_title, t('Stay Updated'))
-    const newsletterDescription = footerTextOrFallback(
-        settings.newsletter_description,
-        t('Get product news and launch updates in your inbox.'),
-    )
-    const newsletterPlaceholder = footerTextOrFallback(settings.newsletter_placeholder, t('Enter your email'))
-    const newsletterButtonLabel = footerTextOrFallback(settings.newsletter_button_label, t('Subscribe'))
-    const menuTitles = [
-        footerMenuTitle(settings.menu_title_1, t('Company')),
-        footerMenuTitle(settings.menu_title_2, t('Support')),
-        footerMenuTitle(settings.menu_title_3, t('Legal')),
-    ]
 
-    const aboutBlock: FooterBlock = {
-        id: 'simple_footer_about',
-        type: 'about_text',
-        enabled: true,
-        config: {
-            title: brandTitle,
-            description: brandDescription,
-            show_social_icon: showSocialIcons,
-        },
-    }
-
-    const newsletterBlock: FooterBlock = {
-        id: 'simple_footer_newsletter',
-        type: 'newsletter',
-        enabled: true,
-        config: {
-            title: newsletterTitle,
-            description: newsletterDescription,
-            placeholder: newsletterPlaceholder,
-            button_text: newsletterButtonLabel,
-        },
-    }
-
-    const contactBlock: FooterBlock = {
-        id: 'simple_footer_contact',
-        type: 'contact_info',
-        enabled: true,
-        config: {
-            title: contactTitle,
-            email: contactEmail,
-            phone: settings.contact_phone?.trim() || '',
-            address: settings.contact_address?.trim() || '',
-            details: settings.contact_details?.trim() || '',
-        },
-    }
-
-    const menuBlocks: FooterBlock[] = [
-        {
-            id: 'simple_footer_menu_1',
-            type: 'menu_list',
-            enabled: true,
-            config: {
-                title: menuTitles[0],
-                menu_slug: resolveFooterMenuSlug(settings.menu_column_1, 'footer-company'),
-            },
-        },
-        {
-            id: 'simple_footer_menu_2',
-            type: 'menu_list',
-            enabled: true,
-            config: {
-                title: menuTitles[1],
-                menu_slug: resolveFooterMenuSlug(settings.menu_column_2, 'footer-support'),
-            },
-        },
-        {
-            id: 'simple_footer_menu_3',
-            type: 'menu_list',
-            enabled: true,
-            config: {
-                title: menuTitles[2],
-                menu_slug: resolveFooterMenuSlug(settings.menu_column_3, 'footer-legal'),
-            },
-        },
-    ]
-
-    let columns: FooterColumn[] = []
-    let layoutColumns = 4
-
-    if (layout === 'simple') {
-        layoutColumns = 2
-        columns = [
-            {
-                id: 'footer_column_1',
-                blocks: [aboutBlock],
-            },
-            {
-                id: 'footer_column_2',
-                blocks: [menuBlocks[0], ...(showNewsletter ? [newsletterBlock] : [contactBlock])],
-            },
-        ]
-    } else if (layout === 'minimal') {
-        layoutColumns = 1
-        columns = [
-            {
-                id: 'footer_column_1',
-                blocks: [aboutBlock],
-            },
-        ]
-    } else if (layout === 'company') {
-        layoutColumns = 4
-        columns = [
-            {
-                id: 'footer_column_1',
-                blocks: [aboutBlock, contactBlock],
-            },
-            { id: 'footer_column_2', blocks: [menuBlocks[0]] },
-            { id: 'footer_column_3', blocks: [menuBlocks[1]] },
-            { id: 'footer_column_4', blocks: [menuBlocks[2]] },
-        ]
-    } else if (layout === 'newsletter') {
-        layoutColumns = 4
-        columns = [
-            {
-                id: 'footer_column_1',
-                blocks: [aboutBlock],
-            },
-            { id: 'footer_column_2', blocks: [menuBlocks[0]] },
-            { id: 'footer_column_3', blocks: [menuBlocks[1]] },
-            {
-                id: 'footer_column_4',
-                blocks: [menuBlocks[2], ...(showNewsletter ? [newsletterBlock] : [contactBlock])],
-            },
-        ]
-    } else if (layout === 'stacked') {
-        layoutColumns = 3
-        columns = [
-            {
-                id: 'footer_column_1',
-                blocks: [aboutBlock],
-            },
-            {
-                id: 'footer_column_2',
-                blocks: [menuBlocks[0], menuBlocks[1], menuBlocks[2]],
-            },
-            {
-                id: 'footer_column_3',
-                blocks: [showNewsletter ? newsletterBlock : contactBlock],
-            },
-        ]
-    } else {
-        layoutColumns = 4
-        columns = [
-            {
-                id: 'footer_column_1',
-                blocks: [aboutBlock],
-            },
-            { id: 'footer_column_2', blocks: [menuBlocks[0]] },
-            { id: 'footer_column_3', blocks: [menuBlocks[1]] },
-            {
-                id: 'footer_column_4',
-                blocks: [menuBlocks[2], ...(showNewsletter ? [newsletterBlock] : [contactBlock])],
-            },
-        ]
-    }
-
-    return {
-        layout: layoutColumns,
-        container_width: '1280px',
-        columns,
-        bottom_blocks: [
-            {
-                id: 'simple_bottom_copyright',
-                type: 'copyright_text',
-                enabled: true,
-                config: { text: copyrightText },
-            },
-            ...(showBottomSocialIcons ? [{
-                id: 'simple_bottom_social_icons',
-                type: 'social_icons' as const,
-                enabled: true,
-                config: { display_mode: 'icons' },
-            }] : []),
-            ...(showPaymentIcons ? [{
-                id: 'simple_bottom_payment_icons',
-                type: 'payment_icons' as const,
-                enabled: true,
-                config: { icons: paymentIcons },
-            }] : []),
-            ...(showBackToTop ? [{
-                id: 'simple_bottom_back_to_top',
-                type: 'back_to_top' as const,
-                enabled: true,
-                config: {
-                    label: settings.back_to_top_label?.trim() || '',
-                    icon: settings.back_to_top_icon?.trim() || 'ti ti-arrow-up',
-                    shape: settings.back_to_top_shape?.trim() || 'rounded',
-                },
-            }] : []),
-        ],
-        bottom_columns: [
-            {
-                id: 'left',
-                title: t('Left Column'),
-                blocks: [{
-                    id: 'simple_bottom_left_copyright',
-                    type: 'copyright_text',
-                    enabled: true,
-                    config: { text: copyrightText },
-                }],
-            },
-            {
-                id: 'right',
-                title: t('Right Column'),
-                blocks: [
-                    ...(showBottomSocialIcons ? [{
-                        id: 'simple_bottom_right_social_icons',
-                        type: 'social_icons' as const,
-                        enabled: true,
-                        config: { display_mode: 'icons' },
-                    }] : []),
-                    ...(showPaymentIcons ? [{
-                        id: 'simple_bottom_right_payment_icons',
-                        type: 'payment_icons' as const,
-                        enabled: true,
-                        config: { icons: paymentIcons },
-                    }] : []),
-                    ...(showBackToTop ? [{
-                        id: 'simple_bottom_right_back_to_top',
-                        type: 'back_to_top' as const,
-                        enabled: true,
-                        config: {
-                            label: settings.back_to_top_label?.trim() || '',
-                            icon: settings.back_to_top_icon?.trim() || 'ti ti-arrow-up',
-                            shape: settings.back_to_top_shape?.trim() || 'rounded',
-                        },
-                    }] : []),
-                ],
-            },
-        ],
-        bottom_bar: {
-            copyright_text: copyrightText,
-            menu_slug: showBottomMenu ? resolveFooterMenuSlug(settings.bottom_menu, '') : null,
-            show_social_icons: showBottomSocialIcons,
-            show_payment_icons: showPaymentIcons,
-            payment_icons: paymentIcons,
-            show_back_to_top: showBackToTop,
-            border_top: isTruthySetting(settings.bottom_bar_show_border, true),
-            border_color: settings.bottom_bar_border_color?.trim() || '',
-            border_width: Number(settings.bottom_bar_border_width ?? 1),
-            padding: Number(settings.bottom_bar_padding ?? 32),
-            bg_color: settings.bottom_bar_bg_color?.trim() || '',
-            text_color: settings.bottom_bar_text_color?.trim() || '',
-        },
-    }
-}
-const footerConfig = computed(() => buildSimplifiedFooterConfig(frontendFooterSettings.value))
-const footerData = computed(() => (page.props.footerData as FooterData | undefined) ?? {})
-const globalMenus = computed(() => (page.props.globalMenus as MenuOption[] | undefined) ?? [])
-const appName = computed(() => String(page.props.appName || ''))
-const currentYear = new Date().getFullYear()
-const footerLogo = computed(() => isDark.value ? (branding.value.site_logo_dark || branding.value.site_logo_light || '') : (branding.value.site_logo_light || branding.value.site_logo_dark || ''))
-
-const footerColumns = computed<FooterColumn[]>(() => {
-    const columns = footerConfig.value?.columns ?? []
-
-    return columns.map((column, index) => {
-        let blocks: FooterBlock[]
-        if (Array.isArray(column)) {
-            blocks = column
-        } else {
-            blocks = column.blocks ?? []
-        }
-        return {
-            id: Array.isArray(column) ? `legacy_footer_column_${index + 1}` : (column.id ?? `footer_column_${index + 1}`),
-            title: Array.isArray(column) ? '' : (column.title ?? ''),
-            subtitle: Array.isArray(column) ? '' : (column.subtitle ?? ''),
-            blocks: blocks.filter(blockFilter),
-        }
-    })
-})
-
-const enabledBottomColumns = computed<FooterBottomColumn[]>(() => {
-    const columns = footerConfig.value?.bottom_columns ?? []
-
-    return columns.map((column, index) => ({
-        id: column.id ?? (index === 0 ? 'left' : 'right'),
-        title: column.title ?? '',
-        blocks: (column.blocks ?? []).filter((block) => blockFilter(block) && bottomBarBlockTypes.includes(block.type)),
-    }))
-})
-
-const hasFooterContent = computed(() => {
-    const hasColumns = footerColumns.value.some((column) => (column.blocks ?? []).length > 0)
-    const hasBottom = enabledBottomColumns.value.some((column) => (column.blocks ?? []).length > 0)
-    const hasBottomMenu = Boolean(footerConfig.value?.bottom_bar?.menu_slug && topMenuItems(footerConfig.value.bottom_bar.menu_slug).length)
-    return hasColumns || hasBottom || hasBottomMenu
-})
-
-const parsedCopyright = computed(() => (footerConfig.value?.bottom_bar?.copyright_text || '').replace('{year}', currentYear.toString()))
-
-const containerClass = computed(() => {
-    const w = footerConfig.value?.container_width ?? '1280px'
-    if (w === 'full') return 'w-full px-4 sm:px-6'
-    if (w === '1080px' || w === 'boxed') return 'mx-auto w-full max-w-[1080px] px-4 sm:px-6'
-    if (w === '1536px') return 'mx-auto w-full max-w-[1536px] px-4 sm:px-6'
-    return 'mx-auto w-full max-w-7xl px-4 sm:px-6'
-})
-
-const layoutClass = computed(() => {
-    const layout = footerConfig.value?.layout || footerColumns.value.length || 4
-    if (layout === 1) return 'grid-cols-1'
-    if (layout === 2) return 'grid-cols-1 md:grid-cols-2'
-    if (layout === 3) return 'grid-cols-1 md:grid-cols-3'
-    return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-})
-
-const footerColFlexClass = (index: number, total: number) => {
-    const flex = footerConfig.value?.column_flex ?? 'default'
-    if (flex === 'column-1') return index === 0 ? 'flex-1 min-w-0' : ''
-    if (flex === 'column-2') return index === 1 ? 'flex-1 min-w-0' : ''
-    if (flex === 'column-3') return index === 2 ? 'flex-1 min-w-0' : ''
-    if (flex === 'column-4') return index === 3 ? 'flex-1 min-w-0' : ''
-    return index === 0 ? 'flex-1 min-w-0' : ''
-}
-
-const footerTextStyle = computed(() => {
-    const style: Record<string, string> = {}
-    if (footerConfig.value?.text_color) style.color = footerConfig.value.text_color
-    return style
-})
-const footerMenuLinkStyle = computed(() => {
-    const style: Record<string, string> = {}
-    if (footerConfig.value?.text_color) style.color = footerConfig.value.text_color
-    return style
-})
-
-const headingStyleVars = computed(() => {
-    const style: Record<string, string> = {}
-    if (footerConfig.value?.heading_color) style['--footer-heading-color'] = footerConfig.value.heading_color
-    if (footerConfig.value?.heading_font_weight) style['--footer-heading-weight'] = footerConfig.value.heading_font_weight
-    if (footerConfig.value?.heading_text_transform) style['--footer-heading-transform'] = footerConfig.value.heading_text_transform
-    if (footerConfig.value?.heading_font_size) style['--footer-heading-size'] = footerConfig.value.heading_font_size
-    return style
-})
-
-const footerBackgroundStyle = computed(() => {
-    const bg = footerConfig.value?.background
-    if (!bg) return {}
-    const style: Record<string, string> = {}
-    if (bg.color) style.backgroundColor = bg.color
-    if (bg.image_url) { style.backgroundImage = `url(${bg.image_url})`; style.backgroundSize = 'cover'; style.backgroundPosition = 'center' }
-    if (bg.image_url && (bg.overlay_opacity ?? 0) > 0) style['--footer-bg-overlay'] = `rgba(0,0,0,${Number(bg.overlay_opacity)})`
-    return style
-})
-
-const bottomBarStyle = computed(() => {
-    const style: Record<string, string> = {}
-    const bar = footerConfig.value?.bottom_bar
-    const pad = Number(bar?.padding ?? 32)
-    style['--footer-bottom-padding'] = `${pad}px`
-    style['--footer-bottom-border-width'] = `${Math.max(1, Number(bar?.border_width ?? 1))}px`
-    if (bar?.bg_color) style.backgroundColor = bar.bg_color
-    if (bar?.text_color) style.color = bar.text_color
-    if (bar?.border_color) style.borderTopColor = bar.border_color
-    return style
-})
-const bottomBarLinkStyle = computed(() => {
-    const style: Record<string, string> = {}
-    const bar = footerConfig.value?.bottom_bar
-    if (bar?.text_color) style.color = bar.text_color
-    return style
-})
-const bottomBarSocialIconStyle = computed(() => {
-    const style: Record<string, string> = {}
-    const bar = footerConfig.value?.bottom_bar
-    if (bar?.text_color) style.color = bar.text_color
-    return style
-})
-
-const bottomColFlexClass = (col: 'left' | 'right') => {
-    const flex = footerConfig.value?.bottom_bar?.column_flex ?? 'default'
-    if (flex === col || (flex === 'default' && col === 'left')) return 'flex-1 min-w-0'
-    return ''
-}
-
-const getMenu = (slug?: ConfigValue) => {
-    if (typeof slug !== 'string' || slug === '') return null
+const getMenu = (slug?: string | null) => {
+    if (!slug) return null
     return globalMenus.value.find((menu) => menu.slug === slug) ?? null
 }
 
-const visibleMenuItems = (menu: MenuOption | null) => {
+const visibleMenuItems = (menu: GlobalMenu | null) => {
     if (!menu) return []
-    const items = menu.items?.filter((item) => item.is_active !== false) || []
-    const loggedIn = Boolean(page.props.auth?.user)
-    const isPro = page.props.auth?.user?.subscription_status === 'active'
 
-    return items.filter((item: any) => {
-        const rule = item.requires_auth ?? 'none'
-        if (rule === 'guest') return !loggedIn
-        if (rule === 'auth') return loggedIn
-        if (rule === 'pro') return isPro
-        return true
-    })
+    const loggedIn = Boolean(page.props.auth?.user)
+    const isProUser = page.props.auth?.user?.subscription_status === 'active'
+
+    return (menu.items ?? [])
+        .filter((item) => item.is_active !== false)
+        .filter((item) => {
+            const rule = item.requires_auth ?? 'none'
+            if (rule === 'guest') return !loggedIn
+            if (rule === 'auth') return loggedIn
+            if (rule === 'pro') return isProUser
+            return true
+        })
 }
-const menuItemId = (item: MenuItem) => item.id ?? item.url
+
+const topMenuItems = (slug?: string | null) => visibleMenuItems(getMenu(slug)).filter((item) => !item.parent_id)
+const menuSlug1 = computed(() => resolveFooterMenuSlug(frontendFooterSettings.value.menu_column_1, 'footer-company'))
+const menuSlug2 = computed(() => resolveFooterMenuSlug(frontendFooterSettings.value.menu_column_2, 'footer-support'))
+const menuSlug3 = computed(() => resolveFooterMenuSlug(frontendFooterSettings.value.menu_column_3, 'footer-legal'))
+const menuItems1 = computed(() => visibleMenuItems(getMenu(menuSlug1.value)))
+const menuItems2 = computed(() => visibleMenuItems(getMenu(menuSlug2.value)))
+const menuItems3 = computed(() => visibleMenuItems(getMenu(menuSlug3.value)))
+const bottomMenuItems = computed(() => topMenuItems(resolveFooterMenuSlug(frontendFooterSettings.value.bottom_menu, '')))
+
+function shouldRenderFooterItem(item: FooterContentKey): boolean {
+    if (item === 'about_text') {
+        return showLogoAbout.value || showSocialIcons.value
+    }
+
+    if (item === 'logo_light') {
+        return Boolean(branding.value.site_logo_light)
+    }
+
+    if (item === 'logo_dark') {
+        return Boolean(branding.value.site_logo_dark)
+    }
+
+    if ((footerStyle.value === 'floating_panel' || footerStyle.value === 'spotlight' || footerStyle.value === 'card_grid') && item === 'newsletter') {
+        return false
+    }
+
+    return true
+}
+
+const activeStyleItems = computed<Array<{ slot: string; items: FooterContentKey[] }>>(() => {
+    const style = footerStyle.value
+    const columns = footerStyleColumns.value[style]
+    const orderWeight = (item: FooterContentKey) => {
+        if (item === 'logo_light' || item === 'logo_dark') return 0
+        return 1
+    }
+
+    return styleColumnDefinitions[style]
+        .map((slot) => ({
+            slot,
+            items: [...(columns[slot] ?? defaultFooterStyleColumns[style][slot])]
+                .filter((item) => shouldRenderFooterItem(item))
+                .sort((left, right) => orderWeight(left) - orderWeight(right)),
+        }))
+        .filter((entry) => entry.items.length > 0)
+})
+
+const spotlightMainEntries = computed(() => activeStyleItems.value.filter((entry) => entry.slot !== 'full_width'))
+const hasSpotlightBrandBar = computed(() => showLogoAbout.value || showSocialIcons.value)
+const spotlightBrandName = computed(() => brandTitle.value)
+const spotlightSocialProfiles = computed(() => socialFollow.value.profiles ?? [])
+const spotlightBrandBarCentered = computed(() => !(showLogoAbout.value && showSocialIcons.value))
+
+const categoryBlockItems = (value: string[] | undefined) => {
+    const selected = Array.isArray(value) ? value : []
+    if (!selected.length) return []
+
+    const map = new Map((footerData.value.aiCategories ?? []).map((category) => [category.slug, category]))
+    return selected.map((slug) => map.get(slug)).filter(Boolean) as FooterAiCategory[]
+}
+
+const isMenuBlock = (item: FooterContentKey) => ['menu_links_1', 'menu_links_2', 'menu_links_3'].includes(item)
+const menuBlockTitle = (item: FooterContentKey) => {
+    if (item === 'menu_links_2') return menuTitle2.value
+    if (item === 'menu_links_3') return menuTitle3.value
+    return menuTitle1.value
+}
+const menuBlockItems = (item: FooterContentKey) => {
+    if (item === 'menu_links_2') return menuItems2.value
+    if (item === 'menu_links_3') return menuItems3.value
+    return menuItems1.value
+}
+const isCustomBlock = (item: FooterContentKey) => ['custom_text_1', 'custom_text_2'].includes(item)
+const customBlockTitle = (item: FooterContentKey) => item === 'custom_text_2' ? customTitle2.value : customTitle1.value
+const customBlockText = (item: FooterContentKey) => item === 'custom_text_2' ? customText2.value : customText1.value
+const isLogoBlock = (item: FooterContentKey) => ['logo_light', 'logo_dark'].includes(item)
+const logoBlockSrc = (item: FooterContentKey) => item === 'logo_dark' ? branding.value.site_logo_dark || '' : branding.value.site_logo_light || ''
+const logoBlockAlt = (item: FooterContentKey) => item === 'logo_dark' ? t('Dark logo') : t('Light logo')
+const socialPlatformIconClass = (platform: string) => ({
+    facebook: 'ti ti-brand-facebook',
+    x: 'ti ti-brand-x',
+    twitter: 'ti ti-brand-x',
+    instagram: 'ti ti-brand-instagram',
+    linkedin: 'ti ti-brand-linkedin',
+    youtube: 'ti ti-brand-youtube',
+    tiktok: 'ti ti-brand-tiktok',
+    github: 'ti ti-brand-github',
+    discord: 'ti ti-brand-discord',
+}[platform] ?? 'ti ti-world')
+const isCategoryBlock = (item: FooterContentKey) => ['tool_categories_1', 'tool_categories_2'].includes(item)
+const categoryBlockTitle = (item: FooterContentKey) => item === 'tool_categories_2' ? toolCategoriesTitle2.value : toolCategoriesTitle1.value
+const categoryBlockList = (item: FooterContentKey) => item === 'tool_categories_2'
+    ? categoryBlockItems(frontendFooterSettings.value.tool_categories_items_2)
+    : categoryBlockItems(frontendFooterSettings.value.tool_categories_items_1)
+
 const menuItemHref = (item: MenuItem) => String(item.final_url || item.url || '#')
 const menuItemLabel = (item: MenuItem) => item.label || item.title || ''
-const topMenuItems = (slug?: string | null) => visibleMenuItems(getMenu(slug)).filter((item) => !item.parent_id)
-
-const limitedPosts = (count: ConfigValue) => footerData.value.recentPosts?.slice(0, Number(count || 3)) ?? []
-const limitedCategories = (count: ConfigValue) => footerData.value.aiCategories?.slice(0, Number(count || 6)) ?? []
-const socialDisplayMode = (value: ConfigValue): SocialDisplayMode => {
-    return value === 'icons' || value === 'counts' || value === 'cards' ? value : 'icons'
+const menuItemIcon = (item: MenuItem) => String(item.icon || '').trim()
+const menuItemBadgeText = (item: MenuItem) => String(item.badge_text || '').trim()
+const menuItemBadgeColor = (item: MenuItem) => {
+    const color = String(item.badge_color || 'gray')
+    return ['green', 'blue', 'violet', 'amber', 'red', 'gray'].includes(color) ? color : 'gray'
 }
-const showSocialIcon = (value: ConfigValue) => value === true
+const menuItemTarget = (item: MenuItem) => item.target === '_blank' ? '_blank' : '_self'
+const menuItemRel = (item: MenuItem) => menuItemTarget(item) === '_blank' ? 'noopener noreferrer' : undefined
+
+const panelClass = computed(() => disableCardStyle.value ? '' : 'rounded-3xl border p-6 shadow-[0_24px_80px_rgba(15,23,42,0.16)] backdrop-blur-sm')
+const cardClass = computed(() => disableCardStyle.value ? '' : 'rounded-3xl border p-6 shadow-[0_18px_60px_rgba(15,23,42,0.14)] backdrop-blur-sm')
+const panelToneClass = (value: string) => disableCardStyle.value ? '' : value
+const cardToneClass = (value: string) => disableCardStyle.value ? '' : value
+const splitBandTopSpacingClass = computed(() => disableCardStyle.value ? 'py-3 sm:py-4' : '')
+const splitBandColumnClass = computed(() => disableCardStyle.value ? 'py-3' : '')
+const splitBandColumnContentClass = computed(() => disableCardStyle.value ? 'space-y-10' : 'space-y-8')
+
+const newsletterButtonClass = computed(() => {
+    const style = newsletterButtonStyle.value
+
+    if (style === 'dark') {
+        return 'rounded-xl bg-gray-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-gray-800'
+    }
+    if (style === 'danger') {
+        return 'rounded-xl bg-linear-to-r from-rose-500 to-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+    }
+    if (style === 'success') {
+        return 'rounded-xl bg-linear-to-r from-emerald-500 to-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+    }
+    if (style === 'warning') {
+        return 'rounded-xl bg-linear-to-r from-amber-400 to-orange-500 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:opacity-90'
+    }
+    if (style === 'outline') {
+        return 'rounded-xl border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10'
+    }
+    if (style === 'ghost') {
+        return 'rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/15'
+    }
+    if (style === 'gradient_sunset') {
+        return 'rounded-xl bg-linear-to-r from-orange-400 via-rose-500 to-fuchsia-600 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+    }
+    if (style === 'purple' || style === 'gradient_royal') {
+        return 'rounded-xl bg-linear-to-r from-violet-500 to-indigo-500 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+    }
+    if (style === 'gradient_ocean' || style === 'gradient') {
+        return 'rounded-xl bg-linear-to-r from-sky-500 to-cyan-500 px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90'
+    }
+
+    return 'rounded-xl btn-primary px-5 py-3 text-sm font-semibold text-white transition'
+})
+
+const splitBandNewsletterButtonClass = computed(() => {
+    const style = newsletterButtonStyle.value
+
+    if (style === 'dark') {
+        return 'split-band-newsletter-submit bg-gray-950 text-white hover:bg-gray-800'
+    }
+    if (style === 'danger') {
+        return 'split-band-newsletter-submit bg-linear-to-r from-rose-500 to-red-600 text-white hover:opacity-90'
+    }
+    if (style === 'success') {
+        return 'split-band-newsletter-submit bg-linear-to-r from-emerald-500 to-green-600 text-white hover:opacity-90'
+    }
+    if (style === 'warning') {
+        return 'split-band-newsletter-submit bg-linear-to-r from-amber-400 to-orange-500 text-slate-950 hover:opacity-90'
+    }
+    if (style === 'outline') {
+        return 'split-band-newsletter-submit border border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+    }
+    if (style === 'ghost') {
+        return 'split-band-newsletter-submit bg-slate-100 text-slate-900 hover:bg-slate-200'
+    }
+    if (style === 'gradient_sunset') {
+        return 'split-band-newsletter-submit bg-linear-to-r from-orange-400 via-rose-500 to-fuchsia-600 text-white hover:opacity-90'
+    }
+    if (style === 'purple' || style === 'gradient_royal') {
+        return 'split-band-newsletter-submit bg-linear-to-r from-violet-500 to-indigo-500 text-white hover:opacity-90'
+    }
+    if (style === 'gradient_ocean' || style === 'gradient') {
+        return 'split-band-newsletter-submit bg-linear-to-r from-sky-500 to-cyan-500 text-white hover:opacity-90'
+    }
+
+    return 'split-band-newsletter-submit btn-primary text-white'
+})
+
+const paymentIconList = computed(() => {
+    const value = frontendFooterSettings.value.payment_icons
+    if (typeof value !== 'string') return []
+    const icon = value.trim()
+    return icon ? [icon] : []
+})
+
 const paymentIconSrc = (value: ConfigValue) => {
     if (typeof value !== 'string') return ''
     const icon = value.trim()
@@ -612,6 +532,7 @@ const paymentIconSrc = (value: ConfigValue) => {
     }
     return ''
 }
+
 const paymentIconLabel = (value: ConfigValue) => {
     if (typeof value !== 'string') return t('Payment')
 
@@ -628,282 +549,939 @@ const paymentIconLabel = (value: ConfigValue) => {
     const normalized = value.trim().toLowerCase().replaceAll(' ', '_').replaceAll('-', '_')
     return labels[normalized] ?? value
 }
+
 const paymentBadgeClass = (value: ConfigValue) => {
     const normalized = typeof value === 'string' ? value.trim().toLowerCase().replaceAll(' ', '_').replaceAll('-', '_') : ''
 
     const classes: Record<string, string> = {
-        visa: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20',
-        mastercard: 'bg-orange-50 text-orange-700 ring-orange-100 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-500/20',
-        paypal: 'bg-sky-50 text-sky-700 ring-sky-100 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20',
-        stripe: 'bg-violet-50 text-violet-700 ring-violet-100 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-500/20',
-        amex: 'bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20',
-        apple_pay: 'bg-gray-100 text-gray-700 ring-gray-200 dark:bg-surface-800 dark:text-gray-200 dark:ring-surface-700',
-        google_pay: 'bg-rose-50 text-rose-700 ring-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/20',
+        visa: 'bg-blue-50 text-blue-700 ring-blue-100',
+        mastercard: 'bg-orange-50 text-orange-700 ring-orange-100',
+        paypal: 'bg-sky-50 text-sky-700 ring-sky-100',
+        stripe: 'bg-violet-50 text-violet-700 ring-violet-100',
+        amex: 'bg-emerald-50 text-emerald-700 ring-emerald-100',
+        apple_pay: 'bg-gray-100 text-gray-700 ring-gray-200',
+        google_pay: 'bg-rose-50 text-rose-700 ring-rose-100',
     }
 
-    return classes[normalized] ?? 'bg-gray-100 text-gray-700 ring-gray-200 dark:bg-surface-800 dark:text-gray-200 dark:ring-surface-700'
+    return classes[normalized] ?? 'bg-gray-100 text-gray-700 ring-gray-200'
 }
 
-const withYear = (value: ConfigValue) => String(value ?? '').replace('{year}', currentYear.toString())
+const showBottomSocialIcons = computed(() => isTruthySetting(frontendFooterSettings.value.show_bottom_social_icons, false))
+const showBottomLanguageSelector = computed(() => isTruthySetting(frontendFooterSettings.value.show_bottom_language_selector, false))
+const showPaymentIcons = computed(() => isTruthySetting(frontendFooterSettings.value.show_payment_icons, true))
+const showBackToTop = computed(() => isTruthySetting(frontendFooterSettings.value.show_back_to_top, true))
+const showBottomBarBorder = computed(() => isTruthySetting(frontendFooterSettings.value.bottom_bar_show_border, true))
+const bottomBarCentered = computed(() => isTruthySetting(frontendFooterSettings.value.bottom_bar_centered, false))
+const hasBrandIntroPanel = computed(() => showLogoAbout.value || showSocialIcons.value)
+const hasSpotlightLeadPanel = computed(() => showLogoAbout.value || showSocialIcons.value || showNewsletter.value)
+const hasSplitBandTopSection = computed(() => showLogoAbout.value || showSocialIcons.value || showNewsletter.value)
 
-const scrollToTop = () => { window.scrollTo({ top: 0, behavior: 'smooth' }) }
+const bottomBarStyle = computed<Record<string, string>>(() => {
+    const padding = Number(frontendFooterSettings.value.bottom_bar_padding ?? 32)
+    const style: Record<string, string> = {
+        '--footer-bottom-padding': `${padding}px`,
+        '--footer-bottom-border-width': `${Math.max(1, Number(frontendFooterSettings.value.bottom_bar_border_width ?? 1))}px`,
+    }
+
+    if (frontendFooterSettings.value.bottom_bar_bg_color?.trim()) style.backgroundColor = frontendFooterSettings.value.bottom_bar_bg_color.trim()
+    if (frontendFooterSettings.value.bottom_bar_text_color?.trim()) style.color = frontendFooterSettings.value.bottom_bar_text_color.trim()
+    if (frontendFooterSettings.value.bottom_bar_border_color?.trim()) style.borderTopColor = frontendFooterSettings.value.bottom_bar_border_color.trim()
+
+    return style
+})
+
+const bottomBarLinkStyle = computed<Record<string, string>>(() => {
+    const style: Record<string, string> = {}
+    if (frontendFooterSettings.value.bottom_bar_text_color?.trim()) style.color = frontendFooterSettings.value.bottom_bar_text_color.trim()
+    return style
+})
+
+const bottomBarSocialIconStyle = computed<Record<string, string>>(() => {
+    const style: Record<string, string> = {
+        color: frontendFooterSettings.value.bottom_bar_text_color?.trim() || 'inherit',
+        borderColor: 'rgb(148 163 184 / 0.22)',
+        background: 'rgb(148 163 184 / 0.12)',
+    }
+    return style
+})
+
+const bottomBarLanguageSwitcherStyle = computed<Record<string, string>>(() => {
+    const textColor = frontendFooterSettings.value.bottom_bar_text_color?.trim() || 'inherit'
+
+    return {
+        color: textColor,
+        '--header-control-text-color': textColor,
+        '--header-control-hover-color': textColor,
+        '--header-soft-icon-border': 'rgb(148 163 184 / 0.22)',
+        '--header-soft-icon-bg': 'rgb(148 163 184 / 0.12)',
+        '--header-soft-icon-hover-border': 'rgb(148 163 184 / 0.28)',
+        '--header-soft-icon-hover-bg': 'rgb(148 163 184 / 0.18)',
+        '--header-soft-icon-hover-bg-dark': 'rgb(148 163 184 / 0.2)',
+    }
+})
+
+const copyrightLine = computed(() => {
+    const fallback = t('© {year} :app. All rights reserved.', { app: appName.value })
+    return String(frontendFooterSettings.value.copyright_text || fallback)
+        .replaceAll('{copyright}', '©')
+        .replaceAll('{year}', currentYear.toString())
+        .replaceAll('{site_name}', appName.value)
+})
 
 const backToTopShapeClass = (shape: ConfigValue, hasLabel: boolean) => {
-    if (shape === 'square') return 'h-8 w-8 rounded-none px-0'
-    if (shape === 'pill') return hasLabel ? 'rounded-full px-3' : 'h-8 w-8 rounded-full px-0'
-    if (shape === 'circle') return 'h-8 w-8 rounded-full px-0'
-    return hasLabel ? 'rounded-lg' : 'h-8 w-8 rounded-lg px-0'
+    if (shape === 'square') return 'h-9 w-9 rounded-none px-0'
+    if (shape === 'pill') return hasLabel ? 'rounded-full px-3.5' : 'h-9 w-9 rounded-full px-0'
+    if (shape === 'circle') return 'h-9 w-9 rounded-full px-0'
+    return hasLabel ? 'rounded-xl px-3.5' : 'h-9 w-9 rounded-xl px-0'
 }
 
-const backToTopStyle = (config: Record<string, ConfigValue>) => {
-    const style: Record<string, string> = {}
-    if (typeof config.bg_color === 'string' && config.bg_color) style.backgroundColor = config.bg_color
-    if (typeof config.text_color === 'string' && config.text_color) style.color = config.text_color
-    return style
-}
+const backToTopIcon = computed(() => frontendFooterSettings.value.back_to_top_icon?.trim() || 'ti ti-arrow-up')
+const backToTopLabel = computed(() => frontendFooterSettings.value.back_to_top_label?.trim() || t('Back to top'))
+const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
-const backToTopIcon = (config: Record<string, ConfigValue>) => {
-    return typeof config.icon === 'string' && config.icon ? config.icon : 'ti ti-arrow-up'
-}
-
-const legalLinks = [
-    { key: 'privacy', label: t('Privacy Policy'), href: '/privacy-policy' },
-    { key: 'terms', label: t('Terms of Service'), href: '/terms' },
-    { key: 'cookies', label: t('Cookie Preferences'), href: '#' },
-    { key: 'refund', label: t('Refund Policy'), href: '/refund-policy' },
-    { key: 'contact', label: t('Contact'), href: '/contact' },
-]
-
-const enabledLegalLinks = (links: ConfigValue) => {
-    if (!Array.isArray(links)) return legalLinks
-    return legalLinks.filter((link) => links.includes(link.key))
-}
-
-const customLinkHref = (config: Record<string, ConfigValue>) => {
-    if (config.link_type === 'page' && typeof config.page_slug === 'string' && config.page_slug) {
-        return `/${config.page_slug}`
-    }
-    if (config.link_type === 'tool_category' && typeof config.tool_category_slug === 'string' && config.tool_category_slug) {
-        return `/ai-tools/category/${config.tool_category_slug}`
-    }
-    if (config.link_type === 'custom' && typeof config.custom_url === 'string') {
-        return config.custom_url
-    }
-    return ''
-}
-
-const canShowCustomLink = (config: Record<string, ConfigValue>) => {
-    const access = typeof config.access === 'string' ? config.access : 'all'
-    const loggedIn = Boolean(page.props.auth?.user)
-    const isFreeUser = loggedIn && page.props.auth?.user?.subscription_status !== 'active'
-
-    if (access === 'logged_in') return loggedIn
-    if (access === 'free') return isFreeUser
-    return true
-}
-
-const customLinkClass = (config: Record<string, ConfigValue>) => {
-    const displayMode = typeof config.display_mode === 'string' ? config.display_mode : 'vertical'
-    return displayMode === 'horizontal'
-        ? 'inline-flex items-center'
-        : 'block'
-}
+const hasFooterContent = computed(() => {
+    return Boolean(
+        brandTitle.value
+        || brandDescription.value
+        || footerLogo.value
+        || menuItems1.value.length
+        || menuItems2.value.length
+        || menuItems3.value.length
+        || customText1.value
+        || customText2.value
+        || contactEmail.value
+        || frontendFooterSettings.value.contact_phone?.trim()
+        || frontendFooterSettings.value.contact_address?.trim()
+        || showNewsletter.value
+        || showBottomSocialIcons.value
+        || showPaymentIcons.value
+        || showBackToTop.value
+        || bottomMenuItems.value.length,
+    )
+})
 </script>
 
 <template>
-    <component v-if="footerConfig?.custom_css" is="style">{{ footerConfig.custom_css }}</component>
-    <footer v-if="footerConfig && hasFooterContent" class="mt-auto border-t border-gray-100 bg-white dark:border-surface-800 dark:bg-surface-900" :style="[footerBackgroundStyle, footerTextStyle, headingStyleVars]">
-        <div class="footer-section-overlay py-12" :class="containerClass">
-            <div class="grid gap-12" :class="layoutClass">
-                <div v-for="(column, index) in footerColumns" :key="column.id ?? index" class="space-y-8" :class="footerColFlexClass(index, footerColumns.length)">
-                    <div v-if="column.title || column.subtitle" class="footer-heading">
-                        <h3 v-if="column.title" class="footer-heading-title">{{ column.title }}</h3>
-                        <p v-if="column.subtitle" class="mt-2 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ column.subtitle }}</p>
+    <section v-if="hasFooterContent && footerStyle === 'card_grid' && showNewsletter" class="w-full pb-6">
+        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6">
+            <section class="card-grid-newsletter-band">
+                <p class="card-grid-newsletter-badge text-xs font-semibold uppercase tracking-[0.24em]">{{ t('Newsletter') }}</p>
+                <div class="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:items-center">
+                    <div class="space-y-3">
+                        <h3 class="card-grid-newsletter-heading text-2xl font-bold sm:text-3xl">{{ newsletterTitle }}</h3>
+                        <p class="card-grid-newsletter-copy max-w-3xl text-sm leading-7">{{ newsletterDescription }}</p>
                     </div>
+                    <div :class="[showSocialIcons ? 'space-y-4' : '', 'w-full min-w-0']">
+                        <form method="post" action="/newsletter/subscribe" class="card-grid-newsletter-form">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="card-grid-newsletter-input min-w-0 px-4 py-3 text-sm focus:outline-none">
+                            <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
+                                {{ newsletterButtonLabel }}
+                            </button>
+                        </form>
+                        <SocialFollow
+                            v-if="showSocialIcons"
+                            display-mode="icons"
+                            icon-item-class="card-grid-social-icon"
+                            :icon-item-style="cardGridSocialIconStyle"
+                            :icon-inner-style="cardGridSocialIconInnerStyle"
+                            :icon-use-platform-color="false"
+                            :icon-use-platform-surface="false"
+                        />
+                    </div>
+                </div>
+            </section>
+        </div>
+    </section>
 
-                    <template v-for="block in column.blocks?.filter((item) => item.enabled !== false)" :key="block.id">
-                        <div v-if="block.type === 'about_text'" class="space-y-6">
-                            <Link href="/" class="flex items-center gap-3">
-                                <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-9 max-w-36 object-contain">
-                                <template v-else>
-                                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary-600 to-accent-600">
-                                        <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" /></svg>
-                                    </span>
-                                    <span class="text-xl font-black tracking-tight text-gray-900 dark:text-white">{{ appName }}</span>
-                                </template>
-                            </Link>
-                            <h4 v-if="block.config.title" class="footer-heading-title">{{ block.config.title }}</h4>
-                            <p v-if="block.config.description" class="text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ block.config.description }}</p>
-                            <SocialFollow v-if="showSocialIcon(block.config.show_social_icon)" display-mode="icons" />
-                        </div>
+    <footer v-if="hasFooterContent" :class="['mt-auto', footerStyle === 'floating_panel' ? 'footer-shell-floating' : '', isMobileBottomHeaderEnabled ? 'has-mobile-bottom-nav' : '']" :style="footerRootStyle">
+        <div :class="footerContainerClass">
+            <div v-if="footerStyle === 'default'" class="space-y-8">
+                <section
+                    v-if="showNewsletter"
+                    :class="[panelClass, panelToneClass('border-white/12 bg-linear-to-r from-white/12 via-white/6 to-transparent')]"
+                    class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center"
+                >
+                    <div class="space-y-3">
+                        <h2 class="footer-heading-main text-2xl font-bold">{{ newsletterTitle }}</h2>
+                        <p class="footer-copy max-w-2xl text-sm leading-7">{{ newsletterDescription }}</p>
+                    </div>
+                    <div class="space-y-3 lg:self-center">
+                        <SocialFollow
+                            v-if="showSocialIcons"
+                            display-mode="icons"
+                            icon-item-class="footer-social-icon"
+                            :icon-item-style="topSocialIconStyle"
+                            :icon-use-platform-color="false"
+                            :icon-use-platform-surface="false"
+                        />
+                        <form method="post" action="/newsletter/subscribe" class="default-newsletter-form w-full">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="default-newsletter-input footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                            <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
+                                {{ newsletterButtonLabel }}
+                            </button>
+                        </form>
+                    </div>
+                </section>
 
-                        <div v-else-if="block.type === 'menu_list'">
-                            <h4 v-if="block.config.title" class="footer-heading-title mb-6">{{ block.config.title }}</h4>
-                            <ul class="space-y-4">
-                                <template v-if="visibleMenuItems(getMenu(block.config.menu_slug)).length">
-                                    <li v-for="item in visibleMenuItems(getMenu(block.config.menu_slug))" :key="item.id">
-                                        <a :href="item.final_url || item.url" :target="item.target" class="footer-nav-link text-sm font-medium" :style="footerMenuLinkStyle">{{ item.label }}</a>
-                                    </li>
-                                </template>
-                                <li v-else class="text-sm italic text-gray-400">{{ t('Menu not found') }}</li>
-                            </ul>
-                        </div>
+                <section class="grid gap-6 lg:grid-cols-4">
+                    <div v-for="entry in activeStyleItems" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5')]">
+                        <div class="space-y-8">
+                            <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
+                                <div v-if="item === 'about_text'" class="space-y-5">
+                                    <div v-if="showLogoAbout" class="space-y-3">
+                                        <Link href="/" class="inline-flex items-center gap-3">
+                                            <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-10 max-w-40 object-contain">
+                                            <span v-else class="footer-brand-mark text-xl font-black tracking-tight">{{ appName }}</span>
+                                        </Link>
+                                        <div class="space-y-1">
+                                            <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                            <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                        </div>
+                                    </div>
+                                    <SocialFollow v-if="showSocialIcons" display-mode="icons" icon-item-class="footer-social-icon" :icon-item-style="topSocialIconStyle" :icon-use-platform-color="false" :icon-use-platform-surface="false" />
+                                </div>
+                                <div v-else-if="isLogoBlock(item)">
+                                    <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
+                                </div>
 
-                        <div v-else-if="block.type === 'contact_info'" class="rounded-2xl border border-gray-100 bg-gray-50/80 p-5 dark:border-surface-700 dark:bg-surface-800/70">
-                            <h4 v-if="block.config.title" class="footer-heading-title mb-6">{{ block.config.title }}</h4>
-                            <ul class="space-y-4">
-                                <li v-if="block.config.address" class="flex items-start gap-3 text-sm text-gray-500 dark:text-gray-400">
-                                    <i class="ti ti-map-pin mt-0.5 shrink-0 text-lg text-primary-500"></i>
-                                    <span>{{ block.config.address }}</span>
-                                </li>
-                                <li v-if="block.config.phone" class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                                    <i class="ti ti-phone shrink-0 text-lg text-primary-500"></i>
-                                    <a :href="`tel:${block.config.phone}`" class="transition-colors hover:text-primary-600">{{ block.config.phone }}</a>
-                                </li>
-                                <li v-if="block.config.email" class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                                    <i class="ti ti-mail shrink-0 text-lg text-primary-500"></i>
-                                    <a :href="`mailto:${block.config.email}`" class="transition-colors hover:text-primary-600">{{ block.config.email }}</a>
-                                </li>
-                            </ul>
-                            <p v-if="block.config.details" class="pt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">{{ block.config.details }}</p>
-                        </div>
+                                <div v-else-if="isMenuBlock(item)">
+                                    <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
+                                                <span>{{ menuItemLabel(menuItem) }}</span>
+                                                <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
+                                            </a>
+                                        </li>
+                                        <li v-if="menuBlockItems(item).length === 0" class="footer-subtle text-sm italic">{{ t('Menu not found') }}</li>
+                                    </ul>
+                                </div>
 
-                        <div v-else-if="block.type === 'newsletter'" class="rounded-2xl border border-primary-100 bg-gradient-to-br from-primary-50 to-white p-6 shadow-sm dark:border-primary-500/20 dark:bg-linear-to-br dark:from-primary-500/10 dark:to-surface-800">
-                            <h4 v-if="block.config.title" class="mb-2 footer-heading-title">{{ block.config.title }}</h4>
-                            <p v-if="block.config.description" class="mb-4 text-sm text-gray-500 dark:text-gray-400">{{ block.config.description }}</p>
-                            <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-2 sm:flex-row">
-                                <input type="email" name="email" required :placeholder="String(block.config.placeholder || t('Enter your email'))" class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 transition focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200">
-                                <button type="submit" class="rounded-lg btn-primary justify-center transition sm:self-start" :aria-label="String(block.config.button_text || t('Subscribe'))">
-                                    <span>{{ block.config.button_text || t('Subscribe') }}</span>
-                                </button>
-                            </form>
-                        </div>
+                                <div v-else-if="item === 'contact_info'">
+                                    <h3 v-if="contactTitle" class="footer-heading-title mb-5">{{ contactTitle }}</h3>
+                                    <ul class="footer-copy space-y-4 text-sm">
+                                        <li v-if="frontendFooterSettings.contact_address?.trim()" class="flex items-start gap-3">
+                                            <i class="footer-soft ti ti-map-pin mt-0.5 text-base"></i>
+                                            <span>{{ frontendFooterSettings.contact_address }}</span>
+                                        </li>
+                                        <li v-if="frontendFooterSettings.contact_phone?.trim()" class="flex items-center gap-3">
+                                            <i class="footer-soft ti ti-phone text-base"></i>
+                                            <a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a>
+                                        </li>
+                                        <li v-if="contactEmail" class="flex items-center gap-3">
+                                            <i class="footer-soft ti ti-mail text-base"></i>
+                                            <a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a>
+                                        </li>
+                                    </ul>
+                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft mt-5 text-sm leading-7">{{ frontendFooterSettings.contact_details }}</p>
+                                </div>
 
-                        <div v-else-if="block.type === 'social_icons'">
-                            <h4 v-if="block.config.title" class="mb-6 footer-heading-title">{{ block.config.title }}</h4>
-                            <SocialFollow :display-mode="socialDisplayMode(block.config.display_mode)" />
-                        </div>
+                                <div v-else-if="item === 'newsletter'" class="space-y-4">
+                                    <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
+                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                                        <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
+                                    </form>
+                                </div>
 
-                        <div v-else-if="block.type === 'recent_blog_posts'">
-                            <h4 v-if="block.config.title" class="mb-6 footer-heading-title">{{ block.config.title }}</h4>
-                            <ul class="space-y-3">
-                                <li v-for="post in limitedPosts(block.config.count)" :key="post.slug">
-                                    <Link :href="`/blog/${post.slug}`" class="text-sm font-medium text-gray-500 transition hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400">{{ post.title }}</Link>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div v-else-if="block.type === 'ai_tool_categories'">
-                            <h4 v-if="block.config.title" class="mb-6 footer-heading-title">{{ block.config.title }}</h4>
-                            <ul class="space-y-3">
-                                <li v-for="category in limitedCategories(block.config.count)" :key="category.slug">
-                                    <Link :href="`/ai-tools/category/${category.slug}`" class="text-sm font-medium text-gray-500 transition hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400">
-                                        {{ category.name }}
-                                        <span v-if="category.tools_count !== undefined" class="text-xs text-gray-400">({{ category.tools_count }})</span>
-                                    </Link>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div v-else-if="block.type === 'legal_links'">
-                            <h4 v-if="block.config.title" class="mb-6 footer-heading-title">{{ block.config.title }}</h4>
-                            <ul class="space-y-3">
-                                <li v-for="link in enabledLegalLinks(block.config.links)" :key="link.key">
-                                    <Link :href="link.href" class="text-sm font-medium text-gray-500 transition hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400">{{ t(link.label) }}</Link>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div v-else-if="block.type === 'custom_link' && canShowCustomLink(block.config)">
-                            <Link v-if="customLinkHref(block.config)" :href="customLinkHref(block.config)" :target="typeof block.config.target === 'string' ? block.config.target : '_self'" class="text-sm font-medium text-gray-500 transition hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400" :class="customLinkClass(block.config)">
-                                {{ block.config.label }}
-                            </Link>
-                        </div>
-
-                        <div v-else-if="block.type === 'image'">
-                            <h4 v-if="block.config.title" class="mb-4 footer-heading-title">{{ block.config.title }}</h4>
-                            <component :is="block.config.link ? 'a' : 'div'" :href="block.config.link || undefined" :target="typeof block.config.target === 'string' ? block.config.target : '_self'" class="inline-flex max-w-full">
-                                <img v-if="block.config.image_url" :src="String(block.config.image_url)" :alt="block.config.title || appName" class="object-contain" :style="{ width: `${Number(block.config.width || 120)}px`, height: `${Number(block.config.height || 40)}px` }">
-                            </component>
-                        </div>
-
-                        <div v-else-if="block.type === 'trust_badges'" class="rounded-xl border border-primary-100 bg-primary-50 p-4 dark:border-primary-900/40 dark:bg-primary-900/10">
-                            <h4 v-if="block.config.title" class="footer-heading-title text-sm font-bold text-gray-900 dark:text-white" style="color: inherit">{{ block.config.title }}</h4>
-                            <p v-if="block.config.text" class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ block.config.text }}</p>
-                        </div>
-
-                        <div v-else-if="block.type === 'custom_html'">
-                            <h4 v-if="block.config.title" class="mb-6 footer-heading-title">{{ block.config.title }}</h4>
-                            <div class="prose prose-sm text-gray-500 dark:prose-invert dark:text-gray-400" v-html="block.config.content"></div>
-                        </div>
-
-                        <div v-else-if="block.type === 'language_switcher'" class="flex items-center gap-2">
-                            <h4 v-if="block.config.title" class="footer-heading-title">{{ block.config.title }}</h4>
-                            <LanguageSwitcher />
-                        </div>
-
-                        <button v-else-if="block.type === 'dark_mode'" type="button" class="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" @click="toggleDark()">
-                            <svg v-if="isDark" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                            <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                            <span v-if="block.config.title">{{ block.config.title }}</span>
-                        </button>
-
-                        <div v-else-if="block.type === 'store_badges'">
-                            <h4 v-if="block.config.title" class="mb-6 footer-heading-title">{{ block.config.title }}</h4>
-                            <div class="flex flex-wrap gap-3">
-                                <a v-for="(badge, idx) in (Array.isArray(block.config.links) ? block.config.links : [])" :key="idx" :href="typeof badge === 'object' && badge ? (badge as any).url || '#' : '#'" target="_blank" class="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 text-sm font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20">
-                                    <span>{{ typeof badge === 'object' && badge ? ((badge as any).label || (badge as any).url) : badge }}</span>
-                                </a>
-                                <span v-if="!Array.isArray(block.config.links) || block.config.links.length === 0" class="text-sm italic text-gray-400">{{ t('No store badges configured.') }}</span>
+                                <div v-else-if="isCategoryBlock(item)">
+                                    <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="category in categoryBlockList(item)" :key="category.slug">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <span>{{ category.name }}</span>
+                                                <span v-if="category.tools_count !== undefined" class="footer-subtle text-xs">({{ category.tools_count }})</span>
+                                            </Link>
+                                        </li>
+                                        <li v-if="categoryBlockList(item).length === 0" class="footer-subtle text-sm italic">{{ t('No categories selected') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else>
+                                    <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Use this area for trust signals, offer notes, or a short buyer-focused message.') }}</p>
+                                </div>
                             </div>
                         </div>
-
-                        <div v-else-if="block.type === 'divider'" class="border-t border-gray-100 dark:border-surface-800" :style="{ marginBlock: `${Number(block.config.spacing || 24) / 2}px`, borderColor: typeof block.config.color === 'string' && block.config.color ? block.config.color : undefined }"></div>
-                    </template>
-                </div>
+                    </div>
+                </section>
             </div>
 
+            <div v-else-if="footerStyle === 'centered'" class="mx-auto max-w-5xl space-y-8 text-center">
+                <div class="space-y-4">
+                    <template v-if="showLogoAbout">
+                        <Link href="/" class="inline-flex items-center justify-center gap-3">
+                            <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-11 max-w-44 object-contain">
+                            <span v-else class="footer-brand-mark text-2xl font-black tracking-tight">{{ appName }}</span>
+                        </Link>
+                        <h2 v-if="brandTitle" class="footer-heading-main text-3xl font-bold">{{ brandTitle }}</h2>
+                        <p v-if="brandDescription" class="footer-copy mx-auto max-w-3xl text-sm leading-7">{{ brandDescription }}</p>
+                    </template>
+                    <SocialFollow
+                        v-if="showSocialIcons"
+                        display-mode="icons"
+                        class="justify-center"
+                        icon-item-class="footer-social-icon"
+                        :icon-item-style="topSocialIconStyle"
+                        :icon-use-platform-color="false"
+                        :icon-use-platform-surface="false"
+                    />
+                </div>
+
+                <section v-if="showNewsletter" :class="[panelClass, panelToneClass('border-white/12 bg-white/6')]">
+                    <div class="mx-auto max-w-3xl space-y-4">
+                        <h3 class="footer-heading-title text-base">{{ newsletterTitle }}</h3>
+                        <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                        <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3 sm:flex-row">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                            <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
+                                {{ newsletterButtonLabel }}
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="grid gap-6 md:grid-cols-3">
+                    <div v-for="entry in activeStyleItems" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5')]" class="text-center">
+                        <div class="space-y-8">
+                            <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
+                                <div v-if="item === 'about_text'" class="space-y-4">
+                                    <template v-if="showLogoAbout">
+                                        <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                    </template>
+                                    <SocialFollow v-if="showSocialIcons" display-mode="icons" class="justify-center" icon-item-class="footer-social-icon" :icon-item-style="topSocialIconStyle" :icon-use-platform-color="false" :icon-use-platform-surface="false" />
+                                </div>
+                                <div v-else-if="isLogoBlock(item)">
+                                    <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="mx-auto h-10 max-w-40 object-contain">
+                                </div>
+                                <div v-else-if="isMenuBlock(item)" class="space-y-4">
+                                    <h3 v-if="menuBlockTitle(item)" class="footer-heading-title">{{ menuBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <span>{{ menuItemLabel(menuItem) }}</span>
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div v-else-if="item === 'contact_info'" class="footer-copy space-y-3 text-sm leading-7">
+                                    <h3 v-if="contactTitle" class="footer-heading-title">{{ contactTitle }}</h3>
+                                    <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
+                                    <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
+                                    <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
+                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                </div>
+                                <div v-else-if="item === 'newsletter'" class="space-y-4">
+                                    <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
+                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                                        <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
+                                    </form>
+                                </div>
+                                <div v-else-if="isCategoryBlock(item)" class="space-y-4">
+                                    <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title">{{ categoryBlockTitle(item) }}</h3>
+                                    <div class="flex flex-wrap items-center justify-center gap-2">
+                                        <Link v-for="category in categoryBlockList(item)" :key="category.slug" :href="`/ai-tools/category/${category.slug}`" class="footer-pill-link inline-flex items-center rounded-full border border-white/12 bg-white/6 px-3 py-1.5 text-xs font-semibold transition hover:bg-white/12">
+                                            {{ category.name }}
+                                        </Link>
+                                    </div>
+                                </div>
+                                <div v-else class="space-y-4">
+                                    <h3 v-if="customBlockTitle(item)" class="footer-heading-title">{{ customBlockTitle(item) }}</h3>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Add onboarding hints, guarantees, or buyer-friendly product guidance here.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div v-else-if="footerStyle === 'spotlight'" class="space-y-6">
+                <section
+                    v-if="showNewsletter"
+                    class="spotlight-newsletter-band"
+                >
+                    <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:items-center">
+                        <div class="space-y-3 text-center lg:text-start">
+                            <h2 class="spotlight-newsletter-heading text-3xl font-bold tracking-tight sm:text-4xl">{{ newsletterTitle }}</h2>
+                            <p class="mx-auto max-w-2xl text-sm leading-7 text-slate-200 lg:mx-0">{{ newsletterDescription }}</p>
+                        </div>
+                        <form method="post" action="/newsletter/subscribe" class="spotlight-newsletter-form w-full">
+                            <div class="spotlight-newsletter-input-wrap">
+                                <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="spotlight-newsletter-input min-w-0 flex-1 rounded-full border px-5 py-3 pe-32 text-sm focus:outline-none sm:pe-40">
+                                <button type="submit" :aria-label="newsletterButtonLabel" class="spotlight-newsletter-button">
+                                    <span class="hidden sm:inline">{{ newsletterButtonLabel }}</span>
+                                    <i class="ti ti-arrow-up-right text-base sm:ms-2" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                    <div v-for="entry in spotlightMainEntries" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5')]">
+                        <div class="space-y-8">
+                            <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
+                                <div v-if="isMenuBlock(item)">
+                                    <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
+                                                <span>{{ menuItemLabel(menuItem) }}</span>
+                                                <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
+                                            </a>
+                                        </li>
+                                        <li v-if="menuBlockItems(item).length === 0" class="footer-subtle text-sm italic">{{ t('Menu not found') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else-if="item === 'contact_info'">
+                                    <h3 v-if="contactTitle" class="footer-heading-title mb-5">{{ contactTitle }}</h3>
+                                    <div class="footer-copy space-y-3 text-sm leading-7">
+                                        <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
+                                        <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
+                                        <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
+                                        <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                    </div>
+                                </div>
+                                <div v-else-if="item === 'newsletter'" class="space-y-4">
+                                    <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
+                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                                        <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
+                                    </form>
+                                </div>
+                                <div v-else-if="item === 'about_text'" class="space-y-4">
+                                    <template v-if="showLogoAbout">
+                                        <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                    </template>
+                                </div>
+                                <div v-else-if="isLogoBlock(item)">
+                                    <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
+                                </div>
+                                <div v-else-if="isCategoryBlock(item)">
+                                    <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="category in categoryBlockList(item)" :key="category.slug">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <span>{{ category.name }}</span>
+                                                <span v-if="category.tools_count !== undefined" class="footer-subtle text-xs">({{ category.tools_count }})</span>
+                                            </Link>
+                                        </li>
+                                        <li v-if="categoryBlockList(item).length === 0" class="footer-subtle text-sm italic">{{ t('No categories selected') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else>
+                                    <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Use this card for trust badges, offer details, or short marketplace notes.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section v-if="hasSpotlightBrandBar" :class="[panelClass, panelToneClass('border-white/12 bg-linear-to-r from-white/8 via-white/5 to-transparent')]">
+                    <div :class="spotlightBrandBarCentered ? 'flex flex-col items-center gap-5 text-center' : 'flex flex-col gap-5 md:flex-row md:items-center md:justify-between'">
+                        <div v-if="showLogoAbout" :class="spotlightBrandBarCentered ? 'flex justify-center' : 'flex items-center gap-4'">
+                            <Link href="/" class="inline-flex items-center gap-4">
+                                <img v-if="footerLogo" :src="footerLogo" :alt="spotlightBrandName" class="h-12 max-w-48 object-contain">
+                                <span v-if="spotlightBrandName" class="footer-heading-title text-lg font-semibold normal-case">{{ spotlightBrandName }}</span>
+                            </Link>
+                        </div>
+                        <div v-if="showSocialIcons && spotlightSocialProfiles.length" :class="['flex flex-wrap gap-2.5', spotlightBrandBarCentered ? 'justify-center' : 'md:justify-end']">
+                            <a
+                                v-for="profile in spotlightSocialProfiles"
+                                :key="profile.platform"
+                                :href="profile.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="spotlight-social-pill"
+                                :aria-label="t('Follow :platform', { platform: profile.label })"
+                            >
+                                <span class="spotlight-social-pill__icon">
+                                    <i :class="[socialPlatformIconClass(profile.platform), 'text-base leading-none']" aria-hidden="true" />
+                                </span>
+                                <span class="truncate">{{ profile.label }}</span>
+                            </a>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div v-else-if="footerStyle === 'split_band'" class="space-y-6">
+                <section v-if="hasSplitBandTopSection" :class="[panelClass, panelToneClass('border-white/12 bg-linear-to-r from-white/12 via-white/8 to-transparent'), splitBandTopSpacingClass]">
+                    <div :class="showLogoAbout ? 'grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] lg:items-center' : 'mx-auto flex max-w-3xl flex-col gap-4 text-center'">
+                        <div v-if="showLogoAbout" class="space-y-4">
+                            <Link href="/" class="inline-flex items-center gap-3">
+                                <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-10 max-w-40 object-contain">
+                                <span v-else class="footer-brand-mark text-xl font-black tracking-tight">{{ appName }}</span>
+                            </Link>
+                            <h2 v-if="brandTitle" class="footer-heading-main text-3xl font-bold">{{ brandTitle }}</h2>
+                            <p v-if="brandDescription" class="footer-copy max-w-2xl text-sm leading-7">{{ brandDescription }}</p>
+                        </div>
+                        <div :class="showLogoAbout ? 'space-y-4 lg:text-end' : 'space-y-4 text-center'">
+                            <div v-if="showNewsletter" class="space-y-3">
+                                <div :class="showLogoAbout ? 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between' : 'flex flex-col items-center gap-3'">
+                                    <SocialFollow
+                                        v-if="showSocialIcons"
+                                        display-mode="icons"
+                                        :class="showLogoAbout ? 'sm:shrink-0' : 'justify-center'"
+                                        icon-item-class="footer-social-icon"
+                                        :icon-item-style="topSocialIconStyle"
+                                        :icon-use-platform-color="false"
+                                        :icon-use-platform-surface="false"
+                                    />
+                                    <div :class="showLogoAbout ? 'space-y-3' : 'space-y-3 text-center'">
+                                        <p class="footer-kicker text-base font-semibold uppercase tracking-[0.24em]">{{ newsletterTitle }}</p>
+                                        <p :class="showLogoAbout ? 'footer-copy text-sm leading-7 lg:ms-auto lg:max-w-xl' : 'footer-copy mx-auto max-w-2xl text-sm leading-7'">{{ newsletterDescription }}</p>
+                                    </div>
+                                </div>
+                                <form method="post" action="/newsletter/subscribe" :class="showLogoAbout ? 'split-band-newsletter-form lg:justify-end' : 'split-band-newsletter-form mx-auto w-full max-w-xl'">
+                                    <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="split-band-newsletter-input min-w-0 flex-1">
+                                    <button type="submit" :aria-label="newsletterButtonLabel" :class="splitBandNewsletterButtonClass">
+                                        {{ newsletterButtonLabel }}
+                                    </button>
+                                </form>
+                            </div>
+                            <SocialFollow
+                                v-else-if="showSocialIcons"
+                                display-mode="icons"
+                                :class="showLogoAbout ? 'lg:justify-end' : 'justify-center'"
+                                icon-item-class="footer-social-icon"
+                                :icon-item-style="topSocialIconStyle"
+                                :icon-use-platform-color="false"
+                                :icon-use-platform-surface="false"
+                            />
+                        </div>
+                    </div>
+                </section>
+
+                <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                    <div v-for="entry in activeStyleItems" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5'), splitBandColumnClass]">
+                        <div :class="splitBandColumnContentClass">
+                            <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
+                                <div v-if="isMenuBlock(item)">
+                                    <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
+                                                <span>{{ menuItemLabel(menuItem) }}</span>
+                                            </a>
+                                        </li>
+                                        <li v-if="menuBlockItems(item).length === 0" class="footer-subtle text-sm italic">{{ t('Menu not found') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else-if="item === 'contact_info'">
+                                    <h3 v-if="contactTitle" class="footer-heading-title mb-5">{{ contactTitle }}</h3>
+                                    <div class="footer-copy space-y-3 text-sm leading-7">
+                                        <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
+                                        <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
+                                        <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
+                                    </div>
+                                </div>
+                                <div v-else-if="item === 'newsletter'" class="space-y-4">
+                                    <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
+                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                                        <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
+                                    </form>
+                                </div>
+                                <div v-else-if="item === 'about_text'" class="space-y-4">
+                                    <template v-if="showLogoAbout">
+                                        <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                    </template>
+                                </div>
+                                <div v-else-if="isLogoBlock(item)">
+                                    <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
+                                </div>
+                                <div v-else-if="isCategoryBlock(item)">
+                                    <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="category in categoryBlockList(item)" :key="category.slug">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <span>{{ category.name }}</span>
+                                                <span v-if="category.tools_count !== undefined" class="footer-subtle text-xs">({{ category.tools_count }})</span>
+                                            </Link>
+                                        </li>
+                                        <li v-if="categoryBlockList(item).length === 0" class="footer-subtle text-sm italic">{{ t('No categories selected') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else>
+                                    <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Add a short product trust message or onboarding note here.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div v-else-if="footerStyle === 'floating_panel'" :class="['space-y-8', showNewsletter ? '' : 'pt-10 sm:pt-12 lg:pt-14']">
+                <section
+                    v-if="showNewsletter"
+                    class="floating-newsletter-band relative z-20"
+                >
+                    <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)] xl:items-center">
+                        <div class="space-y-4 lg:text-left text-center">
+                            <h3 class="mb-2 floating-newsletter-title bg-gradient-to-br from-primary-400 to-primary-600 bg-clip-text !text-transparent">{{ newsletterTitle }}</h3>
+                            <p class="floating-newsletter-copy">{{ newsletterDescription }}</p>
+                        </div>
+                        <form method="post" action="/newsletter/subscribe" class="floating-newsletter-form relative">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="floating-newsletter-input w-full">
+                            <button type="submit" :aria-label="newsletterButtonLabel" class="floating-newsletter-button">
+                                {{ newsletterButtonLabel }}
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <section v-if="hasBrandIntroPanel" :class="[panelClass, panelToneClass('border-white/12 bg-linear-to-r from-white/12 via-white/8 to-transparent')]">
+                    <div class="space-y-5 flex flex-col items-center justify-center text-center">
+                        <div v-if="showLogoAbout" class="space-y-5">
+                            <Link href="/" class="inline-flex items-center gap-3">
+                                <img v-if="footerLogo" :src="footerLogo" :alt="appName" class="h-10 max-w-40 object-contain">
+                                    <span v-else class="footer-brand-mark text-xl font-black tracking-tight">{{ appName }}</span>
+                            </Link>
+                            <h2 v-if="brandTitle" class="footer-heading-main text-4xl font-bold">{{ brandTitle }}</h2>
+                            <p v-if="brandDescription" class="footer-copy max-w-3xl text-sm">{{ brandDescription }}</p>
+                        </div>
+                        <SocialFollow
+                            v-if="showSocialIcons"
+                            display-mode="icons"
+                            icon-item-class="footer-social-icon"
+                            :icon-item-style="topSocialIconStyle"
+                            :icon-use-platform-color="false"
+                            :icon-use-platform-surface="false"
+                        />
+                    </div>
+                </section>
+
+                <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+                    <div v-for="entry in activeStyleItems" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5')]">
+                        <div class="space-y-8">
+                            <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
+                                <div v-if="isMenuBlock(item)">
+                                    <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
+                                            <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
+                                                <span>{{ menuItemLabel(menuItem) }}</span>
+                                                <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
+                                            </a>
+                                        </li>
+                                        <li v-if="menuBlockItems(item).length === 0" class="footer-subtle text-sm italic">{{ t('Menu not found') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else-if="item === 'contact_info'">
+                                    <h3 v-if="contactTitle" class="footer-heading-title mb-5">{{ contactTitle }}</h3>
+                                    <div class="footer-copy space-y-3 text-sm leading-7">
+                                        <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
+                                        <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
+                                        <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
+                                        <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                    </div>
+                                </div>
+                                <div v-else-if="item === 'newsletter'" class="space-y-4">
+                                    <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
+                                    <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
+                                    <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input footer-input-ghost min-w-0 flex-1 rounded-xl border border-white/18 bg-transparent px-4 py-3 text-sm focus:border-white/36 focus:outline-none">
+                                        <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
+                                    </form>
+                                </div>
+                                <div v-else-if="item === 'about_text'" class="space-y-4">
+                                    <template v-if="showLogoAbout">
+                                        <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                        <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                                    </template>
+                                </div>
+                                <div v-else-if="isLogoBlock(item)">
+                                    <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
+                                </div>
+                                <div v-else-if="isCategoryBlock(item)">
+                                    <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
+                                    <ul class="space-y-3">
+                                        <li v-for="category in categoryBlockList(item)" :key="category.slug">
+                                            <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                                <span>{{ category.name }}</span>
+                                                <span v-if="category.tools_count !== undefined" class="footer-subtle text-xs">({{ category.tools_count }})</span>
+                                            </Link>
+                                        </li>
+                                        <li v-if="categoryBlockList(item).length === 0" class="footer-subtle text-sm italic">{{ t('No categories selected') }}</li>
+                                    </ul>
+                                </div>
+                                <div v-else>
+                                    <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
+                                    <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
+                                    <p v-else class="footer-subtle text-sm leading-7">{{ t('Use this floating card for benefits, trust points, or a short marketplace-ready message.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div v-else class="space-y-6">
+                <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+                    <div v-for="entry in activeStyleItems" :key="entry.slot" :class="[cardClass, cardToneClass('border-white/10 bg-white/5')]">
+                    <div class="space-y-8">
+                        <div v-for="item in entry.items" :key="`${entry.slot}-${item}`">
+                            <div v-if="isMenuBlock(item)">
+                                <h3 v-if="menuBlockTitle(item)" class="footer-heading-title mb-5">{{ menuBlockTitle(item) }}</h3>
+                                <ul class="space-y-3">
+                                    <li v-for="menuItem in menuBlockItems(item)" :key="menuItem.id">
+                                        <a :href="menuItemHref(menuItem)" :target="menuItemTarget(menuItem)" :rel="menuItemRel(menuItem)" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <i v-if="menuItemIcon(menuItem)" :class="[menuItemIcon(menuItem), 'text-base leading-none']" aria-hidden="true" />
+                                            <span>{{ menuItemLabel(menuItem) }}</span>
+                                            <span v-if="menuItemBadgeText(menuItem)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(menuItem)}`">{{ menuItemBadgeText(menuItem) }}</span>
+                                        </a>
+                                    </li>
+                                    <li v-if="menuBlockItems(item).length === 0" class="footer-subtle text-sm italic">{{ t('Menu not found') }}</li>
+                                </ul>
+                            </div>
+                            <div v-else-if="item === 'contact_info'">
+                                <h3 v-if="contactTitle" class="footer-heading-title mb-5">{{ contactTitle }}</h3>
+                                <div class="footer-copy space-y-3 text-sm leading-7">
+                                    <p v-if="contactEmail"><a :href="`mailto:${contactEmail}`" class="footer-nav-link">{{ contactEmail }}</a></p>
+                                    <p v-if="frontendFooterSettings.contact_phone?.trim()"><a :href="`tel:${frontendFooterSettings.contact_phone}`" class="footer-nav-link">{{ frontendFooterSettings.contact_phone }}</a></p>
+                                    <p v-if="frontendFooterSettings.contact_address?.trim()">{{ frontendFooterSettings.contact_address }}</p>
+                                    <p v-if="frontendFooterSettings.contact_details?.trim()" class="footer-soft">{{ frontendFooterSettings.contact_details }}</p>
+                                </div>
+                            </div>
+                            <div v-else-if="item === 'about_text'" class="space-y-4">
+                                <h3 v-if="brandTitle" class="footer-heading-title">{{ brandTitle }}</h3>
+                                <p v-if="brandDescription" class="footer-copy text-sm leading-7">{{ brandDescription }}</p>
+                            </div>
+                            <div v-else-if="isLogoBlock(item)">
+                                <img :src="logoBlockSrc(item)" :alt="logoBlockAlt(item)" class="h-10 max-w-40 object-contain">
+                            </div>
+                            <div v-else-if="isCategoryBlock(item)">
+                                <h3 v-if="categoryBlockTitle(item)" class="footer-heading-title mb-5">{{ categoryBlockTitle(item) }}</h3>
+                                <ul class="space-y-3">
+                                    <li v-for="category in categoryBlockList(item)" :key="category.slug">
+                                        <Link :href="`/ai-tools/category/${category.slug}`" class="footer-nav-link inline-flex items-center gap-2 text-sm font-medium">
+                                            <span>{{ category.name }}</span>
+                                            <span v-if="category.tools_count !== undefined" class="footer-subtle text-xs">({{ category.tools_count }})</span>
+                                        </Link>
+                                    </li>
+                                    <li v-if="categoryBlockList(item).length === 0" class="footer-subtle text-sm italic">{{ t('No categories selected') }}</li>
+                                </ul>
+                            </div>
+                            <div v-else>
+                                <h3 v-if="customBlockTitle(item)" class="footer-heading-title mb-5">{{ customBlockTitle(item) }}</h3>
+                                <p v-if="customBlockText(item)" class="footer-copy text-sm leading-7">{{ customBlockText(item) }}</p>
+                                <p v-else class="footer-subtle text-sm leading-7">{{ t('Share a support promise, launch note, or short buyer reassurance here.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                </section>
+            </div>
         </div>
 
-        <section v-if="footerConfig.bottom_bar" class="footer-bottom-shell" :class="footerConfig.bottom_bar.border_top !== false ? 'footer-bottom-shell--border' : ''" :style="bottomBarStyle">
-            <div class="footer-bottom-grid flex flex-col gap-4 md:flex-row" :class="containerClass">
-                <div v-for="column in enabledBottomColumns" :key="column.id" class="footer-bottom-column" :class="[column.id === 'right' ? 'footer-bottom-column-right' : 'footer-bottom-column-left', bottomColFlexClass((column.id || 'left') as 'left' | 'right')]">
-                    <div v-if="column.id === 'right' && footerConfig.bottom_bar.menu_slug && topMenuItems(footerConfig.bottom_bar.menu_slug).length" class="footer-bottom-item">
+        <section
+            class="footer-bottom-shell"
+            :class="[
+                showBottomBarBorder ? 'footer-bottom-shell--border' : '',
+                bottomBarCentered ? 'footer-bottom-shell--centered' : '',
+            ]"
+            :style="bottomBarStyle"
+        >
+            <div v-if="bottomBarCentered" :class="['flex w-full flex-col items-center gap-4 text-center', footerContainerClass]">
+                <div v-if="showPaymentIcons && paymentIconList.length" class="footer-payment-image-wrap justify-center">
+                    <template v-for="(icon, index) in paymentIconList" :key="`${icon}-${index}`">
+                        <img v-if="paymentIconSrc(icon)" :src="paymentIconSrc(icon)" :alt="paymentIconLabel(icon)" class="footer-payment-image">
+                        <span
+                            v-else
+                            class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1"
+                            :class="paymentBadgeClass(icon)"
+                        >
+                            {{ paymentIconLabel(icon) }}
+                        </span>
+                    </template>
+                </div>
+
+                <SocialFollow
+                    v-if="showBottomSocialIcons"
+                    display-mode="icons"
+                    class="justify-center"
+                    icon-item-class="footer-bottom-social-icon"
+                    :icon-item-style="bottomBarSocialIconStyle"
+                    :icon-use-platform-color="false"
+                    :icon-use-platform-surface="false"
+                />
+
+                <div v-if="bottomMenuItems.length" class="footer-bottom-item">
+                    <ul class="flex flex-wrap items-center justify-center gap-4">
+                        <li v-for="item in bottomMenuItems" :key="item.id">
+                            <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" class="footer-bottom-link inline-flex items-center gap-2 text-xs font-medium" :style="bottomBarLinkStyle">
+                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-sm leading-none']" aria-hidden="true" />
+                                <span>{{ menuItemLabel(item) }}</span>
+                                <span v-if="menuItemBadgeText(item)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <p class="text-xs font-medium">{{ copyrightLine }}</p>
+
+                <div v-if="showBackToTop || showBottomLanguageSelector" class="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                        v-if="showBackToTop"
+                        type="button"
+                        class="footer-back-to-top flex items-center justify-center gap-2 bg-white/8 px-2.5 text-sm font-semibold text-inherit transition hover:bg-white/14"
+                        :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(frontendFooterSettings.back_to_top_label?.trim()))"
+                        :aria-label="backToTopLabel"
+                        @click="scrollToTop"
+                    >
+                        <i :class="backToTopIcon"></i>
+                        <span v-if="frontendFooterSettings.back_to_top_shape !== 'circle' && frontendFooterSettings.back_to_top_shape !== 'square'">
+                            {{ backToTopLabel }}
+                        </span>
+                    </button>
+
+                    <LanguageSwitcher
+                        v-if="showBottomLanguageSelector"
+                        display="icon_label"
+                        placement="up"
+                        :ui="{ buttonClass: 'footer-language-switcher inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold', buttonStyle: bottomBarLanguageSwitcherStyle }"
+                    />
+                </div>
+            </div>
+            <div v-else :class="['flex w-full flex-col items-center gap-4 text-center lg:hidden', footerContainerClass]">
+                <div v-if="showPaymentIcons && paymentIconList.length" class="footer-payment-image-wrap justify-center">
+                    <template v-for="(icon, index) in paymentIconList" :key="`mobile-${icon}-${index}`">
+                        <img v-if="paymentIconSrc(icon)" :src="paymentIconSrc(icon)" :alt="paymentIconLabel(icon)" class="footer-payment-image">
+                        <span
+                            v-else
+                            class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1"
+                            :class="paymentBadgeClass(icon)"
+                        >
+                            {{ paymentIconLabel(icon) }}
+                        </span>
+                    </template>
+                </div>
+
+                <SocialFollow
+                    v-if="showBottomSocialIcons"
+                    display-mode="icons"
+                    class="justify-center"
+                    icon-item-class="footer-bottom-social-icon"
+                    :icon-item-style="bottomBarSocialIconStyle"
+                    :icon-use-platform-color="false"
+                    :icon-use-platform-surface="false"
+                />
+
+                <div v-if="bottomMenuItems.length" class="footer-bottom-item justify-center">
+                    <ul class="flex flex-wrap items-center justify-center gap-4">
+                        <li v-for="item in bottomMenuItems" :key="`mobile-${item.id}`">
+                            <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" class="footer-bottom-link inline-flex items-center gap-2 text-xs font-medium" :style="bottomBarLinkStyle">
+                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-sm leading-none']" aria-hidden="true" />
+                                <span>{{ menuItemLabel(item) }}</span>
+                                <span v-if="menuItemBadgeText(item)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <p class="text-xs font-medium">{{ copyrightLine }}</p>
+
+                <div v-if="showBackToTop || showBottomLanguageSelector" class="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                        v-if="showBackToTop"
+                        type="button"
+                        class="footer-back-to-top flex items-center justify-center gap-2 bg-white/8 px-2.5 text-sm font-semibold text-inherit transition hover:bg-white/14"
+                        :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(frontendFooterSettings.back_to_top_label?.trim()))"
+                        :aria-label="backToTopLabel"
+                        @click="scrollToTop"
+                    >
+                        <i :class="backToTopIcon"></i>
+                        <span v-if="frontendFooterSettings.back_to_top_shape !== 'circle' && frontendFooterSettings.back_to_top_shape !== 'square'">
+                            {{ backToTopLabel }}
+                        </span>
+                    </button>
+
+                    <LanguageSwitcher
+                        v-if="showBottomLanguageSelector"
+                        display="icon_label"
+                        placement="up"
+                        :ui="{ buttonClass: 'footer-language-switcher inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold', buttonStyle: bottomBarLanguageSwitcherStyle }"
+                    />
+                </div>
+            </div>
+            <div v-if="!bottomBarCentered" :class="['hidden w-full flex-col gap-4 lg:flex lg:flex-row lg:items-center lg:justify-between', footerContainerClass]">
+                <div class="footer-bottom-column footer-bottom-column-left">
+                    <p class="text-xs font-medium">{{ copyrightLine }}</p>
+                </div>
+
+                <div class="footer-bottom-column footer-bottom-column-right">
+                    <div v-if="bottomMenuItems.length" class="footer-bottom-item">
                         <ul class="flex flex-wrap items-center justify-center gap-4 md:justify-end">
-                            <li v-for="item in topMenuItems(footerConfig.bottom_bar.menu_slug)" :key="menuItemId(item)">
-                                <a :href="menuItemHref(item)" :target="item.target" class="footer-bottom-link text-xs font-medium" :style="bottomBarLinkStyle">{{ menuItemLabel(item) }}</a>
+                            <li v-for="item in bottomMenuItems" :key="item.id">
+                                <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" class="footer-bottom-link inline-flex items-center gap-2 text-xs font-medium" :style="bottomBarLinkStyle">
+                                    <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-sm leading-none']" aria-hidden="true" />
+                                    <span>{{ menuItemLabel(item) }}</span>
+                                    <span v-if="menuItemBadgeText(item)" class="footer-menu-badge" :class="`footer-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                </a>
                             </li>
                         </ul>
                     </div>
-                    <div v-for="block in column.blocks" :key="block.id" class="footer-bottom-item" :class="{ 'footer-bottom-item-copyright': block.type === 'copyright_text', 'footer-bottom-item-fixed': block.type === 'payment_icons' || block.type === 'social_icons' }">
-                        <p v-if="block.type === 'copyright_text'" class="text-xs font-medium">{{ withYear(block.config.text) }}</p>
-                        <SocialFollow
-                            v-else-if="block.type === 'social_icons'"
-                            :display-mode="socialDisplayMode(block.config.display_mode)"
-                            icon-item-class="footer-bottom-social-icon"
-                            :icon-item-style="bottomBarSocialIconStyle"
-                            :icon-use-platform-surface="false"
-                            :icon-use-platform-color="false"
-                        />
-                        <div v-else-if="block.type === 'payment_icons' && Array.isArray(block.config.icons) && block.config.icons.length" class="footer-payment-image-wrap">
-                            <template v-for="(icon, index) in block.config.icons" :key="`${icon}-${index}`">
-                                <img v-if="paymentIconSrc(icon)" :src="paymentIconSrc(icon)" :alt="paymentIconLabel(icon)" class="footer-payment-image">
-                                <span
-                                    v-else
-                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1"
-                                    :class="paymentBadgeClass(icon)"
-                                >
-                                    {{ paymentIconLabel(icon) }}
-                                </span>
-                            </template>
-                        </div>
-                        <button v-else-if="block.type === 'back_to_top'" type="button" class="flex min-h-8 items-center justify-center gap-2 bg-gray-50 px-2.5 text-gray-600 shadow-sm transition hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :class="backToTopShapeClass(block.config.shape, Boolean(block.config.label))" :style="backToTopStyle(block.config)" :aria-label="String(block.config.label || t('Back to top'))" @click="scrollToTop">
-                            <i :class="backToTopIcon(block.config)"></i>
-                            <span v-if="block.config.shape !== 'circle' && block.config.shape !== 'square' && block.config.label" class="text-xs font-semibold">
-                                {{ block.config.label }}
+
+                    <SocialFollow
+                        v-if="showBottomSocialIcons"
+                        display-mode="icons"
+                        icon-item-class="footer-bottom-social-icon"
+                        :icon-item-style="bottomBarSocialIconStyle"
+                        :icon-use-platform-color="false"
+                        :icon-use-platform-surface="false"
+                    />
+
+                    <div v-if="showPaymentIcons && paymentIconList.length" class="footer-payment-image-wrap">
+                        <template v-for="(icon, index) in paymentIconList" :key="`${icon}-${index}`">
+                            <img v-if="paymentIconSrc(icon)" :src="paymentIconSrc(icon)" :alt="paymentIconLabel(icon)" class="footer-payment-image">
+                            <span
+                                v-else
+                                class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1"
+                                :class="paymentBadgeClass(icon)"
+                            >
+                                {{ paymentIconLabel(icon) }}
                             </span>
-                        </button>
+                        </template>
                     </div>
+
+                    <button
+                        v-if="showBackToTop"
+                        type="button"
+                        class="footer-back-to-top flex items-center justify-center gap-2 bg-white/8 px-2.5 text-sm font-semibold text-inherit transition hover:bg-white/14"
+                        :class="backToTopShapeClass(frontendFooterSettings.back_to_top_shape, Boolean(frontendFooterSettings.back_to_top_label?.trim()))"
+                        :aria-label="backToTopLabel"
+                        @click="scrollToTop"
+                    >
+                        <i :class="backToTopIcon"></i>
+                        <span v-if="frontendFooterSettings.back_to_top_shape !== 'circle' && frontendFooterSettings.back_to_top_shape !== 'square'">
+                            {{ backToTopLabel }}
+                        </span>
+                    </button>
+
+                    <LanguageSwitcher
+                        v-if="showBottomLanguageSelector"
+                        display="icon_label"
+                        placement="up"
+                        :ui="{ buttonClass: 'footer-language-switcher inline-flex min-w-0 items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold', buttonStyle: bottomBarLanguageSwitcherStyle }"
+                    />
                 </div>
             </div>
         </section>
@@ -911,61 +1489,26 @@ const customLinkClass = (config: Record<string, ConfigValue>) => {
 </template>
 
 <style scoped>
-.footer-section-overlay {
-    position: relative;
-}
-.footer-section-overlay::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--footer-bg-overlay, transparent);
-    pointer-events: none;
-    z-index: 1;
-}
-.footer-section-overlay > * {
-    position: relative;
-    z-index: 2;
+.footer-heading-main,
+.footer-heading-title,
+.footer-brand-mark,
+.footer-kicker {
+    color: var(--footer-heading-color, #ffffff) !important;
 }
 
-.footer-heading-title {
-    font-size: var(--footer-heading-size, 12px);
-    font-weight: var(--footer-heading-weight, 900);
-    text-transform: var(--footer-heading-transform, uppercase);
-    letter-spacing: 0.1em;
-    color: var(--footer-heading-color, inherit);
-}
-
-:deep(.footer-bottom-social-icon) {
-    color: inherit;
-    border-radius: 9999px;
-    border: 1px solid rgb(148 163 184 / 0.22);
-    background: rgb(148 163 184 / 0.12);
-    box-shadow: none;
-}
-
-:deep(.footer-bottom-social-icon:hover) {
-    color: inherit;
-    border-color: rgb(148 163 184 / 0.32);
-    background: rgb(148 163 184 / 0.18);
-}
-
-:deep(.footer-bottom-social-icon i) {
-    color: inherit;
-}
-
-:global(.dark) :deep(.footer-bottom-social-icon) {
-    border-color: rgb(255 255 255 / 0.18);
-    background: rgb(255 255 255 / 0.08);
-}
-
-:global(.dark) :deep(.footer-bottom-social-icon:hover) {
-    border-color: rgb(255 255 255 / 0.26);
-    background: rgb(255 255 255 / 0.14);
+.footer-heading-main,
+.footer-heading-title,
+.footer-kicker {
+    text-transform: var(--footer-heading-transform, capitalize);
 }
 
 .footer-nav-link,
-.footer-bottom-link {
-    color: inherit;
+.footer-nav-link span,
+.footer-nav-link i,
+.footer-bottom-link,
+.footer-bottom-link span,
+.footer-bottom-link i {
+    color: inherit !important;
     transition: opacity 0.2s ease, color 0.2s ease;
 }
 
@@ -974,13 +1517,653 @@ const customLinkClass = (config: Record<string, ConfigValue>) => {
     opacity: 0.84;
 }
 
-.footer-bottom-grid {
-    padding-block: var(--footer-bottom-padding, 32px);
+.footer-copy {
+    color: var(--footer-text-muted) !important;
+}
+
+.footer-soft {
+    color: var(--footer-text-soft) !important;
+}
+
+.footer-subtle {
+    color: var(--footer-text-subtle) !important;
+}
+
+.footer-pill-link {
+    color: var(--footer-text-muted) !important;
+}
+
+.footer-input {
+    color: var(--footer-text-color) !important;
+    -webkit-text-fill-color: var(--footer-text-color);
+    caret-color: var(--footer-text-color);
+}
+
+.footer-input-ghost {
+    background: transparent !important;
+    color: var(--footer-heading-color, #ffffff) !important;
+    -webkit-text-fill-color: var(--footer-heading-color, #ffffff);
+    caret-color: var(--footer-heading-color, #ffffff);
+}
+
+.footer-input::placeholder {
+    color: var(--footer-input-placeholder) !important;
+}
+
+.footer-input-ghost::placeholder {
+    color: color-mix(in srgb, var(--footer-heading-color, #ffffff) 52%, transparent) !important;
+}
+
+.split-band-newsletter-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.split-band-newsletter-input {
+    min-height: 3.25rem;
+    border: 1px solid rgb(255 255 255 / 0.18);
+    border-radius: 0.9rem;
+    padding: 0.8rem 1rem;
+    background: rgb(255 255 255 / 0.96);
+    color: rgb(15 23 42);
+    -webkit-text-fill-color: rgb(15 23 42);
+    caret-color: rgb(15 23 42);
+    box-shadow: 0 10px 30px rgb(15 23 42 / 0.08);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.split-band-newsletter-input:focus {
+    outline: none;
+    border-color: rgb(59 130 246 / 0.5);
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.14);
+}
+
+.split-band-newsletter-input::placeholder {
+    color: rgb(100 116 139);
+}
+
+.default-newsletter-form {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 0;
+}
+
+.default-newsletter-input {
+    width: 100%;
+}
+
+.spotlight-newsletter-form {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 0;
+}
+
+.spotlight-newsletter-input-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.default-newsletter-form :deep(button) {
+    margin-top: -1px;
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+}
+
+.default-newsletter-input {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+}
+
+.spotlight-newsletter-band {
+    overflow: hidden;
+    border: 1px solid rgb(148 163 184 / 0.2);
+    border-radius: 1.75rem;
+    padding: 1.5rem;
+    background:
+        radial-gradient(circle at top right, rgb(191 219 254 / 0.7), transparent 24%),
+        radial-gradient(circle at bottom left, rgb(220 252 231 / 0.8), transparent 28%),
+        linear-gradient(135deg, #0f172a 0%, #172554 45%, #0369a1 100%);
+    box-shadow:
+        0 24px 70px rgba(15, 23, 42, 0.22),
+        0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.spotlight-newsletter-heading {
+    display: inline-block;
+    background: linear-gradient(135deg, #fde68a 0%, #fb923c 32%, #f97316 58%, #d946ef 82%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+.spotlight-newsletter-input {
+    width: 100%;
+    border-radius: 9999px;
+    border-color: rgb(255 255 255 / 0.16);
+    background: rgb(255 255 255 / 0.96);
+    color: rgb(15 23 42);
+    -webkit-text-fill-color: rgb(15 23 42);
+    caret-color: rgb(15 23 42);
+}
+
+.spotlight-newsletter-input::placeholder {
+    color: rgb(100 116 139);
+}
+
+.spotlight-newsletter-icon-button {
+    position: absolute;
+    inset-inline-end: 0.5rem;
+    top: 50%;
+    display: none;
+    height: 2.5rem;
+    width: 2.5rem;
+    transform: translateY(-50%);
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #f97316, #d946ef);
+    color: white;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.spotlight-newsletter-icon-button:hover {
+    opacity: 0.92;
+}
+
+@media (max-width: 639px) {
+    .spotlight-newsletter-icon-button {
+        display: inline-flex;
+    }
+}
+
+.spotlight-newsletter-button {
+    position: absolute;
+    inset-inline-end: 0;
+    top: 50%;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    padding: 0.65rem 0.95rem;
+    background: linear-gradient(135deg, #f97316, #ef4444);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    transform: translateY(-50%);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.spotlight-newsletter-button:hover {
+    opacity: 0.92;
+}
+
+.card-grid-newsletter-band {
+    position: relative;
+    overflow: visible;
+    border: 1px solid rgb(226 232 240 / 0.9);
+    border-radius: 1.75rem;
+    padding: 2.6rem 1.5rem 1.5rem;
+    background:
+        radial-gradient(circle at top right, rgb(219 234 254 / 0.9), transparent 24%),
+        radial-gradient(circle at bottom left, rgb(220 252 231 / 0.92), transparent 30%),
+        linear-gradient(135deg, #ffffff 0%, #f8fafc 48%, #eef2ff 100%);
+    box-shadow:
+        0 24px 70px rgba(148, 163, 184, 0.18),
+        0 10px 24px rgba(148, 163, 184, 0.1);
+}
+
+.card-grid-newsletter-badge {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgb(165 180 252 / 0.8);
+    border-radius: 9999px;
+    padding: 0.45rem 0.95rem;
+    color: rgb(79 70 229);
+    background: linear-gradient(135deg, rgb(238 242 255), rgb(224 231 255));
+    box-shadow: 0 12px 26px rgb(129 140 248 / 0.18);
+    white-space: nowrap;
+    z-index: 2;
+}
+
+.card-grid-newsletter-heading {
+    background: linear-gradient(
+        135deg,
+        var(--color-primary-500, #10b981) 0%,
+        var(--color-primary-600, #059669) 52%,
+        var(--color-primary-700, #047857) 100%
+    );
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.card-grid-newsletter-copy {
+    color: rgb(71 85 105);
+}
+
+.card-grid-newsletter-form {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    width: 100%;
+}
+
+.card-grid-newsletter-input {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgb(203 213 225);
+    border-start-start-radius: 9999px;
+    border-end-start-radius: 9999px;
+    border-start-end-radius: 0;
+    border-end-end-radius: 0;
+    background: rgba(255, 255, 255, 0.9);
+    color: rgb(15 23 42);
+    -webkit-text-fill-color: rgb(15 23 42);
+    caret-color: rgb(15 23 42);
+    box-shadow: 0 10px 30px rgb(148 163 184 / 0.12);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.card-grid-newsletter-input:focus {
+    border-color: rgb(99 102 241 / 0.5);
+    box-shadow: 0 0 0 3px rgb(99 102 241 / 0.12);
+}
+
+.card-grid-newsletter-input::placeholder {
+    color: rgb(148 163 184);
+}
+
+.card-grid-newsletter-form :deep(button) {
+    margin-top: 0;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    border-start-end-radius: 9999px;
+    border-end-end-radius: 9999px;
+    margin-inline-start: -1px;
+}
+
+:deep(.card-grid-social-icon) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.7rem;
+    height: 2.7rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary-500, #10b981) 22%, white);
+    border-radius: 9999px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-primary-500, #10b981) 12%, white),
+        color-mix(in srgb, var(--color-primary-500, #10b981) 7%, white)
+    );
+    color: var(--color-primary-600, #059669);
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--color-primary-500, #10b981) 14%, transparent);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+:deep(.card-grid-social-icon:hover) {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-primary-500, #10b981) 36%, white);
+    box-shadow: 0 14px 30px color-mix(in srgb, var(--color-primary-500, #10b981) 20%, transparent);
+}
+
+:deep(.card-grid-social-icon i),
+:deep(.card-grid-social-icon svg) {
+    color: inherit;
+}
+
+.split-band-newsletter-submit {
+    min-height: 3.25rem;
+    border-radius: 0.9rem;
+    padding: 0.8rem 1.2rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+    .spotlight-newsletter-form {
+        align-items: stretch;
+    }
+
+    .default-newsletter-form {
+        flex-direction: row;
+        align-items: stretch;
+    }
+
+    .default-newsletter-input {
+        border-end-start-radius: 0.75rem;
+        border-start-end-radius: 0;
+        border-end-end-radius: 0;
+    }
+
+    .default-newsletter-form :deep(button) {
+        margin-top: 0;
+        border-start-start-radius: 0;
+        border-end-start-radius: 0;
+        border-start-end-radius: 0.75rem;
+        border-end-end-radius: 0.75rem;
+        margin-inline-start: -1px;
+    }
+
+    .spotlight-newsletter-button {
+        min-height: 2.875rem;
+        padding-inline: 1.15rem;
+    }
+
+    .card-grid-newsletter-form {
+        flex-direction: row;
+        align-items: stretch;
+    }
+
+    .split-band-newsletter-form {
+        flex-direction: row;
+        align-items: stretch;
+    }
+
+    .split-band-newsletter-input {
+        border-start-end-radius: 0;
+        border-end-end-radius: 0;
+    }
+
+    .split-band-newsletter-submit {
+        border-start-start-radius: 0;
+        border-end-start-radius: 0;
+        margin-inline-start: -1px;
+    }
+}
+
+@media (max-width: 639px) {
+    .card-grid-newsletter-band {
+        text-align: center;
+    }
+
+    .card-grid-newsletter-copy {
+        margin-inline: auto;
+    }
+
+    .card-grid-newsletter-form {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .card-grid-newsletter-input {
+        border-radius: 9999px;
+    }
+
+    .card-grid-newsletter-form :deep(button) {
+        width: 100%;
+        margin-inline-start: 0;
+        border-radius: 9999px;
+    }
+
+    :deep(.card-grid-newsletter-band .flex.shrink-0.items-center.gap-2\.5) {
+        justify-content: center;
+    }
+}
+
+.footer-menu-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.footer-menu-badge--green { background: rgb(220 252 231) !important; color: rgb(21 128 61) !important; }
+.footer-menu-badge--blue { background: rgb(219 234 254) !important; color: rgb(29 78 216) !important; }
+.footer-menu-badge--violet { background: rgb(237 233 254) !important; color: rgb(109 40 217) !important; }
+.footer-menu-badge--amber { background: rgb(254 243 199) !important; color: rgb(180 83 9) !important; }
+.footer-menu-badge--red { background: rgb(254 226 226) !important; color: rgb(220 38 38) !important; }
+.footer-menu-badge--gray { background: rgb(243 244 246) !important; color: rgb(75 85 99) !important; }
+
+:deep(.footer-social-icon),
+:deep(.footer-bottom-social-icon) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    color: inherit;
+    border-radius: 9999px;
+    box-shadow: none;
+    transition: all 0.2s ease;
+}
+
+:deep(.footer-social-icon:hover) {
+    background: rgb(255 255 255 / 0.12) !important;
+    border-color: rgb(255 255 255 / 0.2) !important;
+    transform: translateY(-2px);
+}
+
+:deep(.footer-bottom-social-icon:hover) {
+    background: rgb(148 163 184 / 0.2) !important;
+    border-color: rgb(148 163 184 / 0.3) !important;
+    transform: translateY(-2px);
+}
+
+.spotlight-social-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in srgb, var(--footer-text-color) 14%, transparent);
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--footer-text-color) 12%, transparent),
+        color-mix(in srgb, var(--footer-text-color) 5%, transparent)
+    );
+    padding: 0.25rem 1rem 0.5rem 0.25rem;
+    color: var(--footer-text-color);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    backdrop-filter: blur(10px);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--footer-text-color) 8%, transparent), 0 10px 24px rgb(15 23 42 / 0.16);
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.spotlight-social-pill,
+.spotlight-social-pill span,
+.spotlight-social-pill i {
+    color: var(--footer-text-color) !important;
+    -webkit-text-fill-color: var(--footer-text-color);
+}
+
+.spotlight-social-pill:hover {
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--footer-text-color) 16%, transparent),
+        color-mix(in srgb, var(--footer-text-color) 8%, transparent)
+    );
+    border-color: color-mix(in srgb, var(--footer-text-color) 22%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--footer-text-color) 10%, transparent), 0 14px 30px rgb(15 23 42 / 0.2);
+    transform: translateY(-1px);
+}
+
+.spotlight-social-pill__icon {
+    display: inline-flex;
+    height: 1.5rem;
+    width: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--footer-text-color) 18%, rgb(15 23 42 / 0.72)),
+        color-mix(in srgb, var(--footer-text-color) 10%, rgb(15 23 42 / 0.92))
+    );
+    border: 1px solid color-mix(in srgb, var(--footer-text-color) 14%, transparent);
+    color: var(--footer-text-color);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--footer-text-color) 8%, transparent);
+    flex-shrink: 0;
+}
+
+.footer-shell-floating {
+    position: relative;
+    margin-top: 6rem;
+    border-top: 1px solid var(--footer-floating-shell-edge, rgb(15 23 42 / 0.12));
+    border-top-left-radius: 2rem;
+    border-top-right-radius: 2rem;
+    background:
+        linear-gradient(180deg, color-mix(in srgb, var(--footer-floating-shell-bg, #0f172a) 96%, white 4%) 0%, var(--footer-floating-shell-bg, #0f172a) 100%);
+    box-shadow: var(--footer-floating-shell-shadow, 0 -24px 80px rgba(15, 23, 42, 0.14));
+    overflow: visible;
+}
+
+@media (max-width: 1023px) {
+    .footer-shell-floating {
+        margin-top: 5rem;
+    }
+}
+
+@media (max-width: 767px) {
+    .footer-shell-floating {
+        margin-top: 4rem;
+    }
+}
+
+.footer-shell-floating::before {
+    content: none;
+}
+
+.footer-shell-floating::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 20%);
+}
+
+.floating-newsletter-band {
+    position: relative;
+    z-index: 20;
+    transform: translateY(-50%);
+    margin-bottom: -2.5rem;
+    overflow: hidden;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 1.75rem;
+    padding: 1.5rem;
+    background:
+        radial-gradient(circle at top right, rgb(191 219 254 / 0.7), transparent 24%),
+        radial-gradient(circle at bottom left, rgb(220 252 231 / 0.85), transparent 26%),
+        linear-gradient(135deg, #ffffff 0%, #f8fafc 52%, #eef6ff 100%);
+    box-shadow:
+        0 24px 70px rgba(15, 23, 42, 0.18),
+        0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 1023px) {
+    .floating-newsletter-band {
+        margin-bottom: -5rem;
+    }
+}
+
+.floating-newsletter-band::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgb(255 255 255 / 0.74), transparent 58%);
+}
+
+.floating-newsletter-title {
+    position: relative;
+    z-index: 1;
+    max-width: 36rem;
+    font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.03em;
+    text-transform: none;
+}
+
+.floating-newsletter-copy {
+    position: relative;
+    z-index: 1;
+    max-width: 40rem;
+    color: rgb(71 85 105);
+    font-size: 0.95rem;
+    line-height: 1.8;
+}
+
+.floating-newsletter-form {
+    position: relative;
+    z-index: 1;
+}
+
+.floating-newsletter-input {
+    position: relative;
+    z-index: 1;
+    min-height: 3.75rem;
+    border: 1px solid rgb(203 213 225);
+    border-radius: 9999px;
+    padding: 0.9rem 8.5rem 0.9rem 1.5rem;
+    background: rgb(255 255 255 / 0.88);
+    color: rgb(15 23 42);
+    -webkit-text-fill-color: rgb(15 23 42);
+    caret-color: rgb(15 23 42);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.75);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.floating-newsletter-input:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    background: rgb(255 255 255);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 20%, transparent);
+}
+
+.floating-newsletter-input::placeholder {
+    color: rgb(148 163 184);
+}
+
+.floating-newsletter-button {
+    position: absolute;
+    z-index: 2;
+    inset-block: 0.35rem;
+    right: 0.35rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 9999px;
+    padding: 0 1.5rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary-500) 90%, black 10%), var(--color-primary-500));
+    color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--color-primary-500) 30%, transparent);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+
+.floating-newsletter-button:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--color-primary-500) 35%, transparent);
 }
 
 .footer-bottom-shell {
     background-color: inherit;
     color: inherit;
+    margin-top: var(--footer-bottom-gap, 40px);
 }
 
 .footer-bottom-shell--border {
@@ -988,100 +2171,70 @@ const customLinkClass = (config: Record<string, ConfigValue>) => {
     border-top-width: var(--footer-bottom-border-width, 1px);
 }
 
+.footer-bottom-shell--centered {
+    text-align: center;
+}
+
 .footer-bottom-column {
     display: flex;
-    flex: 1 1 100%;
     min-width: 0;
-    flex-direction: column;
     align-items: center;
-    flex-wrap: wrap;
     gap: 1rem;
 }
 
 .footer-bottom-column-left {
-    justify-content: flex-start;
-    text-align: center;
+    justify-content: center;
 }
 
 .footer-bottom-column-right {
-    justify-content: flex-start;
-    text-align: center;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .footer-bottom-item {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    min-width: 0;
-}
-
-.footer-bottom-item-fixed {
-    flex: 0 0 auto;
-    min-width: max-content;
-    width: max-content;
-    max-width: none;
-    overflow: visible;
-}
-
-.footer-bottom-item-copyright {
-    order: 99;
-    width: 100%;
 }
 
 .footer-payment-image-wrap {
-    display: inline-flex;
-    flex: 0 0 auto;
-    align-items: center;
-    gap: 0.5rem;
-    width: max-content;
-    min-width: max-content;
-    max-width: none;
-    overflow: visible;
-    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .footer-payment-image {
     display: block;
     flex: 0 0 auto;
     width: auto;
-    min-width: max-content;
-    max-width: none;
     height: 32px;
+    object-fit: contain;
+}
+
+.footer-back-to-top {
+    min-height: 36px;
 }
 
 @media (min-width: 768px) {
-    .footer-bottom-column {
-        flex-basis: calc(50% - 0.5rem);
-        flex-direction: row;
-        align-items: center;
+    .footer-bottom-shell {
+        padding-block: var(--footer-bottom-padding, 32px);
     }
 
     .footer-bottom-column-left {
+        justify-content: flex-start;
         text-align: start;
     }
 
     .footer-bottom-column-right {
         justify-content: flex-end;
-        text-align: end;
-    }
-
-    .footer-bottom-item {
-        justify-content: flex-start;
-    }
-
-    .footer-bottom-item-copyright {
-        order: 0;
-        width: auto;
-    }
-
-    .footer-bottom-grid {
-        padding-block: var(--footer-bottom-padding, 32px);
     }
 }
 
-@media (min-width: 1280px) {
-    .footer-bottom-grid {
+@media (max-width: 767px) {
+    .footer-bottom-shell {
         padding-block: var(--footer-bottom-padding, 32px);
+    }
+
+    footer.has-mobile-bottom-nav {
+        padding-bottom: var(--mobile-bottom-height, 60px) !important;
     }
 }
 </style>

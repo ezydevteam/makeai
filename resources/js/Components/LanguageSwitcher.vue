@@ -21,6 +21,7 @@ interface LanguageOption {
 
 const props = withDefaults(defineProps<{
     display?: 'default' | 'icon' | 'icon_label' | 'bottom'
+    placement?: 'down' | 'up'
     ui?: {
         buttonClass?: string
         buttonStyle?: CSSProperties
@@ -28,6 +29,7 @@ const props = withDefaults(defineProps<{
     }
 }>(), {
     display: 'default',
+    placement: 'down',
     ui: () => ({}),
 })
 
@@ -44,6 +46,7 @@ const currentLanguage = computed(() => languages.value.find((language) => langua
 })
 const shouldRender = computed(() => Boolean(currentLanguage.value?.code || currentLanguage.value?.name))
 const isBottomDisplay = computed(() => props.display === 'bottom')
+const opensUpward = computed(() => isBottomDisplay.value || props.placement === 'up')
 const showFlag = computed(() => props.display === 'default' || props.display === 'bottom')
 const showName = computed(() => props.display === 'default' || props.display === 'icon_label' || props.display === 'bottom')
 const showChevron = computed(() => props.display === 'default' || props.display === 'icon_label')
@@ -53,9 +56,9 @@ const buttonClass = computed(() => isBottomDisplay.value
     : props.display === 'icon'
         ? 'inline-flex h-9 w-9 min-w-9 items-center justify-center gap-0 rounded-lg p-0 text-sm font-semibold transition-all duration-200 disabled:cursor-wait disabled:opacity-60'
         : 'inline-flex min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition disabled:cursor-wait disabled:opacity-60')
-const dropdownClass = computed(() => isBottomDisplay.value
-    ? 'absolute bottom-full start-1/2 z-50 mb-2 max-h-72 w-56 max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900 rtl:translate-x-1/2'
-    : 'absolute end-0 top-full z-50 mt-2 max-h-72 w-56 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900')
+const dropdownClass = computed(() => opensUpward.value
+    ? 'absolute bottom-full start-1/2 z-50 mb-2 max-h-72 min-w-48 max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900 rtl:translate-x-1/2'
+    : 'absolute end-0 top-full z-50 mt-2 max-h-72 min-w-48 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-800 dark:bg-gray-900')
 
 const isRtlValue = (value?: boolean | number | string | null) => value === true || value === 1 || value === '1'
 
@@ -140,7 +143,7 @@ onUnmounted(() => {
                     <span class="truncate">{{ language.name }}</span>
                     <span v-if="language.is_rtl" class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500 dark:bg-gray-800 dark:text-gray-400">{{ t('RTL') }}</span>
                 </span>
-                <span v-if="language.code === locale.code" class="shrink-0 text-xs text-primary-600">{{ t('Active') }}</span>
+                <i v-if="language.code === locale.code" class="ti ti-check shrink-0 text-base text-primary-600 dark:text-primary-300" aria-hidden="true"></i>
             </button>
         </div>
     </div>

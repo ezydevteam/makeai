@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SupportDepartment extends Model
 {
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'name',
         'slug',

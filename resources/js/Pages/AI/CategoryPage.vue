@@ -36,8 +36,8 @@ const { t } = useTranslate()
 const isProTool = (tool: Template) => {
     const level = tool.access_level || 'inherit'
     if (level === 'premium' || level.startsWith('plan:')) return true
-    if (level === 'inherit' && category.access_level) {
-        const catLevel = category.access_level
+    if (level === 'inherit' && props.category.access_level) {
+        const catLevel = props.category.access_level
         return catLevel === 'premium' || catLevel.startsWith('plan:')
     }
     return false

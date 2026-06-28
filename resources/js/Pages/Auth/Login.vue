@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
 import { Head, useForm, Link, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useFlashToasts } from '@/Composables/useToastr'
+import { useTheme } from '@/Composables/useTheme'
 
 useFlashToasts()
 
@@ -13,35 +15,49 @@ interface SocialLoginProvider {
     display_mode?: 'icon' | 'icon-label'
 }
 
+interface DemoCredentials {
+    admin: { email: string; password: string }
+    user: { email: string; password: string }
+}
+
 interface PageProps {
     socialLoginProviders?: SocialLoginProvider[]
-    branding?: { site_name?: string }
-    app?: { demo?: boolean; demo_credentials?: { admin: { email: string; password: string }; user: { email: string; password: string } } | null }
+    branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
+    app?: { demo?: boolean; demo_credentials?: DemoCredentials | null }
+    captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
 }
 
 const form = useForm({
     email: '',
     password: '',
     remember: false,
+    captcha_token: '',
 })
 
 const showPassword = ref(false)
 const page = usePage()
 const { t } = useTranslate()
-const appName = computed(() => String((page.props as unknown as PageProps).branding?.site_name || t('Application')))
+const { isDark } = useTheme()
+const branding = computed(() => (page.props as unknown as PageProps).branding)
+const appName = computed(() => String(branding.value?.site_name || t('Application')))
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
 const isDemo = computed(() => (page.props as unknown as PageProps).app?.demo ?? false)
 const demoCredentials = computed(() => (page.props as unknown as PageProps).app?.demo_credentials ?? null)
-const socialProviders = computed(() => {
-    const props = page.props as unknown as PageProps
-
-    return props.socialLoginProviders ?? []
-})
+const socialProviders = computed(() => ((page.props as unknown as PageProps).socialLoginProviders ?? []))
+const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => (page.props as unknown as PageProps).captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
 const socialProviderIcons: Record<string, string> = {
-    google: 'ti ti-brand-google',
     github: 'ti ti-brand-github',
-    facebook: 'ti ti-brand-facebook',
     reddit: 'ti ti-brand-reddit',
     twitter: 'ti ti-brand-x',
+}
+const socialProviderIconColors: Record<string, string> = {
+    google: 'text-[#ea4335]',
+    github: 'text-[#111827] dark:text-white',
+    facebook: 'text-[#1877f2]',
+    reddit: 'text-[#ff4500]',
+    twitter: 'text-[#111827] dark:text-white',
 }
 
 const submit = () => {
@@ -52,105 +68,154 @@ const submit = () => {
 </script>
 
 <template>
-    <Head title="Sign In" />
+    <Head :title="t('Sign In')" />
 
-    <div class="auth-page">
-        <div class="auth-glow">
-            <div class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/20 to-white"></div>
-            <div class="absolute top-1/4 left-1/3 w-80 h-80 bg-primary-100/40 rounded-full blur-3xl"></div>
-            <div class="absolute bottom-1/3 right-1/4 w-64 h-64 bg-accent-100/30 rounded-full blur-3xl"></div>
-        </div>
-
-        <div class="w-full max-w-md relative z-10">
-            <!-- Logo -->
-            <div class="text-center mb-10">
-                <Link :href="route('home')" class="inline-flex items-center gap-3 mb-6 group">
-                    <div class="w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-2xl shadow-gray-900/20 group-hover:scale-105 transition-transform">
-                        <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                    </div>
-                </Link>
-                <h1 class="text-3xl font-black text-gray-900 tracking-tight">{{ t('Welcome back') }}</h1>
-                <p class="text-gray-500 mt-2 text-sm font-medium">{{ t('Log in to your :app account to continue', { app: appName }) }}</p>
-            </div>
-
-            <!-- Card -->
-            <div class="auth-card">
-                <div v-if="socialProviders.length > 0" class="mb-8 space-y-3">
-                    <a
-                        v-for="provider in socialProviders"
-                        :key="provider.provider"
-                        :href="provider.url"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-700 shadow-sm transition hover:border-primary-300 hover:bg-primary-50"
-                    >
-                        <i :class="socialProviderIcons[provider.provider] || 'ti ti-login-2'" class="text-base"></i>
-                        <span v-if="provider.display_mode !== 'icon'">{{ t('Continue with :provider', { provider: provider.label }) }}</span>
-                    </a>
-                    <div class="flex items-center gap-3">
-                        <span class="h-px flex-1 bg-gray-100"></span>
-                        <span class="text-xs font-bold uppercase tracking-wider text-gray-400">{{ t('or') }}</span>
-                        <span class="h-px flex-1 bg-gray-100"></span>
-                    </div>
-                </div>
-
-                <form @submit.prevent="submit" class="space-y-6">
-                    <div>
-                        <label for="email" class="auth-label">{{ t('Email Address') }}</label>
-                        <input id="email" v-model="form.email" type="email" required autofocus autocomplete="email" class="auth-input" :placeholder="t('name@company.com')" />
-                        <p v-if="form.errors.email" class="auth-error">{{ form.errors.email }}</p>
-                    </div>
-
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <label for="password" class="auth-label mb-0">{{ t('Password') }}</label>
+    <div class="auth-page p-4 lg:p-8">
+        <div class="auth-shell">
+            <div class="auth-split-card grid lg:grid-cols-2 lg:rounded-7xl lg:overflow-hidden">
+                <section class="auth-form-panel flex items-center px-6 py-10 sm:px-8 lg:min-h-[42rem] lg:px-12 xl:px-16">
+                    <div class="auth-form-inner mx-auto">
+                        <div class="auth-brand-block mb-8">
+                            <Link :href="route('home')" class="mb-8 inline-flex items-center justify-center text-gray-950 no-underline dark:text-white">
+                                <img v-if="authLogo" :src="authLogo" :alt="appName" class="h-11 w-auto max-w-[180px] object-contain">
+                                <span v-else class="font-heading text-[1.75rem] font-bold">{{ appName }}</span>
+                            </Link>
+                            <h1 class="font-heading text-[2rem] font-bold tracking-tight text-gray-950 dark:text-white">
+                                <span>{{ t('Welcome back!') }}</span>
+                                {{ t('Sign In') }}
+                            </h1>
+                            <p class="text-base text-gray-500 dark:text-gray-400">{{ t('Please enter your details to get full access.') }}</p>
                         </div>
-                        <div class="relative">
-                            <input id="password" v-model="form.password" :type="showPassword ? 'text' : 'password'" required autocomplete="current-password" class="auth-input pr-12" :placeholder="t('••••••••')" />
-                            <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors">
-                                <svg v-if="!showPassword" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                <svg v-else class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+
+                        <form class="space-y-6" @submit.prevent="submit">
+                            <div class="auth-floating-group">
+                                <input
+                                    id="email"
+                                    v-model="form.email"
+                                    type="email"
+                                    required
+                                    autofocus
+                                    autocomplete="email"
+                                    placeholder=" "
+                                    :class="['auth-floating-input', { 'is-invalid': Boolean(form.errors.email) }]"
+                                >
+                                <label for="email" class="auth-floating-label">{{ t('E-mail') }}</label>
+                                <span class="pointer-events-none absolute inset-y-0 right-4 flex items-center text-gray-300 dark:text-gray-500">
+                                    <i class="ti ti-mail text-[1.15rem]"></i>
+                                </span>
+                            </div>
+                            <p v-if="form.errors.email" class="auth-error">{{ form.errors.email }}</p>
+
+                            <div class="auth-floating-group">
+                                <input
+                                    id="password"
+                                    v-model="form.password"
+                                    :type="showPassword ? 'text' : 'password'"
+                                    required
+                                    autocomplete="current-password"
+                                    placeholder=" "
+                                    :class="['auth-floating-input', { 'is-invalid': Boolean(form.errors.password) }]"
+                                >
+                                <label for="password" class="auth-floating-label">{{ t('Password') }}</label>
+                                <button
+                                    type="button"
+                                    class="absolute inset-y-0 right-4 flex items-center text-gray-300 transition-colors hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="showPassword ? t('Hide password') : t('Show password')"
+                                    @click="showPassword = !showPassword"
+                                >
+                                    <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-[1.15rem]"></i>
+                                </button>
+                            </div>
+                            <p v-if="form.errors.password" class="auth-error">{{ form.errors.password }}</p>
+
+                            <div class="flex items-center justify-between gap-4 text-sm">
+                                <label class="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+                                    <input v-model="form.remember" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-white/10 dark:bg-white/5">
+                                    <span>{{ t('Remember me') }}</span>
+                                </label>
+                                <Link :href="route('password.request')" class="auth-inline-link">
+                                    {{ t('Forgot password?') }}
+                                </Link>
+                            </div>
+
+                            <AuthCaptchaField
+                                v-if="captcha.enabled"
+                                v-model="form.captcha_token"
+                                :config="captcha"
+                                :error="form.errors.captcha_token"
+                            />
+
+                            <button type="submit" :disabled="form.processing" class="auth-primary-button">
+                                <span v-if="!form.processing">{{ t('Sign In') }}</span>
+                                <span v-else class="inline-flex items-center gap-2">
+                                    <i class="ti ti-loader-2 animate-spin text-lg"></i>
+                                    {{ t('Signing in...') }}
+                                </span>
                             </button>
-                        </div>
-                        <p v-if="form.errors.password" class="auth-error">{{ form.errors.password }}</p>
-                    </div>
+                        </form>
 
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer group">
-                            <input v-model="form.remember" type="checkbox" class="w-4 h-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-primary-500 shadow-sm" />
-                            <span class="text-sm text-gray-500 group-hover:text-gray-900 transition-colors font-medium">{{ t('Remember me') }}</span>
-                        </label>
-                        <Link :href="route('password.request')" class="text-sm text-primary-600 hover:text-primary-700 font-bold transition-colors">{{ t('Forgot password?') }}</Link>
-                    </div>
-
-                    <button type="submit" :disabled="form.processing" class="auth-btn">
-                        <svg v-if="form.processing" class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                        <span>{{ form.processing ? t('Signing in...') : t('Sign In') }}</span>
-                    </button>
-                </form>
-
-                <div class="mt-10 pt-8 border-t border-gray-50 text-center">
-                    <!-- Demo credentials -->
-                    <div v-if="isDemo && demoCredentials" class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-left dark:border-amber-800 dark:bg-amber-900/20">
-                        <p class="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-3">{{ t('Demo Credentials') }}</p>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 dark:text-gray-400">{{ t('Admin') }}</span>
-                                <code class="text-xs bg-amber-100 dark:bg-amber-800 px-2 py-0.5 rounded font-mono text-amber-800 dark:text-amber-200">{{ demoCredentials.admin.email }}</code>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 dark:text-gray-400">{{ t('User') }}</span>
-                                <code class="text-xs bg-amber-100 dark:bg-amber-800 px-2 py-0.5 rounded font-mono text-amber-800 dark:text-amber-200">{{ demoCredentials.user.email }}</code>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-gray-600 dark:text-gray-400">{{ t('Password') }}</span>
-                                <code class="text-xs bg-amber-100 dark:bg-amber-800 px-2 py-0.5 rounded font-mono text-amber-800 dark:text-amber-200">{{ demoCredentials.admin.password }}</code>
+                        <div v-if="socialProviders.length > 0" class="mt-10">
+                            <div class="auth-divider">{{ t('or sign in with') }}</div>
+                            <div class="mt-6 grid gap-4 sm:grid-cols-2">
+                                <a
+                                    v-for="provider in socialProviders"
+                                    :key="provider.provider"
+                                    :href="provider.url"
+                                    class="auth-social-button"
+                                    :aria-label="t('Continue with :provider', { provider: provider.label })"
+                                >
+                                    <span class="auth-social-icon">
+                                        <svg v-if="provider.provider === 'google'" viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
+                                            <path fill="#4285F4" d="M21.805 12.23c0-.75-.067-1.47-.191-2.16H12v4.09h5.498a4.7 4.7 0 0 1-2.04 3.08v2.56h3.3c1.93-1.78 3.047-4.4 3.047-7.57Z" />
+                                            <path fill="#34A853" d="M12 22c2.76 0 5.07-.91 6.76-2.47l-3.3-2.56c-.91.61-2.08.97-3.46.97-2.66 0-4.91-1.8-5.72-4.22H2.87v2.64A10 10 0 0 0 12 22Z" />
+                                            <path fill="#FBBC05" d="M6.28 13.72A5.99 5.99 0 0 1 5.96 12c0-.6.11-1.18.32-1.72V7.64H2.87A10 10 0 0 0 2 12c0 1.61.39 3.13 1.08 4.36l3.2-2.64Z" />
+                                            <path fill="#EA4335" d="M12 6.04c1.5 0 2.84.52 3.9 1.53l2.93-2.93C17.06 2.98 14.76 2 12 2A10 10 0 0 0 3.08 7.64l3.2 2.64C7.09 7.84 9.34 6.04 12 6.04Z" />
+                                        </svg>
+                                        <svg v-else-if="provider.provider === 'facebook'" viewBox="0 0 24 24" class="h-5 w-5" aria-hidden="true">
+                                            <path fill="#1877F2" d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07c0 6.02 4.39 11.02 10.12 11.93v-8.44H7.08v-3.49h3.04V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.88v2.26h3.32l-.53 3.49h-2.79V24C19.61 23.09 24 18.09 24 12.07Z" />
+                                            <path fill="#FFFFFF" d="M16.67 15.56l.53-3.49h-3.32V9.81c0-.95.46-1.88 1.95-1.88h1.51V4.96s-1.37-.24-2.68-.24c-2.74 0-4.53 1.67-4.53 4.69v2.66H7.08v3.49h3.04V24a12.2 12.2 0 0 0 3.75 0v-8.44h2.8Z" />
+                                        </svg>
+                                        <i v-else :class="[socialProviderIcons[provider.provider] || 'ti ti-login-2', socialProviderIconColors[provider.provider] || 'text-primary-600 dark:text-primary-300']"></i>
+                                    </span>
+                                    <span>{{ provider.label }}</span>
+                                </a>
                             </div>
                         </div>
+
+                        <div v-if="isDemo && demoCredentials" class="mt-8 rounded-xl border border-amber-200 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:text-amber-200">
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <span>{{ t('Demo') }}:</span>
+                                <code class="font-mono text-xs">{{ demoCredentials.user.email }}</code>
+                                <code class="font-mono text-xs">{{ demoCredentials.admin.password }}</code>
+                            </div>
+                        </div>
+
+                        <p class="mt-8 text-center text-sm text-gray-500 dark:text-gray-400 lg:hidden">
+                            {{ t('New to :app?', { app: appName }) }}
+                            <Link :href="route('register')" class="auth-inline-link ms-1">
+                                {{ t('Create Account') }}
+                            </Link>
+                        </p>
+
                     </div>
-                    <p class="text-sm text-gray-500 font-medium">
-                        {{ t('Don\'t have an account?') }}
-                        <Link :href="route('register')" class="text-primary-600 hover:text-primary-700 font-black transition-colors ml-1">{{ t('Create an account') }}</Link>
-                    </p>
-                </div>
+                </section>
+
+                <section class="auth-visual-panel relative hidden lg:flex lg:min-h-[42rem] lg:items-center lg:justify-center lg:px-6 xl:px-8">
+                    <div class="auth-art-surface"></div>
+                    <div class="auth-side-cta">
+                        <p class="text-sm font-medium text-white/80">{{ t('New to ') }} {{appName}}?</p>
+                        <h2 class="mt-2 font-heading text-2xl font-bold leading-tight text-white">
+                            {{ t('Create your account and start using the workspace in minutes.') }}
+                        </h2>
+                        <p class="mt-3 text-sm leading-6 text-white/80">
+                            {{ t('Launch faster with a clean setup flow, polished UI, and tools ready from day one.') }}
+                        </p>
+                        <Link :href="route('register')" class="auth-side-cta-button mt-5">
+                            <i class="ti ti-user-plus mr-2"></i>
+                            {{ t('Create Account') }}
+                        </Link>
+                    </div>
+                </section>
             </div>
         </div>
     </div>

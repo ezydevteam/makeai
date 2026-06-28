@@ -46,6 +46,22 @@ const storageKey = computed(() => `makeai:${props.context}:live-search:recent`)
 const flattenedResults = computed(() => groups.value.flatMap((group) => group.results))
 const hasResults = computed(() => flattenedResults.value.length > 0)
 const showSuggestions = computed(() => query.value.trim().length < 3)
+const showShortcut = computed(() => props.context === 'admin' && !props.compact)
+const hasWideTrailingControls = computed(() => props.context === 'admin' && !props.compact)
+const wrapperClass = computed(() => {
+    if (props.compact) {
+        return 'w-full'
+    }
+
+    if (props.context === 'admin') {
+        return 'w-full max-w-[30rem] lg:focus-within:max-w-[34rem]'
+    }
+
+    return 'w-full max-w-[30rem] lg:focus-within:max-w-[32rem]'
+})
+const inputClass = computed(() => props.context === 'admin'
+    ? `w-full rounded-full border border-gray-200/80 bg-white/92 py-2.5 ps-10 ${hasWideTrailingControls.value ? 'pe-24' : 'pe-10'} text-sm text-gray-900 shadow-sm shadow-gray-200/20 transition-all placeholder:text-gray-400 focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800/90 dark:text-white dark:placeholder:text-gray-500 dark:shadow-black/10 dark:focus:border-primary-500/40 dark:focus:bg-surface-800`
+    : 'w-full rounded-xl border border-gray-200 bg-white py-2.5 ps-10 pe-10 text-sm text-gray-900 shadow-sm shadow-gray-200/20 transition-all placeholder:text-gray-400 focus:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-gray-500 dark:shadow-black/10 dark:focus:border-primary-500/40')
 const visibleSuggestions = computed(() => {
     const merged = [...recent.value, ...suggestions.value]
 
@@ -136,6 +152,18 @@ const chooseResult = (result: SearchResult) => {
     router.visit(result.url)
 }
 
+const clearQuery = () => {
+    query.value = ''
+    groups.value = []
+    suggestions.value = []
+    loading.value = false
+    activeIndex.value = 0
+    open.value = props.enableLiveSearch && props.showSuggestions
+    void nextTick(() => {
+        focusInput()
+    })
+}
+
 const remember = (term: string) => {
     if (term.length < 3) return
 
@@ -173,10 +201,7 @@ const submit = () => {
 
 const closeOnEscape = () => {
     if (query.value.trim().length > 0) {
-        query.value = ''
-        groups.value = []
-        loading.value = false
-        open.value = props.enableLiveSearch && props.showSuggestions
+        clearQuery()
         return
     }
 
@@ -220,44 +245,56 @@ onUnmounted(() => {
 <template>
     <div
         ref="root"
-        class="relative transition-[width,transform] duration-200 ease-out"
-        :class="compact ? 'w-full' : 'w-full max-w-[30rem] focus-within:scale-[1.01]'"
+        class="relative transition-[max-width] duration-200 ease-out"
+        :class="wrapperClass"
     >
         <label class="sr-only" :for="`live-search-${context}`">{{ t('Search') }}</label>
-        <svg class="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <i class="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-[15px] leading-none text-gray-400 ti ti-search"></i>
         <input
             :id="`live-search-${context}`"
             ref="input"
             v-model="query"
-            type="search"
+            type="text"
+            inputmode="search"
+            enterkeyhint="search"
             autocomplete="off"
+            spellcheck="false"
             data-global-search
             :placeholder="t('Search...')"
-            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 ps-10 pe-24 text-sm text-gray-900 shadow-sm transition-all focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+            :class="inputClass"
             @focus="focus"
             @keydown.down.prevent="navigate(1)"
             @keydown.up.prevent="navigate(-1)"
             @keydown.enter.prevent="submit"
             @keydown.esc.prevent="closeOnEscape"
         >
-        <span
-            v-if="!loading && !query"
-            class="pointer-events-none absolute end-3 top-1/2 inline-flex h-6 -translate-y-1/2 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-400 shadow-sm dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+        <div
+            class="absolute end-2 top-1/2 flex -translate-y-1/2 items-center justify-end"
+            :class="hasWideTrailingControls ? 'w-18' : 'w-7'"
         >
-            <span>Ctrl</span>
-            <span>/</span>
-        </span>
-        <svg v-if="loading" class="absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
+            <button
+                v-if="query"
+                type="button"
+                class="inline-flex h-5 w-5 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                :aria-label="t('Clear search')"
+                @click="clearQuery"
+            >
+                <i class="ti ti-x text-[14px] leading-none"></i>
+            </button>
+            <span
+                v-else-if="showShortcut && !loading"
+                class="pointer-events-none inline-flex h-5 items-center gap-1 rounded-md border border-gray-200/80 bg-white/95 px-1.5 text-[10px] font-medium text-gray-400 shadow-sm shadow-gray-200/20 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500 dark:shadow-black/10"
+            >
+                <span>Ctrl</span>
+                <span>/</span>
+            </span>
+            <i v-else-if="loading" class="pointer-events-none animate-spin text-[15px] leading-none text-primary-500 ti ti-loader-2"></i>
+        </div>
 
         <Transition enter-active-class="transition ease-out duration-150" enter-from-class="opacity-0 translate-y-1" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 translate-y-1">
             <div v-if="open" class="absolute inset-inline-start-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
                 <div v-if="showSuggestions && props.showSuggestions" class="p-3">
-                    <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Suggested searches') }}</p>
+                    <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Recent searches') }}</p>
                     <button
                         v-for="suggestion in visibleSuggestions"
                         :key="suggestion"
@@ -265,9 +302,7 @@ onUnmounted(() => {
                         class="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-start text-sm text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20"
                         @click="chooseSuggestion(suggestion)"
                     >
-                        <svg class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
+                        <i class="ti ti-history text-sm text-gray-400"></i>
                         <span>{{ suggestion }}</span>
                     </button>
                     <p v-if="visibleSuggestions.length === 0" class="px-2 py-3 text-sm text-gray-500">{{ t('Type at least 3 characters to search.') }}</p>

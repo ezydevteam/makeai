@@ -18,14 +18,18 @@ type Branding = {
 type AppHeaderUser = {
     name?: string
     email?: string
+    avatar?: string | null
     credits?: number
+    is_pro?: boolean
+    plan_id?: number | null
     subscription_status?: string | null
 }
 type SimpleDesktopHeaderSettings = {
-    layout?: string
     sticky?: boolean
     sticky_behavior?: string
     shadow_style?: string
+    menu_position?: string
+    menu_hover_style?: string
     show_notification_bell?: boolean
     notification_button_style?: string
     show_social_icons?: boolean
@@ -64,17 +68,29 @@ type SimpleDesktopHeaderSettings = {
 type SimpleMobileTopHeaderSettings = {
     enabled?: boolean
     layout?: string
-    sticky?: boolean
+    height?: number
+    bg_color?: string
+    text_color?: string
+    show_shadow?: string
+    sticky_behavior?: string
     show_logo?: boolean
     show_hamburger?: boolean
     show_dark_mode_toggle?: boolean
+    show_notification_bell?: boolean
+    show_search_icon?: boolean
+    show_language_switcher?: boolean
+    show_login?: boolean
+    show_cta_button?: boolean
 }
 type SimpleMobileBottomHeaderSettings = {
     enabled?: boolean
-    layout?: string
+    hide_menu_labels?: boolean
+    show_glassmorphism?: boolean
     show_home?: boolean
+    show_search_icon?: boolean
     show_tools?: boolean
-    show_dashboard?: boolean
+    show_notification_bell?: boolean
+    show_hamburger?: boolean
     show_profile?: boolean
 }
 type SimpleHeaderSettings = {
@@ -91,6 +107,13 @@ const siteName = computed(() => String(branding.value?.site_name || page.props.a
 
 const user = computed(() => page.props.auth?.user as AppHeaderUser | undefined)
 const frontendHeaderSettings = computed(() => (page.props.frontendHeaderSettings as SimpleHeaderSettings | undefined) ?? {})
+interface HeaderBlock {
+    id: string
+    type: string
+    enabled: boolean
+    config: Record<string, any>
+}
+
 const resolveFrontendMenuSlug = (value: string | undefined, fallback: string) => {
     if (!value) return fallback
     if (value === 'primary') return 'main'
@@ -103,23 +126,25 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
     const desktop = settings.desktop ?? {}
     const mobileTop = settings.mobile_top ?? {}
     const mobileBottom = settings.mobile_bottom ?? {}
-    const desktopLayout = (desktop.layout || 'classic') === 'landing' ? 'centered' : (desktop.layout || 'classic')
+    const desktopLayout = 'classic'
     const mobileTopLayout = mobileTop.layout || 'compact'
-    const mobileBottomLayout = mobileBottom.layout || 'tabs'
-    const desktopHeight = Number(desktop.height ?? (desktopLayout === 'compact' ? 64 : desktopLayout === 'centered' ? 80 : 72))
+    const mobileBottomLayout = 'tabs'
+    const desktopHeight = Number(desktop.height ?? 72)
     const mobileTopHeight = mobileTopLayout === 'centered' ? 72 : 64
     const desktopTextColor = desktop.text_color || ''
     const desktopHoverColor = desktop.menu_hover_color || desktop.text_color || ''
+    const mobileTopTextColor = mobileTop.text_color || ''
+    const mobileTopHoverColor = mobileTop.text_color || ''
     const desktopStickyBehavior = desktop.sticky_behavior || (desktop.sticky === false ? 'none' : 'always')
-    const navBlockAlign = ['saas', 'compact'].includes(desktopLayout) ? 'left' : 'center'
+    const menuPosition = ['hide', 'left', 'center', 'right'].includes(String(desktop.menu_position || 'center'))
+        ? String(desktop.menu_position || 'center')
+        : 'center'
+    const navBlockAlign = menuPosition === 'hide' ? 'center' : menuPosition
     const logoBlockAlign = 'left'
-    const desktopNavHoverStyle = desktopLayout === 'centered'
-        ? 'pill'
-        : ['saas', 'compact'].includes(desktopLayout)
-            ? 'box'
-            : 'underline'
-    const mainRightBlocks: Array<Record<string, unknown>> = [
-    ]
+    const desktopNavHoverStyle = ['bottom_border', 'rounded_soft_bg', 'pill_soft_bg', 'simple'].includes(String(desktop.menu_hover_style || 'rounded_soft_bg'))
+        ? String(desktop.menu_hover_style || 'rounded_soft_bg')
+        : 'rounded_soft_bg'
+    const mainRightBlocks: HeaderBlock[] = []
     const desktopAccountAvatarStyle = String(desktop.account_avatar_style || 'avatar_name_arrow')
 
     if ((desktop.command_palette_style || 'hidden') !== 'hidden') {
@@ -135,6 +160,21 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
                 hover_color: desktopHoverColor,
                 label: t('Search'),
                 hint: t('Ctrl + K'),
+            },
+        })
+    }
+
+    if (desktop.show_social_icons === true && desktop.social_icon_style !== 'hide') {
+        mainRightBlocks.push({
+            id: 'simple_social',
+            type: 'social_icons',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                display_mode: 'icons',
+                display_style: desktop.social_icon_style || 'rounded_soft_bg',
+                text_color: desktopTextColor,
+                hover_color: desktopHoverColor,
             },
         })
     }
@@ -194,22 +234,7 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
         })
     }
 
-    if (desktop.show_social_icons === true && desktop.social_icon_style !== 'hide') {
-        mainRightBlocks.push({
-            id: 'simple_social',
-            type: 'social_icons',
-            enabled: true,
-            config: {
-                block_align: 'right',
-                display_mode: 'icons',
-                display_style: desktop.social_icon_style || 'rounded_soft_bg',
-                text_color: desktopTextColor,
-                hover_color: desktopHoverColor,
-            },
-        })
-    }
-
-    const mobileBlocks: Array<Record<string, unknown>> = []
+    const mobileBlocks: HeaderBlock[] = []
     if (mobileTop.show_hamburger !== false) {
         mobileBlocks.push({
             id: 'simple_mobile_hamburger',
@@ -221,6 +246,9 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
                 label: t('Menu'),
                 show_label: false,
                 icon_class: 'ti ti-menu-2',
+                text_color: mobileTopTextColor,
+                icon_color: mobileTopTextColor,
+                hover_color: mobileTopHoverColor,
             },
         })
     }
@@ -228,24 +256,130 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
         mobileBlocks.push({ id: 'simple_mobile_logo', type: 'logo', enabled: true, config: { block_align: 'left' } })
     }
 
-    mobileBlocks.push({ id: 'simple_mobile_notify', type: 'notification_bell', enabled: true, config: { block_align: 'right' } })
+    if (mobileTop.show_notification_bell === true) {
+        mobileBlocks.push({
+            id: 'simple_mobile_notify',
+            type: 'notification_bell',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                display_style: 'icon_only',
+                text_color: mobileTopTextColor,
+                icon_color: mobileTopTextColor,
+                hover_color: mobileTopHoverColor,
+            },
+        })
+    }
+
+    if (mobileTop.show_search_icon === true) {
+        mobileBlocks.push({
+            id: 'simple_mobile_search',
+            type: 'command_palette',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                display_style: 'icon_only',
+                icon_class: 'ti ti-search',
+                label: t('Search'),
+                text_color: mobileTopTextColor,
+                icon_color: mobileTopTextColor,
+                hover_color: mobileTopHoverColor,
+            },
+        })
+    }
+
+    if (mobileTop.show_language_switcher === true) {
+        mobileBlocks.push({
+            id: 'simple_mobile_lang',
+            type: 'language_switcher',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                display_style: 'icon_only',
+                text_color: mobileTopTextColor,
+                icon_color: mobileTopTextColor,
+                hover_color: mobileTopHoverColor,
+            },
+        })
+    }
 
     if (mobileTop.show_dark_mode_toggle !== false) {
-        mobileBlocks.push({ id: 'simple_mobile_dark', type: 'dark_mode', enabled: true, config: { block_align: 'right' } })
+        mobileBlocks.push({
+            id: 'simple_mobile_dark',
+            type: 'dark_mode',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                display_style: 'icon_only',
+                text_color: mobileTopTextColor,
+                icon_color: mobileTopTextColor,
+                hover_color: mobileTopHoverColor,
+            },
+        })
     }
 
-    const mobileBottomBlocks: Array<Record<string, unknown>> = []
+    if (mobileTop.show_login === true) {
+        mobileBlocks.push({
+            id: 'simple_mobile_user',
+            type: 'user_menu_icon',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                icon_class: 'ti ti-user',
+                text_color: mobileTopTextColor,
+                icon_color: mobileTopTextColor,
+                hover_color: mobileTopHoverColor,
+            },
+        })
+    }
+
+    if (mobileTop.show_cta_button === true) {
+        mobileBlocks.push({
+            id: 'simple_mobile_cta',
+            type: 'cta_button',
+            enabled: true,
+            config: {
+                block_align: 'right',
+                text: desktop.cta_text || t('Get Started'),
+                link: desktop.cta_link || '/register',
+                style: desktop.cta_style || 'primary',
+                shape: desktop.cta_shape || 'rounded_xl',
+                access_level: desktop.cta_access_level || 'all',
+                icon_class: desktop.cta_icon || 'ti ti-rocket',
+            },
+        })
+    }
+
+    const showLabels = mobileBottom.hide_menu_labels !== true
+    const mobileBottomBlocks: HeaderBlock[] = []
     if (mobileBottom.show_home !== false) {
-        mobileBottomBlocks.push({ id: 'simple_bottom_home', type: 'home_link', enabled: true, config: { link: '/', label: t('Home'), icon_class: 'ti ti-home', show_label: true } })
+        mobileBottomBlocks.push({ id: 'simple_bottom_home', type: 'home_link', enabled: true, config: { link: '/', label: t('Home'), icon_class: 'ti ti-home', show_label: showLabels } })
+    }
+    if (mobileBottom.show_search_icon === true) {
+        mobileBottomBlocks.push({ id: 'simple_bottom_search', type: 'command_palette', enabled: true, config: { label: t('Search'), icon_class: 'ti ti-search', show_label: showLabels } })
     }
     if (mobileBottom.show_tools !== false) {
-        mobileBottomBlocks.push({ id: 'simple_bottom_tools', type: 'home_link', enabled: true, config: { link: '/ai-tools', label: t('Tools'), icon_class: 'ti ti-sparkles', show_label: true } })
+        mobileBottomBlocks.push({ id: 'simple_bottom_tools', type: 'home_link', enabled: true, config: { link: '/ai-tools', label: t('Tools'), icon_class: 'ti ti-sparkles', show_label: showLabels } })
     }
-    if (mobileBottom.show_dashboard !== false) {
-        mobileBottomBlocks.push({ id: 'simple_bottom_dashboard', type: 'home_link', enabled: true, config: { link: '/user/dashboard', label: t('Dashboard'), icon_class: 'ti ti-layout-dashboard', show_label: true } })
+    if (mobileBottom.show_notification_bell === true) {
+        mobileBottomBlocks.push({ id: 'simple_bottom_notify', type: 'notification_bell', enabled: true, config: { label: t('Notifications'), icon_class: 'ti ti-bell', show_label: showLabels } })
     }
     if (mobileBottom.show_profile !== false) {
-        mobileBottomBlocks.push({ id: 'simple_bottom_profile', type: 'user_menu_icon', enabled: true, config: { label: t('Account'), guest_label: t('Sign In'), icon_class: 'ti ti-user', show_label: true } })
+        mobileBottomBlocks.push({ id: 'simple_bottom_profile', type: 'user_menu_icon', enabled: true, config: { label: t('Account'), guest_label: t('Sign In'), icon_class: 'ti ti-user', show_label: showLabels } })
+    }
+    if (mobileBottom.show_hamburger === true) {
+        mobileBottomBlocks.push({
+            id: 'simple_bottom_hamburger',
+            type: 'hamburger',
+            enabled: true,
+            config: {
+                block_align: 'center',
+                menu_slug: resolveFrontendMenuSlug(desktop.menu_source, 'mobile'),
+                label: t('Menu'),
+                show_label: showLabels,
+                icon_class: 'ti ti-menu-2',
+            },
+        })
     }
 
     return {
@@ -267,28 +401,34 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
             custom_css: '',
             blocks: [
                 { id: 'simple_logo', type: 'logo', enabled: true, config: { block_align: logoBlockAlign } },
-                { id: 'simple_nav', type: 'navigation', enabled: true, config: { menu_slug: resolveFrontendMenuSlug(desktop.menu_source, 'main'), alignment: ['saas', 'compact'].includes(desktopLayout) ? 'left' : 'center', block_align: navBlockAlign, hover_style: desktopNavHoverStyle, text_color: desktopTextColor, hover_color: desktopHoverColor } },
+                ...(menuPosition === 'hide'
+                    ? []
+                    : [{ id: 'simple_nav', type: 'navigation', enabled: true, config: { menu_slug: resolveFrontendMenuSlug(desktop.menu_source, 'main'), alignment: navBlockAlign, block_align: navBlockAlign, hover_style: desktopNavHoverStyle, text_color: desktopTextColor, hover_color: desktopHoverColor } }]),
                 ...mainRightBlocks,
             ],
         },
         mobile: {
             enabled: mobileTop.enabled !== false,
-            sticky: mobileTop.sticky !== false,
-            height: mobileTopHeight,
+            sticky: mobileTop.sticky_behavior !== 'none',
+            height: Number(mobileTop.height ?? (mobileTopLayout === 'centered' ? 72 : 64)),
             layout: mobileTopLayout,
             container_width: '1280px',
-            sticky_behavior: mobileTop.sticky === false ? 'none' : 'always',
-            shadow: false,
+            sticky_behavior: mobileTop.sticky_behavior || (mobileTop.sticky === false ? 'none' : 'always'),
+            shadow: ['small', 'medium', 'large'].includes(String(mobileTop.show_shadow)),
+            shadow_style: mobileTop.show_shadow || 'none',
+            show_border: mobileTop.show_shadow === 'border_small',
             progressbar: false,
-            background: { color: '', image_url: '', overlay_opacity: 0 },
+            background: { color: mobileTop.bg_color || '', image_url: '', overlay_opacity: 0 },
+            text_color: mobileTop.text_color || '',
             custom_css: '',
             blocks: mobileBlocks,
         },
         mobile_bottom: {
             enabled: mobileBottom.enabled === true,
             sticky: true,
-            height: 64,
+            height: mobileBottom.hide_menu_labels === true ? 48 : 60,
             layout: mobileBottomLayout,
+            show_glassmorphism: mobileBottom.show_glassmorphism !== false,
             container_width: '1280px',
             sticky_behavior: 'always',
             shadow: true,
@@ -305,8 +445,8 @@ const mobileHeaderConfig = computed(() => rawHeaderConfig.value?.mobile)
 const mobileBottomHeaderConfig = computed(() => rawHeaderConfig.value?.mobile_bottom)
 const mainHeaderHeight = computed(() => Number(headerConfig.value?.height ?? 72))
 const totalDesktopHeaderHeight = computed(() => mainHeaderHeight.value)
-const desktopTransparentOnHero = computed(() => frontendHeaderSettings.value.desktop?.transparent_on_hero === true)
-const isHeroOverlayActive = ref(false)
+const desktopTransparentOnHero = computed(() => String(frontendHeaderSettings.value.desktop?.transparent_on_hero) === 'true')
+const isHeroOverlayActive = ref(typeof window !== 'undefined' ? window.scrollY <= 2 : true)
 let clearHeroOverlayListeners: (() => void) | null = null
 let heroOverlayFrame: number | null = null
 let heroOverlayTimeout: ReturnType<typeof setTimeout> | null = null
@@ -325,25 +465,98 @@ const isStackedCenteredMainHeader = computed(() => mainHeaderLayout.value === 'c
 const centeredMainLogoBlocks = computed(() => activeBlocks.value.filter((block: any) => block.type === 'logo'))
 const centeredMainNavBlocks = computed(() => activeBlocks.value.filter((block: any) => block.type === 'navigation'))
 const centeredMainActionBlocks = computed(() => activeBlocks.value.filter((block: any) => !['logo', 'navigation'].includes(block.type)))
-const isOverlayCenteredMainHeader = computed(() => false)
 const isLeftClusterMainHeader = computed(() => ['saas', 'compact'].includes(mainHeaderLayout.value))
 const isMinimalMainHeader = computed(() => mainHeaderLayout.value === 'minimal')
-const supportsTransparentHeroHeader = computed(() => desktopTransparentOnHero.value || headerConfig.value?.transparent_homepage === true)
+const homepageHeroSection = computed(() => {
+    const config = page.props.frontendHomepageConfig as any
+    if (!config || !config.sections) return null
+    return config.sections.find((s: any) => s.type === 'hero')
+})
+
+const isHeroBgEnabled = computed(() => {
+    const bg = homepageHeroSection.value?.config?.show_hero_background
+    if (bg === undefined || bg === null || bg === '') return false
+    if (typeof bg === 'boolean') return bg
+    if (typeof bg === 'number') return bg !== 0
+    if (typeof bg === 'string') {
+        const lower = bg.toLowerCase().trim()
+        if (lower === '1' || lower === 'true') return true
+        if (lower === '0' || lower === 'false') return false
+    }
+    return false
+})
+
+const isHeroGradEnabled = computed(() => {
+    const grad = homepageHeroSection.value?.config?.hero_gradient_enabled
+    if (grad === undefined || grad === null || grad === '') return true
+    if (typeof grad === 'boolean') return grad
+    if (typeof grad === 'number') return grad !== 0
+    if (typeof grad === 'string') {
+        const lower = grad.toLowerCase().trim()
+        if (lower === '1' || lower === 'true') return true
+        if (lower === '0' || lower === 'false') return false
+    }
+    return true
+})
+
+const isLightGradient = computed(() => {
+    const palette = homepageHeroSection.value?.config?.hero_gradient_palette
+    if (typeof palette !== 'string') return false
+    return ['light_glow', 'light_warm'].includes(palette.trim())
+})
+
+const supportsTransparentHeroHeader = computed(() => {
+    if (!isHeroBgEnabled.value && !isHeroGradEnabled.value) {
+        return false
+    }
+    if (!isHeroBgEnabled.value && isHeroGradEnabled.value && isLightGradient.value) {
+        return false
+    }
+    return desktopTransparentOnHero.value || headerConfig.value?.transparent_homepage === true
+})
 const isTransparentDesktopHeaderActive = computed(() => supportsTransparentHeroHeader.value && isHeroOverlayActive.value)
 const isTransparentMainHeaderActive = computed(() => isTransparentDesktopHeaderActive.value)
 const mainHeaderBackgroundStyle = computed(() => isTransparentMainHeaderActive.value ? {} : sectionBackgroundStyle(headerConfig.value))
-const isOverlayLightBlock = (_block: any) => isTransparentMainHeaderActive.value
-const mainHeaderSectionStyle = computed<CSSProperties>(() => ({
-    ...sectionStyle(headerConfig.value, 'main', 72),
-    ...(isTransparentMainHeaderActive.value
-        ? {
-            position: stickyBehavior(headerConfig.value) === 'none' ? 'absolute' : 'fixed',
-            top: stickyTop('main'),
-            left: '0px',
-            right: '0px',
-        }
-        : {}),
-}))
+
+const isOverlayLightBlock = (block: any) => {
+    if (block?.id && String(block.id).startsWith('simple_bottom_')) {
+        return false
+    }
+    return isTransparentMainHeaderActive.value
+}
+const mainHeaderSectionStyle = computed<CSSProperties>(() => {
+    const style = { ...sectionStyle(headerConfig.value, 'main', 72) }
+    const isSticky = stickyBehavior(headerConfig.value) !== 'none'
+    if (supportsTransparentHeroHeader.value && isSticky) {
+        style.position = 'fixed'
+        style.top = stickyTop('main')
+        style.left = '0px'
+        style.right = '0px'
+    } else if (isTransparentMainHeaderActive.value) {
+        style.position = isSticky ? 'fixed' : 'absolute'
+        style.top = stickyTop('main')
+        style.left = '0px'
+        style.right = '0px'
+    }
+    return style
+})
+const mobileHeaderSectionStyle = computed<CSSProperties>(() => {
+    const style = { ...sectionStyle(mobileHeaderConfig.value, 'mobile', 64) }
+    const isSticky = mobileHeaderConfig.value?.sticky !== false
+    if (supportsTransparentHeroHeader.value && isSticky) {
+        style.position = 'fixed'
+        style.top = '0px'
+        style.left = '0px'
+        style.right = '0px'
+    } else if (isTransparentMainHeaderActive.value) {
+        style.position = isSticky ? 'fixed' : 'absolute'
+        style.top = '0px'
+        style.left = '0px'
+        style.right = '0px'
+    }
+    return style
+})
+const mobileHeaderBackgroundStyle = computed(() => isTransparentMainHeaderActive.value ? {} : sectionBackgroundStyle(mobileHeaderConfig.value))
 const mainRowGapClass = computed(() => {
     return 'gap-2.5'
 })
@@ -429,6 +642,16 @@ const logout = () => router.post(route('logout'))
 
 const globalMenus = computed(() => page.props.globalMenus as Array<any> || [])
 const affiliateEnabled = computed(() => Boolean(page.props.affiliateEnabled))
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+const hasPremiumAccess = computed(() => {
+    const status = String(user.value?.subscription_status || '').trim().toLowerCase()
+
+    if (Boolean(user.value?.is_pro)) {
+        return true
+    }
+
+    return ['active', 'trialing'].includes(status)
+})
 
 const getMenu = (slug: string) => globalMenus.value.find((m: any) => m.slug === slug)
 
@@ -436,7 +659,7 @@ const visibleMenuItems = (slug: string) => {
     const menu = getMenu(slug)
     const items = menu?.items?.filter((item: any) => item.is_active !== false) || []
     const loggedIn = Boolean(page.props.auth?.user)
-    const isPro = page.props.auth?.user?.subscription_status === 'active'
+    const isPro = hasPremiumAccess.value
 
     return items.filter((item: any) => {
         const rule = item.requires_auth ?? 'none'
@@ -449,9 +672,19 @@ const visibleMenuItems = (slug: string) => {
 
 const menuItemId = (item: any) => item.id ?? item.key ?? item.url
 const menuItemHref = (item: any) => String(item.final_url || item.url || '#')
+const menuItemLabel = (item: any) => String(item.label || item.title || '')
+const menuItemIcon = (item: any) => String(item.icon || '').trim()
+const menuItemBadgeText = (item: any) => String(item.badge_text || '').trim()
+const menuItemBadgeColor = (item: any) => {
+    const color = String(item.badge_color || 'gray')
+    return ['green', 'blue', 'violet', 'amber', 'red', 'gray'].includes(color) ? color : 'gray'
+}
+const menuItemTarget = (item: any) => item?.target === '_blank' ? '_blank' : '_self'
+const menuItemRel = (item: any) => menuItemTarget(item) === '_blank' ? 'noopener noreferrer' : undefined
 const menuParentId = (item: any) => item.parent_id ?? item.parentId ?? null
 const topMenuItems = (slug: string) => visibleMenuItems(slug).filter((item: any) => !menuParentId(item))
 const submenuItems = (slug: string, parentId: string | number) => visibleMenuItems(slug).filter((item: any) => String(menuParentId(item)) === String(parentId))
+const hasSubmenuItems = (slug: string, parentId: string | number) => submenuItems(slug, parentId).length > 0
 
 const isActive = (url: string) => {
     if (!url) return false
@@ -496,13 +729,16 @@ const sectionBackgroundStyle = (config: any): CSSProperties => {
 const sectionAccentStyle = (config: any): HeaderStyle => {
     const style: HeaderStyle = {}
     const textColor = typeof config?.text_color === 'string' ? config.text_color : ''
-    const hoverColor = typeof config?.menu_hover_color === 'string' ? config.menu_hover_color : ''
+    const hoverColor = typeof config?.menu_hover_color === 'string' && config.menu_hover_color
+        ? config.menu_hover_color
+        : textColor
 
     if (textColor) {
         style.color = textColor
         style['--header-menu-text-color'] = textColor
         style['--header-control-text-color'] = textColor
         style['--header-action-text-color'] = textColor
+        style['--header-soft-icon-color'] = textColor
     }
 
     if (hoverColor) {
@@ -515,6 +751,9 @@ const sectionAccentStyle = (config: any): HeaderStyle => {
         style['--header-control-hover-bg-dark'] = `color-mix(in srgb, ${hoverColor} 14%, transparent)`
         style['--header-action-hover-bg'] = style['--header-control-hover-bg']
         style['--header-action-hover-bg-dark'] = style['--header-control-hover-bg-dark']
+        style['--header-soft-icon-hover-color'] = hoverColor
+        style['--header-soft-icon-hover-bg'] = style['--header-control-hover-bg']
+        style['--header-soft-icon-hover-bg-dark'] = style['--header-control-hover-bg-dark']
     }
 
     return style
@@ -661,6 +900,29 @@ watch(
     { immediate: true },
 )
 
+watch(
+    () => mobileBottomHeaderConfig.value,
+    (config) => {
+        if (typeof window !== 'undefined') {
+            const height = config?.enabled ? Number(config.height || 60) : 0
+            document.documentElement.style.setProperty('--mobile-bottom-height', `${height}px`)
+        }
+    },
+    { immediate: true, deep: true }
+)
+
+watch(
+    () => mobileHeaderConfig.value,
+    (config) => {
+        if (typeof window !== 'undefined') {
+            const height = config?.enabled ? Number(config.height || 64) : 0
+            document.documentElement.style.setProperty('--header-height', `${height}px`)
+            document.documentElement.style.setProperty('--mobile-top-height', `${height}px`)
+        }
+    },
+    { immediate: true, deep: true }
+)
+
 onUnmounted(() => {
     removeHeroOverlayListeners()
 })
@@ -687,7 +949,7 @@ const sectionStyle = (config: any, section: 'main' | 'mobile' | 'mobile_bottom',
 }
 
 
-const mobileIconButtonClass = 'flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
+const mobileIconButtonClass = 'flex h-10 w-10 items-center justify-center rounded-xl bg-transparent transition-colors hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
 const mobileBottomItemClass = 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-primary-50 hover:text-primary-600 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300'
 const configString = (config: Record<string, unknown> | undefined, key: string, fallback = '') => typeof config?.[key] === 'string' ? (config[key] as string) : fallback
 const sharedButtonStyleValue = (value: unknown) => {
@@ -741,7 +1003,7 @@ const headerUtilityClass = (block: any, bottom = false) => {
     }
 
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style)
-    const roundedClass = ['icon_only', 'circular_soft_bg'].includes(displayStyle) ? 'rounded-full' : 'rounded-lg'
+    const roundedClass = ['icon_only', 'circular_soft_bg', 'light_bg'].includes(displayStyle) ? 'rounded-full' : 'rounded-lg'
     const iconOnlyClass = displayStyle === 'icon_only' ? 'header-soft-icon-button--icon-only' : ''
     const sizeClass = 'h-9 w-9'
     const toneClass = displayStyle === 'icon_only'
@@ -750,7 +1012,11 @@ const headerUtilityClass = (block: any, bottom = false) => {
             ? 'border-gray-200 bg-gray-50 dark:border-surface-700 dark:bg-surface-800'
             : 'border'
 
-    return iconSurfaceClass(block, `header-soft-icon-button ${iconOnlyClass} relative flex ${sizeClass} items-center justify-center ${roundedClass} ${toneClass} text-gray-500 transition-all duration-200 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white`)
+    const isMobileBlock = block?.id && String(block.id).startsWith('simple_mobile_')
+    const hasMobileColor = isMobileBlock && mobileHeaderConfig.value?.text_color
+    const colorClass = hasMobileColor ? 'text-current' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+
+    return iconSurfaceClass(block, `header-soft-icon-button ${iconOnlyClass} relative flex ${sizeClass} items-center justify-center ${roundedClass} ${toneClass} ${colorClass} transition-all duration-200`)
 }
 const notificationButtonClass = (block: any, bottom = false) => headerUtilityClass(block, bottom)
 const socialIconButtonClass = (block: any) => {
@@ -770,10 +1036,8 @@ const softIconSurfaceStyle = (block: any): HeaderStyle => {
         style['--header-soft-icon-hover-bg-dark'] = 'rgb(255 255 255 / 0.18)'
         style['--header-soft-icon-hover-border'] = 'rgb(255 255 255 / 0.28)'
 
-        if (displayStyle !== 'icon_only') {
-            style.background = 'rgb(255 255 255 / 0.08)'
-            style.borderColor = 'rgb(255 255 255 / 0.18)'
-        }
+        style.background = 'rgb(255 255 255 / 0.08)'
+        style.borderColor = 'rgb(255 255 255 / 0.18)'
 
         return style
     }
@@ -813,7 +1077,7 @@ const languageSwitcherDisplay = (block: any): 'default' | 'icon' | 'icon_label' 
 const languageSwitcherClass = (block: any) => {
     const displayStyle = headerUtilityDisplayStyle(block.config?.display_style, true)
     if (displayStyle === 'icon_with_label') return ''
-    const shapeClass = ['icon_only', 'circular_soft_bg'].includes(displayStyle) ? '!rounded-full' : '!rounded-lg'
+    const shapeClass = ['icon_only', 'circular_soft_bg', 'light_bg'].includes(displayStyle) ? '!rounded-full' : '!rounded-lg'
     const sizeOverride = '!h-9 !w-9 !min-w-9'
     return `${headerUtilityClass(block, false).join(' ')} ${shapeClass} ${sizeOverride} !justify-center !gap-0 !p-0`
 }
@@ -832,14 +1096,12 @@ const languageSwitcherStyle = (block: any) => {
             '--header-action-hover-bg-dark': 'rgb(255 255 255 / 0.18)',
         }
 
-        if (!['icon_with_label', 'icon_only'].includes(displayStyle)) {
-            style.background = 'rgb(255 255 255 / 0.08)'
-            style.borderColor = 'rgb(255 255 255 / 0.18)'
-            style['--header-soft-icon-color'] = '#ffffff'
-            style['--header-soft-icon-hover-color'] = '#ffffff'
-            style['--header-soft-icon-hover-bg'] = 'rgb(255 255 255 / 0.14)'
-            style['--header-soft-icon-hover-bg-dark'] = 'rgb(255 255 255 / 0.18)'
-        }
+        style.background = 'rgb(255 255 255 / 0.08)'
+        style.borderColor = 'rgb(255 255 255 / 0.18)'
+        style['--header-soft-icon-color'] = '#ffffff'
+        style['--header-soft-icon-hover-color'] = '#ffffff'
+        style['--header-soft-icon-hover-bg'] = 'rgb(255 255 255 / 0.14)'
+        style['--header-soft-icon-hover-bg-dark'] = 'rgb(255 255 255 / 0.18)'
 
         return style
     }
@@ -906,17 +1168,16 @@ const commandPaletteButtonStyle = (block: any): HeaderStyle => {
     return style
 }
 const commandPaletteHintClass = (block: any) => {
-    if (isOverlayLightBlock(block)) return 'text-white/70'
-    return 'text-gray-400 dark:text-gray-500'
+    return 'text-current opacity-75'
 }
+const showCommandPaletteText = (block: any) => ['search_transparent', 'search_light'].includes(commandPaletteDisplayStyle(block))
 const commandPaletteLabelClass = (block: any) => {
-    if (isOverlayLightBlock(block)) return 'text-white/90'
-    return 'text-gray-500 dark:text-gray-400'
+    return 'text-current opacity-75'
 }
 const canShowCtaButton = (block: any) => {
     const accessLevel = String(block.config?.access_level || 'all')
     const isLoggedIn = Boolean(user.value)
-    const isProUser = user.value?.subscription_status === 'active'
+    const isProUser = hasPremiumAccess.value
 
     if (accessLevel === 'guest') return !isLoggedIn
     if (accessLevel === 'auth') return isLoggedIn
@@ -933,11 +1194,25 @@ const menuAlignmentClass = (block: any) => {
     return 'justify-center'
 }
 const menuHoverStyleClass = (block: any) => {
-    const style = String(block.config?.hover_style || 'underline')
-    return ['underline', 'pill', 'box', 'glow'].includes(style) ? `header-menu-hover-${style}` : 'header-menu-hover-underline'
+    const style = String(block.config?.hover_style || 'rounded_soft_bg')
+    if (style === 'bottom_border') return 'header-menu-hover-bottom-border'
+    if (style === 'pill_soft_bg') return 'header-menu-hover-pill-soft-bg'
+    if (style === 'simple') return 'header-menu-hover-simple'
+    return 'header-menu-hover-rounded-soft-bg'
 }
 const menuStyle = (block: any): CSSProperties => {
     const style: HeaderStyle = {}
+
+    if (isOverlayLightBlock(block)) {
+        style.color = '#ffffff'
+        style['--header-menu-text-color'] = '#ffffff'
+        style['--header-menu-hover-color'] = '#ffffff'
+        style['--header-menu-hover-bg'] = 'rgb(255 255 255 / 0.12)'
+        style['--header-menu-hover-bg-dark'] = 'rgb(255 255 255 / 0.16)'
+        style['--header-menu-hover-shadow'] = 'none'
+        return style
+    }
+
     const textColor = configString(block.config, 'text_color')
     const hoverColor = configString(block.config, 'hover_color')
     if (textColor) style.color = textColor
@@ -953,20 +1228,22 @@ const menuStyle = (block: any): CSSProperties => {
 const submenuStyle = (block: any): CSSProperties => {
     const style: HeaderStyle = {}
     const bgColor = configString(block.config, 'submenu_bg_color')
-    const textColor = configString(block.config, 'submenu_text_color') || configString(block.config, 'text_color')
+    const textColor = configString(block.config, 'submenu_text_color')
     if (bgColor) style.backgroundColor = bgColor
-    if (textColor) style['--header-submenu-text-color'] = textColor
+    style.color = textColor || 'rgb(31 41 55)'
+    style['--header-submenu-text-color'] = textColor || 'rgb(31 41 55)'
     return style
 }
 const headerActionStyle = (block: any): HeaderStyle => {
     const style: HeaderStyle = {}
     const textColor = configString(block.config, 'text_color')
-    const hoverColor = configString(block.config, 'hover_color')
+    const hoverColor = configString(block.config, 'hover_color') || textColor
 
     if (textColor) {
         style.color = textColor
         style['--header-action-text-color'] = textColor
         style['--header-control-text-color'] = textColor
+        style['--header-soft-icon-color'] = textColor
     }
     if (hoverColor) {
         style['--header-action-hover-color'] = hoverColor
@@ -975,6 +1252,9 @@ const headerActionStyle = (block: any): HeaderStyle => {
         style['--header-control-hover-color'] = hoverColor
         style['--header-control-hover-bg'] = style['--header-action-hover-bg']
         style['--header-control-hover-bg-dark'] = style['--header-action-hover-bg-dark']
+        style['--header-soft-icon-hover-color'] = hoverColor
+        style['--header-soft-icon-hover-bg'] = style['--header-action-hover-bg']
+        style['--header-soft-icon-hover-bg-dark'] = style['--header-action-hover-bg-dark']
     }
 
     return style
@@ -990,6 +1270,8 @@ const blockVisualStyle = (block: any): CSSProperties => {
     const textColor = configString(block.config, 'text_color')
     const ctaStyle = ctaStyleValue(block)
     const isCustomCta = block.type === 'cta_button' && ctaStyle === 'custom'
+    const utilityDisplayStyle = headerUtilityDisplayStyle(block.config?.display_style, block.type === 'language_switcher')
+    const isLightBgUtilityIcon = ['notification_bell', 'dark_mode', 'social_icons', 'language_switcher'].includes(block.type) && utilityDisplayStyle === 'light_bg'
     if (iconColor) style.color = iconColor
     if (bgColor && (block.config?.bg_style === 'custom' || isCustomCta)) style.backgroundColor = bgColor
     if (block.type === 'cta_button') {
@@ -1004,6 +1286,9 @@ const blockVisualStyle = (block: any): CSSProperties => {
         }
     } else if (textColor) {
         style.color = textColor
+    }
+    if (isLightBgUtilityIcon) {
+        style.color = 'rgb(31 41 55)'
     }
     return style
 }
@@ -1069,11 +1354,74 @@ const guestRegisterIconClass = (block: any) => String(block.config?.guest_regist
 const guestLoginText = (block: any) => String(block.config?.guest_login_text || t('Login'))
 const guestRegisterText = (block: any) => String(block.config?.guest_register_text || t('Register'))
 const userMenuInitial = computed(() => String(user.value?.name || 'U').trim().charAt(0).toUpperCase() || 'U')
+const userMenuAvatarUrl = computed(() => {
+    const avatar = String(user.value?.avatar || '').trim()
+
+    if (!avatar) {
+        return ''
+    }
+
+    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('/')) {
+        return avatar
+    }
+
+    return `/storage/${avatar}`
+})
+const userMenuLinks = computed(() => {
+    const links = [
+        { href: route('user.dashboard'), label: t('Dashboard'), iconClass: 'ti ti-layout-dashboard', tone: 'default' },
+        { href: route('user.dashboard.profile'), label: t('My Profile'), iconClass: 'ti ti-user-circle', tone: 'default' },
+        { href: route('user.dashboard.favorites.index'), label: t('My Favorites'), iconClass: 'ti ti-heart', tone: 'default' },
+        { href: route('user.dashboard.history.index'), label: t('History'), iconClass: 'ti ti-history', tone: 'default' },
+    ]
+
+    if (affiliateEnabled.value) {
+        links.push({ href: route('user.dashboard.affiliate'), label: t('Affiliate'), iconClass: 'ti ti-affiliate', tone: 'default' })
+    }
+
+    if (isProAvailable.value && !hasPremiumAccess.value) {
+        links.push({ href: route('user.dashboard.billing'), label: t('Upgrade'), iconClass: 'ti ti-rocket', tone: 'success' })
+    }
+
+    if (isProAvailable.value && hasPremiumAccess.value) {
+        links.push({ href: route('user.dashboard.credit-topup'), label: t('Buy Credits'), iconClass: 'ti ti-coins', tone: 'success' })
+    }
+
+    return links
+})
+const userMenuLinkToneClass = (tone: string) => {
+    if (tone === 'success') {
+        return 'header-user-dropdown-link--success'
+    }
+
+    if (tone === 'danger') {
+        return 'header-user-dropdown-link--danger'
+    }
+
+    return 'header-user-dropdown-link--default'
+}
+
+const activeMobileSubmenus = ref<Record<string | number, boolean>>({})
+const toggleMobileSubmenu = (itemId: string | number) => {
+    activeMobileSubmenus.value[itemId] = !activeMobileSubmenus.value[itemId]
+}
+const isMobileSubmenuOpen = (itemId: string | number) => {
+    return !!activeMobileSubmenus.value[itemId]
+}
 const closeMobileMenu = () => { mobileMenuOpen.value = false }
 
 const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
 const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
-const getLogoImage = () => isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)
+const getLogoImage = () => {
+    if (isTransparentMainHeaderActive.value) {
+        return logoDark.value || logoLight.value
+    }
+
+    return isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)
+}
+const drawerLogo = computed(() => {
+    return isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)
+})
 const logoAltText = computed(() => siteName.value)
 const logoInitial = computed(() => siteName.value.trim().charAt(0).toUpperCase() || 'A')
 
@@ -1106,6 +1454,9 @@ const handleKeydown = (event: KeyboardEvent) => {
 watch(mobileMenuOpen, (open) => {
     if (typeof document === 'undefined') return
     document.documentElement.classList.toggle('overflow-hidden', open)
+    if (!open) {
+        activeMobileSubmenus.value = {}
+    }
 })
 
 onMounted(() => {
@@ -1165,19 +1516,47 @@ onUnmounted(() => {
                     <nav v-if="block.type === 'navigation'" :class="[...mainNavClass('center'), menuAlignmentClass(block), menuHoverStyleClass(block), mainCenterNavClass]" :style="menuStyle(block)">
                         <template v-if="getMenu(block.config.menu_slug)">
                             <div v-for="item in topMenuItems(block.config.menu_slug)" :key="menuItemId(item)" class="group relative">
-                                <a :href="menuItemHref(item)" :target="item.target" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
-                                    {{ item.label || item.title }}
+                                <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
+                                    <span class="header-menu-label-wrap inline-flex items-center gap-2">
+                                        <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none']" aria-hidden="true" />
+                                        <span>{{ menuItemLabel(item) }}</span>
+                                        <span v-if="menuItemBadgeText(item)" class="header-menu-badge header-menu-badge--floating" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                    </span>
                                 </a>
                                 <div
                                     v-if="submenuItems(block.config.menu_slug, menuItemId(item)).length"
-                                    class="invisible absolute inset-inline-start-0 top-full z-50 mt-3 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    class="header-submenu-panel invisible absolute inset-inline-start-0 top-full z-50 mt-0 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
                                     :style="submenuStyle(block)"
                                 >
-                                    <a v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" :href="menuItemHref(child)" :target="child.target" class="header-submenu-link block rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20" :style="menuStyle(block)">{{ child.label || child.title }}</a>
+                                    <div v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" class="header-submenu-item relative">
+                                        <a :href="menuItemHref(child)" :target="menuItemTarget(child)" :rel="menuItemRel(child)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                            </span>
+                                            <span class="flex shrink-0 items-center gap-2">
+                                                <span v-if="menuItemBadgeText(child)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(child)}`">{{ menuItemBadgeText(child) }}</span>
+                                                <svg v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))" class="h-4 w-4 shrink-0 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" /></svg>
+                                            </span>
+                                        </a>
+                                        <div
+                                            v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))"
+                                            class="header-submenu-panel header-submenu-flyout invisible absolute z-50 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition dark:border-surface-700 dark:bg-surface-900"
+                                            :style="submenuStyle(block)"
+                                        >
+                                            <a v-for="grandchild in submenuItems(block.config.menu_slug, menuItemId(child))" :key="menuItemId(grandchild)" :href="menuItemHref(grandchild)" :target="menuItemTarget(grandchild)" :rel="menuItemRel(grandchild)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <i v-if="menuItemIcon(grandchild)" :class="[menuItemIcon(grandchild), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                    <span class="truncate">{{ menuItemLabel(grandchild) }}</span>
+                                                </span>
+                                                <span v-if="menuItemBadgeText(grandchild)" class="header-menu-badge shrink-0" :class="`header-menu-badge--${menuItemBadgeColor(grandchild)}`">{{ menuItemBadgeText(grandchild) }}</span>
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div
                                     v-else-if="item.mega_menu && item.mega_menu_content"
-                                    class="invisible absolute left-0 top-full z-50 mt-3 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    class="header-submenu-panel invisible absolute left-0 top-full z-50 mt-0 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
                                     :style="submenuStyle(block)"
                                     v-html="item.mega_menu_content"
                                 ></div>
@@ -1198,9 +1577,9 @@ onUnmounted(() => {
                     <button v-else-if="block.type === 'command_palette'" type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
                         <span class="inline-flex items-center gap-2 min-w-0">
                             <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
-                            <span v-if="commandPaletteDisplayStyle(block) !== 'icon_only'" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
+                            <span v-if="showCommandPaletteText(block)" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
                         </span>
-                        <span v-if="commandPaletteDisplayStyle(block) !== 'icon_only'" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
+                            <span v-if="showCommandPaletteText(block)" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
                     </button>
                     <button v-else-if="block.type === 'dark_mode'" @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)">
                         <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
@@ -1217,26 +1596,28 @@ onUnmounted(() => {
                             <button @click="toggleUserMenu('main')" :class="userMenuTriggerClass(block)" :style="headerActionStyle(block)">
                                 <div :class="userMenuAvatarClass(block)">{{ userMenuInitial }}</div>
                                 <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold">{{ user.name }}</span>
-                                <svg v-if="showUserMenuArrow(block)" class="w-4 h-4 text-gray-500 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                <svg v-if="showUserMenuArrow(block)" class="hidden h-4 w-4 text-current sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                             </button>
                             <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0 scale-95">
-                                <div v-if="isUserMenuOpen('main')" class="absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-[80]">
-                                    <div class="px-4 py-2.5 border-b border-gray-100 dark:border-white/5">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ user.name }}</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
+                                <div v-if="isUserMenuOpen('main')" class="header-user-dropdown absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-[80]">
+                                    <div class="flex items-center gap-3 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary-500 to-accent-500 text-sm font-bold text-white">
+                                            <img v-if="userMenuAvatarUrl" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" />
+                                            <span v-else>{{ userMenuInitial }}</span>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ user.name }}</p>
+                                            <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ user.email }}</p>
+                                        </div>
                                     </div>
-                                    <Link :href="route('user.dashboard')" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
-                                        {{ t('Dashboard') }}
+                                    <Link v-for="menuLink in userMenuLinks" :key="menuLink.href" :href="menuLink.href" :class="['header-user-dropdown-link flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors rtl:text-right', userMenuLinkToneClass(menuLink.tone)]">
+                                        <i :class="[menuLink.iconClass, 'text-base leading-none']" aria-hidden="true" />
+                                        {{ menuLink.label }}
                                     </Link>
-                                    <Link v-if="affiliateEnabled" :href="route('user.dashboard.affiliate')" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v7.5A2.25 2.25 0 005.25 18h8.25m0-12l-3 3m3-3l-3-3m0 15l3-3m-3 3l3 3M15.75 9h3A2.25 2.25 0 0121 11.25v1.5A2.25 2.25 0 0118.75 15h-3" /></svg>
-                                        {{ t('Affiliate') }}
-                                    </Link>
-                                    <button @click="logout" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-danger-500 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
+                                    <Link :href="route('logout')" class="header-user-dropdown-link header-user-dropdown-link--danger w-full border-t border-gray-200 text-left rtl:text-right px-4 py-2.5 text-sm text-danger-500 transition-colors dark:border-white/10 flex items-center gap-2">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
                                         {{ t('Sign Out') }}
-                                    </button>
+                                    </Link>
                                 </div>
                             </Transition>
                         </div>
@@ -1269,19 +1650,47 @@ onUnmounted(() => {
                     <nav v-else-if="block.type === 'navigation'" :class="[...mainNavClass('left'), menuAlignmentClass(block), menuHoverStyleClass(block)]" :style="menuStyle(block)">
                         <template v-if="getMenu(block.config.menu_slug)">
                             <div v-for="item in topMenuItems(block.config.menu_slug)" :key="menuItemId(item)" class="group relative">
-                                <a :href="menuItemHref(item)" :target="item.target" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
-                                    {{ item.label || item.title }}
+                                <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
+                                    <span class="header-menu-label-wrap inline-flex items-center gap-2">
+                                        <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none']" aria-hidden="true" />
+                                        <span>{{ menuItemLabel(item) }}</span>
+                                        <span v-if="menuItemBadgeText(item)" class="header-menu-badge header-menu-badge--floating" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                    </span>
                                 </a>
                                 <div
                                     v-if="submenuItems(block.config.menu_slug, menuItemId(item)).length"
-                                    class="invisible absolute inset-inline-start-0 top-full z-50 mt-3 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    class="header-submenu-panel invisible absolute inset-inline-start-0 top-full z-50 mt-0 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
                                     :style="submenuStyle(block)"
                                 >
-                                    <a v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" :href="menuItemHref(child)" :target="child.target" class="header-submenu-link block rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20" :style="menuStyle(block)">{{ child.label || child.title }}</a>
+                                    <div v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" class="header-submenu-item relative">
+                                        <a :href="menuItemHref(child)" :target="menuItemTarget(child)" :rel="menuItemRel(child)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                            </span>
+                                            <span class="flex shrink-0 items-center gap-2">
+                                                <span v-if="menuItemBadgeText(child)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(child)}`">{{ menuItemBadgeText(child) }}</span>
+                                                <svg v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))" class="h-4 w-4 shrink-0 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" /></svg>
+                                            </span>
+                                        </a>
+                                        <div
+                                            v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))"
+                                            class="header-submenu-panel header-submenu-flyout invisible absolute z-50 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition dark:border-surface-700 dark:bg-surface-900"
+                                            :style="submenuStyle(block)"
+                                        >
+                                            <a v-for="grandchild in submenuItems(block.config.menu_slug, menuItemId(child))" :key="menuItemId(grandchild)" :href="menuItemHref(grandchild)" :target="menuItemTarget(grandchild)" :rel="menuItemRel(grandchild)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <i v-if="menuItemIcon(grandchild)" :class="[menuItemIcon(grandchild), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                    <span class="truncate">{{ menuItemLabel(grandchild) }}</span>
+                                                </span>
+                                                <span v-if="menuItemBadgeText(grandchild)" class="header-menu-badge shrink-0" :class="`header-menu-badge--${menuItemBadgeColor(grandchild)}`">{{ menuItemBadgeText(grandchild) }}</span>
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div
                                     v-else-if="item.mega_menu && item.mega_menu_content"
-                                    class="invisible absolute left-0 top-full z-50 mt-3 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    class="header-submenu-panel invisible absolute left-0 top-full z-50 mt-0 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
                                     :style="submenuStyle(block)"
                                     v-html="item.mega_menu_content"
                                 ></div>
@@ -1301,19 +1710,47 @@ onUnmounted(() => {
                     <nav v-if="block.type === 'navigation'" :class="[...mainNavClass('center'), menuAlignmentClass(block), menuHoverStyleClass(block), mainCenterNavClass]" :style="menuStyle(block)">
                         <template v-if="getMenu(block.config.menu_slug)">
                             <div v-for="item in topMenuItems(block.config.menu_slug)" :key="menuItemId(item)" class="group relative">
-                                <a :href="menuItemHref(item)" :target="item.target" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
-                                    {{ item.label || item.title }}
+                                <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
+                                    <span class="header-menu-label-wrap inline-flex items-center gap-2">
+                                        <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none']" aria-hidden="true" />
+                                        <span>{{ menuItemLabel(item) }}</span>
+                                        <span v-if="menuItemBadgeText(item)" class="header-menu-badge header-menu-badge--floating" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                    </span>
                                 </a>
                                 <div
                                     v-if="submenuItems(block.config.menu_slug, menuItemId(item)).length"
-                                    class="invisible absolute inset-inline-start-0 top-full z-50 mt-3 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    class="header-submenu-panel invisible absolute inset-inline-start-0 top-full z-50 mt-0 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
                                     :style="submenuStyle(block)"
                                 >
-                                    <a v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" :href="menuItemHref(child)" :target="child.target" class="header-submenu-link block rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20" :style="menuStyle(block)">{{ child.label || child.title }}</a>
+                                    <div v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" class="header-submenu-item relative">
+                                        <a :href="menuItemHref(child)" :target="menuItemTarget(child)" :rel="menuItemRel(child)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                            </span>
+                                            <span class="flex shrink-0 items-center gap-2">
+                                                <span v-if="menuItemBadgeText(child)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(child)}`">{{ menuItemBadgeText(child) }}</span>
+                                                <svg v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))" class="h-4 w-4 shrink-0 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" /></svg>
+                                            </span>
+                                        </a>
+                                        <div
+                                            v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))"
+                                            class="header-submenu-panel header-submenu-flyout invisible absolute z-50 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition dark:border-surface-700 dark:bg-surface-900"
+                                            :style="submenuStyle(block)"
+                                        >
+                                            <a v-for="grandchild in submenuItems(block.config.menu_slug, menuItemId(child))" :key="menuItemId(grandchild)" :href="menuItemHref(grandchild)" :target="menuItemTarget(grandchild)" :rel="menuItemRel(grandchild)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <i v-if="menuItemIcon(grandchild)" :class="[menuItemIcon(grandchild), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                    <span class="truncate">{{ menuItemLabel(grandchild) }}</span>
+                                                </span>
+                                                <span v-if="menuItemBadgeText(grandchild)" class="header-menu-badge shrink-0" :class="`header-menu-badge--${menuItemBadgeColor(grandchild)}`">{{ menuItemBadgeText(grandchild) }}</span>
+                                            </a>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div
                                     v-else-if="item.mega_menu && item.mega_menu_content"
-                                    class="invisible absolute left-0 top-full z-50 mt-3 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    class="header-submenu-panel invisible absolute left-0 top-full z-50 mt-0 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
                                     :style="submenuStyle(block)"
                                     v-html="item.mega_menu_content"
                                 ></div>
@@ -1337,15 +1774,69 @@ onUnmounted(() => {
                         </div>
                         <span v-if="!getLogoImage()" class="hidden whitespace-nowrap text-lg font-bold tracking-tight text-gray-900 sm:block dark:text-white">{{ siteName }}</span>
                     </Link>
+                    <nav v-else-if="block.type === 'navigation'" :class="[...mainNavClass('right'), menuAlignmentClass(block), menuHoverStyleClass(block)]" :style="menuStyle(block)">
+                        <template v-if="getMenu(block.config.menu_slug)">
+                            <div v-for="item in topMenuItems(block.config.menu_slug)" :key="menuItemId(item)" class="group relative">
+                                <a :href="menuItemHref(item)" :target="menuItemTarget(item)" :rel="menuItemRel(item)" :class="{ 'header-menu-link-active': isActive(menuItemHref(item)) }" class="header-menu-link px-3.5 py-2 text-sm font-medium transition-all whitespace-nowrap" :style="menuStyle(block)">
+                                    <span class="header-menu-label-wrap inline-flex items-center gap-2">
+                                        <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none']" aria-hidden="true" />
+                                        <span>{{ menuItemLabel(item) }}</span>
+                                        <span v-if="menuItemBadgeText(item)" class="header-menu-badge header-menu-badge--floating" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                    </span>
+                                </a>
+                                <div
+                                    v-if="submenuItems(block.config.menu_slug, menuItemId(item)).length"
+                                    class="header-submenu-panel invisible absolute inset-inline-end-0 top-full z-50 mt-0 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    :style="submenuStyle(block)"
+                                >
+                                    <div v-for="child in submenuItems(block.config.menu_slug, menuItemId(item))" :key="menuItemId(child)" class="header-submenu-item relative">
+                                        <a :href="menuItemHref(child)" :target="menuItemTarget(child)" :rel="menuItemRel(child)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                            </span>
+                                            <span class="flex shrink-0 items-center gap-2">
+                                                <span v-if="menuItemBadgeText(child)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(child)}`">{{ menuItemBadgeText(child) }}</span>
+                                                <svg v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))" class="h-4 w-4 shrink-0 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" /></svg>
+                                            </span>
+                                        </a>
+                                        <div
+                                            v-if="hasSubmenuItems(block.config.menu_slug, menuItemId(child))"
+                                            class="header-submenu-panel header-submenu-flyout invisible absolute z-50 min-w-52 rounded-xl border border-gray-200 bg-white p-2 opacity-0 shadow-xl transition dark:border-surface-700 dark:bg-surface-900"
+                                            :style="submenuStyle(block)"
+                                        >
+                                            <a v-for="grandchild in submenuItems(block.config.menu_slug, menuItemId(child))" :key="menuItemId(grandchild)" :href="menuItemHref(grandchild)" :target="menuItemTarget(grandchild)" :rel="menuItemRel(grandchild)" class="header-submenu-link flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-900/20">
+                                                <span class="flex min-w-0 items-center gap-2">
+                                                    <i v-if="menuItemIcon(grandchild)" :class="[menuItemIcon(grandchild), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                    <span class="truncate">{{ menuItemLabel(grandchild) }}</span>
+                                                </span>
+                                                <span v-if="menuItemBadgeText(grandchild)" class="header-menu-badge shrink-0" :class="`header-menu-badge--${menuItemBadgeColor(grandchild)}`">{{ menuItemBadgeText(grandchild) }}</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div
+                                    v-else-if="item.mega_menu && item.mega_menu_content"
+                                    class="header-submenu-panel invisible absolute right-0 top-full z-50 mt-0 min-w-[480px] rounded-xl border border-gray-200 bg-white p-5 opacity-0 shadow-xl transition group-hover:visible group-hover:opacity-100 dark:border-surface-700 dark:bg-surface-900"
+                                    :style="submenuStyle(block)"
+                                    v-html="item.mega_menu_content"
+                                ></div>
+                            </div>
+                        </template>
+                        <div v-else class="flex items-center gap-2 px-3 py-2 text-xs text-gray-400 italic">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                            {{ t('Menu "') }}{{ block.config.menu_slug }}{{ t('" not found.') }}
+                        </div>
+                    </nav>
                     <LanguageSwitcher v-else-if="block.type === 'language_switcher'" :display="languageSwitcherDisplay(block)" :ui="{ buttonClass: languageSwitcherClass(block), buttonStyle: languageSwitcherStyle(block), iconStyle: blockVisualStyle(block) }" />
                     <NotificationBell v-else-if="block.type === 'notification_bell'" context="user" :ui="{ triggerClass: notificationButtonClass(block).join(' '), triggerStyle: softIconSurfaceStyle(block), iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                     <SocialFollow v-else-if="block.type === 'social_icons'" display-mode="icons" :icon-use-platform-surface="false" :icon-use-platform-color="false" :icon-item-class="socialIconButtonClass(block)" icon-inner-class="text-[18px] leading-none" :icon-item-style="softIconSurfaceStyle(block)" :icon-inner-style="blockVisualStyle(block)" />
                     <button v-else-if="block.type === 'command_palette'" type="button" :class="commandPaletteButtonClass(block)" :style="commandPaletteButtonStyle(block)" :aria-label="t('Open command palette')" @click="openCommandPalette()">
                         <span class="inline-flex items-center gap-2 min-w-0">
                             <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" :style="blockVisualStyle(block)" aria-hidden="true" />
-                            <span v-if="commandPaletteDisplayStyle(block) !== 'icon_only'" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
+                            <span v-if="showCommandPaletteText(block)" :class="commandPaletteLabelClass(block)" class="truncate text-sm font-medium">{{ blockText(block, t('Search')) }}</span>
                         </span>
-                        <span v-if="commandPaletteDisplayStyle(block) !== 'icon_only'" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
+                        <span v-if="showCommandPaletteText(block)" :class="commandPaletteHintClass(block)" class="rounded-md border border-current/10 px-2 py-1 text-[11px] font-semibold leading-none">{{ blockHint(block, t('Ctrl + K')) }}</span>
                     </button>
 
                     <button v-else-if="block.type === 'dark_mode'" @click="toggleDark()" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)">
@@ -1371,23 +1862,25 @@ onUnmounted(() => {
                             <button @click="toggleUserMenu('main')" :class="userMenuTriggerClass(block)" :style="headerActionStyle(block)">
                                 <div :class="userMenuAvatarClass(block)">{{ userMenuInitial }}</div>
                                 <span v-if="authDisplayMode(block) === 'avatar_name'" class="hidden sm:block text-sm font-semibold">{{ user.name }}</span>
-                                <svg v-if="showUserMenuArrow(block)" class="w-4 h-4 text-gray-500 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                <svg v-if="showUserMenuArrow(block)" class="hidden h-4 w-4 text-current sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                             </button>
                             <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100" leave-to-class="opacity-0 scale-95">
-                                <div v-if="isUserMenuOpen('main')" class="absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-[80]">
-                                    <div class="px-4 py-2.5 border-b border-gray-100 dark:border-white/5">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ user.name }}</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ user.email }}</p>
+                                <div v-if="isUserMenuOpen('main')" class="header-user-dropdown absolute right-0 rtl:right-auto rtl:left-0 top-full mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-white/10 rounded-xl shadow-2xl py-1.5 z-[80]">
+                                    <div class="flex items-center gap-3 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
+                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary-500 to-accent-500 text-sm font-bold text-white">
+                                            <img v-if="userMenuAvatarUrl" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" />
+                                            <span v-else>{{ userMenuInitial }}</span>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ user.name }}</p>
+                                            <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ user.email }}</p>
+                                        </div>
                                     </div>
-                                    <Link :href="route('user.dashboard')" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
-                                        {{ t('Dashboard') }}
+                                    <Link v-for="menuLink in userMenuLinks" :key="menuLink.href" :href="menuLink.href" :class="['header-user-dropdown-link flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm transition-colors rtl:text-right', userMenuLinkToneClass(menuLink.tone)]">
+                                        <i :class="[menuLink.iconClass, 'text-base leading-none']" aria-hidden="true" />
+                                        {{ menuLink.label }}
                                     </Link>
-                                    <Link v-if="affiliateEnabled" :href="route('user.dashboard.affiliate')" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
-                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v7.5A2.25 2.25 0 005.25 18h8.25m0-12l-3 3m3-3l-3-3m0 15l3-3m-3 3l3 3M15.75 9h3A2.25 2.25 0 0121 11.25v1.5A2.25 2.25 0 0118.75 15h-3" /></svg>
-                                        {{ t('Affiliate') }}
-                                    </Link>
-                                    <button @click="logout" class="w-full text-left rtl:text-right px-4 py-2.5 text-sm text-danger-500 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors flex items-center gap-2">
+                                    <button @click="logout" class="header-user-dropdown-link header-user-dropdown-link--danger w-full border-t border-gray-200 text-left rtl:text-right px-4 py-2.5 text-sm text-danger-500 transition-colors dark:border-white/10 flex items-center gap-2">
                                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
                                         {{ t('Sign Out') }}
                                     </button>
@@ -1417,18 +1910,26 @@ onUnmounted(() => {
     <!-- Mobile Header -->
     <header
         v-if="mobileHeaderConfig?.enabled"
-        :class="[sectionPositionClass(mobileHeaderConfig), sectionTransitionClass(mobileHeaderConfig), sectionShadowClass(mobileHeaderConfig), sectionVisibilityClass(mobileHeaderConfig)]"
-        :style="{ ...sectionStyle(mobileHeaderConfig, 'mobile', 64), ...sectionBackgroundStyle(mobileHeaderConfig) }"
-        class="w-full border-b border-gray-200 bg-white/95 backdrop-blur-md dark:border-white/5 dark:bg-surface-900/90 md:hidden header-section-overlay"
+        :class="[
+            'w-full md:hidden header-section-overlay',
+            sectionPositionClass(mobileHeaderConfig),
+            sectionTransitionClass(mobileHeaderConfig),
+            isTransparentMainHeaderActive ? '' : sectionShadowClass(mobileHeaderConfig),
+            sectionVisibilityClass(mobileHeaderConfig),
+            isTransparentMainHeaderActive
+                ? `absolute bg-transparent shadow-none header-overlay-light ${sectionBorderClass(mobileHeaderConfig, 'bottom', true)}`
+                : `backdrop-blur-md ${sectionBorderClass(mobileHeaderConfig)} ${hasCustomBackground(mobileHeaderConfig) ? '' : 'bg-white/95 dark:bg-surface-900/90'}`,
+        ]"
+        :style="{ ...mobileHeaderSectionStyle, ...mobileHeaderBackgroundStyle, ...sectionAccentStyle(mobileHeaderConfig) }"
     >
         <div class="flex h-full items-center justify-between gap-3" :class="[containerClass({ ...mobileHeaderConfig, container_width: '1280px' }, true), isCenteredMobileTop ? 'relative' : '']">
             <div class="flex items-center gap-2" :class="[mobileColFlexClass('left'), mobileTopSideClass]">
                 <template v-for="block in mobileLeftBlocks" :key="block.id">
-                    <button v-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
+                    <button v-if="block.type === 'hamburger'" type="button" class="mobile-header-utility-btn" :class="iconSurfaceClass(block, [mobileIconButtonClass, mobileHeaderConfig?.text_color ? 'text-current' : 'text-gray-600 dark:text-gray-300'].join(' '))" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
                     </button>
-                    <Link v-else-if="block.type === 'logo'" href="/" class="flex items-center gap-2 text-base font-bold text-gray-900 dark:text-white" :class="mobileTopLogoClass">
+                    <Link v-else-if="block.type === 'logo'" href="/" class="flex items-center gap-2 text-base font-bold" :class="[mobileTopLogoClass, mobileHeaderConfig?.text_color ? '' : 'text-gray-900 dark:text-white']">
                         <img v-if="getLogoImage()" :src="getLogoImage()" :alt="logoAltText" class="h-9 w-auto max-w-32 object-contain" />
                         <div v-else class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 text-sm font-bold text-white shadow-lg shadow-primary-500/20">
                             {{ logoInitial }}
@@ -1444,9 +1945,23 @@ onUnmounted(() => {
                         <svg v-if="isDark" class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
                     </button>
-                    <Link v-else-if="block.type === 'user_menu_icon'" :href="userIconHref" :class="iconSurfaceClass(block, mobileIconButtonClass)" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
+                    <Link v-else-if="block.type === 'user_menu_icon'" class="mobile-header-utility-btn" :href="userIconHref" :class="iconSurfaceClass(block, [mobileIconButtonClass, mobileHeaderConfig?.text_color ? 'text-current' : 'text-gray-600 dark:text-gray-300'].join(' '))" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
                         <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
                         <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
+                    </Link>
+                    <button v-else-if="block.type === 'command_palette'" type="button" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" :aria-label="t('Open search')" @click="openCommandPalette()">
+                        <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" aria-hidden="true" />
+                    </button>
+                    <LanguageSwitcher v-else-if="block.type === 'language_switcher'" display="icon" :ui="{ buttonClass: notificationButtonClass(block).join(' '), buttonStyle: softIconSurfaceStyle(block), iconStyle: blockVisualStyle(block) }" />
+                    <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" class="text-xs font-bold transition-all whitespace-nowrap shrink-0 flex items-center justify-center" :style="blockVisualStyle(block)" :class="[
+                        ctaShapeClass(block),
+                        isIconOnly(block) ? 'h-9 w-9' : 'px-3 h-9',
+                        ...buttonVariantClass(ctaStyleValue(block)),
+                    ]">
+                        <span class="inline-flex items-center gap-1">
+                            <i v-if="blockIconClass(block) || isIconOnly(block)" :class="[blockIconClass(block, 'ti ti-rocket'), 'text-base']" aria-hidden="true" />
+                            <span v-if="!isIconOnly(block)">{{ blockText(block, t('Get Started')) }}</span>
+                        </span>
                     </Link>
                 </template>
             </div>
@@ -1479,25 +1994,147 @@ onUnmounted(() => {
                 >
                     <aside class="absolute inset-y-0 left-0 flex w-[min(20rem,calc(100vw-2rem))] max-w-full flex-col border-r border-gray-200 bg-white shadow-2xl dark:border-surface-800 dark:bg-surface-900 rtl:left-auto rtl:right-0 rtl:border-l rtl:border-r-0">
                         <div class="flex h-16 items-center justify-between border-b border-gray-100 px-5 dark:border-surface-800">
-                            <Link href="/" class="min-w-0 truncate text-base font-bold text-gray-900 dark:text-white" @click="closeMobileMenu">{{ mobileDrawerTitle }}</Link>
-                            <button type="button" class="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-50 text-gray-500 transition hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Close menu')" @click="closeMobileMenu">
+                            <Link href="/" class="flex min-w-0 items-center gap-2" @click="closeMobileMenu">
+                                <img v-if="drawerLogo" :src="drawerLogo" :alt="logoAltText" class="h-9 w-auto max-w-32 object-contain" />
+                                <span v-else class="truncate text-base font-bold text-gray-900 dark:text-white">{{ mobileDrawerTitle }}</span>
+                            </Link>
+                            <button type="button" class="flex h-10 w-10 items-center justify-center rounded-full bg-gray-50 text-gray-500 transition hover:bg-primary-50 hover:text-primary-600 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Close menu')" @click="closeMobileMenu">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
                         <nav class="flex-1 space-y-1 overflow-y-auto p-4">
                             <template v-if="getMenu(mobileDrawerMenuSlug)">
-                                <a
-                                    v-for="item in visibleMenuItems(mobileDrawerMenuSlug)"
-                                    :key="item.id"
-                                    :href="menuItemHref(item)"
-                                    :target="item.target"
-                                    class="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition"
-                                    :class="isActive(menuItemHref(item)) ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'"
-                                    @click="closeMobileMenu"
-                                >
-                                    <span class="truncate">{{ item.label || item.title }}</span>
-                                    <svg class="h-4 w-4 shrink-0 text-gray-300 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" /></svg>
-                                </a>
+                                <div v-for="item in topMenuItems(mobileDrawerMenuSlug)" :key="menuItemId(item)" class="space-y-1">
+                                    <template v-if="hasSubmenuItems(mobileDrawerMenuSlug, menuItemId(item))">
+                                        <button
+                                            type="button"
+                                            class="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition text-start"
+                                            :class="isActive(menuItemHref(item)) ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'"
+                                            @click="toggleMobileSubmenu(menuItemId(item))"
+                                        >
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(item) }}</span>
+                                            </span>
+                                            <span class="flex shrink-0 items-center gap-2">
+                                                <span v-if="menuItemBadgeText(item)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                                <svg
+                                                    class="h-4 w-4 transition-transform duration-200"
+                                                    :class="[
+                                                        isMobileSubmenuOpen(menuItemId(item)) ? 'rotate-90 rtl:-rotate-90 text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600 rtl:rotate-180'
+                                                    ]"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                    stroke="currentColor"
+                                                    stroke-width="1.8"
+                                                >
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                                                </svg>
+                                            </span>
+                                        </button>
+                                    </template>
+                                    <template v-else>
+                                        <a
+                                            :href="menuItemHref(item)"
+                                            :target="menuItemTarget(item)"
+                                            :rel="menuItemRel(item)"
+                                            class="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition"
+                                            :class="isActive(menuItemHref(item)) ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white'"
+                                            @click="closeMobileMenu"
+                                        >
+                                            <span class="flex min-w-0 items-center gap-2">
+                                                <i v-if="menuItemIcon(item)" :class="[menuItemIcon(item), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                <span class="truncate">{{ menuItemLabel(item) }}</span>
+                                            </span>
+                                            <span class="flex shrink-0 items-center gap-2">
+                                                <span v-if="menuItemBadgeText(item)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(item)}`">{{ menuItemBadgeText(item) }}</span>
+                                            </span>
+                                        </a>
+                                    </template>
+
+                                    <div
+                                        v-if="hasSubmenuItems(mobileDrawerMenuSlug, menuItemId(item))"
+                                        class="grid transition-[grid-template-rows,opacity] duration-200 ease-in-out"
+                                        :class="isMobileSubmenuOpen(menuItemId(item)) ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 pointer-events-none'"
+                                    >
+                                        <div class="overflow-hidden">
+                                            <div class="space-y-1 ps-4 pb-1">
+                                                <div v-for="child in submenuItems(mobileDrawerMenuSlug, menuItemId(item))" :key="menuItemId(child)" class="space-y-1">
+                                                    <template v-if="hasSubmenuItems(mobileDrawerMenuSlug, menuItemId(child))">
+                                                        <button
+                                                            type="button"
+                                                            class="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-950 text-start"
+                                                            @click="toggleMobileSubmenu(menuItemId(child))"
+                                                        >
+                                                            <span class="flex min-w-0 items-center gap-2">
+                                                                <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                                <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                                            </span>
+                                                            <span class="flex shrink-0 items-center gap-2">
+                                                                <span v-if="menuItemBadgeText(child)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(child)}`">{{ menuItemBadgeText(child) }}</span>
+                                                                <svg
+                                                                    class="h-4 w-4 transition-transform duration-200"
+                                                                    :class="[
+                                                                        isMobileSubmenuOpen(menuItemId(child)) ? 'rotate-90 rtl:-rotate-90 text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600 rtl:rotate-180'
+                                                                    ]"
+                                                                    fill="none"
+                                                                    viewBox="0 0 24 24"
+                                                                    stroke="currentColor"
+                                                                    stroke-width="1.8"
+                                                                >
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m9 5 7 7-7 7" />
+                                                                </svg>
+                                                            </span>
+                                                        </button>
+                                                    </template>
+                                                    <template v-else>
+                                                        <a
+                                                            :href="menuItemHref(child)"
+                                                            :target="menuItemTarget(child)"
+                                                            :rel="menuItemRel(child)"
+                                                            class="flex items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-950"
+                                                            @click="closeMobileMenu"
+                                                        >
+                                                            <span class="flex min-w-0 items-center gap-2">
+                                                                <i v-if="menuItemIcon(child)" :class="[menuItemIcon(child), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                                <span class="truncate">{{ menuItemLabel(child) }}</span>
+                                                            </span>
+                                                            <span class="flex shrink-0 items-center gap-2">
+                                                                <span v-if="menuItemBadgeText(child)" class="header-menu-badge" :class="`header-menu-badge--${menuItemBadgeColor(child)}`">{{ menuItemBadgeText(child) }}</span>
+                                                            </span>
+                                                        </a>
+                                                    </template>
+
+                                                    <div
+                                                        v-if="hasSubmenuItems(mobileDrawerMenuSlug, menuItemId(child))"
+                                                        class="grid transition-[grid-template-rows,opacity] duration-200 ease-in-out"
+                                                        :class="isMobileSubmenuOpen(menuItemId(child)) ? 'grid-rows-[1fr] opacity-100 mt-1' : 'grid-rows-[0fr] opacity-0 pointer-events-none'"
+                                                    >
+                                                        <div class="overflow-hidden">
+                                                            <div class="space-y-1 ps-4 pb-1">
+                                                                <a
+                                                                    v-for="grandchild in submenuItems(mobileDrawerMenuSlug, menuItemId(child))"
+                                                                    :key="menuItemId(grandchild)"
+                                                                    :href="menuItemHref(grandchild)"
+                                                                    :target="menuItemTarget(grandchild)"
+                                                                    :rel="menuItemRel(grandchild)"
+                                                                    class="flex items-center justify-between gap-3 rounded-xl px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50 hover:text-gray-950"
+                                                                    @click="closeMobileMenu"
+                                                                >
+                                                                    <span class="flex min-w-0 items-center gap-2">
+                                                                        <i v-if="menuItemIcon(grandchild)" :class="[menuItemIcon(grandchild), 'text-base leading-none shrink-0']" aria-hidden="true" />
+                                                                        <span class="truncate">{{ menuItemLabel(grandchild) }}</span>
+                                                                    </span>
+                                                                    <span v-if="menuItemBadgeText(grandchild)" class="header-menu-badge shrink-0" :class="`header-menu-badge--${menuItemBadgeColor(grandchild)}`">{{ menuItemBadgeText(grandchild) }}</span>
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </template>
                             <div v-else class="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500 dark:border-surface-700">
                                 {{ t('No menu items found.') }}
@@ -1512,9 +2149,17 @@ onUnmounted(() => {
     <!-- Mobile Bottom Header -->
     <nav
         v-if="mobileBottomHeaderConfig?.enabled && activeMobileBottomBlocks.length > 0"
-        :class="[sectionTransitionClass(mobileBottomHeaderConfig), sectionShadowClass(mobileBottomHeaderConfig), bottomSectionVisibilityClass(mobileBottomHeaderConfig), sectionBorderClass(mobileBottomHeaderConfig, 'top')]"
-        :style="{ height: `${Number(mobileBottomHeaderConfig?.height ?? 64)}px`, ...sectionBackgroundStyle(mobileBottomHeaderConfig) }"
-        class="fixed inset-x-0 bottom-0 z-50 transform-gpu bg-white/95 backdrop-blur-md will-change-transform dark:bg-surface-900/90 md:hidden header-section-overlay"
+        :class="[
+            sectionTransitionClass(mobileBottomHeaderConfig),
+            sectionShadowClass(mobileBottomHeaderConfig),
+            bottomSectionVisibilityClass(mobileBottomHeaderConfig),
+            sectionBorderClass(mobileBottomHeaderConfig, 'top'),
+            mobileBottomHeaderConfig?.show_glassmorphism !== false
+                ? 'bg-white/95 backdrop-blur-md dark:bg-surface-900/90'
+                : 'bg-white dark:bg-surface-900'
+        ]"
+        :style="{ height: `${Number(mobileBottomHeaderConfig?.height ?? 60)}px`, ...sectionBackgroundStyle(mobileBottomHeaderConfig) }"
+        class="fixed inset-x-0 bottom-0 z-50 transform-gpu will-change-transform md:hidden header-section-overlay"
     >
         <div class="flex h-full items-center justify-around gap-1" :class="containerClass({ ...mobileBottomHeaderConfig, container_width: '1280px' }, true)">
             <template v-for="block in activeMobileBottomBlocks" :key="block.id">
@@ -1523,28 +2168,22 @@ onUnmounted(() => {
                     <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.125 1.125 0 0 1 1.592 0L21.75 12M4.5 9.75v9A2.25 2.25 0 0 0 6.75 21h10.5a2.25 2.25 0 0 0 2.25-2.25v-9" /></svg>
                     <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Home')) }}</span>
                 </Link>
-                <Link v-else-if="block.type === 'user_menu_icon'" :href="userIconHref" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
-                    <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
-                    <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
-                    <span v-if="showBlockLabel(block)">{{ user ? blockLabel(block, t('Dashboard')) : String(block.config?.guest_label || blockLabel(block, t('Sign In'))) }}</span>
-                </Link>
+                <button v-else-if="block.type === 'command_palette'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Search')" @click="openCommandPalette()">
+                    <i :class="[blockIconClass(block, 'ti ti-search'), 'text-xl leading-none']" aria-hidden="true" />
+                    <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Search')) }}</span>
+                </button>
                 <div v-else-if="block.type === 'notification_bell' && user" class="flex min-w-0 flex-1 justify-center">
                     <NotificationBell context="user" :label="showBlockLabel(block) ? blockLabel(block, t('Notifications')) : ''" :ui="{ wrapperClass: 'flex min-w-0 w-full', triggerClass: notificationButtonClass(block, true).join(' '), triggerStyle: softIconSurfaceStyle(block), dropdownClass: 'fixed inset-x-4 bottom-20 z-50 max-h-[70vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900', iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                 </div>
-                <div v-else-if="block.type === 'language_switcher'" class="flex min-w-0 flex-1 justify-center">
-                    <LanguageSwitcher display="bottom" />
-                </div>
-                <Link v-else-if="block.type === 'cta_button' && canShowCtaButton(block)" :href="String(block.config.link || '/register')" :class="mobileCtaClass(block, true)" :style="blockVisualStyle(block)">
-                    <i v-if="blockIconClass(block, 'ti ti-arrow-right')" :class="[blockIconClass(block, 'ti ti-arrow-right'), ctaIconSizeClass(true)]" aria-hidden="true" />
-                    <span v-if="!isIconOnly(block)" class="max-w-full truncate">{{ blockText(block, t('Start')) }}</span>
-                </Link>
-                <button v-else-if="block.type === 'dark_mode'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Toggle dark mode')" @click="toggleDark()">
+                <Link v-else-if="block.type === 'user_menu_icon'" :href="userIconHref" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
                     <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
-                    <template v-else>
-                        <svg v-if="isDark" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M14 12a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                    </template>
-                    <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Theme')) }}</span>
+                    <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
+                    <span v-if="showBlockLabel(block)">{{ user ? blockLabel(block, t('Account')) : String(block.config?.guest_label || blockLabel(block, t('Sign In'))) }}</span>
+                </Link>
+                <button v-else-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
+                    <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
+                    <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h16" /></svg>
+                    <span v-if="showBlockLabel(block)">{{ blockLabel(block, t('Menu')) }}</span>
                 </button>
             </template>
         </div>
@@ -1594,9 +2233,14 @@ onUnmounted(() => {
 .header-overlay-light :is(.header-menu-link, .header-action-link, .language-switcher-button, .header-soft-icon-button) {
     color: #ffffff !important;
 }
-.header-overlay-light :is(.header-soft-icon-button:not(.header-soft-icon-button--icon-only), .language-switcher-button:not(.header-soft-icon-button--icon-only)) {
+.header-overlay-light :is(.header-soft-icon-button, .language-switcher-button, :deep(.language-switcher-button), .mobile-header-utility-btn, [class*="h-10"][class*="w-10"]) {
     border-color: rgb(255 255 255 / 0.18) !important;
     background: rgb(255 255 255 / 0.08) !important;
+    border-radius: 9999px !important;
+}
+.header-overlay-light :is(.header-soft-icon-button:hover, .language-switcher-button:hover, :deep(.language-switcher-button:hover), .mobile-header-utility-btn:hover, [class*="h-10"][class*="w-10"]:hover) {
+    background: rgb(255 255 255 / 0.16) !important;
+    border-color: rgb(255 255 255 / 0.28) !important;
 }
 .header-overlay-light .header-action-link {
     border-color: rgb(255 255 255 / 0.22) !important;
@@ -1607,11 +2251,17 @@ onUnmounted(() => {
 .header-overlay-light :is(.header-menu-link:hover, .header-menu-link-active, .header-action-link:hover, .language-switcher-button:hover, .header-soft-icon-button:hover) {
     color: #ffffff !important;
 }
-.header-overlay-light :is(.header-menu-hover-pill .header-menu-link:hover, .header-menu-hover-pill .header-menu-link-active, .header-menu-hover-box .header-menu-link:hover, .header-menu-hover-box .header-menu-link-active, .header-menu-hover-glow .header-menu-link:hover, .header-menu-hover-glow .header-menu-link-active) {
+.header-overlay-light :is(.header-menu-hover-pill-soft-bg .header-menu-link:hover, .header-menu-hover-pill-soft-bg .header-menu-link-active, .header-menu-hover-rounded-soft-bg .header-menu-link:hover, .header-menu-hover-rounded-soft-bg .header-menu-link-active) {
     background: rgb(255 255 255 / 0.12) !important;
     box-shadow: none !important;
 }
-.header-overlay-light .header-menu-hover-underline .header-menu-link::after {
+.header-overlay-light :is(.header-menu-hover-pill-soft-bg .header-menu-link:hover, .header-menu-hover-pill-soft-bg .header-menu-link-active) {
+    border-radius: 9999px !important;
+}
+.header-overlay-light :is(.header-menu-hover-rounded-soft-bg .header-menu-link:hover, .header-menu-hover-rounded-soft-bg .header-menu-link-active) {
+    border-radius: var(--radius-lg) !important;
+}
+.header-overlay-light .header-menu-hover-bottom-border .header-menu-link::after {
     background: #ffffff;
 }
 .header-overlay-light :is([class*="border-primary-"], [class*="text-primary-"]) {
@@ -1621,6 +2271,98 @@ onUnmounted(() => {
 .header-overlay-light :is([class*="bg-gray-50"], [class*="bg-primary-50"], [class*="bg-surface-800"]) {
     background: rgb(255 255 255 / 0.08) !important;
 }
+.header-overlay-light .header-user-dropdown {
+    background: #ffffff !important;
+    border-color: rgb(229 231 235) !important;
+    color: rgb(55 65 81) !important;
+}
+.dark .header-overlay-light .header-user-dropdown {
+    background: rgb(31 41 55) !important;
+    border-color: rgb(255 255 255 / 0.1) !important;
+    color: rgb(229 231 235) !important;
+}
+.header-overlay-light .header-user-dropdown :is(a, button, svg, i, span) {
+    color: inherit;
+}
+.header-user-dropdown .header-user-dropdown-link--default {
+    color: rgb(55 65 81) !important;
+}
+.dark .header-user-dropdown .header-user-dropdown-link--default {
+    color: rgb(209 213 219) !important;
+}
+.header-user-dropdown .header-user-dropdown-link--default:hover {
+    background: rgb(249 250 251) !important;
+}
+.dark .header-user-dropdown .header-user-dropdown-link--default:hover {
+    background: rgb(255 255 255 / 0.05) !important;
+}
+.header-user-dropdown .header-user-dropdown-link--danger {
+    color: rgb(239 68 68) !important;
+}
+.header-user-dropdown .header-user-dropdown-link--danger:hover {
+    background: rgb(254 242 242) !important;
+}
+.dark .header-user-dropdown .header-user-dropdown-link--danger:hover {
+    background: rgb(127 29 29 / 0.22) !important;
+}
+.header-overlay-light .header-user-dropdown .header-user-dropdown-link--default {
+    color: rgb(55 65 81) !important;
+}
+.dark .header-overlay-light .header-user-dropdown .header-user-dropdown-link--default {
+    color: rgb(209 213 219) !important;
+}
+.header-overlay-light .header-user-dropdown .header-user-dropdown-link--default:hover {
+    background: rgb(249 250 251) !important;
+}
+.dark .header-overlay-light .header-user-dropdown .header-user-dropdown-link--default:hover {
+    background: rgb(255 255 255 / 0.05) !important;
+}
+.header-overlay-light .header-user-dropdown .header-user-dropdown-link--danger {
+    color: rgb(239 68 68) !important;
+}
+.header-overlay-light .header-user-dropdown .header-user-dropdown-link--danger:hover {
+    background: rgb(254 242 242) !important;
+}
+.dark .header-overlay-light .header-user-dropdown .header-user-dropdown-link--danger:hover {
+    background: rgb(127 29 29 / 0.22) !important;
+}
+.header-user-dropdown .header-user-dropdown-link--success {
+    color: rgb(21 128 61) !important;
+}
+.header-user-dropdown .header-user-dropdown-link--success:hover {
+    background: rgb(240 253 244) !important;
+    color: rgb(21 128 61) !important;
+}
+.dark .header-user-dropdown .header-user-dropdown-link--success {
+    color: rgb(74 222 128) !important;
+}
+.dark .header-user-dropdown .header-user-dropdown-link--success:hover {
+    background: rgb(20 83 45 / 0.32) !important;
+    color: rgb(74 222 128) !important;
+}
+.header-overlay-light .header-user-dropdown .header-user-dropdown-link--success {
+    color: rgb(21 128 61) !important;
+}
+.dark .header-overlay-light .header-user-dropdown .header-user-dropdown-link--success {
+    color: rgb(74 222 128) !important;
+}
+.header-overlay-light .header-submenu-panel {
+    --header-submenu-bg: #ffffff;
+    --header-submenu-border: rgb(229 231 235);
+    --header-submenu-text: rgb(31 41 55);
+    --header-submenu-hover-bg: rgb(243 244 246);
+    --header-submenu-hover-text: rgb(31 41 55);
+    color: rgb(31 41 55) !important;
+    background: #ffffff !important;
+}
+.header-overlay-light .header-submenu-panel :is(a, button, span, i, svg, p, div, strong, em) {
+    color: rgb(31 41 55) !important;
+}
+.header-overlay-light .header-submenu-panel .header-submenu-link:hover {
+    color: rgb(31 41 55) !important;
+    background: rgb(243 244 246) !important;
+}
+
 .header-menu-link {
     position: relative;
     display: inline-flex;
@@ -1630,49 +2372,122 @@ onUnmounted(() => {
 .dark .header-menu-link { color: var(--header-menu-text-color, var(--color-gray-400)); }
 .header-menu-link:hover, .header-menu-link-active { color: var(--header-menu-hover-color, var(--color-primary-600)); }
 .dark .header-menu-link:hover, .dark .header-menu-link-active { color: var(--header-menu-hover-color, var(--color-primary-400)); }
+.header-menu-label-wrap {
+    position: relative;
+    padding-inline-end: 0.9rem;
+}
+.header-menu-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+.header-menu-badge--floating {
+    position: absolute;
+    inset-inline-end: -0.425rem;
+    top: -0.675rem;
+}
+.header-menu-badge--green { background: rgb(220 252 231) !important; color: rgb(21 128 61) !important; }
+.header-menu-badge--blue { background: rgb(219 234 254) !important; color: rgb(29 78 216) !important; }
+.header-menu-badge--violet { background: rgb(237 233 254) !important; color: rgb(109 40 217) !important; }
+.header-menu-badge--amber { background: rgb(254 243 199) !important; color: rgb(180 83 9) !important; }
+.header-menu-badge--red { background: rgb(254 226 226) !important; color: rgb(220 38 38) !important; }
+.header-menu-badge--gray { background: rgb(243 244 246) !important; color: rgb(75 85 99) !important; }
 
-.header-menu-hover-underline .header-menu-link::after {
+.header-menu-hover-bottom-border .header-menu-link::after {
     position: absolute;
     inset-inline: 0.875rem;
     bottom: 0.25rem;
     height: 2px;
     content: "";
     background: var(--header-menu-hover-color, var(--color-primary-500));
-    border-radius: var(--radius-full);
+    border-radius: 9999px;
     transform: scaleX(0);
     transform-origin: center;
     transition: transform 0.18s ease;
 }
-.header-menu-hover-underline .header-menu-link:hover::after,
-.header-menu-hover-underline .header-menu-link-active::after { transform: scaleX(1); }
-.header-menu-hover-pill .header-menu-link:hover,
-.header-menu-hover-pill .header-menu-link-active { background: var(--header-menu-hover-bg, var(--color-primary-50)); }
-.dark .header-menu-hover-pill .header-menu-link:hover,
-.dark .header-menu-hover-pill .header-menu-link-active { background: var(--header-menu-hover-bg-dark, rgb(16 185 129 / 0.14)); }
-.header-menu-hover-box .header-menu-link:hover,
-.header-menu-hover-box .header-menu-link-active { background: var(--header-menu-hover-bg, var(--surface-card)); box-shadow: var(--shadow-sm); transform: translateY(-1px); }
-.header-menu-hover-glow .header-menu-link:hover,
-.header-menu-hover-glow .header-menu-link-active { background: var(--header-menu-hover-bg, rgb(16 185 129 / 0.08)); box-shadow: var(--header-menu-hover-shadow, 0 0 0 1px rgb(16 185 129 / 0.14), 0 8px 18px rgb(16 185 129 / 0.14)); }
-.header-submenu-link { color: var(--header-submenu-text-color, var(--color-gray-700)); }
-.dark .header-submenu-link { color: var(--header-submenu-text-color, var(--color-gray-200)); }
+.header-menu-hover-bottom-border .header-menu-link:hover::after,
+.header-menu-hover-bottom-border .header-menu-link-active::after { transform: scaleX(1); }
+.header-menu-hover-pill-soft-bg .header-menu-link {
+    border-radius: 9999px !important;
+}
+.header-menu-hover-pill-soft-bg .header-menu-link:hover,
+.header-menu-hover-pill-soft-bg .header-menu-link-active { background: var(--header-menu-hover-bg, var(--color-primary-50)); border-radius: 9999px !important; }
+.dark .header-menu-hover-pill-soft-bg .header-menu-link:hover,
+.dark .header-menu-hover-pill-soft-bg .header-menu-link-active { background: var(--header-menu-hover-bg-dark, rgb(16 185 129 / 0.14)); }
+.header-menu-hover-rounded-soft-bg .header-menu-link {
+    border-radius: var(--radius-lg);
+}
+.header-menu-hover-rounded-soft-bg .header-menu-link:hover,
+.header-menu-hover-rounded-soft-bg .header-menu-link-active { background: var(--header-menu-hover-bg, var(--surface-card)); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+.dark .header-menu-hover-rounded-soft-bg .header-menu-link:hover,
+.dark .header-menu-hover-rounded-soft-bg .header-menu-link-active { background: var(--header-menu-hover-bg-dark, rgb(16 185 129 / 0.14)); }
+.header-menu-hover-simple .header-menu-link:hover,
+.header-menu-hover-simple .header-menu-link-active {
+    color: var(--header-menu-hover-color, var(--color-primary-600)) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+.dark .header-menu-hover-simple .header-menu-link:hover,
+.dark .header-menu-hover-simple .header-menu-link-active {
+    color: var(--header-menu-hover-color, var(--color-primary-400)) !important;
+}
+.header-submenu-panel {
+    --header-submenu-bg: #ffffff;
+    --header-submenu-border: rgb(229 231 235);
+    --header-submenu-text: rgb(31 41 55);
+    --header-submenu-hover-bg: rgb(243 244 246);
+    --header-submenu-hover-text: rgb(31 41 55);
+    color: var(--header-submenu-text) !important;
+    background: var(--header-submenu-bg) !important;
+    border-color: var(--header-submenu-border) !important;
+}
+.dark .header-submenu-panel {
+    --header-submenu-bg: rgb(17 24 39);
+    --header-submenu-border: rgb(55 65 81 / 0.7);
+    --header-submenu-text: rgb(229 231 235);
+    --header-submenu-hover-bg: rgb(31 41 55);
+    --header-submenu-hover-text: rgb(243 244 246);
+    color: var(--header-submenu-text) !important;
+}
+.header-submenu-panel :is(a, button, span, i, svg, p, div, strong, em) {
+    color: inherit;
+}
+.header-submenu-item:hover > .header-submenu-flyout {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+}
+.header-submenu-flyout {
+    inset-inline-start: calc(100% - 0.25rem);
+    top: 0;
+    pointer-events: none;
+}
+.header-submenu-link { color: var(--header-submenu-text) !important; }
+.dark .header-submenu-link { color: var(--header-submenu-text) !important; }
 .header-submenu-link:hover {
-    color: var(--header-menu-hover-color, var(--color-primary-600));
-    background: var(--header-menu-hover-bg, var(--color-primary-50));
+    color: var(--header-submenu-hover-text) !important;
+    background: var(--header-submenu-hover-bg) !important;
 }
 .dark .header-submenu-link:hover {
-    color: var(--header-menu-hover-color, var(--color-primary-400));
-    background: var(--header-menu-hover-bg-dark, rgb(16 185 129 / 0.14));
+    color: var(--header-submenu-hover-text) !important;
+    background: var(--header-submenu-hover-bg) !important;
 }
 .header-action-link {
     color: var(--header-action-text-color, inherit);
 }
 .header-action-link:hover {
-    color: var(--header-action-hover-color, inherit);
-    background: var(--header-action-hover-bg, var(--color-gray-100));
+    color: var(--header-soft-icon-hover-color, var(--header-action-hover-color, inherit));
+    background: var(--header-soft-icon-hover-bg, var(--header-action-hover-bg, var(--color-gray-100)));
 }
 .dark .header-action-link:hover {
-    color: var(--header-action-hover-color, inherit);
-    background: var(--header-action-hover-bg-dark, rgb(255 255 255 / 0.05));
+    color: var(--header-soft-icon-hover-color, var(--header-action-hover-color, inherit));
+    background: var(--header-soft-icon-hover-bg-dark, var(--header-action-hover-bg-dark, rgb(255 255 255 / 0.05)));
 }
 .header-soft-icon-button {
     background: var(--header-soft-icon-bg, var(--surface-card));
@@ -1695,5 +2510,14 @@ onUnmounted(() => {
 .dark .header-soft-icon-button--icon-only:hover {
     background: var(--header-soft-icon-hover-bg-dark, rgb(255 255 255 / 0.08)) !important;
     border-color: transparent !important;
+}
+
+/* Ensure mobile hamburger and login buttons have transparent backgrounds in the original header */
+:not(.header-overlay-light) .mobile-header-utility-btn {
+    background-color: transparent !important;
+    border-color: transparent !important;
+}
+:not(.header-overlay-light) .mobile-header-utility-btn:hover {
+    background-color: var(--header-control-hover-bg, var(--color-gray-100)) !important;
 }
 </style>

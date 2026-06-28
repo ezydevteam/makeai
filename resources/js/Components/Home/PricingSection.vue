@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, watch, ref } from 'vue'
+import { computed, watch, ref, onMounted, onUnmounted } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
+import { useSectionStyle } from '@/Composables/useSectionStyle'
+import { useTheme } from '@/Composables/useTheme'
+const { sectionBgClass, titleColorClass, subtitleColorClass, titleAlignClass, titleSizeClass, badgeClass, cardBgClass, cardWrapperClass, sectionIconClass, sectionHeaderClass, sectionPaddingStyle } = useSectionStyle()
+const { isDark } = useTheme()
 
 type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
 interface PricingCycle { amount: number; subtotal_amount: number; original_amount: number | null; formatted: string; subtotal_formatted: string; original_formatted: string | null; vat_percentage: number; vat_formatted: string; uses_default: boolean; is_trial: boolean; trial_days: number | null }
@@ -76,13 +80,38 @@ const pricingPlanActionUrl = (plan: PricingPlan) => {
     const u = (page.props.auth as { user?: unknown } | undefined)?.user
     return `${u ? '/checkout' : '/register'}?${q.toString()}`
 }
-const pricingPlanCardClass = (plan: PricingPlan): string[] => [
-    plan.is_featured ? 'border-primary-200 bg-white shadow-2xl shadow-primary-500/10 ring-1 ring-primary-100' : 'border-gray-100 bg-white hover:border-gray-200',
-    'relative flex flex-col rounded-[2rem] border p-8 transition-all duration-300 hover:-translate-y-1',
-]
+const pricingPlanCardClass = (plan: PricingPlan): string[] => {
+    if (isDark.value) {
+        const bgClasses = plan.is_featured
+            ? 'border-primary-500/30 bg-surface-900/60 shadow-2xl shadow-primary-500/5 ring-1 ring-primary-500/20'
+            : 'border-surface-800/60 bg-surface-900/40 hover:border-primary-500/30 hover:bg-surface-900/80'
+        return [
+            bgClasses,
+            'relative flex flex-col rounded-[2rem] border p-8 transition-all duration-300 hover:-translate-y-1 pricing-card',
+        ]
+    }
+    const bgClasses = plan.is_featured
+        ? 'border-primary-300 bg-gradient-to-b from-primary-500/10 via-white to-white shadow-2xl shadow-primary-500/10 ring-1 ring-primary-100'
+        : 'border-gray-100 bg-gradient-to-b from-primary-500/5 via-white to-white hover:border-primary-400'
+    return [
+        bgClasses,
+        'relative flex flex-col rounded-[2rem] border p-8 transition-all duration-300 hover:-translate-y-1 pricing-card',
+    ]
+}
+
+const effectiveCardWrapperClass = computed(() => {
+    const style = asString(props.section.config.card_bg_style, 'default')
+    if (isDark.value) {
+        if (style === 'default' || style === 'transparent') return ''
+        return 'bg-surface-900/40 border border-surface-800/60 relative isolate overflow-hidden rounded-[2.5rem] p-8 md:p-16'
+    }
+    return cardWrapperClass(style)
+})
 const pricingPlanButtonClass = (plan: PricingPlan): string[] => [
     'inline-flex w-full items-center justify-center rounded-2xl px-5 py-3.5 text-sm font-black leading-none transition-all duration-200 ease-out hover:-translate-y-0.5',
-    plan.is_featured ? 'bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-xl shadow-primary-600/20 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-600/25' : 'bg-gray-100 text-gray-900 hover:bg-gray-200',
+    plan.is_featured
+        ? 'bg-gradient-to-r from-primary-600 to-primary-500 !text-white shadow-xl shadow-primary-600/20 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-600/25'
+        : 'border border-gray-200 bg-white text-gray-800 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-400 dark:hover:text-primary-400 dark:hover:bg-primary-500/10',
 ]
 const pricingSectionPlans = (): PricingPlan[] => {
     const plans = [...(props.pricingPlans ?? [])]
@@ -92,55 +121,177 @@ const pricingSectionPlans = (): PricingPlan[] => {
     if (source === 'paid') return plans.filter((p) => !p.is_free)
     return plans
 }
+
+const tabRefs = ref<Record<number, HTMLElement>>({})
+const activeTabWidth = ref(0)
+const activeTabOffset = ref(0)
+
+const activeIndex = computed(() => pricingBillingCycles.value.indexOf(pricingBilling.value))
+
+const updatePill = () => {
+    const activeIdx = activeIndex.value
+    const el = tabRefs.value[activeIdx]
+    if (el) {
+        activeTabWidth.value = el.offsetWidth
+        activeTabOffset.value = el.offsetLeft
+    }
+}
+
+watch(activeIndex, () => {
+    setTimeout(updatePill, 0)
+}, { flush: 'post' })
+
+onMounted(() => {
+    setTimeout(updatePill, 100)
+})
+
+const slidingPillStyle = computed(() => ({
+    width: `${activeTabWidth.value}px`,
+    transform: `translateX(${activeTabOffset.value - 4}px)`,
+}))
+
+const sectionRef = ref<HTMLElement | null>(null)
+let gsapCtx: any = null
+
+onMounted(async () => {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+  const { gsap } = await import('gsap')
+  const { ScrollTrigger } = await import('gsap/ScrollTrigger')
+  gsap.registerPlugin(ScrollTrigger)
+
+  gsapCtx = gsap.context(() => {
+    // Section Header Entrance
+    const header = sectionRef.value!.querySelector('.mb-16')
+    if (header) {
+      gsap.from(header, {
+        opacity: 0,
+        y: 30,
+        duration: 0.7,
+        ease: 'power2.out',
+        immediateRender: false,
+        scrollTrigger: {
+          trigger: sectionRef.value,
+          start: 'top 85%',
+          once: true,
+        },
+      })
+    }
+
+    // Pricing Cards — Staggered Entrance
+    const cards = sectionRef.value!.querySelectorAll('.pricing-card')
+    if (cards.length) {
+      gsap.from(cards, {
+        opacity: 0,
+        y: 50,
+        duration: 0.6,
+        stagger: 0.12,
+        ease: 'power2.out',
+        immediateRender: false,
+        scrollTrigger: {
+          trigger: sectionRef.value,
+          start: 'top 85%',
+          once: true,
+        }
+      })
+    }
+  }, sectionRef.value!)
+
+  setTimeout(() => {
+    ScrollTrigger.refresh()
+  }, 100)
+})
+
+onUnmounted(() => gsapCtx?.revert())
 </script>
 
 <template>
-    <section class="bg-gray-50 py-24 transition-colors duration-300 dark:bg-surface-900">
+    <section ref="sectionRef" :class="[isDark ? '!bg-surface-950' : sectionBgClass(asString(section.config.section_bg, 'default'))]" :style="sectionPaddingStyle(section.config.vertical_padding, '96')" class="transition-colors duration-300">
         <div class="mx-auto max-w-7xl px-6">
-            <div class="mb-16 text-center">
-                <div v-if="asString(section.config.icon)" class="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 shadow-sm dark:bg-primary-500/10 dark:text-primary-300">
-                    <i :class="[asString(section.config.icon), 'text-2xl']"></i>
-                </div>
-                <h2 class="mb-4 text-3xl font-black text-gray-900 dark:text-white md:text-5xl">{{ asString(section.config.heading ?? section.config.title, t('Simple Pricing')) }}</h2>
-                <p v-if="asString(section.config.subheading ?? section.config.subtitle)" class="mx-auto max-w-2xl font-medium text-gray-500 dark:text-gray-400">{{ asString(section.config.subheading ?? section.config.subtitle) }}</p>
-                <div v-if="pricingBillingCycles.length > 1" class="mt-10 inline-flex items-center justify-center gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
-                    <button v-for="cycle in pricingBillingCycles" :key="cycle" type="button" @click="pricingBilling = cycle" :class="pricingBilling === cycle ? 'btn-primary shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'" class="rounded-xl px-5 py-2 text-sm font-bold transition">{{ pricingBillingLabels[cycle] }}</button>
-                </div>
-                <div v-else class="mt-10 flex justify-center">
-                    <span class="rounded-full border border-primary-200 bg-primary-50 px-5 py-2 text-sm font-bold text-primary-700">{{ pricingBillingLabels[pricingBillingCycles[0]] }}</span>
-                </div>
-            </div>
-            <div v-if="pricingSectionPlans().length > 0" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <article v-for="plan in pricingSectionPlans()" :key="plan.id" :class="pricingPlanCardClass(plan)">
-                    <div v-if="plan.is_featured" class="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary-600 to-accent-600 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">{{ ps.pricing_featured_label_text }}</div>
-                    <h3 class="mb-1 text-xl font-black text-gray-900">{{ plan.name }}</h3>
-                    <p class="mb-6 text-sm font-medium leading-relaxed text-gray-500">{{ plan.description }}</p>
-                    <div class="mb-6">
-                        <div class="flex flex-wrap items-end gap-2">
-                            <span v-if="pricingActiveCycle(plan).original_formatted && Number(pricingActiveCycle(plan).original_amount) > pricingActiveCycle(plan).subtotal_amount" class="mb-1 text-lg font-bold text-gray-400 line-through">{{ pricingActiveCycle(plan).original_formatted }}</span>
-                            <span class="text-4xl font-black tracking-tight text-gray-900">{{ pricingDisplayPrice(plan) }}</span>
-                            <span v-if="pricingPriceSuffix(plan)" class="mb-1 text-sm font-bold text-gray-400">{{ pricingPriceSuffix(plan) }}</span>
-                        </div>
-                        <p v-if="pricingActiveCycle(plan).is_trial" class="mt-1 text-xs font-bold text-primary-600">{{ t(':days days trial, then renews at :price', { days: String(pricingActiveCycle(plan).trial_days ?? 0), price: pricingActiveCycle(plan).formatted }) }}</p>
-                        <p v-else-if="pricingBilling === 'yearly' && pricingSavingsText(plan)" class="mt-1 text-xs font-bold text-success-600">{{ pricingSavingsText(plan) }}</p>
-                        <p v-else-if="pricingBilling === 'lifetime'" class="mt-1 text-xs font-bold text-success-600">{{ t('One-time lifetime access') }}</p>
-                        <p v-if="pricingBilling === 'lifetime' && pricingSavingsText(plan)" class="mt-1 text-xs font-bold text-success-600">{{ pricingSavingsText(plan) }}</p>
-                        <p v-if="pricingActiveCycle(plan).vat_percentage > 0" class="mt-1 text-xs font-semibold text-gray-500">{{ t('Includes :percentage% VAT (:amount)', { percentage: String(pricingActiveCycle(plan).vat_percentage), amount: pricingActiveCycle(plan).vat_formatted }) }}</p>
-                        <p v-if="pricingActiveCycle(plan).uses_default === false" class="mt-2 text-[10px] font-black uppercase tracking-widest text-gray-400">{{ t('Country price') }}</p>
+            <div :class="effectiveCardWrapperClass">
+                <div :class="[sectionHeaderClass(asString(section.config.title_align, 'center'))]" class="mb-16">
+                    <!-- Top Position Icon -->
+                    <div v-if="asString(section.config.icon) && asString(section.config.icon_position, 'top') === 'top'" :class="[
+                        sectionIconClass(asString(section.config.icon_style, 'primary')),
+                        'mb-5 h-14 w-14 text-2xl'
+                    ]">
+                        <i :class="asString(section.config.icon)"></i>
                     </div>
-                    <ul class="mb-8 flex-1 space-y-3.5">
-                        <li v-for="feature in pricingPlanFeatures(plan)" :key="feature" class="flex items-start gap-3 text-sm font-medium leading-tight text-gray-600">
-                            <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 shadow-sm shadow-primary-500/20">
-                                <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                            </span>
-                            {{ feature }}
-                        </li>
-                    </ul>
-                    <Link :href="pricingPlanActionUrl(plan)" :class="pricingPlanButtonClass(plan)">{{ pricingActiveCycle(plan).is_trial ? ps.pricing_trial_button_text : ps.pricing_checkout_button_text }}</Link>
-                    <p v-if="plan.bottom_info_text" class="mt-4 text-center text-xs font-semibold text-gray-500">{{ plan.bottom_info_text }}</p>
-                </article>
+                    <div class="w-full">
+                        <span v-if="asString(section.config.badge_text)" :class="badgeClass(asString(section.config.section_bg, 'default'), asString(section.config.title_color, 'dark'))">
+                            <i class="ti ti-sparkles text-xs"></i>
+                            {{ asString(section.config.badge_text) }}
+                        </span>
+                        <!-- Title Wrapper with Left Position Icon -->
+                        <div :class="['flex items-center gap-3 mb-4', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
+                            <div v-if="asString(section.config.icon) && asString(section.config.icon_position, 'top') === 'left'" :class="[
+                                sectionIconClass(asString(section.config.icon_style, 'primary')),
+                                'h-9 w-9 text-lg shrink-0'
+                            ]">
+                                <i :class="asString(section.config.icon)"></i>
+                            </div>
+                            <h2 :class="['font-black', titleSizeClass(asString(section.config.title_size, 'md')), titleColorClass(asString(section.config.title_color, 'dark'))]">{{ asString(section.config.heading ?? section.config.title, t('Simple Pricing')) }}</h2>
+                        </div>
+                        <p v-if="asString(section.config.subheading ?? section.config.subtitle)" :class="['font-medium mt-4 max-w-2xl', subtitleColorClass(asString(section.config.title_color, 'dark'), asString(section.config.section_bg, 'default')), asString(section.config.title_align, 'center') === 'center' ? 'mx-auto' : '']">{{ asString(section.config.subheading ?? section.config.subtitle) }}</p>
+                    </div>
+                </div>
+                <div v-if="pricingBillingCycles.length > 1" class="relative mt-10 inline-flex items-center justify-center rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-surface-700 dark:bg-surface-800">
+                        <!-- Sliding background pill -->
+                        <div
+                            class="absolute top-1 bottom-1 left-1 rounded-full bg-primary-600 transition-all duration-300 ease-out dark:bg-primary-500"
+                            :style="slidingPillStyle"
+                        ></div>
+                        <button
+                            v-for="(cycle, idx) in pricingBillingCycles"
+                            :key="cycle"
+                            :ref="(el) => { if (el) tabRefs[idx] = el as HTMLElement }"
+                            type="button"
+                            @click="pricingBilling = cycle"
+                            :class="[
+                                pricingBilling === cycle
+                                    ? 'text-white'
+                                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white',
+                                'relative z-10 rounded-full px-5 py-2 text-sm font-bold transition-colors duration-200'
+                            ]"
+                        >
+                            {{ pricingBillingLabels[cycle] }}
+                        </button>
+                    </div>
+                    <div v-else :class="['mt-10 flex', titleAlignClass(asString(section.config.title_align, 'center')) === 'text-center' ? 'justify-center' : 'justify-start']">
+                        <span class="rounded-full border border-primary-200 bg-primary-50 px-5 py-2 text-sm font-bold text-primary-700 dark:border-primary-900/50 dark:bg-primary-500/10 dark:text-primary-400">{{ pricingBillingLabels[pricingBillingCycles[0]] }}</span>
+                    </div>
+                <div v-if="pricingSectionPlans().length > 0" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    <article v-for="plan in pricingSectionPlans()" :key="plan.id" :class="pricingPlanCardClass(plan)">
+                        <div v-if="plan.is_featured" class="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary-600 to-accent-600 px-5 py-1.5 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">{{ ps.pricing_featured_label_text }}</div>
+                        <h3 class="mb-1 text-xl font-black text-gray-900 dark:text-white">{{ plan.name }}</h3>
+                        <p class="mb-6 text-sm font-medium leading-relaxed text-gray-500 dark:text-gray-400">{{ plan.description }}</p>
+                        <div class="mb-6">
+                            <div class="flex flex-wrap items-end gap-2">
+                                <span v-if="pricingActiveCycle(plan).original_formatted && Number(pricingActiveCycle(plan).original_amount) > pricingActiveCycle(plan).subtotal_amount" class="mb-1 text-lg font-bold text-gray-400 dark:text-gray-500 line-through">{{ pricingActiveCycle(plan).original_formatted }}</span>
+                                <span class="text-4xl font-black tracking-tight text-gray-900 dark:text-white">{{ pricingDisplayPrice(plan) }}</span>
+                                <span v-if="pricingPriceSuffix(plan)" class="mb-1 text-sm font-bold text-gray-400 dark:text-gray-500">{{ pricingPriceSuffix(plan) }}</span>
+                            </div>
+                            <p v-if="pricingActiveCycle(plan).is_trial" class="mt-1 text-xs font-bold text-primary-600 dark:text-primary-400">{{ t(':days days trial, then renews at :price', { days: String(pricingActiveCycle(plan).trial_days ?? 0), price: pricingActiveCycle(plan).formatted }) }}</p>
+                            <p v-else-if="pricingBilling === 'yearly' && pricingSavingsText(plan)" class="mt-1 text-xs font-bold text-success-600 dark:text-success-400">{{ pricingSavingsText(plan) }}</p>
+                            <p v-else-if="pricingBilling === 'lifetime'" class="mt-1 text-xs font-bold text-success-600 dark:text-success-400">{{ t('One-time lifetime access') }}</p>
+                            <p v-if="pricingBilling === 'lifetime' && pricingSavingsText(plan)" class="mt-1 text-xs font-bold text-success-600 dark:text-success-400">{{ pricingSavingsText(plan) }}</p>
+                            <p v-if="pricingActiveCycle(plan).vat_percentage > 0" class="mt-1 text-xs font-semibold text-gray-500 dark:text-gray-400">{{ t('Includes :percentage% VAT (:amount)', { percentage: String(pricingActiveCycle(plan).vat_percentage), amount: pricingActiveCycle(plan).vat_formatted }) }}</p>
+                            <p v-if="pricingActiveCycle(plan).uses_default === false" class="mt-2 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-500">{{ t('Country price') }}</p>
+                        </div>
+                        <ul class="mb-8 flex-1 space-y-3.5">
+                            <li v-for="feature in pricingPlanFeatures(plan)" :key="feature" class="flex items-start gap-3 text-sm font-medium leading-tight text-gray-600 dark:text-gray-300">
+                                <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-600 shadow-sm shadow-primary-500/20">
+                                    <svg class="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                </span>
+                                {{ feature }}
+                            </li>
+                        </ul>
+                        <Link :href="pricingPlanActionUrl(plan)" :class="pricingPlanButtonClass(plan)">{{ pricingActiveCycle(plan).is_trial ? ps.pricing_trial_button_text : ps.pricing_checkout_button_text }}</Link>
+                        <p v-if="plan.bottom_info_text" class="mt-4 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">{{ plan.bottom_info_text }}</p>
+                    </article>
+                </div>
+                <div v-else class="rounded-[2rem] border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400">{{ t('No plans are available for this pricing section yet.') }}</div>
             </div>
-            <div v-else class="rounded-[2rem] border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400">{{ t('No plans are available for this pricing section yet.') }}</div>
         </div>
     </section>
 </template>

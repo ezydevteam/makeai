@@ -2,12 +2,18 @@
 import { watch, computed, onMounted } from 'vue'
 import { Link, usePage } from '@inertiajs/vue3'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
-import { usePlayground, playgroundState } from '@/composables/usePlayground'
+import { usePlayground, playgroundState } from '@/Composables/usePlayground'
+import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserDashboardLayout })
 
 const page = usePage()
 const { runBoth, shareSnapshot, clearOutputs } = usePlayground()
+const { t } = useTranslate()
+
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text)
+}
 
 interface ProviderOption {
   slug: string
@@ -54,65 +60,65 @@ watch(() => playgroundState.syncPanels, (sync) => {
 
 <template>
   <div>
-    <div class="mb-4 flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-900 dark:text-white">AI Playground</h1>
-      <div class="flex items-center gap-2">
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ t('AI Playground') }}</h1>
+      <div class="flex flex-wrap items-center gap-2">
         <Link
           :href="route('ai.tools.index')"
-          class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          class="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
         >
-          Save as AI Tool
+          {{ t('Save as AI Tool') }}
         </Link>
         <button
           @click="clearOutputs"
-          class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          class="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
         >
-          Clear
+          {{ t('Clear') }}
         </button>
       </div>
     </div>
 
-    <div class="mb-4 grid grid-cols-2 gap-4">
+    <div class="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
       <!-- Left Panel -->
       <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-        <div class="mb-3 grid grid-cols-2 gap-3">
+        <div class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AppSelect
             v-model="playgroundState.leftPanel.provider"
             :options="providerOptions"
-            :label="'Provider'"
-            :placeholder="'Select a provider...'"
+            :label="t('Provider')"
+            :placeholder="t('Select a provider...')"
             live-search
             :size="8"
           />
           <AppSelect
             v-model="playgroundState.leftPanel.model"
             :options="leftModels"
-            :label="'Model'"
-            :placeholder="'Select a model...'"
+            :label="t('Model')"
+            :placeholder="t('Select a model...')"
             live-search
             :size="8"
           />
         </div>
-        <div class="mb-3 grid grid-cols-3 gap-2">
+        <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Temperature</label>
+            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Temperature') }}</label>
             <input v-model.number="playgroundState.leftPanel.temperature" type="number" step="0.1" min="0" max="2" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Top P</label>
+            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Top P') }}</label>
             <input v-model.number="playgroundState.leftPanel.topP" type="number" step="0.1" min="0" max="1" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Max Tokens</label>
+            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Max Tokens') }}</label>
             <input v-model.number="playgroundState.leftPanel.maxTokens" type="number" min="1" max="32000" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
         </div>
         <template v-if="!playgroundState.syncPanels">
-          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">System Prompt</label>
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('System Prompt') }}</label>
           <textarea
             v-model="playgroundState.leftPanel.systemPrompt"
             rows="2"
-            placeholder="Optional system instructions..."
+            :placeholder="t('Optional system instructions...')"
             class="mb-3 w-full rounded-lg border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
         </template>
@@ -123,55 +129,55 @@ watch(() => playgroundState.syncPanels, (sync) => {
             rows="12"
             class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
             :class="{ 'animate-pulse': playgroundState.leftPanel.streaming }"
-            placeholder="Output will appear here..."
+            :placeholder="t('Output will appear here...')"
           />
-          <div v-if="playgroundState.leftPanel.tokens.input > 0" class="mt-1 flex justify-between text-[10px] text-gray-400">
-            <span>In: {{ playgroundState.leftPanel.tokens.input }} · Out: {{ playgroundState.leftPanel.tokens.output }}</span>
-            <button @click="navigator.clipboard.writeText(playgroundState.leftPanel.output)" class="hover:text-gray-600 dark:hover:text-gray-300">Copy</button>
+          <div v-if="playgroundState.leftPanel.tokens.input > 0" class="mt-1 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-400">
+            <span>{{ t('In: :input · Out: :output', { input: playgroundState.leftPanel.tokens.input, output: playgroundState.leftPanel.tokens.output }) }}</span>
+            <button @click="copyToClipboard(playgroundState.leftPanel.output)" class="hover:text-gray-600 dark:hover:text-gray-300">{{ t('Copy') }}</button>
           </div>
         </div>
       </div>
 
       <!-- Right Panel -->
       <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-        <div class="mb-3 grid grid-cols-2 gap-3">
+        <div class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <AppSelect
             v-model="playgroundState.rightPanel.provider"
             :options="providerOptions"
-            :label="'Provider'"
-            :placeholder="'Select a provider...'"
+            :label="t('Provider')"
+            :placeholder="t('Select a provider...')"
             live-search
             :size="8"
           />
           <AppSelect
             v-model="playgroundState.rightPanel.model"
             :options="rightModels"
-            :label="'Model'"
-            :placeholder="'Select a model...'"
+            :label="t('Model')"
+            :placeholder="t('Select a model...')"
             live-search
             :size="8"
           />
         </div>
-        <div class="mb-3 grid grid-cols-3 gap-2">
+        <div class="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Temperature</label>
+            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Temperature') }}</label>
             <input v-model.number="playgroundState.rightPanel.temperature" type="number" step="0.1" min="0" max="2" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Top P</label>
+            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Top P') }}</label>
             <input v-model.number="playgroundState.rightPanel.topP" type="number" step="0.1" min="0" max="1" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
           <div>
-            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Max Tokens</label>
+            <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Max Tokens') }}</label>
             <input v-model.number="playgroundState.rightPanel.maxTokens" type="number" min="1" max="32000" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
           </div>
         </div>
         <template v-if="!playgroundState.syncPanels">
-          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">System Prompt</label>
+          <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('System Prompt') }}</label>
           <textarea
             v-model="playgroundState.rightPanel.systemPrompt"
             rows="2"
-            placeholder="Optional system instructions..."
+            :placeholder="t('Optional system instructions...')"
             class="mb-3 w-full rounded-lg border border-gray-200 px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
         </template>
@@ -182,11 +188,11 @@ watch(() => playgroundState.syncPanels, (sync) => {
             rows="12"
             class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
             :class="{ 'animate-pulse': playgroundState.rightPanel.streaming }"
-            placeholder="Output will appear here..."
+            :placeholder="t('Output will appear here...')"
           />
-          <div v-if="playgroundState.rightPanel.tokens.input > 0" class="mt-1 flex justify-between text-[10px] text-gray-400">
-            <span>In: {{ playgroundState.rightPanel.tokens.input }} · Out: {{ playgroundState.rightPanel.tokens.output }}</span>
-            <button @click="navigator.clipboard.writeText(playgroundState.rightPanel.output)" class="hover:text-gray-600 dark:hover:text-gray-300">Copy</button>
+          <div v-if="playgroundState.rightPanel.tokens.input > 0" class="mt-1 flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-400">
+            <span>{{ t('In: :input · Out: :output', { input: playgroundState.rightPanel.tokens.input, output: playgroundState.rightPanel.tokens.output }) }}</span>
+            <button @click="copyToClipboard(playgroundState.rightPanel.output)" class="hover:text-gray-600 dark:hover:text-gray-300">{{ t('Copy') }}</button>
           </div>
         </div>
       </div>
@@ -194,37 +200,39 @@ watch(() => playgroundState.syncPanels, (sync) => {
 
     <!-- Shared Controls -->
     <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-      <div class="mb-3 flex items-center gap-3">
+      <div class="mb-3 flex flex-col gap-3 xl:flex-row xl:items-center">
         <input
           v-model="playgroundState.sharedMessage"
-          placeholder="Type your message here..."
-          class="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+          :placeholder="t('Type your message here...')"
+          class="w-full min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           @keyup.enter="runBoth"
         />
         <label class="flex cursor-pointer items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
           <input v-model="playgroundState.syncPanels" type="checkbox" class="rounded" />
-          Sync system prompts
+          {{ t('Sync system prompts') }}
         </label>
-        <button
-          @click="runBoth"
-          :disabled="!playgroundState.sharedMessage || playgroundState.leftPanel.streaming || playgroundState.rightPanel.streaming"
-          class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-        >
-          {{ playgroundState.leftPanel.streaming || playgroundState.rightPanel.streaming ? 'Running...' : 'Run Both →' }}
-        </button>
-        <button
-          @click="shareSnapshot"
-          :disabled="!playgroundState.leftPanel.output && !playgroundState.rightPanel.output"
-          class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
-        >
-          Share
-        </button>
+        <div class="flex w-full flex-col gap-2 sm:flex-row xl:w-auto">
+          <button
+            @click="runBoth"
+            :disabled="!playgroundState.sharedMessage || playgroundState.leftPanel.streaming || playgroundState.rightPanel.streaming"
+            class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {{ playgroundState.leftPanel.streaming || playgroundState.rightPanel.streaming ? t('Running...') : t('Run Both') }}
+          </button>
+          <button
+            @click="shareSnapshot"
+            :disabled="!playgroundState.leftPanel.output && !playgroundState.rightPanel.output"
+            class="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+          >
+            {{ t('Share') }}
+          </button>
+        </div>
       </div>
 
       <!-- History -->
       <details v-if="playgroundState.history.length > 0" class="mt-2">
         <summary class="cursor-pointer text-xs font-medium text-gray-500 dark:text-gray-400">
-          History ({{ playgroundState.history.length }})
+          {{ t('History (:count)', { count: playgroundState.history.length }) }}
         </summary>
         <div class="mt-2 max-h-40 space-y-1 overflow-y-auto">
           <div

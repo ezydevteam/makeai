@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AppColorPicker from '@/Components/AppColorPicker.vue'
@@ -11,6 +11,7 @@ import { useTranslate } from '@/Composables/useTranslate'
 defineOptions({ layout: AdminLayout })
 
 const { t } = useTranslate()
+const page = usePage()
 
 const props = defineProps<{
     tool: any | null

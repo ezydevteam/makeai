@@ -1,12 +1,39 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import { computed } from 'vue'
 import { useFlashToasts } from '@/Composables/useToastr'
+import { useTheme } from '@/Composables/useTheme'
+import { useTranslate } from '@/Composables/useTranslate'
 
 useFlashToasts()
 
+interface PageProps {
+    branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
+    captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
+    appearanceAdminSettings?: Record<string, string>
+}
+
+const page = usePage()
+const { isDark } = useTheme()
+const { t } = useTranslate()
+
 const form = useForm({
     email: '',
+    captcha_token: '',
 })
+
+const branding = computed(() => (page.props as unknown as PageProps).branding)
+const appearanceAdminSettings = computed(() => (page.props as unknown as PageProps).appearanceAdminSettings ?? {})
+const appName = computed(() => String(branding.value?.site_name || page.props.appName || t('Application')))
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
+const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => (page.props as unknown as PageProps).captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
+const adminAuthStyle = computed(() => ({
+    '--admin-auth-primary': appearanceAdminSettings.value.primary_color || appearanceAdminSettings.value.button_color || '',
+    '--admin-auth-accent': appearanceAdminSettings.value.accent_color || appearanceAdminSettings.value.primary_color || '',
+}))
 
 const submit = () => {
     form.post(route('admin.password.email'))
@@ -16,25 +43,21 @@ const submit = () => {
 <template>
     <Head :title="$t('Admin Password Reset')" />
 
-    <div class="flex min-h-screen items-center justify-center bg-surface-950 p-4">
-        <div class="fixed inset-0 -z-10">
-            <div class="absolute inset-0 bg-gradient-to-br from-surface-950 via-primary-950/30 to-surface-950"></div>
-            <div class="absolute left-1/3 top-1/4 h-80 w-80 rounded-full bg-primary-600/8 blur-3xl"></div>
-        </div>
-
+    <div class="auth-page admin-auth-page" :style="adminAuthStyle">
         <div class="w-full max-w-md">
             <div class="mb-8 text-center">
-                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-500/10">
-                    <i class="ti ti-lock-question text-3xl text-primary-400"></i>
-                </div>
-                <h1 class="font-heading text-2xl font-bold text-white">{{ $t('Reset Admin Password') }}</h1>
-                <p class="mt-2 text-sm text-gray-500">{{ $t('Enter your admin email to receive a secure reset code.') }}</p>
+                <Link :href="route('home')" class="mb-8 inline-flex items-center justify-center text-gray-950 no-underline dark:text-white">
+                    <img v-if="authLogo" :src="authLogo" :alt="appName" class="h-11 w-auto max-w-[180px] object-contain">
+                    <span v-else class="font-heading text-[1.75rem] font-bold">{{ appName }}</span>
+                </Link>
+                <h1 class="font-heading text-2xl font-bold text-gray-950 dark:text-white">{{ $t('Reset Password') }}</h1>
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $t('Enter your email address to reset your password.') }}</p>
             </div>
 
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+            <div class="auth-card p-8">
                 <form class="space-y-5" @submit.prevent="submit">
                     <div>
-                        <label for="email" class="mb-1.5 block text-sm font-medium text-gray-300">{{ $t('Email') }}</label>
+                        <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Email') }}</label>
                         <input
                             id="email"
                             v-model="form.email"
@@ -42,16 +65,23 @@ const submit = () => {
                             required
                             autofocus
                             autocomplete="email"
-                            class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition-all duration-200 focus:border-primary-500/50 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 transition-all duration-200 placeholder:text-gray-400 focus:border-primary-500 focus:outline-none dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-gray-500"
                             :placeholder="$t('admin@example.com')"
                         />
                         <p v-if="form.errors.email" class="mt-1.5 text-sm text-danger-500">{{ form.errors.email }}</p>
                     </div>
 
+                    <AuthCaptchaField
+                        v-if="captcha.enabled"
+                        v-model="form.captcha_token"
+                        :config="captcha"
+                        :error="form.errors.captcha_token"
+                    />
+
                     <button
                         type="submit"
                         :disabled="form.processing"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-accent-600 py-3 font-semibold text-white shadow-lg shadow-primary-600/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary-500/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                        class="auth-primary-button flex items-center justify-center gap-2"
                     >
                         <svg v-if="form.processing" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -60,7 +90,7 @@ const submit = () => {
                         <span>{{ form.processing ? $t('Sending...') : $t('Send Reset Code') }}</span>
                     </button>
 
-                    <Link :href="route('admin.login')" class="block text-center text-sm text-gray-500 transition-colors hover:text-gray-300">
+                    <Link :href="route('admin.login')" class="auth-inline-link block text-center text-sm">
                         {{ $t('Back to login') }}
                     </Link>
                 </form>
@@ -68,9 +98,3 @@ const submit = () => {
         </div>
     </div>
 </template>
-
-<style scoped>
-.font-heading {
-    font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
-</style>

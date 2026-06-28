@@ -7,7 +7,10 @@ use App\Models\AiTool;
 use App\Models\Conversation;
 use App\Models\CreditTransaction;
 use App\Models\Document;
+use App\Models\LoginHistory;
 use App\Models\Plan;
+use App\Models\SupportTicket;
+use App\Models\UserCollection;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +34,7 @@ class DashboardController extends Controller
             'quickTools' => $this->quickTools(),
             'recentConversations' => $this->recentConversations($user),
             'recentDocuments' => $this->recentDocuments($user),
+            'recentLoginHistory' => $this->recentLoginHistory($user),
             'plan' => $this->planData($user),
             'referral' => $this->referralData($user),
             'showOnboarding' => $showOnboarding,
@@ -56,6 +60,22 @@ class DashboardController extends Controller
             'credits_used_month' => (float) $user->credits_used_month,
             'total_conversations' => $user->conversations()->count(),
             'total_documents' => $user->documents()->count(),
+            'total_favorites' => $user->favorites()->count(),
+            'total_collections' => UserCollection::where('user_id', $user->id)->count(),
+            'total_open_support_tickets' => SupportTicket::query()
+                ->where('user_id', $user->id)
+                ->whereIn('status', ['open', 'in_progress'])
+                ->count(),
+            'active_days' => $user->creditTransactions()
+                ->where('type', 'usage')
+                ->where('created_at', '>=', now()->subDays(30)->startOfDay())
+                ->get()
+                ->groupBy(fn (CreditTransaction $transaction) => $transaction->created_at?->toDateString() ?? '')
+                ->filter(fn ($group, string $date) => $date !== '')
+                ->count(),
+            'lifetime_credits_used' => (float) $user->creditTransactions()
+                ->where('type', 'usage')
+                ->sum(DB::raw('ABS(amount)')),
         ];
     }
 
@@ -125,7 +145,7 @@ class DashboardController extends Controller
             ->map(fn (Conversation $conversation) => [
                 'id' => $conversation->id,
                 'ulid' => $conversation->ulid,
-                'title' => $conversation->title ?: 'Untitled',
+                'title' => $conversation->title ?: translate('Untitled'),
                 'model' => $conversation->model,
                 'message_count' => $conversation->message_count,
                 'last_message_at' => optional($conversation->last_message_at)->toISOString(),
@@ -151,6 +171,24 @@ class DashboardController extends Controller
             ->all();
     }
 
+    private function recentLoginHistory(User $user): array
+    {
+        return $user->loginHistory()
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(fn (LoginHistory $login) => [
+                'id' => $login->id,
+                'ip' => $login->ip,
+                'country' => $login->country,
+                'city' => $login->city,
+                'success' => (bool) $login->success,
+                'created_at' => optional($login->created_at)->toISOString(),
+            ])
+            ->values()
+            ->all();
+    }
+
     private function planData(User $user): ?array
     {
         $plan = $user->plan;
@@ -163,13 +201,41 @@ class DashboardController extends Controller
             'name' => $plan->name,
             'slug' => $plan->slug,
             'is_free' => (bool) $plan->is_free,
-            'features' => $plan->features,
+            'features' => $this->normalizePlanFeatures($plan->features),
             'subscription_status' => $user->subscription_status,
             'subscription_ends_at' => optional($user->subscription_ends_at)->toISOString(),
             'trial_ends_at' => optional($user->trial_ends_at)->toISOString(),
             'daily_limit' => $user->daily_limit ? (float) $user->daily_limit : null,
             'monthly_limit' => $user->monthly_limit ? (float) $user->monthly_limit : null,
         ];
+    }
+
+    private function normalizePlanFeatures(mixed $features): array
+    {
+        if (is_array($features)) {
+            return array_values(array_filter(array_map(
+                static fn (mixed $feature): string => trim((string) $feature),
+                $features
+            )));
+        }
+
+        if (is_string($features)) {
+            $decoded = json_decode($features, true);
+
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return array_values(array_filter(array_map(
+                    static fn (mixed $feature): string => trim((string) $feature),
+                    $decoded
+                )));
+            }
+
+            return array_values(array_filter(array_map(
+                static fn (string $feature): string => trim($feature),
+                preg_split('/[\r\n,]+/', $features) ?: []
+            )));
+        }
+
+        return [];
     }
 
     private function referralData(User $user): array

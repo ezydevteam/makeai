@@ -23,6 +23,16 @@ const showCookieBanner = ref(false)
 
 const gdprConfig = computed(() => (page.props as any).gdpr ?? { enabled: false })
 const gdprEnabled = computed(() => gdprConfig.value.enabled === true)
+const frontendHeaderSettings = computed(() => (page.props as any).frontendHeaderSettings ?? {})
+const mobileBottomHeaderHeight = computed(() => {
+    const mobileBottom = frontendHeaderSettings.value?.mobile_bottom ?? {}
+
+    if (mobileBottom.enabled !== true) {
+        return 0
+    }
+
+    return mobileBottom.hide_menu_labels === true ? 48 : 60
+})
 const gdprShowBanner = computed(() => {
     if (!gdprConfig.value.enabled) return false
     if (gdprConfig.value.eu_only && !gdprConfig.value.is_eu) return false
@@ -39,7 +49,7 @@ onMounted(() => {
     }
 })
 
-function onCookieAccept(consent: Record<string, boolean>) {
+function onCookieAccept(consent: any) {
     showCookieBanner.value = false
     if (consent.analytics && typeof window !== 'undefined' && (window as any).gtag) {
         (window as any).gtag('consent', 'update', { analytics_storage: 'granted' })
@@ -60,6 +70,9 @@ const colorClasses: Record<string, string> = {
 }
 
 const bannerBg = computed(() => colorClasses[demoBannerColor.value] ?? colorClasses.indigo)
+const mobileBottomInsetStyle = computed(() => ({
+    paddingBottom: `${mobileBottomHeaderHeight.value}px`,
+}))
 
 useFlashToasts()
 </script>
@@ -95,7 +108,7 @@ useFlashToasts()
             <AdSection zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />
         </template>
 
-        <main class="flex-1">
+        <main class="flex-1 md:pb-0" :style="mobileBottomInsetStyle">
             <template v-if="!hideHeader">
                 <AdSection zone="content_top" class="mx-auto mt-4 w-full max-w-7xl px-6" />
             </template>

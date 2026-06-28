@@ -6,25 +6,25 @@ type NotificationRealtimeConfig = {
     key?: string
     host?: string
     port?: number
-    scheme?: 'http' | 'https'
+    scheme?: string
     cluster?: string
 }
 
 declare global {
     interface Window {
-        Echo?: Echo<'reverb'>
+        Echo?: any
         Pusher?: typeof Pusher
     }
 }
 
-let activeEcho: Echo<'reverb'> | null = null
+let activeEcho: any = null
 let activeSignature = ''
 
 export function resolveNotificationChannel(context: 'user' | 'admin', id: number | string): string {
     return context === 'admin' ? `App.Models.Admin.${id}` : `App.Models.User.${id}`
 }
 
-export function getNotificationEcho(config: NotificationRealtimeConfig | null | undefined): Echo<'reverb'> | null {
+export function getNotificationEcho(config: NotificationRealtimeConfig | null | undefined): any {
     if (!config || !['reverb', 'pusher'].includes(config.driver ?? '')) {
         disconnectNotificationEcho()
         return null

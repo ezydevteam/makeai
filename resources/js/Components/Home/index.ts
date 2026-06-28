@@ -11,7 +11,6 @@ import StatsBarSection from './StatsBarSection.vue'
 import CtaBannerSection from './CtaBannerSection.vue'
 import LatestPostsSection from './LatestPostsSection.vue'
 import NewsletterSection from './NewsletterSection.vue'
-import IntegrationsSection from './IntegrationsSection.vue'
 import CustomHtmlSection from './CustomHtmlSection.vue'
 import RichtextSection from './RichtextSection.vue'
 import ImageCarouselSection from './ImageCarouselSection.vue'
@@ -31,7 +30,6 @@ export {
     CtaBannerSection,
     LatestPostsSection,
     NewsletterSection,
-    IntegrationsSection,
     CustomHtmlSection,
     RichtextSection,
     ImageCarouselSection,
@@ -40,7 +38,7 @@ export {
     AllToolsSection,
 }
 
-type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'integrations' | 'custom_html' | 'all_tools' | 'richtext' | 'image_carousel' | 'ad_slot' | 'announcement'
+type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'custom_html' | 'all_tools' | 'richtext' | 'image_carousel' | 'ad_slot' | 'ad_slot_2' | 'ad_slot_3' | 'announcement'
 
 export const sectionComponentMap: Record<SectionType, Component> = {
     hero: HeroSection,
@@ -54,11 +52,12 @@ export const sectionComponentMap: Record<SectionType, Component> = {
     cta_banner: CtaBannerSection,
     latest_posts: LatestPostsSection,
     newsletter: NewsletterSection,
-    integrations: IntegrationsSection,
     custom_html: CustomHtmlSection,
     richtext: RichtextSection,
     image_carousel: ImageCarouselSection,
     ad_slot: AdSlotSection,
+    ad_slot_2: AdSlotSection,
+    ad_slot_3: AdSlotSection,
     announcement: AnnouncementSection,
     all_tools: AllToolsSection,
 }

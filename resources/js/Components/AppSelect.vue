@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick as vueNextTick } from 'vue'
+import { useTranslate } from '@/Composables/useTranslate'
 
 export interface SelectOption {
-    value: string | number
+    value: string | number | null
     label: string
     icon?: string
     color?: string
@@ -51,6 +52,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
     'update:modelValue': [value: string | number | null | (string | number)[]]
 }>()
+const { t } = useTranslate()
 
 const ITEM_HEIGHT = 38
 
@@ -278,24 +280,32 @@ watch(searchQuery, () => {
 </script>
 
 <template>
-    <div ref="wrapperRef" class="relative" :class="{ 'opacity-60 pointer-events-none': disabled }">
+    <div
+        ref="wrapperRef"
+        class="relative min-w-0 w-full"
+        :class="{ 'opacity-60 pointer-events-none': disabled }"
+    >
         <label v-if="label" :for="id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             {{ label }}
             <span v-if="required" class="text-danger-500">*</span>
         </label>
 
-        <div class="relative">
+        <div class="relative min-w-0 w-full">
             <button
                 ref="triggerRef"
                 type="button"
                 :id="id"
                 :name="name"
                 :disabled="disabled"
-                class="w-full min-h-[2.5rem] flex items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white text-left transition-colors focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                class="w-full min-w-0 min-h-[2.5rem] flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white text-left transition-colors focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                :class="multiple && compactMultiple ? 'h-10 overflow-hidden' : ''"
                 @click.stop="toggle"
                 @keydown="handleKeydown"
             >
-                <span class="flex items-center gap-1.5 flex-wrap truncate">
+                <span
+                    class="flex min-w-0 items-center gap-1.5 truncate"
+                    :class="multiple && compactMultiple ? 'min-w-0 flex-1 flex-nowrap overflow-hidden' : 'flex-wrap'"
+                >
                     <i v-if="!multiple && displayText && selectedOptions[0]?.icon" :class="selectedOptions[0].icon" class="text-base shrink-0" aria-hidden="true" />
                     <template v-if="multiple && selectedOptions.length > 0 && !compactMultiple">
                         <span
@@ -315,7 +325,11 @@ watch(searchQuery, () => {
                             </button>
                         </span>
                     </template>
-                    <span v-if="displayText" :class="{ 'text-gray-400 dark:text-gray-500': !selectedOptions.length }">{{ displayText }}</span>
+                    <span
+                        v-if="displayText"
+                        class="block min-w-0 flex-1 truncate"
+                        :class="{ 'text-gray-400 dark:text-gray-500': !selectedOptions.length }"
+                    >{{ displayText }}</span>
                 </span>
                 <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -333,7 +347,7 @@ watch(searchQuery, () => {
                 <div
                     v-if="isOpen"
                     ref="dropdownRef"
-                    class="absolute z-50 w-full rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900 overflow-hidden"
+                    class="absolute z-40 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900"
                     :class="placement === 'top' ? 'bottom-full' : 'top-full mt-1'"
                     @click.stop
                     @mousedown.stop.prevent
@@ -343,7 +357,7 @@ watch(searchQuery, () => {
                             ref="inputRef"
                             v-model="searchQuery"
                             type="text"
-                            :placeholder="searchPlaceholder || 'Search...'"
+                            :placeholder="searchPlaceholder || t('Search...')"
                             class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white focus:ring-0"
                             @keydown.stop="handleKeydown"
                         />
@@ -449,7 +463,7 @@ watch(searchQuery, () => {
                             v-if="filtered.length === 0"
                             class="px-3 py-4 text-center text-sm text-gray-400 dark:text-gray-500"
                         >
-                            No results found
+                            {{ t('No results found') }}
                         </div>
                     </div>
 
@@ -458,7 +472,7 @@ watch(searchQuery, () => {
                             ref="inputRef"
                             v-model="searchQuery"
                             type="text"
-                            :placeholder="searchPlaceholder || 'Search...'"
+                            :placeholder="searchPlaceholder || t('Search...')"
                             class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white focus:ring-0"
                             @keydown.stop="handleKeydown"
                         />

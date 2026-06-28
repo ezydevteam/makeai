@@ -8,9 +8,11 @@ use App\Http\Requests\Auth\ResetPasswordOtpRequest;
 use App\Http\Requests\Auth\VerifyPasswordResetOtpRequest;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
+use App\Services\CaptchaService;
 use App\Services\NotificationEventService;
 use App\Services\RateLimiterService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -24,6 +26,8 @@ class PasswordResetController extends Controller
 
     public function sendResetOtp(ForgotPasswordOtpRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $email = strtolower((string) $request->validated('email'));
         $rateLimiter = app(RateLimiterService::class);
         $throttleKey = $email.'|'.$request->ip();
@@ -68,6 +72,8 @@ class PasswordResetController extends Controller
 
     public function verifyResetOtp(VerifyPasswordResetOtpRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $data = $request->validated();
         $email = strtolower((string) $data['email']);
 
@@ -139,6 +145,8 @@ class PasswordResetController extends Controller
 
     public function resetPassword(ResetPasswordOtpRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $data = $request->validated();
         $email = strtolower((string) $data['email']);
 

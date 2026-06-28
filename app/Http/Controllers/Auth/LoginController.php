@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\CaptchaService;
 use App\Services\NotificationEventService;
 use App\Services\RateLimiterService;
 use Illuminate\Http\Request;
@@ -20,10 +21,19 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
-        $request->validate([
+        $captcha = CaptchaService::fromSettings();
+
+        $rules = [
             'email' => 'required|email',
             'password' => 'required|string',
-        ]);
+        ];
+
+        if ($captcha->isEnabled()) {
+            $rules['captcha_token'] = 'required|string';
+        }
+
+        $request->validate($rules);
+        $captcha->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
 
         $rateLimiter = app(RateLimiterService::class);
         $result = $rateLimiter->attempt('auth', $request->ip());

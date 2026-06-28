@@ -177,7 +177,10 @@ const trackCannedUsage = (id: number) => {
     })
 }
 
-const insertCanned = (id: string | number | null) => {
+const insertCanned = (id: string | number | null | (string | number)[]) => {
+    if (Array.isArray(id)) {
+        id = id[0] ?? null
+    }
     if (!id) {
         return
     }

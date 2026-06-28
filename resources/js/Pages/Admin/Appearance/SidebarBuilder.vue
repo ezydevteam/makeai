@@ -65,7 +65,7 @@ const submit = () => {
     });
 };
 
-const blockTypes = [
+const blockTypes: { type: SidebarBlockType; label: string; desc: string }[] = [
     { type: 'search_box', label: 'Search Box', desc: 'A search input field' },
     { type: 'categories_list', label: 'Categories List', desc: 'List of AI tool categories' },
     { type: 'recent_posts', label: 'Recent Blog Posts', desc: 'List of recent articles' },

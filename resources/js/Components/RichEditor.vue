@@ -22,6 +22,7 @@ import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
 import { RICH_EDITOR_FONT_OPTIONS } from '@/config/fontFamilies'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
+import { Document, Paragraph, TextRun, HeadingLevel, Packer } from 'docx'
 
 const lowlight = createLowlight(common)
 
@@ -209,6 +210,8 @@ const emojiOpen = ref(false)
 const tablePickerOpen = ref(false)
 const tablePickerRows = ref(0)
 const tablePickerCols = ref(0)
+const imageInputRef = ref<HTMLInputElement | null>(null)
+const attachmentInputRef = ref<HTMLInputElement | null>(null)
 const linkUrl = ref('')
 const linkTitle = ref('')
 const linkTarget = ref<'_self' | '_blank'>('_self')
@@ -476,6 +479,9 @@ const handleImageUpload = (event: Event) => {
     imageFileName.value = file.name; uploadedImageData.value = ''; imageError.value = ''; imageUploading.value = true
     uploadFile(file, props.imageUploadUrl).then((url) => { uploadedImageData.value = url }).catch((error) => { imageError.value = error instanceof Error ? error.message : t('Image upload failed.') }).finally(() => { imageUploading.value = false })
 }
+const openImageFilePicker = () => {
+    imageInputRef.value?.click()
+}
 
 // ---- Formatting ----
 const activeFormatLabel = computed(() => {
@@ -521,6 +527,9 @@ const handleAttachmentUpload = async (event: Event) => {
     try { attachmentUrl.value = await uploadFile(file, props.attachmentUploadUrl) }
     catch (error) { attachmentError.value = error instanceof Error ? error.message : t('File upload failed.') }
     finally { attachmentUploading.value = false }
+}
+const openAttachmentFilePicker = () => {
+    attachmentInputRef.value?.click()
 }
 const insertAttachment = () => {
     const href = attachmentUrl.value.trim(); const name = attachmentName.value.trim() || t('Download file')
@@ -620,6 +629,7 @@ const exportContent = async (format: ExportFormat) => {
         wrapper.innerHTML = html
         wrapper.style.cssText = 'font-family: Inter, sans-serif; font-size: 12px; line-height: 1.6; color: #111; padding: 20px; max-width: 700px;'
         try {
+            const html2pdf = (await import('html2pdf.js')).default
             await html2pdf().set({ margin: 10, filename: 'content.pdf', image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(wrapper).save()
         } catch { const win = window.open('', '_blank'); if (win) { win.document.write(`<html><head><title>Print</title></head><body>${html}</body></html>`); win.document.close(); win.print() } }
         finally { exporting.value = false }
@@ -847,10 +857,10 @@ onBeforeUnmount(() => {
             <div v-if="variant === 'full' && overflowOpen" data-rich-editor-overflow class="absolute end-2 top-12 z-30 w-80 rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900 p-3 shadow-lg">
                 <!-- Font family/size/line-height -->
                 <div class="space-y-2 border-b border-gray-100 pb-3 dark:border-surface-800">
-                    <AppSelect :options="fontOptions" @update:model-value="(v: string | number) => setFontFamily(String(v))" placeholder="Font" :size="5" />
+                    <AppSelect :options="fontOptions" @update:model-value="(v: any) => setFontFamily(String(v))" placeholder="Font" :size="5" />
                     <div class="grid grid-cols-2 gap-2">
-                        <AppSelect :options="[12,14,16,18,20,24,30,36,48,60,72].map(s => ({value: `${s}px`, label: `${s}px`}))" @update:model-value="(v: string | number) => setFontSize(String(v))" placeholder="Size" :size="5" />
-                        <AppSelect :options="[{value:'1.2',label:'1.2'},{value:'1.5',label:'1.5'},{value:'1.75',label:'1.75'},{value:'2',label:'2'}]" @update:model-value="(v: string | number) => setLineHeight(String(v))" placeholder="Line height" :size="5" />
+                        <AppSelect :options="[12,14,16,18,20,24,30,36,48,60,72].map(s => ({value: `${s}px`, label: `${s}px`}))" @update:model-value="(v: any) => setFontSize(String(v))" placeholder="Size" :size="5" />
+                        <AppSelect :options="[{value:'1.2',label:'1.2'},{value:'1.5',label:'1.5'},{value:'1.75',label:'1.75'},{value:'2',label:'2'}]" @update:model-value="(v: any) => setLineHeight(String(v))" placeholder="Line height" :size="5" />
                     </div>
                 </div>
                 <!-- Alignment + code + lists -->
@@ -1016,7 +1026,18 @@ onBeforeUnmount(() => {
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Add image') }}</h3></div>
                 <div class="space-y-4 p-5">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Upload image') }}<input type="file" accept="image/*" @change="handleImageUpload" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none file:me-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Upload image') }}</label>
+                        <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-surface-700 dark:bg-surface-800">
+                            <button type="button" @click="openImageFilePicker" class="inline-flex items-center justify-center rounded-full border border-primary-500 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-100 dark:border-primary-500/30 dark:bg-primary-500/15 dark:text-primary-300 dark:hover:bg-primary-500/25">
+                                {{ t('Choose file') }}
+                            </button>
+                            <span class="min-w-0 flex-1 truncate text-sm text-gray-500 dark:text-gray-400">
+                                {{ imageFileName || t('No file chosen') }}
+                            </span>
+                            <input ref="imageInputRef" type="file" accept="image/*" @change="handleImageUpload" class="hidden">
+                        </div>
+                    </div>
                     <div class="relative text-center text-xs font-medium uppercase text-gray-400"><span class="bg-white px-3 dark:bg-surface-900">{{ t('or') }}</span><div class="absolute inset-x-0 top-1/2 -z-0 h-px bg-gray-100 dark:bg-surface-800"></div></div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image URL') }}<input v-model="imageUrl" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1050,7 +1071,18 @@ onBeforeUnmount(() => {
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
                 <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Attach file') }}</h3></div>
                 <div class="space-y-4 p-5">
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Upload file') }}<input type="file" @change="handleAttachmentUpload" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none file:me-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Upload file') }}</label>
+                        <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-3 dark:border-surface-700 dark:bg-surface-800">
+                            <button type="button" @click="openAttachmentFilePicker" class="inline-flex items-center justify-center rounded-full border border-primary-500 bg-primary-50 px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-100 dark:border-primary-500/30 dark:bg-primary-500/15 dark:text-primary-300 dark:hover:bg-primary-500/25">
+                                {{ t('Choose file') }}
+                            </button>
+                            <span class="min-w-0 flex-1 truncate text-sm text-gray-500 dark:text-gray-400">
+                                {{ attachmentFileName || t('No file chosen') }}
+                            </span>
+                            <input ref="attachmentInputRef" type="file" @change="handleAttachmentUpload" class="hidden">
+                        </div>
+                    </div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('File URL') }}<input v-model="attachmentUrl" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Display name') }}<input v-model="attachmentName" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
                     <p v-if="attachmentUploading" class="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">{{ t('Uploading file...') }}</p>

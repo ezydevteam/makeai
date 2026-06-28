@@ -10,6 +10,7 @@ use App\Http\Requests\Admin\Auth\AdminTwoFactorRequest;
 use App\Http\Requests\Admin\Auth\AdminVerifyPasswordResetOtpRequest;
 use App\Jobs\SendTemplatedEmail;
 use App\Models\Admin;
+use App\Services\CaptchaService;
 use App\Services\RateLimiterService;
 use App\Services\Security\TotpService;
 use Illuminate\Http\Request;
@@ -34,6 +35,8 @@ class AdminLoginController extends Controller
      */
     public function login(AdminLoginRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $rateLimiter = app(RateLimiterService::class);
         $throttleKey = strtolower((string) $request->validated('email')).'|'.$request->ip();
 
@@ -110,6 +113,8 @@ class AdminLoginController extends Controller
      */
     public function verify2fa(AdminTwoFactorRequest $request, TotpService $totp)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $adminId = $request->session()->get('admin_2fa_id');
         if (! $adminId) {
             return redirect()->route('admin.login');
@@ -166,6 +171,8 @@ class AdminLoginController extends Controller
 
     public function sendPasswordResetOtp(AdminForgotPasswordRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $email = strtolower((string) $request->validated('email'));
         $rateLimiter = app(RateLimiterService::class);
         $throttleKey = $email.'|'.$request->ip();
@@ -209,6 +216,8 @@ class AdminLoginController extends Controller
 
     public function verifyPasswordResetOtp(AdminVerifyPasswordResetOtpRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $data = $request->validated();
         $email = strtolower((string) $data['email']);
         $rateLimiter = app(RateLimiterService::class);
@@ -248,6 +257,8 @@ class AdminLoginController extends Controller
 
     public function resetPassword(AdminResetPasswordRequest $request)
     {
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
+
         $data = $request->validated();
         $email = strtolower((string) $data['email']);
 

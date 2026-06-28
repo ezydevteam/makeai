@@ -15,6 +15,7 @@ use App\Models\Language;
 use App\Models\Menu;
 use App\Models\Setting;
 use App\Services\BroadcastingService;
+use App\Services\CaptchaService;
 use App\Services\CountryDetectionService;
 use App\Services\ThemeSettingsService;
 use App\Services\InAppNotificationService;
@@ -158,6 +159,7 @@ class HandleInertiaRequests extends Middleware
             'isExtendedLicense' => fn () => is_extended_license(),
             'licenseBlocked' => fn () => $this->isLicenseBlocked(),
             'socialLoginProviders' => fn () => $this->getSocialLoginProviders(),
+            'captcha' => fn () => CaptchaService::fromSettings()->frontendConfig(),
 
             'app' => [
                 'demo' => config('demo.enabled'),
@@ -165,7 +167,7 @@ class HandleInertiaRequests extends Middleware
                 'envato_url' => config('demo.envato_url', 'https://codecanyon.net'),
                 'demo_credentials' => config('demo.enabled') ? [
                     'admin' => ['email' => config('demo.admin_email', 'admin@demo.com'), 'password' => config('demo.admin_password', 'demo12345')],
-                    'user' => ['email' => config('demo.user_email', 'user@demo.com'), 'password' => config('demo.user_password', 'demo12345')],
+                    'user' => ['email' => config('demo.user_email', 'demo@demo.com'), 'password' => config('demo.user_password', 'demo12345')],
                 ] : null,
                 'name' => $siteName,
             ],
@@ -282,13 +284,20 @@ class HandleInertiaRequests extends Middleware
                     ]),
                 'recentTools' => fn () => AiTool::active()->latest()->limit(5)->get(['id', 'name', 'slug', 'description', 'color', 'icon']),
                 'popularTools' => fn () => AiTool::active()->orderByDesc('usage_count')->limit(10)->get(['id', 'name', 'slug', 'description', 'color', 'icon', 'usage_count']),
-                'recentPosts' => fn () => BlogPost::published()->latest('published_at')->limit(5)->get(['title', 'slug', 'published_at', 'featured_image', 'is_featured'])->map(fn (BlogPost $post) => [
-                    'title' => $post->title,
-                    'slug' => $post->slug,
-                    'published_at' => $post->published_at?->toDateString(),
-                    'image' => $post->featured_image,
-                    'is_featured' => $post->is_featured,
-                ]),
+                'recentPosts' => fn () => BlogPost::published()
+                    ->with('categories:id,name')
+                    ->latest('published_at')
+                    ->limit(5)
+                    ->get(['id', 'title', 'slug', 'excerpt', 'published_at', 'featured_image', 'is_featured'])
+                    ->map(fn (BlogPost $post) => [
+                        'title' => $post->title,
+                        'slug' => $post->slug,
+                        'excerpt' => $post->excerpt,
+                        'published_at' => $post->published_at?->toDateString(),
+                        'image' => $post->featured_image,
+                        'is_featured' => $post->is_featured,
+                        'category' => $post->categories->first()?->name,
+                    ]),
                 'tags' => fn () => BlogTag::where('posts_count', '>', 0)->orderByDesc('posts_count')->limit(30)->get(['name', 'slug', 'posts_count'])->map(fn (BlogTag $tag) => [
                     'name' => $tag->name,
                     'slug' => $tag->slug,
@@ -309,9 +318,7 @@ class HandleInertiaRequests extends Middleware
 
             'addonMenuItems' => fn () => app(\App\Services\AddonService::class)->getActiveAddonMenuItems(),
 
-            'appearanceAdminSettings' => fn () => auth('admin')->check()
-                ? AppearanceSetting::getForScope('admin')
-                : null,
+            'appearanceAdminSettings' => fn () => AppearanceSetting::getForScope('admin'),
 
             'appearanceThemeSettings' => fn () => $frontendThemeSettings,
         ];
@@ -380,6 +387,7 @@ class HandleInertiaRequests extends Middleware
                 'avatar' => $user->avatar,
                 'credits' => (float) $user->credits,
                 'plan_id' => $user->plan_id,
+                'is_pro' => isProAvailable() && $user->isPro(),
                 'subscription_status' => $user->subscription_status,
                 'subscription_ends_at' => $user->subscription_ends_at?->toISOString(),
                 'trial_ends_at' => $user->trial_ends_at?->toISOString(),

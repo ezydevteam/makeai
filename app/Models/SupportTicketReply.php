@@ -10,6 +10,8 @@ class SupportTicketReply extends Model
 {
     use SoftDeletes;
 
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'ticket_id',
         'author_type',

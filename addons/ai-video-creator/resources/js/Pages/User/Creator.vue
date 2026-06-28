@@ -87,7 +87,7 @@ async function generate() {
 <template>
     <Head :title="t('Video Creator')" />
 
-    <div class="p-6 max-w-3xl mx-auto space-y-6">
+    <div class="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
         <h1 class="text-xl font-semibold">{{ t('Create Video') }}</h1>
 
         <!-- Tab 1: Choose Type -->
@@ -121,7 +121,7 @@ async function generate() {
             <div v-if="selectedType === 'slideshow'">
                 <label class="block text-sm font-medium mb-1">{{ t('Slides (2-20 images)') }}</label>
                 <input type="file" multiple accept="image/*" @change="(e: Event) => { const f = (e.target as HTMLInputElement).files; if (f) form.slides = Array.from(f) }" />
-                <div class="flex gap-4 mt-2">
+                <div class="mt-2 flex flex-col gap-4 sm:flex-row">
                     <div>
                         <label class="text-xs">{{ t('Slide duration') }}</label>
                         <select v-model="form.slide_duration" class="input">
@@ -132,17 +132,17 @@ async function generate() {
                     </div>
                 </div>
             </div>
-            <div class="flex gap-4">
-                <div>
+            <div class="flex flex-col gap-4 sm:flex-row">
+                <div class="sm:flex-1">
                     <label class="block text-xs mb-1">{{ t('Duration') }}</label>
-                    <select v-model="form.duration" class="input">
+                    <select v-model="form.duration" class="input w-full">
                         <option :value="5">5s</option>
                         <option :value="10">10s</option>
                     </select>
                 </div>
-                <div>
+                <div class="sm:flex-1">
                     <label class="block text-xs mb-1">{{ t('Aspect Ratio') }}</label>
-                    <select v-model="form.aspect_ratio" class="input">
+                    <select v-model="form.aspect_ratio" class="input w-full">
                         <option value="16:9">16:9 🖥️</option>
                         <option value="9:16">9:16 📱</option>
                         <option value="1:1">1:1 ⬛</option>
@@ -160,31 +160,32 @@ async function generate() {
                     <option v-for="p in projects" :key="p.id" :value="p.id">{{ p.name }}</option>
                 </select>
             </div>
-            <div class="flex gap-2">
-                <button @click="tab = 'type'" class="btn btn-ghost btn-sm">{{ t('← Back') }}</button>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <button @click="tab = 'type'" class="btn btn-ghost btn-sm w-full justify-center sm:w-auto">{{ t('← Back') }}</button>
                 <button @click="tab = 'review'" class="btn btn-sm btn-emerald"
+                        :class="'w-full justify-center sm:w-auto'"
                         :disabled="!form.prompt && !form.script">{{ t('Review →') }}</button>
             </div>
         </div>
 
         <!-- Tab 3: Review -->
         <div v-if="tab === 'review'" class="card p-4 space-y-3">
-            <div class="flex justify-between text-sm">
+            <div class="flex items-center justify-between gap-4 text-sm">
                 <span class="text-gray-500">{{ t('Type') }}</span>
-                <span class="font-medium">{{ selectedType }}</span>
+                <span class="font-medium text-right break-all">{{ selectedType }}</span>
             </div>
-            <div class="flex justify-between text-sm">
+            <div class="flex items-center justify-between gap-4 text-sm">
                 <span class="text-gray-500">{{ t('Duration') }}</span>
                 <span class="font-medium">{{ form.duration }}s</span>
             </div>
-            <div class="flex justify-between text-sm">
+            <div class="flex items-center justify-between gap-4 text-sm">
                 <span class="text-gray-500">{{ t('Credits') }}</span>
                 <span class="font-medium text-emerald-600">{{ estimatedCredits }}</span>
             </div>
             <hr />
-            <div class="flex gap-2">
-                <button @click="tab = 'configure'" class="btn btn-ghost btn-sm">{{ t('← Back') }}</button>
-                <button @click="generate" :disabled="generating" class="btn btn-sm btn-emerald">
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <button @click="tab = 'configure'" class="btn btn-ghost btn-sm w-full justify-center sm:w-auto">{{ t('← Back') }}</button>
+                <button @click="generate" :disabled="generating" class="btn btn-sm btn-emerald w-full justify-center sm:w-auto">
                     {{ generating ? t('Generating...') : t('🎬 Generate Video') }}
                 </button>
             </div>

@@ -36,6 +36,8 @@ const recoveryForm = useForm({
 const qrDataUrl = ref('')
 const qrError = ref('')
 const manualKeyGroups = computed(() => props.twoFactor.manual_key?.match(/.{1,4}/g)?.join(' ') ?? '')
+const securityInputClass = 'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm shadow-gray-200/40 transition focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-600 dark:bg-surface-800 dark:text-white dark:shadow-black/20 dark:focus:border-primary-400 dark:focus:ring-primary-900/30'
+const codeInputClass = 'w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-gray-900 shadow-sm shadow-gray-200/40 transition focus:border-primary-500 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-600 dark:bg-surface-800 dark:text-white dark:shadow-black/20 dark:focus:border-primary-400 dark:focus:ring-primary-900/30'
 
 watch(
     () => props.twoFactor.provisioning_uri,
@@ -148,15 +150,16 @@ const regenerateRecoveryCodes = () => {
 
                 <form class="mt-5 space-y-4" @submit.prevent="enable">
                     <div>
-                        <label for="enable-code" class="mb-1.5 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ $t('Code') }}</label>
+                        <label for="enable-code" class="mb-1.5 block text-sm text-gray-800 font-semibold dark:text-gray-300">{{ $t('OTP Code') }}</label>
                         <input
                             id="enable-code"
                             v-model="enableForm.code"
                             type="text"
+                            :placeholder="$t('Enter 6-digit code')"
                             inputmode="numeric"
                             maxlength="6"
                             required
-                            class="w-full rounded-xl border-gray-200 bg-white px-4 py-3 text-center text-lg font-bold tracking-widest text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            :class="[codeInputClass, 'text-center']"
                         />
                         <p v-if="enableForm.errors.code" class="mt-1 text-sm text-danger-500">{{ enableForm.errors.code }}</p>
                     </div>
@@ -174,10 +177,10 @@ const regenerateRecoveryCodes = () => {
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('You have :count recovery codes remaining.', { count: twoFactor.recovery_codes_count }) }}</p>
 
                 <form class="mt-5 space-y-4" @submit.prevent="regenerateRecoveryCodes">
-                    <input v-model="recoveryForm.password" type="password" required autocomplete="current-password" class="w-full rounded-xl border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="$t('Current password')" />
+                    <input v-model="recoveryForm.password" type="password" required autocomplete="current-password" :class="securityInputClass" :placeholder="$t('Current password')" />
                     <p v-if="recoveryForm.errors.password" class="text-sm text-danger-500">{{ recoveryForm.errors.password }}</p>
 
-                    <input v-model="recoveryForm.code" type="text" required class="w-full rounded-xl border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="$t('Authenticator or recovery code')" />
+                    <input v-model="recoveryForm.code" type="text" required :class="codeInputClass" :placeholder="$t('Authenticator or recovery code')" />
                     <p v-if="recoveryForm.errors.code" class="text-sm text-danger-500">{{ recoveryForm.errors.code }}</p>
 
                     <button type="submit" :disabled="recoveryForm.processing" class="rounded-lg border border-primary-500 px-4 py-2.5 text-sm font-semibold text-primary-700 transition-colors hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-primary-300 dark:hover:bg-primary-900/20">
@@ -191,10 +194,10 @@ const regenerateRecoveryCodes = () => {
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('Disabling two-factor authentication lowers admin account protection.') }}</p>
 
                 <form class="mt-5 space-y-4" @submit.prevent="disable">
-                    <input v-model="disableForm.password" type="password" required autocomplete="current-password" class="w-full rounded-xl border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="$t('Current password')" />
+                    <input v-model="disableForm.password" type="password" required autocomplete="current-password" :class="securityInputClass" :placeholder="$t('Current password')" />
                     <p v-if="disableForm.errors.password" class="text-sm text-danger-500">{{ disableForm.errors.password }}</p>
 
-                    <input v-model="disableForm.code" type="text" required class="w-full rounded-xl border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="$t('Authenticator or recovery code')" />
+                    <input v-model="disableForm.code" type="text" required :class="codeInputClass" :placeholder="$t('Authenticator or recovery code')" />
                     <p v-if="disableForm.errors.code" class="text-sm text-danger-500">{{ disableForm.errors.code }}</p>
 
                     <button type="submit" :disabled="disableForm.processing" class="rounded-lg btn-danger shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60">

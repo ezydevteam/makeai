@@ -9,6 +9,8 @@ class SupportTicketAttachment extends Model
 {
     public $timestamps = false;
 
+    protected $connection = 'mysql';
+
     protected $fillable = [
         'ticket_id',
         'reply_id',

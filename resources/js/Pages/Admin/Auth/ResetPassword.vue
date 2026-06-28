@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useFlashToasts } from '@/Composables/useToastr'
+import { useTheme } from '@/Composables/useTheme'
+import { useTranslate } from '@/Composables/useTranslate'
 
 useFlashToasts()
 
@@ -10,20 +13,43 @@ const props = defineProps<{
     verified?: boolean
 }>()
 
+interface PageProps {
+    branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
+    captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
+    appearanceAdminSettings?: Record<string, string>
+}
+
 const verifyForm = useForm({
     email: props.email ?? '',
     code: '',
+    captcha_token: '',
 })
 
 const resetForm = useForm({
     email: props.email ?? '',
     password: '',
     password_confirmation: '',
+    captcha_token: '',
 })
 
 const resendForm = useForm({
     email: props.email ?? '',
 })
+
+const page = usePage()
+const { isDark } = useTheme()
+const { t } = useTranslate()
+const branding = computed(() => (page.props as unknown as PageProps).branding)
+const appearanceAdminSettings = computed(() => (page.props as unknown as PageProps).appearanceAdminSettings ?? {})
+const appName = computed(() => String(branding.value?.site_name || page.props.appName || t('Application')))
+const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
+const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
+const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
+const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => (page.props as unknown as PageProps).captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
+const adminAuthStyle = computed(() => ({
+    '--admin-auth-primary': appearanceAdminSettings.value.primary_color || appearanceAdminSettings.value.button_color || '',
+    '--admin-auth-accent': appearanceAdminSettings.value.accent_color || appearanceAdminSettings.value.primary_color || '',
+}))
 
 const inputs = ref<HTMLInputElement[]>([])
 const digits = ref(['', '', '', '', '', ''])
@@ -63,11 +89,14 @@ const startResendCountdown = () => {
 }
 
 const verifyCode = () => {
-    if (verificationStarted.value || verifyForm.processing || verifyForm.code.length !== 6) {
+    if (verificationStarted.value || verifyForm.processing || verifyForm.code.length !== 6) return
+    if (captcha.value.enabled && !verifyForm.captcha_token) {
+        verifyForm.setError('captcha_token', t('Please complete the captcha challenge.'))
         return
     }
 
     verificationStarted.value = true
+    verifyForm.clearErrors('captcha_token')
     verifyForm.post(route('admin.password.verify'), {
         preserveScroll: true,
         onError: () => {
@@ -123,9 +152,7 @@ const submit = () => {
 }
 
 const resendOtp = () => {
-    if (resendCountdown.value > 0 || resendForm.processing) {
-        return
-    }
+    if (resendCountdown.value > 0 || resendForm.processing) return
 
     resendForm.email = verifyForm.email
     resendForm.post(route('admin.password.email'), {
@@ -139,6 +166,18 @@ const resendOtp = () => {
         },
     })
 }
+
+watch(() => verifyForm.captcha_token, (token) => {
+    if (!token) {
+        return
+    }
+
+    verifyForm.clearErrors('captcha_token')
+
+    if (!props.verified && verifyForm.code.length === 6) {
+        verifyCode()
+    }
+})
 
 onMounted(() => {
     if (!props.verified) {
@@ -157,43 +196,35 @@ onUnmounted(() => {
 <template>
     <Head :title="$t('Reset Admin Password')" />
 
-    <div class="flex min-h-screen items-center justify-center bg-surface-950 p-4">
-        <div class="fixed inset-0 -z-10">
-            <div class="absolute inset-0 bg-gradient-to-br from-surface-950 via-primary-950/30 to-surface-950"></div>
-            <div class="absolute left-1/4 top-1/3 h-64 w-64 rounded-full bg-primary-600/8 blur-3xl"></div>
-        </div>
-
+    <div class="auth-page admin-auth-page" :style="adminAuthStyle">
         <div class="w-full max-w-md">
             <div class="mb-8 text-center">
-                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-500/10">
-                    <i class="ti ti-shield-lock text-3xl text-primary-400"></i>
-                </div>
-                <h1 class="font-heading text-2xl font-bold text-white">
-                    {{ verified ? $t('Set New Password') : $t('Enter Reset Code') }}
+                <Link :href="route('home')" class="mb-8 inline-flex items-center justify-center text-gray-950 no-underline dark:text-white">
+                    <img v-if="authLogo" :src="authLogo" :alt="appName" class="h-11 w-auto max-w-[180px] object-contain">
+                    <span v-else class="font-heading text-[1.75rem] font-bold">{{ appName }}</span>
+                </Link>
+                <h1 class="font-heading text-2xl font-bold text-gray-950 dark:text-white">
+                    {{ verified ? $t('Set New Password') : $t('Verify OTP Code') }}
                 </h1>
-                <p class="mt-2 text-sm text-gray-500">
+                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
                     <template v-if="verified">
                         {{ $t('Your reset code is verified. Choose a strong new password.') }}
                     </template>
                     <template v-else>
-                        {{ $t("We've sent a 6-digit OTP to :email.", { email: maskedEmail }) }}
+                        {{ $t("A 6-digit OTP code was sent to :email", { email: maskedEmail }) }}
                     </template>
                 </p>
             </div>
 
-            <div class="rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+            <div class="auth-card p-8">
                 <form class="space-y-5" @submit.prevent="verified ? submit() : verifyCode()">
-                    <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">{{ $t('Admin email') }}</p>
-                        <p class="mt-1 font-mono text-sm font-semibold text-white">{{ maskedEmail || $t('Email hidden') }}</p>
-                        <p v-if="verifyForm.errors.email || resetForm.errors.email" class="mt-1.5 text-sm text-danger-500">
-                            {{ verifyForm.errors.email || resetForm.errors.email }}
-                        </p>
+                    <div  v-if="verifyForm.errors.email || resetForm.errors.email" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.03]">
+                        {{ verifyForm.errors.email || resetForm.errors.email }}
                     </div>
 
                     <div v-if="!verified">
-                        <label class="mb-3 block text-sm font-medium text-gray-300">{{ $t('Reset Code') }}</label>
-                        <div class="flex justify-center gap-3">
+                        <label class="mb-3 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('OTP Code') }}</label>
+                        <div class="w-full flex justify-center gap-3">
                             <input
                                 v-for="(_, i) in 6"
                                 :key="i"
@@ -203,18 +234,26 @@ onUnmounted(() => {
                                 inputmode="numeric"
                                 maxlength="6"
                                 :disabled="verifyForm.processing"
-                                class="h-12 w-10 rounded-xl border border-white/10 bg-white/5 text-center text-lg font-bold text-white transition-all duration-200 focus:border-primary-500/50 focus:outline-none focus:ring-2 focus:ring-primary-500/50 disabled:cursor-not-allowed disabled:opacity-60"
+                                class="h-12 w-12 rounded-xl border border-gray-200 bg-white text-center text-lg font-bold text-gray-900 transition-all duration-200 focus:border-primary-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-surface-900 dark:text-white"
                                 @input="handleInput(i, $event)"
                                 @keydown="handleKeydown(i, $event)"
                             />
                         </div>
                         <p v-if="verifyForm.errors.code" class="mt-2 text-center text-sm text-danger-500">{{ verifyForm.errors.code }}</p>
-                        <p v-else-if="verifyForm.processing" class="mt-2 text-center text-sm text-primary-300">{{ $t('Verifying code...') }}</p>
+                        <p v-else-if="verifyForm.processing" class="mt-2 text-center text-sm text-primary-600 dark:text-primary-300">{{ $t('Verifying code...') }}</p>
+
+                        <AuthCaptchaField
+                            v-if="captcha.enabled"
+                            v-model="verifyForm.captcha_token"
+                            class="mt-5"
+                            :config="captcha"
+                            :error="verifyForm.errors.captcha_token"
+                        />
 
                         <button
                             type="button"
                             :disabled="resendCountdown > 0 || resendForm.processing"
-                            class="mt-5 flex w-full items-center justify-center rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-primary-300 transition-colors hover:border-primary-400/50/10 disabled:cursor-not-allowed disabled:text-gray-500 disabled:hover:border-white/10 disabled:hover:bg-transparent"
+                            class="auth-social-button mt-5"
                             @click="resendOtp"
                         >
                             <span v-if="resendForm.processing">{{ $t('Sending...') }}</span>
@@ -226,7 +265,7 @@ onUnmounted(() => {
 
                     <template v-else>
                         <div>
-                            <label for="password" class="mb-1.5 block text-sm font-medium text-gray-300">{{ $t('New Password') }}</label>
+                            <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('New Password') }}</label>
                             <input
                                 id="password"
                                 v-model="resetForm.password"
@@ -234,29 +273,36 @@ onUnmounted(() => {
                                 required
                                 autofocus
                                 autocomplete="new-password"
-                                class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition-all duration-200 focus:border-primary-500/50 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 transition-all duration-200 focus:border-primary-500 focus:outline-none dark:border-white/10 dark:bg-surface-900 dark:text-white"
                             />
                             <p v-if="resetForm.errors.password" class="mt-1.5 text-sm text-danger-500">{{ resetForm.errors.password }}</p>
                         </div>
 
                         <div>
-                            <label for="password_confirmation" class="mb-1.5 block text-sm font-medium text-gray-300">{{ $t('Confirm Password') }}</label>
+                            <label for="password_confirmation" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Confirm Password') }}</label>
                             <input
                                 id="password_confirmation"
                                 v-model="resetForm.password_confirmation"
                                 type="password"
                                 required
                                 autocomplete="new-password"
-                                class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white transition-all duration-200 focus:border-primary-500/50 focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 transition-all duration-200 focus:border-primary-500 focus:outline-none dark:border-white/10 dark:bg-surface-900 dark:text-white"
                             />
                         </div>
+
+                        <AuthCaptchaField
+                            v-if="captcha.enabled"
+                            v-model="resetForm.captcha_token"
+                            :config="captcha"
+                            :error="resetForm.errors.captcha_token"
+                        />
                     </template>
 
                     <button
                         v-if="verified"
                         type="submit"
                         :disabled="resetForm.processing"
-                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-accent-600 py-3 font-semibold text-white shadow-lg shadow-primary-600/25 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary-500/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+                        class="auth-primary-button flex items-center justify-center gap-2"
                     >
                         <svg v-if="resetForm.processing" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -265,7 +311,7 @@ onUnmounted(() => {
                         <span>{{ resetForm.processing ? $t('Resetting...') : $t('Reset Password') }}</span>
                     </button>
 
-                    <Link :href="route('admin.password.request')" class="block text-center text-sm text-gray-500 transition-colors hover:text-gray-300">
+                    <Link :href="route('admin.password.request')" class="auth-inline-link block text-center text-sm">
                         {{ $t('Request a new code') }}
                     </Link>
                 </form>
@@ -273,9 +319,3 @@ onUnmounted(() => {
         </div>
     </div>
 </template>
-
-<style scoped>
-.font-heading {
-    font-family: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
-</style>

@@ -114,9 +114,9 @@ const applyFilters = () => {
     )
 }
 
-const updateFilter = (key: string, value: string) => {
+const updateFilter = (key: string, value: any) => {
     const params: Record<string, string | undefined> = buildParams()
-    params[key] = value || undefined
+    params[key] = value ? String(value) : undefined
     
     router.get(route('admin.ai.logs.index'), params, {
         preserveState: true,
