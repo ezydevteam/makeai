@@ -229,7 +229,7 @@ watch(realtime, () => {
 
         <Transition enter-active-class="transition ease-out duration-200" enter-from-class="scale-95 opacity-0" enter-to-class="scale-100 opacity-100" leave-active-class="transition ease-in duration-150" leave-from-class="scale-100 opacity-100" leave-to-class="scale-95 opacity-0">
             <div v-if="open" :class="notificationDropdownClass">
-                <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-3 dark:border-surface-800 dark:bg-surface-800/70">
+                <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-4 py-2 dark:border-surface-800 dark:bg-surface-800/70">
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Notifications') }}</h3>
                         <p class="text-xs text-gray-500">{{ t(':count unread', { count: unreadCount }) }}</p>
@@ -268,7 +268,7 @@ watch(realtime, () => {
                     </div>
                 </div>
 
-                <Link :href="indexRoute" class="block bg-gray-50 px-4 py-3 text-center text-sm font-semibold text-primary-600 hover:bg-primary-50 dark:bg-surface-800 dark:hover:bg-surface-700">
+                <Link :href="indexRoute" class="block bg-gray-50 px-4 py-3 text-center text-sm font-medium !text-primary-700 hover:!text-primary-600 dark:!text-primary-400 dark:bg-surface-800">
                     {{ t('View all notifications') }}
                 </Link>
             </div>

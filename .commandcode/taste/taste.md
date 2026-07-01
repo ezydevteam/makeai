@@ -10,6 +10,7 @@
 
 # admin-ui
 - Use AppSelect and AppColorPicker components instead of native &lt;select&gt; and color text inputs in admin panel interfaces. Confidence: 0.75
+- Admin panel color variables are completely separate from frontend theme color variables — admin uses its own admin-specific primary color and color scheme. Do not reference frontend theme colors (e.g., `--color-primary-500` from the frontend palette) in admin panel styling. Confidence: 0.80
 
 # vue
 - When a section visibility toggle disables a section, auto-collapse its settings panel; when enabling, auto-expand it — bidirectional toggle-visibility-to-collapse linkage. Confidence: 0.70
@@ -64,6 +65,13 @@ See [code-style/taste.md](code-style/taste.md)
 # workflow
 - When presenting multiple improvement recommendations, implement all identified fixes rather than asking for selection. Confidence: 0.90
 - When adding a feature toggle to admin settings, update every required location: Vue props interface, useForm data object, featureToggles array, FeatureSettingsController (edit + update methods), FeatureSettingsRequest validation rules, and the database settings table row. Missing any one causes the toggle to not render or fail to save. Confidence: 0.80
+
+# design/user-dashboard
+- All `/user/dashboard/*` pages must use unified card styling: `shadow-[0_18px_40px_rgba(15,23,42,0.06)]`, a single `1px border`, no `shadow-sm`, no `ring-1`, and consistent border-radius. Check existing pages (e.g., support, dashboard index) as the reference implementation before styling new dashboard pages. Confidence: 0.85
+
+# workflow
+- Never add unrequested text, cards, content sections, or make design/styling assumptions. If the user says "unified style," replicate the exact patterns from existing pages rather than inventing new layouts or adding creative flourishes. Confidence: 0.85
+- When implementing "unified dashboard style" for a page, always check existing reference pages (e.g., `/user/dashboard/support`, `/user/dashboard` index) first and mirror their structure exactly — card layout, input field styles, button styles, title/section patterns, back button placement. Confidence: 0.80
 
 # architecture
 - Avoid theme presets entirely for Envato-targeted themes — they confuse buyers and create unnecessary problems. Instead, use a single settings.json merged from the modern preset JSON as the baseline, with no preset switching UI. Confidence: 0.85

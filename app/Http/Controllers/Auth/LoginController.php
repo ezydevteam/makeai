@@ -39,10 +39,13 @@ class LoginController extends Controller
         $result = $rateLimiter->attempt('auth', $request->ip());
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'email' => [translate('Too many attempts. Try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'email' => [
+                    $seconds < 60
+                        ? translate('Too many attempts. Try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many attempts. Try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 

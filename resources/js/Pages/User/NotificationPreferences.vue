@@ -70,7 +70,7 @@ const savePreferences = () => {
         </section>
 
         <!-- Notification Groups -->
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-200 p-6 dark:border-surface-700">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Notification Groups') }}</h2>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Choose which notifications you want to receive via in-app and email.') }}</p>

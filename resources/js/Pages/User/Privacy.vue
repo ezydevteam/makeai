@@ -111,7 +111,7 @@ const exportedCookieConsent = computed(() => {
 <template>
     <Head :title="t('Privacy Settings')" />
 
-    <div class="mx-auto max-w-3xl space-y-8 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="space-y-6">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Privacy Settings') }}</h1>
             <p class="mt-1 text-sm text-gray-500">{{ t('Manage your data, preferences, and account privacy.') }}</p>
@@ -127,17 +127,17 @@ const exportedCookieConsent = computed(() => {
                     <p class="text-sm font-semibold text-red-800 dark:text-red-300">{{ t('Account Scheduled for Deletion') }}</p>
                     <p class="mt-1 text-sm text-red-700 dark:text-red-400">{{ t('Your account will be permanently deleted on :date. Log in before then to cancel.', { date: new Date(scheduledDeletion).toLocaleDateString() }) }}</p>
                 </div>
-                <button @click="cancelDeletion" class="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors">{{ t('Cancel Deletion') }}</button>
+                <button @click="cancelDeletion" class="shrink-0 rounded-full bg-red-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-red-700 transition-colors">{{ t('Cancel Deletion') }}</button>
             </div>
         </section>
 
         <!-- Data & Export -->
-        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Data & Export') }}</h2>
             <p class="mt-1 text-sm text-gray-500">{{ t('Download a complete archive of your data including profile, documents, chat history, usage logs, credit transactions, and login history.') }}</p>
 
             <div class="mt-4 flex items-center gap-3">
-                <button @click="requestExport" :disabled="exportForm.processing || props.pendingExport || props.recentExport" class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">
+                <button @click="requestExport" :disabled="exportForm.processing || props.pendingExport || props.recentExport" class="inline-flex items-center gap-2 rounded-full bg-primary-500 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">
                     <svg v-if="exportForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
                     <span>{{ props.pendingExport ? t('Export in progress...') : t('Download My Data') }}</span>
                 </button>
@@ -159,18 +159,8 @@ const exportedCookieConsent = computed(() => {
             </div>
         </section>
 
-        <!-- Account Deletion -->
-        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Account Deletion') }}</h2>
-            <p class="mt-1 text-sm text-gray-500">{{ t('Permanently delete your account and all associated data. This action includes a 30-day grace period during which you can cancel.') }}</p>
-            <button @click="showDeleteModal = true" class="mt-4 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:border-red-800 dark:bg-transparent dark:hover:bg-red-900/20 transition-colors">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                {{ t('Delete My Account') }}
-            </button>
-        </section>
-
         <!-- Preferences -->
-        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Preferences') }}</h2>
 
             <div class="mt-4 space-y-5">
@@ -191,11 +181,11 @@ const exportedCookieConsent = computed(() => {
                 </label>
             </div>
 
-            <button @click="savePreferences" :disabled="preferencesForm.processing" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">{{ t('Save Preferences') }}</button>
+            <button @click="savePreferences" :disabled="preferencesForm.processing" class="mt-5 inline-flex items-center gap-2 rounded-full bg-primary-500 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">{{ t('Save Preferences') }}</button>
         </section>
 
         <!-- Cookie Preferences -->
-        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Cookie Preferences') }}</h2>
             <p class="mt-1 text-sm text-gray-500">{{ t('Manage which cookie categories you accept. Necessary cookies are always enabled.') }}</p>
 
@@ -220,15 +210,25 @@ const exportedCookieConsent = computed(() => {
                 </label>
             </div>
 
-            <button @click="savePreferences" class="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">{{ t('Save Cookie Preferences') }}</button>
+            <button @click="savePreferences" class="mt-5 inline-flex items-center gap-2 rounded-full bg-primary-500 px-4 py-2 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 transition-colors">{{ t('Save Cookie Preferences') }}</button>
+        </section>
+
+         <!-- Account Deletion -->
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Account Deletion') }}</h2>
+            <p class="mt-1 text-sm text-gray-500">{{ t('Permanently delete your account and all associated data. This action includes a 30-day grace period during which you can cancel.') }}</p>
+            <button @click="showDeleteModal = true" class="mt-4 inline-flex items-center gap-2 rounded-full border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-500 hover:!bg-red-500 hover:text-white dark:border-red-800 transition-colors">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                {{ t('Delete My Account') }}
+            </button>
         </section>
 
         <!-- Session Management -->
-        <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Session Management') }}</h2>
             <p class="mt-1 text-sm text-gray-500">{{ t('View and manage your active login sessions.') }}</p>
 
-            <button @click="signOutAll" class="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 transition-colors">
+            <button @click="signOutAll" class="mt-4 inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-4 py-2 text-sm font-bold text-primary-500 hover:!bg-primary-500 hover:text-white dark:border-primary-600 transition-colors">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>
                 {{ t('Sign Out All Devices') }}
             </button>

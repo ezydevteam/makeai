@@ -123,9 +123,9 @@ const submit = () => {
 <template>
     <Head :title="t('Buy Credits')" />
 
-    <div class="mx-auto max-w-4xl space-y-6 py-8 px-4 sm:px-6 lg:px-8">
+    <div class="space-y-6">
         <!-- Not available -->
-        <div v-if="!isProAvailable" class="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <div v-if="!isProAvailable" class="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <p class="text-sm font-semibold text-gray-600 dark:text-gray-400">{{ t('Premium subscriptions are not available on this installation.') }}</p>
         </div>
 
@@ -149,7 +149,7 @@ const submit = () => {
                 <!-- Left Column: Amount & Gateways -->
                 <div class="space-y-6">
                     <!-- Amount Input -->
-                    <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Enter amount') }}</h2>
 
                         <div class="relative mb-4">
@@ -184,7 +184,7 @@ const submit = () => {
                     </section>
 
                     <!-- Credit Calculation -->
-                    <section v-if="numericAmount > 0" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <section v-if="numericAmount > 0" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('You will receive') }}</h2>
 
                         <div class="space-y-3">
@@ -210,7 +210,7 @@ const submit = () => {
                     </section>
 
                     <!-- Bonus Tiers Info -->
-                    <section v-if="creditTopup.bonus_tiers.length" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <section v-if="creditTopup.bonus_tiers.length" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">
                             <span class="mr-2">&#127873;</span>{{ t('Bonus Credits') }}
                         </h2>
@@ -243,7 +243,7 @@ const submit = () => {
                     </section>
 
                     <!-- Payment Method -->
-                    <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Payment method') }}</h2>
 
                         <div v-if="gateways.length" class="grid gap-3 sm:grid-cols-2">
@@ -272,7 +272,7 @@ const submit = () => {
 
                 <!-- Right Column: Summary -->
                 <aside class="lg:sticky lg:top-6 lg:self-start">
-                    <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <h2 class="mb-5 text-lg font-bold text-gray-900 dark:text-white">{{ t('Summary') }}</h2>
 
                         <div class="space-y-3 text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -312,7 +312,7 @@ const submit = () => {
                             type="button"
                             :disabled="!isValidAmount || !selectedGateway || submitting"
                             @click="submit"
-                            class="mt-6 w-full rounded-xl bg-primary-600 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none dark:disabled:bg-surface-700"
+                            class="mt-6 w-full rounded-full bg-primary-500 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:!bg-primary-300 disabled:shadow-none dark:disabled:bg-surface-700"
                         >
                             {{ submitting ? t('Processing...') : isValidAmount ? t('Proceed to Payment') : t('Enter :min or more', { min: '$' + creditTopup.minimum.toFixed(2) }) }}
                         </button>

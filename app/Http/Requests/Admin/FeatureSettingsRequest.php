@@ -22,6 +22,7 @@ class FeatureSettingsRequest extends FormRequest
             'notifications_enabled' => ['required', 'boolean'],
             'registration_enabled' => ['required', 'boolean'],
             'email_verification_enabled' => ['required', 'boolean'],
+            'tools_review_approval_enabled' => ['required', 'boolean'],
         ];
     }
 }

@@ -6,7 +6,7 @@ use App\Models\Document;
 use App\Models\GenerationHistory;
 use App\Services\ExportService;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\LazyCollection;
 
@@ -16,7 +16,7 @@ class UserExportController extends Controller
         private readonly ExportService $export,
     ) {}
 
-    public function export(Request $request): Response
+    public function export(Request $request): StreamedResponse
     {
         $validated = $request->validate([
             'type' => 'required|in:generations,documents',
@@ -35,7 +35,7 @@ class UserExportController extends Controller
         };
     }
 
-    private function streamGenerationsCsv($user, string $filename): Response
+    private function streamGenerationsCsv($user, string $filename): StreamedResponse
     {
         $rows = GenerationHistory::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')
@@ -59,7 +59,7 @@ class UserExportController extends Controller
         );
     }
 
-    private function streamDocumentsCsv($user, string $filename): Response
+    private function streamDocumentsCsv($user, string $filename): StreamedResponse
     {
         $rows = Document::where('user_id', $user->id)
             ->orderBy('created_at', 'desc')

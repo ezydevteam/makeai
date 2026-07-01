@@ -122,4 +122,22 @@ class Category extends Model
     {
         return $this->is_system;
     }
+
+    public function getEffectiveAccessLevel(): string
+    {
+        $level = $this->access_level ?? 'inherit';
+
+        if ($level === 'inherit') {
+            if ($this->parent) {
+                $parentLevel = $this->parent->getEffectiveAccessLevel();
+                if ($parentLevel !== 'inherit') {
+                    return $parentLevel;
+                }
+            }
+
+            return settings('default_tool_access_level', 'login');
+        }
+
+        return $level;
+    }
 }

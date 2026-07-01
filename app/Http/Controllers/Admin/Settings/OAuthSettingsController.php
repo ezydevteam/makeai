@@ -17,6 +17,7 @@ class OAuthSettingsController extends Controller
         'facebook' => 'Facebook',
         'reddit' => 'Reddit',
         'twitter' => 'Twitter',
+        'linkedin' => 'LinkedIn',
     ];
 
     public function edit(): Response

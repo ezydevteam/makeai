@@ -140,10 +140,10 @@ function autoResize() {
 </script>
 
 <template>
-    <div class="ai-input-wrapper border-t border-gray-200 dark:border-gray-700 shrink-0 flex flex-col px-3 py-2.5 bg-white dark:bg-gray-900">
+    <div class="ai-input-wrapper border-t border-gray-200 dark:border-surface-800 shrink-0 flex flex-col bg-white px-3 py-2.5 dark:bg-surface-900">
         <!-- Attached file preview -->
         <transition name="ai-fade">
-            <div v-if="attachedFile" class="flex items-center gap-2 mb-2 self-start bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-xs text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 max-w-full">
+            <div v-if="attachedFile" class="mb-2 flex max-w-full self-start items-center gap-2 rounded-full border border-gray-200 bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300">
                 <i class="ti ti-file text-sm shrink-0"></i>
                 <span class="truncate max-w-[200px]">{{ attachedFile.name }}</span>
                 <button type="button" class="hover:text-red-500 text-gray-400 ml-1 transition-colors shrink-0" @click="removeAttachedFile">
@@ -152,12 +152,12 @@ function autoResize() {
             </div>
         </transition>
 
-        <div class="flex items-end gap-2 bg-gray-100 dark:bg-gray-850 border border-gray-200 dark:border-gray-800 rounded-2xl p-1.5 focus-within:ring-2 focus-within:ring-[var(--ai-accent,#1F75FE)] focus-within:border-transparent transition-all">
+        <div class="flex items-end gap-2 rounded-2xl border border-gray-200 bg-gray-100 p-1.5 transition-all focus-within:border-transparent focus-within:ring-2 focus-within:ring-[var(--ai-accent,#1F75FE)] dark:border-surface-700 dark:bg-surface-800">
             <!-- File upload button -->
             <button
                 v-if="allowUpload"
                 type="button"
-                class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors relative"
+                class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-300"
                 :disabled="disabled || uploading"
                 @click="triggerFileInput"
             >
@@ -179,7 +179,7 @@ function autoResize() {
                 :placeholder="$t('Type a message...')"
                 :disabled="disabled || uploading"
                 rows="1"
-                class="flex-1 resize-none bg-transparent border-0 px-2 py-1.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-0 max-h-[120px] chat-textarea"
+                class="chat-textarea max-h-[120px] flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder-gray-500"
                 @keydown="onKeydown"
                 @input="autoResize"
             />

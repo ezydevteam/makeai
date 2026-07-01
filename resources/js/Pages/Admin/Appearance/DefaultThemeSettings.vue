@@ -8,6 +8,7 @@ import AppSelect from '@/Components/AppSelect.vue'
 import IconClassSelect from '@/Components/IconClassSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { FONT_FAMILY_SELECT_OPTIONS } from '@/config/fontFamilies'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -189,6 +190,7 @@ interface ThemePresetSettings {
     site_favicon_png?: string
     site_og_image?: string
     bg_image?: string
+    bg_image_enabled?: boolean
     theme_default_mode?: string
     theme_allow_user_toggle?: boolean
     page_loading_animation?: string
@@ -204,11 +206,6 @@ interface ThemePresetSettings {
     body_text_color?: string
     muted_text_color?: string
     border_color?: string
-    gradient_scheme_enabled?: boolean
-    gradient_palette?: string
-    bg_gradient_direction?: string
-    gradient_start_color?: string
-    gradient_end_color?: string
     font_body?: string
     heading_font?: string
     base_font_size?: string
@@ -255,6 +252,7 @@ const props = defineProps<{
     frontendHomepageSettings: Partial<HomepagePresetSettings>
     frontendHomepageConfig?: Record<string, unknown>
     frontendCustomCodeSettings: Partial<CustomCodeSettings>
+    frontendToolPageSettings: Record<string, any>
     allTools?: ToolItem[]
     adZones?: Record<string, string>
 }>()
@@ -267,7 +265,8 @@ const tabs = [
     { id: 'general', label: 'General', icon: 'ti ti-settings' },
     { id: 'header', label: 'Header', icon: 'ti ti-layout-navbar' },
     { id: 'footer', label: 'Footer', icon: 'ti ti-layout-bottombar' },
-    { id: 'homepage', label: 'Homepage', icon: 'ti ti-home' },
+    { id: 'homepage', label: 'Home', icon: 'ti ti-home' },
+    { id: 'page', label: 'Page', icon: 'ti ti-layout-grid' },
     { id: 'colors', label: 'Colors', icon: 'ti ti-palette' },
     { id: 'typography', label: 'Typography', icon: 'ti ti-typography' },
     { id: 'custom_code', label: 'Custom Code', icon: 'ti ti-code' },
@@ -927,6 +926,32 @@ const resolvedCustomCodeDefaults = computed<CustomCodeSettings>(() => ({
     ...props.frontendCustomCodeSettings,
 }))
 
+const resolvedToolPageDefaults = computed(() => ({
+    ...props.frontendToolPageSettings,
+}))
+
+const toolPageForm = useForm({
+    section: 'tool_page',
+    settings: {
+        layout: resolvedToolPageDefaults.value.layout ?? 'default',
+        hide_breadcrumbs: resolvedToolPageDefaults.value.hide_breadcrumbs ?? false,
+        hide_rating: resolvedToolPageDefaults.value.hide_rating ?? false,
+        hide_share: resolvedToolPageDefaults.value.hide_share ?? false,
+        hide_favorite: resolvedToolPageDefaults.value.hide_favorite ?? false,
+        archive_layout: resolvedToolPageDefaults.value.archive_layout ?? 'default',
+        archive_show_breadcrumbs: resolvedToolPageDefaults.value.archive_show_breadcrumbs !== false,
+        archive_show_stats: resolvedToolPageDefaults.value.archive_show_stats !== false,
+        archive_show_featured: resolvedToolPageDefaults.value.archive_show_featured !== false,
+        archive_show_grid_list: resolvedToolPageDefaults.value.archive_show_grid_list !== false,
+        archive_show_recently_used: resolvedToolPageDefaults.value.archive_show_recently_used !== false,
+        archive_show_open_button: resolvedToolPageDefaults.value.archive_show_open_button !== false,
+        archive_pagination: resolvedToolPageDefaults.value.archive_pagination ?? 'numbered',
+        category_show_breadcrumbs: resolvedToolPageDefaults.value.category_show_breadcrumbs !== false,
+        category_enable_gradient: resolvedToolPageDefaults.value.category_enable_gradient ?? false,
+        category_pagination: resolvedToolPageDefaults.value.category_pagination ?? 'numbered',
+    },
+})
+
 const logoLightFile = ref<File | null>(null)
 const logoDarkFile = ref<File | null>(null)
 const faviconIcoFile = ref<File | null>(null)
@@ -949,24 +974,20 @@ const themeForm = useForm({
         site_favicon_png: currentSettingString('site_favicon_png', ''),
         site_og_image: currentSettingString('site_og_image', ''),
         theme_default_mode: resolvedThemeDefaults.value.theme_default_mode ?? currentSettingString('theme_default_mode', 'light'),
-        theme_allow_user_toggle: resolvedThemeDefaults.value.theme_allow_user_toggle ?? currentSettingBoolean('theme_allow_user_toggle', true),
+        theme_allow_user_toggle: normalizeBooleanValue(resolvedThemeDefaults.value.theme_allow_user_toggle, true),
         page_loading_animation: resolvedThemeDefaults.value.page_loading_animation ?? currentSettingString('page_loading_animation', 'none'),
-        smooth_scroll: resolvedThemeDefaults.value.smooth_scroll ?? currentSettingBoolean('smooth_scroll', true),
-        show_back_to_top: resolvedThemeDefaults.value.show_back_to_top ?? currentSettingBoolean('show_back_to_top', true),
+        smooth_scroll: normalizeBooleanValue(resolvedThemeDefaults.value.smooth_scroll, true),
+        show_back_to_top: normalizeBooleanValue(resolvedThemeDefaults.value.show_back_to_top, true),
         primary_color: resolvedThemeDefaults.value.primary_color ?? currentSettingString('primary_color', '#10b981'),
         secondary_color: resolvedThemeDefaults.value.secondary_color ?? currentSettingString('secondary_color', '#3b82f6'),
         accent_color: resolvedThemeDefaults.value.accent_color ?? currentSettingString('accent_color', '#8b5cf6'),
         bg_color: resolvedThemeDefaults.value.bg_color ?? currentSettingString('bg_color', '#f0fdf8'),
         bg_image: resolvedThemeDefaults.value.bg_image ?? currentSettingString('bg_image', ''),
+        bg_image_enabled: normalizeBooleanValue(resolvedThemeDefaults.value.bg_image_enabled, false),
         heading_color: resolvedThemeDefaults.value.heading_color ?? currentSettingString('heading_color', '#111827'),
         body_text_color: resolvedThemeDefaults.value.body_text_color ?? currentSettingString('body_text_color', '#374151'),
         muted_text_color: resolvedThemeDefaults.value.muted_text_color ?? currentSettingString('muted_text_color', '#6b7280'),
         border_color: resolvedThemeDefaults.value.border_color ?? currentSettingString('border_color', '#dbe4ea'),
-        gradient_scheme_enabled: resolvedThemeDefaults.value.gradient_scheme_enabled ?? currentSettingBoolean('gradient_scheme_enabled', false),
-        gradient_palette: resolvedThemeDefaults.value.gradient_palette ?? currentSettingString('gradient_palette', 'aurora'),
-        gradient_start_color: resolvedThemeDefaults.value.gradient_start_color ?? currentSettingString('gradient_start_color', '#10b981'),
-        gradient_end_color: resolvedThemeDefaults.value.gradient_end_color ?? currentSettingString('gradient_end_color', '#3b82f6'),
-        bg_gradient_direction: resolvedThemeDefaults.value.bg_gradient_direction ?? currentSettingString('bg_gradient_direction', 'to right'),
         font_body: resolvedThemeDefaults.value.font_body ?? currentSettingString('font_body', 'Inter'),
         heading_font: resolvedThemeDefaults.value.heading_font ?? currentSettingString('heading_font', 'Plus Jakarta Sans'),
         base_font_size: resolvedThemeDefaults.value.base_font_size ?? currentSettingString('base_font_size', '15px'),
@@ -1955,6 +1976,10 @@ function saveCustomCodeSettings(): void {
     customCodeForm.post(route('admin.themes.settings.simple.save', { slug: props.theme.slug }), { preserveScroll: true })
 }
 
+function saveToolPageSettings(): void {
+    toolPageForm.post(route('admin.themes.settings.simple.save', { slug: props.theme.slug }), { preserveScroll: true })
+}
+
 function saveActiveTab(): void {
     if (activeTab.value === 'general' || activeTab.value === 'colors' || activeTab.value === 'typography') {
         saveThemeSettings()
@@ -1976,6 +2001,11 @@ function saveActiveTab(): void {
         return
     }
 
+    if (activeTab.value === 'page') {
+        saveToolPageSettings()
+        return
+    }
+
     saveCustomCodeSettings()
 }
 
@@ -1986,19 +2016,26 @@ const tabSectionMap: Record<string, string> = {
     header: 'header',
     footer: 'footer',
     homepage: 'homepage',
+    page: 'tool_page',
     custom_code: 'custom_code',
 }
 
-function restoreDefaults(): void {
-    const section = tabSectionMap[activeTab.value]
-    if (!section) return
+const isRestoreModalOpen = ref(false)
+const sectionToRestore = ref('')
+const activeTabLabel = computed(() => {
+    const currentTab = tabs.find(tab => tab.id === activeTab.value)
+    return currentTab ? t(currentTab.label) : ''
+})
 
-    if (!confirm(t('Are you sure you want to restore default :section settings? This cannot be undone.', { section: t(section) }))) {
-        return
-    }
+function confirmRestoreDefaults(): void {
+    sectionToRestore.value = tabSectionMap[activeTab.value] || 'theme'
+    isRestoreModalOpen.value = true
+}
 
+function handleConfirmRestore(): void {
+    isRestoreModalOpen.value = false
     router.post(route('admin.themes.settings.restore-defaults', { slug: props.theme.slug }), {
-        section: section,
+        section: sectionToRestore.value,
     }, {
         preserveScroll: true,
     })
@@ -2012,6 +2049,7 @@ const isSaving = computed(() => {
     if (activeTab.value === 'header') return headerForm.processing
     if (activeTab.value === 'footer') return footerForm.processing
     if (activeTab.value === 'homepage') return homepageForm.processing
+    if (activeTab.value === 'page') return toolPageForm.processing
 
     return customCodeForm.processing
 })
@@ -2100,14 +2138,14 @@ watch(() => [
 <template>
     <Head :title="t('Theme Settings')" />
 
-    <div class="w-full px-4 sm:px-5 lg:px-5 xl:px-6 2xl:px-6">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-5 flex flex-col gap-4 border-b border-gray-100 pb-4 dark:border-surface-800 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Appearance Settings') }}</h1>
-                    <span class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">{{ props.theme.name }}</span>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Theme Settings') }}</h1>
+                    <span class="rounded-full bg-primary-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">{{ props.theme.name }}</span>
                 </div>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage simple frontend presets and buyer-friendly appearance settings.') }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage frontend site appearance and basic settings.') }}</p>
             </div>
             <div class="flex items-center gap-3 self-start">
                 <Link
@@ -2120,7 +2158,7 @@ watch(() => [
                 <button
                     type="button"
                     class="inline-flex items-center gap-2 rounded-lg border border-danger-200 bg-white px-4 py-2 text-sm font-medium text-danger-600 transition-colors hover:bg-danger-50 dark:border-danger-800 dark:bg-danger-950/20 dark:text-danger-400 dark:hover:bg-danger-950/40"
-                    @click="restoreDefaults"
+                    @click="confirmRestoreDefaults"
                     :title="t('Restore defaults')"
                 >
                     <i class="ti ti-restore text-base"></i>
@@ -2147,7 +2185,7 @@ watch(() => [
                         type="button"
                         class="flex items-center gap-2.5 whitespace-nowrap rounded-lg px-4 py-3 text-sm font-medium transition-all lg:w-full"
                         :class="activeTab === tab.id
-                            ? 'bg-violet-50 font-semibold text-violet-700 shadow-sm dark:bg-violet-950/40 dark:text-violet-300'
+                            ? 'bg-primary-50 font-semibold text-primary-700 shadow-sm dark:bg-primary-950/40 dark:text-primary-300'
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-white'"
                         @click="activeTab = tab.id"
                     >
@@ -2168,7 +2206,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_logo_light)" alt="Light logo" class="h-10 max-w-[160px] object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_logo_light = ''; logoLightFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="onLogoLightInput" />
+                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onLogoLightInput" />
                             </div>
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Logo Dark') }}</h3>
@@ -2176,7 +2214,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_logo_dark)" alt="Dark logo" class="h-10 max-w-[160px] object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_logo_dark = ''; logoDarkFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="onLogoDarkInput" />
+                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onLogoDarkInput" />
                             </div>
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Favicon ICO') }}</h3>
@@ -2184,7 +2222,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_favicon_ico)" alt="Favicon ICO" class="h-8 w-8 object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_favicon_ico = ''; faviconIcoFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept=".ico,image/x-icon" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="onFaviconIcoInput" />
+                                <input type="file" accept=".ico,image/x-icon" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onFaviconIcoInput" />
                             </div>
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Favicon PNG') }}</h3>
@@ -2192,23 +2230,23 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_favicon_png)" alt="Favicon PNG" class="h-8 w-8 object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_favicon_png = ''; faviconPngFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="onFaviconPngInput" />
+                                <input type="file" accept="image/png" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onFaviconPngInput" />
                             </div>
                         </div>
                         <div class="mt-5 grid gap-5">
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
-                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('OG Image') }}</h3>
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Open Graph Image') }}</h3>
                                 <div v-if="themeForm.settings.site_og_image" class="mt-3 flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-white p-3 dark:border-surface-700 dark:bg-surface-900/80">
                                     <img :src="fileUrl(themeForm.settings.site_og_image)" alt="OG Image" class="h-12 max-w-[200px] rounded-lg object-cover" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_og_image = ''; ogImageFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="onOgImageInput" />
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onOgImageInput" />
                             </div>
                         </div>
                     </section>
 
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">{{ t('Theme Mode & Experience') }}</h2>
+                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Theme Mode & Experience') }}</h2>
                         <div class="grid gap-5 sm:grid-cols-2">
                             <AppSelect
                                 v-model="themeForm.settings.theme_default_mode"
@@ -2271,29 +2309,26 @@ watch(() => [
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-300">{{ t('Body Background') }}</h2>
                         <div class="space-y-4">
-                            <div v-if="themeForm.settings.bg_image" class="overflow-hidden rounded-xl border border-dashed border-gray-200 bg-white dark:border-surface-700 dark:bg-surface-900/80">
-                                <img :src="fileUrl(themeForm.settings.bg_image)" :alt="t('Body background preview')" class="h-40 w-full object-cover" />
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-200/60 p-4 dark:border-surface-800">
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Use background image') }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Enable to use a custom background image on frontend pages.') }}</p>
+                                </div>
+                                <button type="button" role="switch" :aria-checked="themeForm.settings.bg_image_enabled" class="app-switch shrink-0" @click="themeForm.settings.bg_image_enabled = !themeForm.settings.bg_image_enabled">
+                                    <span class="app-switch__thumb"></span>
+                                </button>
                             </div>
-                            <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" @input="onBodyBgImageInput" />
-                            <button type="button" class="text-sm font-medium text-danger-500 hover:underline" @click="themeForm.settings.bg_image = ''; bodyBgImageFile = null">{{ t('Remove background image') }}</button>
+
+                            <div v-if="themeForm.settings.bg_image_enabled" class="space-y-4">
+                                <div v-if="themeForm.settings.bg_image" class="flex items-center gap-3 rounded-xl border border-dashed border-gray-200 bg-white p-3 dark:border-surface-700 dark:bg-surface-900/80">
+                                    <img :src="fileUrl(themeForm.settings.bg_image)" :alt="t('Body background preview')" class="h-12 w-full rounded-lg object-cover" />
+                                    <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.bg_image = ''; bodyBgImageFile = null">{{ t('Remove') }}</button>
+                                </div>
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="w-full rounded-lg border border-gray-200/60 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onBodyBgImageInput" />
+                            </div>
                         </div>
                     </section>
 
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-violet-700 dark:text-violet-300">{{ t('Gradient Scheme') }}</h2>
-                        <div class="grid gap-5 sm:grid-cols-2">
-                            <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800 sm:col-span-2">
-                                <button type="button" role="switch" :aria-checked="themeForm.settings.gradient_scheme_enabled" class="app-switch" @click="themeForm.settings.gradient_scheme_enabled = !themeForm.settings.gradient_scheme_enabled">
-                                    <span class="app-switch__thumb"></span>
-                                </button>
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Enable gradient scheme') }}</span>
-                            </div>
-                            <AppSelect v-model="themeForm.settings.gradient_palette" :label="t('Gradient palette')" :options="gradientPaletteOptions.map((option) => ({ value: option.value, label: t(option.label) }))" />
-                            <AppSelect v-model="themeForm.settings.bg_gradient_direction" :label="t('Gradient direction')" :options="gradientDirectionOptions.map((option) => ({ value: option.value, label: t(option.label) }))" />
-                            <AppColorPicker v-model="themeForm.settings.gradient_start_color" :label="t('Gradient start')" />
-                            <AppColorPicker v-model="themeForm.settings.gradient_end_color" :label="t('Gradient end')" />
-                        </div>
-                    </section>
                 </div>
 
                 <div v-else-if="activeTab === 'typography'" class="space-y-6">
@@ -2306,8 +2341,6 @@ watch(() => [
                             <AppSelect v-model="themeForm.settings.heading_weight" :label="t('Heading Weight')" :options="headingWeightOptions" />
                             <AppSelect v-model="themeForm.settings.line_height" :label="t('Line Height')" :options="lineHeightOptions" />
                             <AppSelect v-model="themeForm.settings.letter_spacing" :label="t('Letter Spacing')" :options="letterSpacingOptions.map((option) => ({ value: option.value, label: t(option.label) }))" />
-                            <AppSelect v-model="themeForm.settings.border_radius" :label="t('Border Radius')" :options="borderRadiusOptions" />
-                            <AppSelect v-model="themeForm.settings.container_width" :label="t('Container Width')" :options="containerWidthOptions.map((option) => ({ value: option.value, label: t(option.label) }))" />
                         </div>
                     </section>
                 </div>
@@ -2482,11 +2515,16 @@ watch(() => [
                                 <AppColorPicker v-model="headerForm.settings.mobile_top.text_color" :label="t('Text Color')" />
                             </div>
                             <div class="sm:col-span-2 border-t border-gray-100 pt-4 dark:border-surface-800">
-                                <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Header Elements') }}</h3>
+                                <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Top Header Elements') }}</h3>
                             </div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Logo') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_logo" class="app-switch" @click="headerForm.settings.mobile_top.show_logo = !headerForm.settings.mobile_top.show_logo"><span class="app-switch__thumb"></span></button></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_hamburger" class="app-switch" @click="headerForm.settings.mobile_top.show_hamburger = !headerForm.settings.mobile_top.show_hamburger"><span class="app-switch__thumb"></span></button></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Dark Mode Toggle') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_dark_mode_toggle" class="app-switch" @click="headerForm.settings.mobile_top.show_dark_mode_toggle = !headerForm.settings.mobile_top.show_dark_mode_toggle"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_notification_bell" class="app-switch" @click="headerForm.settings.mobile_top.show_notification_bell = !headerForm.settings.mobile_top.show_notification_bell"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_search_icon" class="app-switch" @click="headerForm.settings.mobile_top.show_search_icon = !headerForm.settings.mobile_top.show_search_icon"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Language Switcher') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_language_switcher" class="app-switch" @click="headerForm.settings.mobile_top.show_language_switcher = !headerForm.settings.mobile_top.show_language_switcher"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Login Button') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_login" class="app-switch" @click="headerForm.settings.mobile_top.show_login = !headerForm.settings.mobile_top.show_login"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show CTA Button') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_cta_button" class="app-switch" @click="headerForm.settings.mobile_top.show_cta_button = !headerForm.settings.mobile_top.show_cta_button"><span class="app-switch__thumb"></span></button></div>
                         </div>
                     </section>
 
@@ -2504,16 +2542,25 @@ watch(() => [
                                 ]"
                             />
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Enable Mobile Bottom Header') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.enabled" class="app-switch" @click="headerForm.settings.mobile_bottom.enabled = !headerForm.settings.mobile_bottom.enabled"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Hide Menu Labels') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.hide_menu_labels" class="app-switch" @click="headerForm.settings.mobile_bottom.hide_menu_labels = !headerForm.settings.mobile_bottom.hide_menu_labels"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Glassmorphism Effect') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_glassmorphism" class="app-switch" @click="headerForm.settings.mobile_bottom.show_glassmorphism = !headerForm.settings.mobile_bottom.show_glassmorphism"><span class="app-switch__thumb"></span></button></div>
+
+                            <div class="sm:col-span-2 border-t border-gray-100 pt-4 dark:border-surface-800">
+                                <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Bottom Header Elements') }}</h3>
+                            </div>
+
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Home') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_home" class="app-switch" @click="headerForm.settings.mobile_bottom.show_home = !headerForm.settings.mobile_bottom.show_home"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_search_icon" class="app-switch" @click="headerForm.settings.mobile_bottom.show_search_icon = !headerForm.settings.mobile_bottom.show_search_icon"><span class="app-switch__thumb"></span></button></div>
                             <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Tools') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_tools" class="app-switch" @click="headerForm.settings.mobile_bottom.show_tools = !headerForm.settings.mobile_bottom.show_tools"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Dashboard') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_dashboard" class="app-switch" @click="headerForm.settings.mobile_bottom.show_dashboard = !headerForm.settings.mobile_bottom.show_dashboard"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Profile') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_profile" class="app-switch" @click="headerForm.settings.mobile_bottom.show_profile = !headerForm.settings.mobile_bottom.show_profile"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_notification_bell" class="app-switch" @click="headerForm.settings.mobile_bottom.show_notification_bell = !headerForm.settings.mobile_bottom.show_notification_bell"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_hamburger" class="app-switch" @click="headerForm.settings.mobile_bottom.show_hamburger = !headerForm.settings.mobile_bottom.show_hamburger"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Login/Dashboard') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_profile" class="app-switch" @click="headerForm.settings.mobile_bottom.show_profile = !headerForm.settings.mobile_bottom.show_profile"><span class="app-switch__thumb"></span></button></div>
                         </div>
                     </section>
                 </div>
 
             <div v-else-if="activeTab === 'footer'" class="space-y-6">
-<section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
                             <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">{{ t('Footer Style') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose one ready-made footer style, then control its content and appearance from the settings below.') }}</p>
@@ -2622,7 +2669,7 @@ watch(() => [
 
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
-                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-violet-700 dark:text-violet-300">{{ t('Reusable Footer Content') }}</h2>
+                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Reusable Footer Content') }}</h2>
                             <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('These content cards are shared across all footer styles. Pick them in the style column section above wherever you want them to appear.') }}</p>
                         </div>
                         <div class="grid gap-6 xl:grid-cols-2">
@@ -2892,7 +2939,7 @@ watch(() => [
                                         <img v-if="paymentIconPreviewSrc()" :src="paymentIconPreviewSrc()" :alt="t('Payment method preview')" class="h-12 max-w-full object-contain" />
                                         <span v-else class="inline-flex h-12 w-full items-center justify-center rounded-lg bg-gray-50 px-3 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ footerForm.settings.payment_icons }}</span>
                                     </div>
-                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" @input="onPaymentIconsInput" />
+                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onPaymentIconsInput" />
                                     <div class="mt-2 flex items-center justify-between gap-3">
                                         <span class="block text-xs text-gray-400">{{ t('Upload one combined payment methods image with the brands you want to display.') }}</span>
                                         <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="clearPaymentIconSelection">{{ t('Remove image') }}</button>
@@ -3062,7 +3109,7 @@ watch(() => [
                                     <AppSelect v-model="secCfg('hero').hero_background_type" :label="t('Media Type')" :options="[{ value: 'image', label: t('Image') }, { value: 'video', label: t('Video') }]" />
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {{ t('Choose File') }}
-                                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/avif,video/mp4,video/webm,video/ogg" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-300" @input="onHeroBackgroundInput" />
+                                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/avif,video/mp4,video/webm,video/ogg" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onHeroBackgroundInput" />
                                     </label>
                                     <div v-if="secCfg('hero').hero_background_url" class="sm:col-span-2 flex items-center gap-2 rounded-lg border border-dashed border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700 dark:border-success-800 dark:bg-success-900/20 dark:text-success-300">
                                         <i class="ti ti-check"></i>
@@ -3094,7 +3141,7 @@ watch(() => [
                                 <div class="grid gap-4">
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {{ t('Choose Image') }}
-                                        <input type="file" accept="image/png,image/svg+xml" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-300" @input="onHeroSplitImageInput" />
+                                        <input type="file" accept="image/png,image/svg+xml" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onHeroSplitImageInput" />
                                     </label>
                                     <div v-if="secCfg('hero').hero_split_image_url" class="flex items-center gap-2 rounded-lg border border-dashed border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700 dark:border-success-800 dark:bg-success-900/20 dark:text-success-300">
                                         <i class="ti ti-check"></i>
@@ -3760,7 +3807,7 @@ watch(() => [
                                                 </div>
                                                 <div class="sm:col-span-2">
                                                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ t('Upload Brand Logo') }}</label>
-                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-300" @input="onBrandLogoInput(Number(idx), $event)" />
+                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onBrandLogoInput(Number(idx), $event)" />
 
                                                     <!-- Logo Preview -->
                                                     <div v-if="brand.image || brandLogoPreviewUrls[Number(idx)]" class="mt-2 flex items-center gap-3">
@@ -3970,7 +4017,7 @@ watch(() => [
                                                 </div>
                                                 <div class="sm:col-span-3">
                                                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ t('Upload Image') }}</label>
-                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-700 dark:file:bg-primary-900/30 dark:file:text-primary-300" @input="onCarouselItemImageInput(item, $event)" />
+                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onCarouselItemImageInput(item, $event)" />
 
                                                     <!-- Image Preview -->
                                                     <div v-if="item.image_url || carouselItemPreviewUrls[item._key || '']" class="mt-2 flex items-center gap-3">
@@ -3994,9 +4041,226 @@ watch(() => [
                     </VueDraggable>
                 </div>
 
+                <div v-else-if="activeTab === 'page'" class="space-y-6">
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Tool Single Page') }}</h2>
+
+                        <div class="space-y-6">
+                            <!-- Page Layout Section -->
+                            <div class="grid gap-5 sm:grid-cols-2">
+                                <AppSelect
+                                    v-model="toolPageForm.settings.layout"
+                                    :label="t('Page Layout')"
+                                    :options="[
+                                        { value: 'default', label: t('Default') },
+                                        { value: 'creative', label: t('Creative') },
+                                        { value: 'modern', label: t('Modern') },
+                                        { value: 'minimalist', label: t('Minimalist') },
+                                    ]"
+                                />
+                            </div>
+
+                            <hr class="border-gray-100 dark:border-surface-850" />
+
+                            <!-- Visibility Options Section -->
+                            <div>
+                                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Visibility Settings') }}</h3>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_breadcrumbs" class="app-switch" @click="toolPageForm.settings.hide_breadcrumbs = !toolPageForm.settings.hide_breadcrumbs">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Breadcrumbs') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display navigational breadcrumbs on the tool details page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_rating" class="app-switch" @click="toolPageForm.settings.hide_rating = !toolPageForm.settings.hide_rating">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Rating') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display ratings and reviews on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_share" class="app-switch" @click="toolPageForm.settings.hide_share = !toolPageForm.settings.hide_share">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Share') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the share options button on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_favorite" class="app-switch" @click="toolPageForm.settings.hide_favorite = !toolPageForm.settings.hide_favorite">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Favorite') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the add-to-favorites button on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Tool Archive Page') }}</h2>
+
+                        <div class="space-y-6">
+                            <!-- Page Layout Section -->
+                            <div>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <AppSelect
+                                        v-model="toolPageForm.settings.archive_layout"
+                                        :label="t('Page Layout')"
+                                        :options="[
+                                            { value: 'default', label: t('Default') },
+                                            { value: 'modern', label: t('Modern') },
+                                            { value: 'minimal', label: t('Minimal') },
+                                        ]"
+                                    />
+                                    <AppSelect
+                                        v-model="toolPageForm.settings.archive_pagination"
+                                        :label="t('Pagination Style')"
+                                        :options="[
+                                            { value: 'none', label: t('No Pagination') },
+                                            { value: 'numbered', label: t('Numbered') },
+                                            { value: 'load_more', label: t('Load More') },
+                                        ]"
+                                    />
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100 dark:border-surface-850" />
+
+                            <!-- Visibility Options Section -->
+                            <div>
+                                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Visibility Settings') }}</h3>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_breadcrumbs" class="app-switch" @click="toolPageForm.settings.archive_show_breadcrumbs = !toolPageForm.settings.archive_show_breadcrumbs">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Breadcrumbs') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display navigational breadcrumbs on the tools directory archive page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_stats" class="app-switch" @click="toolPageForm.settings.archive_show_stats = !toolPageForm.settings.archive_show_stats">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Stats Cards') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display quick statistics summary cards on the directory page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_featured" class="app-switch" @click="toolPageForm.settings.archive_show_featured = !toolPageForm.settings.archive_show_featured">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Featured Section') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display the highlighted/featured tools carousel or banner.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_grid_list" class="app-switch" @click="toolPageForm.settings.archive_show_grid_list = !toolPageForm.settings.archive_show_grid_list">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Grid/List Button') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display layout toggles for users to switch between grid and list layouts.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_recently_used" class="app-switch" @click="toolPageForm.settings.archive_show_recently_used = !toolPageForm.settings.archive_show_recently_used">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Recently Used Section') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display the list of recently used tools in the directory archive page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_open_button" class="app-switch" @click="toolPageForm.settings.archive_show_open_button = !toolPageForm.settings.archive_show_open_button">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Open Tool Button') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display an open action button or link inside the tool list cards.') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Tool Category Page') }}</h2>
+
+                        <div class="space-y-6">
+                            <!-- Pagination Options -->
+                            <div>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <AppSelect
+                                        v-model="toolPageForm.settings.category_pagination"
+                                        :label="t('Pagination Style')"
+                                        :options="[
+                                            { value: 'none', label: t('No Pagination') },
+                                            { value: 'numbered', label: t('Numbered') },
+                                            { value: 'load_more', label: t('Load More') },
+                                        ]"
+                                    />
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100 dark:border-surface-850" />
+
+                            <!-- Visibility and Style Options -->
+                            <div>
+                                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Visibility & Style Settings') }}</h3>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.category_show_breadcrumbs" class="app-switch" @click="toolPageForm.settings.category_show_breadcrumbs = !toolPageForm.settings.category_show_breadcrumbs">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Breadcrumbs') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display navigational breadcrumbs on the category tool list page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.category_enable_gradient" class="app-switch" @click="toolPageForm.settings.category_enable_gradient = !toolPageForm.settings.category_enable_gradient">
+                                            <span class="app-switch__thumb"></span>
+                                        </button>
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Gradient Scheme') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Use a gradient theme for headers, tool titles, and action buttons.') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
                 <div v-else-if="activeTab === 'custom_code'" class="space-y-6">
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-violet-700 dark:text-violet-300">{{ t('Custom Code') }}</h2>
+                        <h2 class="mb-4 text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Custom Code') }}</h2>
                         <div class="space-y-5">
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 {{ t('Custom CSS') }}
@@ -4018,15 +4282,15 @@ watch(() => [
 
         <Transition
             enter-active-class="transition duration-200 ease-out"
-            enter-from-class="translate-y-4 opacity-0"
+            enter-from-class="-translate-y-4 opacity-0"
             enter-to-class="translate-y-0 opacity-100"
             leave-active-class="transition duration-150 ease-in"
             leave-from-class="translate-y-0 opacity-100"
-            leave-to-class="translate-y-4 opacity-0"
+            leave-to-class="-translate-y-4 opacity-0"
         >
             <div
                 v-if="showFloatingSaveButton"
-                class="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-end px-4 sm:px-6 lg:px-8"
+                class="pointer-events-none fixed inset-x-0 top-20 z-40 flex justify-end px-4 sm:px-6 lg:px-8"
             >
                 <button
                     type="button"
@@ -4039,5 +4303,15 @@ watch(() => [
                 </button>
             </div>
         </Transition>
+
+        <ActionConfirmModal
+            :open="isRestoreModalOpen"
+            :title="t('Restore default settings?')"
+            :message="t('Are you sure you want to restore the default settings for the \'{tab}\' tab? Any custom changes made to this section will be reset back to their factory default values and cannot be undone.', { tab: activeTabLabel })"
+            :confirm-label="t('Restore defaults')"
+            variant="danger"
+            @confirm="handleConfirmRestore"
+            @cancel="isRestoreModalOpen = false"
+        />
     </div>
 </template>

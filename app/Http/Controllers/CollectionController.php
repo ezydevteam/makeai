@@ -18,7 +18,7 @@ class CollectionController extends Controller
         $user = Auth::user();
         $collections = app(ToolFavoritesService::class)->getUserCollections($user);
 
-        return Inertia::render('Collections/Index', [
+        return Inertia::render('User/Collections/Index', [
             'collections' => $collections,
         ]);
     }
@@ -52,10 +52,16 @@ class CollectionController extends Controller
         $ordered = $slugs->map(fn ($slug) => $tools->get($slug))->filter();
 
         // All active tools for the add-to-collection picker
-        $availableTools = AiTool::active()->select('slug', 'name')->get()
-            ->map(fn ($t) => ['slug' => $t->slug, 'name' => $t->name]);
+        $availableTools = AiTool::active()->select('slug', 'name', 'description', 'icon', 'color')->get()
+            ->map(fn ($t) => [
+                'slug' => $t->slug,
+                'name' => $t->name,
+                'description' => $t->description,
+                'icon' => $t->icon,
+                'color' => $t->color,
+            ]);
 
-        return Inertia::render('Collections/Show', [
+        return Inertia::render('User/Collections/Show', [
             'collection' => $collection,
             'tools' => $ordered->values(),
             'availableTools' => $availableTools,

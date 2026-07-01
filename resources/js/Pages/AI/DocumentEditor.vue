@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import AdSection from '@/Components/AdSection.vue'
 
 const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
@@ -14,6 +15,7 @@ const props = defineProps<{
         title: string
         content: string
         tool_slug?: string | null
+        tool_name?: string | null
         word_count?: number | null
         folder_id?: number | null
         updated_at?: string | null
@@ -61,15 +63,28 @@ const saveDocument = () => {
 <template>
     <Head :title="t('Edit :title', { title: document.title })" />
 
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div class="!max-w-5xl mx-auto px-4 py-6 sm:px-6">
+        <!-- Top Ad Slot -->
+        <AdSection zone="tool_page_top" class="mx-auto mb-4 w-full max-w-5xl" />
+
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div>
                 <div class="flex items-center gap-2 text-sm mb-2">
+                    <Link :href="routeTo('home')" class="text-gray-500 hover:text-primary-500 transition-colors">
+                        <i class="ti ti-home"></i>
+                    </Link>
+                    <i class="ti ti-chevron-right text-gray-400 text-xs"></i>
                     <Link :href="routeTo('ai.tools.index')" class="text-gray-500 hover:text-primary-500 transition-colors">{{ t('AI Tools') }}</Link>
                     <i class="ti ti-chevron-right text-gray-400 text-xs"></i>
                     <span class="text-gray-500">{{ t('Documents') }}</span>
                 </div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Edit Document') }}</h1>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex flex-wrap items-center gap-2">
+                    <span>{{ t('Edit Document') }}</span>
+                    <span v-if="document.tool_name || document.tool_slug" class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 shadow-xs">
+                        <i class="ti ti-robot text-[13px]"></i>
+                        {{ document.tool_name || document.tool_slug }}
+                    </span>
+                </h1>
             </div>
 
             <div class="flex items-center gap-2">
@@ -78,12 +93,13 @@ const saveDocument = () => {
                     :href="routeTo('ai.tools.show', document.tool_slug)"
                     class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl hover:border-primary-300 dark:hover:border-primary-700 transition-colors"
                 >
+                    <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back to Tool') }}
                 </Link>
                 <button
                     type="button"
                     :disabled="form.processing"
-                    class="px-5 py-2 text-sm font-semibold text-white bg-primary-600 rounded-xl disabled:opacity-50 transition-colors inline-flex items-center gap-2"
+                    class="px-5 py-2 text-sm font-semibold text-white bg-primary-500 rounded-xl disabled:opacity-50 transition-colors inline-flex items-center gap-2"
                     @click="saveDocument"
                 >
                     <i class="ti ti-device-floppy"></i>
@@ -92,26 +108,25 @@ const saveDocument = () => {
             </div>
         </div>
 
-        <div class="bg-white dark:bg-surface-950 border border-gray-100 dark:border-surface-800 rounded-2xl p-4 sm:p-6 shadow-sm">
-            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">{{ t('Title') }}</label>
-            <input
-                v-model="form.title"
-                type="text"
-                class="w-full px-4 py-3 mb-5 bg-gray-50 dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl text-gray-900 dark:text-white focus:border-primary-500 focus:ring-primary-500/20"
-                :placeholder="t('Document title')"
-            />
-            <p v-if="form.errors.title" class="text-sm text-danger-500 -mt-3 mb-4">{{ form.errors.title }}</p>
+        <div class="space-y-6">
+            <div>
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">{{ t('Title') }}</label>
+                <input
+                    v-model="form.title"
+                    type="text"
+                    class="w-full px-4 py-3 bg-gray-50 dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-xl text-gray-900 dark:text-white transition-all focus:!ring-1 focus:ring-primary-500/40"
+                    :placeholder="t('Document title')"
+                />
+                <p v-if="form.errors.title" class="text-sm text-danger-500 mt-2">{{ form.errors.title }}</p>
+            </div>
 
-            <RichEditor v-model="form.content" />
-            <p v-if="form.errors.content" class="text-sm text-danger-500 mt-3">{{ form.errors.content }}</p>
-
-            <div class="flex flex-wrap items-center justify-between gap-3 mt-5 pt-5 border-t border-gray-100 dark:border-surface-800 text-xs text-gray-500">
-                <div class="flex flex-wrap items-center gap-3">
-                    <span v-if="document.tool_slug">Tool: {{ document.tool_slug }}</span>
-                    <span>{{ t(':count words', { count: currentWordCount }) }}</span>
-                </div>
-                <span v-if="form.recentlySuccessful" class="text-primary-600 dark:text-primary-400">{{ t('Saved') }}</span>
+            <div>
+                <RichEditor v-model="form.content" variant="minimal" />
+                <p v-if="form.errors.content" class="text-sm text-danger-500 mt-2">{{ form.errors.content }}</p>
             </div>
         </div>
+
+        <!-- Bottom Ad Slot -->
+        <AdSection zone="tool_page_bottom" class="mx-auto mt-6 w-full max-w-5xl" />
     </div>
 </template>

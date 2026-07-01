@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AppSelect from '@/Components/AppSelect.vue'
+import AppColorPicker from '@/Components/AppColorPicker.vue'
 
 export interface ToolField {
     id?: string
@@ -9,7 +10,7 @@ export interface ToolField {
     label: string
     type: string
     placeholder?: string
-    options?: Array<string | { label: string; value: string }>
+    options?: string | Array<string | { label: string; value: string }>
     required?: boolean
     default?: string | number | boolean | string[]
     min?: number
@@ -46,14 +47,40 @@ const fieldError = (field: ToolField): string => {
     return props.fieldErrors[name] || ''
 }
 
-const normalizedOptions = (field: ToolField) => {
+const normalizedOptions = (field: ToolField): Array<{ label: string; value: string | number | null }> => {
+    const mapOption = (o: string | { label?: string; value?: string | number | boolean } | unknown): { label: string; value: string | number | null } => {
+        if (typeof o === 'string') {
+            return { label: o, value: o }
+        }
+        if (o && typeof o === 'object') {
+            const obj = o as { label?: string | number; value?: string | number | boolean }
+            const label = obj.label ?? obj.value ?? ''
+            const value = obj.value ?? obj.label ?? ''
+            return { label: String(label), value: value !== undefined && value !== null ? (value as string | number) : null }
+        }
+        return { label: String(o ?? ''), value: o !== undefined && o !== null ? String(o) : null }
+    }
+
     if (field.type === 'tone_select') {
         const tones = ['Professional', 'Friendly', 'Casual', 'Formal', 'Humorous', 'Persuasive', 'Inspirational', 'Empathetic']
         return tones.map(t => ({ label: t, value: t.toLowerCase() }))
     }
     if (field.type === 'length_select') {
-        if (field.options && field.options.length > 0) {
-            return field.options
+        let optArray: unknown[] = []
+        if (field.options) {
+            if (Array.isArray(field.options)) {
+                optArray = field.options as unknown[]
+            } else if (typeof field.options === 'string') {
+                try {
+                    const parsed = JSON.parse(field.options)
+                    optArray = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) : [])
+                } catch {}
+            } else if (typeof field.options === 'object') {
+                optArray = Object.values(field.options)
+            }
+        }
+        if (optArray.length > 0) {
+            return optArray.map(mapOption)
         }
         return [
             { label: 'Short (~100 words)', value: 'short' },
@@ -63,17 +90,120 @@ const normalizedOptions = (field: ToolField) => {
         ]
     }
     if (field.type === 'language_select') {
-        return (props.languages || []).map((language) => ({ label: language.name, value: language.name }))
+        let optArray: unknown[] = []
+        if (field.options) {
+            if (Array.isArray(field.options)) {
+                optArray = field.options as unknown[]
+            } else if (typeof field.options === 'string') {
+                try {
+                    const parsed = JSON.parse(field.options)
+                    optArray = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) : [])
+                } catch {
+                    optArray = field.options.split(',').map(s => s.trim()).filter(Boolean)
+                }
+            } else if (typeof field.options === 'object') {
+                optArray = Object.values(field.options)
+            }
+        }
+        if (optArray.length > 0) {
+            return optArray.map(mapOption)
+        }
+
+        // Fallback popular languages
+        const defaultLanguages = [
+            'English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese', 'Dutch', 'Russian',
+            'Chinese (Simplified)', 'Chinese (Traditional)', 'Japanese', 'Korean', 'Arabic', 'Hindi',
+            'Tamil', 'Bangla', 'Urdu', 'Turkish', 'Polish', 'Swedish', 'Vietnamese', 'Indonesian', 'Thai'
+        ]
+        return defaultLanguages.map(l => ({ label: l, value: l }))
+    }
+    if (field.type === 'audience_select') {
+        let optArray: unknown[] = []
+        if (field.options) {
+            if (Array.isArray(field.options)) {
+                optArray = field.options as unknown[]
+            } else if (typeof field.options === 'string') {
+                try {
+                    const parsed = JSON.parse(field.options)
+                    optArray = Array.isArray(parsed) ? parsed : (parsed && typeof parsed === 'object' ? Object.values(parsed) : [])
+                } catch {
+                    optArray = field.options.split(',').map(s => s.trim()).filter(Boolean)
+                }
+            } else if (typeof field.options === 'object') {
+                optArray = Object.values(field.options)
+            }
+        }
+        if (optArray.length > 0) {
+            return optArray.map(mapOption)
+        }
+
+        // Default popular audiences
+        const defaultAudiences = [
+            'General Public', 'Beginners', 'Professionals', 'Business Owners', 'Social Workers',
+            'Developers', 'Marketers', 'Students', 'Teachers', 'Seniors', 'Tech Savvy', 'Parents', 'Children'
+        ]
+        return defaultAudiences.map(a => ({ label: a, value: a }))
     }
     if (field.type === 'model_select') {
         return (props.models || []).map((model) => ({ label: `${model.name} (${model.provider})`, value: model.slug }))
     }
 
-    return (field.options || []).map(o => typeof o === 'string' ? { label: o, value: o } : o)
+    const rawOptions = field.options
+    let parsed: unknown[] = []
+    if (rawOptions) {
+        if (Array.isArray(rawOptions)) {
+            parsed = rawOptions as unknown[]
+        } else if (typeof rawOptions === 'string') {
+            try {
+                const decoded = JSON.parse(rawOptions)
+                if (Array.isArray(decoded)) {
+                    parsed = decoded
+                } else if (decoded && typeof decoded === 'object') {
+                    parsed = Object.values(decoded)
+                } else {
+                    parsed = rawOptions.split(',').map(s => s.trim()).filter(Boolean)
+                }
+            } catch {
+                parsed = rawOptions.split(',').map(s => s.trim()).filter(Boolean)
+            }
+        } else if (typeof rawOptions === 'object') {
+            parsed = Object.values(rawOptions)
+        }
+    }
+    return parsed.map(mapOption)
 }
 
 const updateValue = (name: string, value: unknown) => {
     values.value = { ...values.value, [name]: value }
+}
+
+const isPercentSlider = (field: ToolField) => {
+    return String(field.min ?? '').includes('%') ||
+           String(field.max ?? '').includes('%') ||
+           String(field.default ?? '').includes('%');
+}
+
+const getSliderValue = (field: ToolField) => {
+    const raw = values.value[fieldName(field)] ?? field.default ?? 0;
+    return parseFloat(String(raw));
+}
+
+const formatSliderDisplay = (field: ToolField) => {
+    const val = values.value[fieldName(field)] ?? field.default ?? 0;
+    const str = String(val);
+    if (isPercentSlider(field) && !str.includes('%')) {
+        return str + '%';
+    }
+    return str;
+}
+
+const handleSliderInput = (field: ToolField, val: number) => {
+    const name = fieldName(field)
+    if (isPercentSlider(field)) {
+        updateValue(name, val + '%')
+    } else {
+        updateValue(name, val)
+    }
 }
 
 const addTag = (field: ToolField, event: KeyboardEvent) => {
@@ -93,14 +223,6 @@ const removeTag = (field: ToolField, tag: string) => {
     updateValue(name, current.filter((item) => item !== tag))
 }
 
-const toggleMultiSelectOption = (field: ToolField, optionValue: string) => {
-    const name = fieldName(field)
-    const current = Array.isArray(values.value[name]) ? values.value[name] as string[] : []
-    updateValue(name, current.includes(optionValue)
-        ? current.filter(v => v !== optionValue)
-        : [...current, optionValue])
-}
-
 const readFile = (field: ToolField, event: Event) => {
     const input = event.target as HTMLInputElement
     const file = input.files?.[0]
@@ -118,14 +240,22 @@ const readFile = (field: ToolField, event: Event) => {
     else reader.readAsText(file)
 }
 
-const inputClass = 'w-full px-4 py-2.5 border rounded-xl text-sm transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/40 bg-white dark:bg-white/[0.03] border-gray-300 dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-600'
+const isChecked = (field: ToolField) => {
+    const val = values.value[fieldName(field)];
+    if (val === undefined || val === null) return false;
+    if (typeof val === 'boolean') return val;
+    const str = String(val).toLowerCase();
+    return str === 'true' || str === '1' || str === 'on' || str === 'yes';
+}
+
+const inputClass = 'w-full px-4 py-2.5 border border-gray-200 bg-white rounded-xl text-sm transition-all focus:outline-none focus:!ring-1 focus:!ring-primary-500/40 text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-600'
 const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red-500/50 dark:focus:ring-red-500/40'
 </script>
 
 <template>
     <form class="space-y-4" @submit.prevent="emit('submit')">
         <div v-for="field in fields" :key="fieldName(field)">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+            <label v-if="field.type !== 'toggle' && field.type !== 'checkbox' && field.type !== 'hidden'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 {{ field.label }}
                 <span v-if="field.required" class="text-danger-500">*</span>
             </label>
@@ -144,9 +274,9 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
                 @input="updateValue(fieldName(field), ($event.target as HTMLTextAreaElement).value)"
             />
 
-            <!-- select / tone_select / language_select / length_select / model_select -->
+            <!-- select / tone_select / language_select / length_select / model_select / audience_select -->
             <AppSelect
-                v-else-if="['select', 'tone_select', 'language_select', 'length_select', 'model_select'].includes(field.type)"
+                v-else-if="['select', 'tone_select', 'language_select', 'length_select', 'model_select', 'audience_select'].includes(field.type)"
                 :model-value="String(values[fieldName(field)] ?? '') || null"
                 :options="normalizedOptions(field)"
                 :placeholder="field.placeholder || `Select ${field.label.toLowerCase()}...`"
@@ -173,37 +303,43 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <!-- slider -->
             <div v-else-if="field.type === 'slider'" class="space-y-2">
                 <input
-                    :value="Number(values[fieldName(field)] ?? field.default ?? 0)"
+                    :value="getSliderValue(field)"
                     type="range"
-                    :min="field.min ?? 0"
-                    :max="field.max ?? 1"
-                    :step="field.step ?? 0.1"
+                    :min="parseFloat(String(field.min ?? 0))"
+                    :max="parseFloat(String(field.max ?? (isPercentSlider(field) ? 100 : 1)))"
+                    :step="parseFloat(String(field.step ?? (isPercentSlider(field) ? 1 : 0.1)))"
                     :disabled="disabled"
                     class="w-full accent-primary-500"
-                    @input="updateValue(fieldName(field), Number(($event.target as HTMLInputElement).value))"
+                    @input="handleSliderInput(field, Number(($event.target as HTMLInputElement).value))"
                 />
-                <div class="text-xs text-gray-500">{{ values[fieldName(field)] ?? field.default ?? 0 }}</div>
+                <div class="text-xs text-gray-500">{{ formatSliderDisplay(field) }}</div>
             </div>
 
-            <!-- toggle -->
-            <label v-else-if="field.type === 'toggle'" class="inline-flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
-                <input
-                    type="checkbox"
-                    :checked="Boolean(values[fieldName(field)])"
-                    :disabled="disabled"
-                    class="w-4 h-4 rounded border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.03] text-primary-500 focus:ring-primary-500/40"
-                    @change="updateValue(fieldName(field), ($event.target as HTMLInputElement).checked)"
-                />
-                <span>{{ values[fieldName(field)] ? 'Enabled' : 'Disabled' }}</span>
-            </label>
+            <!-- toggle / checkbox -->
+            <div v-else-if="field.type === 'toggle' || field.type === 'checkbox'" class="flex items-center justify-between py-2">
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ field.label }}
+                    <span v-if="field.required" class="text-danger-500">*</span>
+                </span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input
+                        type="checkbox"
+                        :checked="isChecked(field)"
+                        :disabled="disabled"
+                        class="sr-only peer"
+                        @change="updateValue(fieldName(field), ($event.target as HTMLInputElement).checked)"
+                    />
+                    <div class="h-6 w-11 rounded-full bg-gray-200 peer-checked:!bg-primary-500 dark:bg-white/10 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white dark:after:border-white/10 dark:after:bg-gray-400 dark:peer-checked:after:bg-white"></div>
+                </label>
+            </div>
 
             <!-- color -->
-            <input
+            <AppColorPicker
                 v-else-if="field.type === 'color'"
-                :value="String(values[fieldName(field)] ?? field.default ?? '#10b981')"
-                type="color"
+                :model-value="String(values[fieldName(field)] ?? field.default ?? '#10b981')"
                 :disabled="disabled"
-                class="w-full h-11 px-2 py-1 bg-white dark:bg-white/[0.03] border border-gray-300 dark:border-white/10 rounded-xl"
+                :error="fieldError(field)"
+                @update:model-value="updateValue(fieldName(field), $event)"
             />
 
             <!-- tags_input -->
@@ -267,16 +403,16 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             <div v-else-if="field.type === 'radio'" class="flex flex-wrap gap-3">
                 <label
                     v-for="option in normalizedOptions(field)"
-                    :key="option.value"
+                    :key="option.value ?? ''"
                     class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
                 >
                     <input
                         type="radio"
                         :name="fieldName(field)"
                         :value="option.value"
-                        :checked="String(values[fieldName(field)] ?? '') === option.value"
+                        :checked="String(values[fieldName(field)] ?? '').toLowerCase() === String(option.value).toLowerCase()"
                         :disabled="disabled"
-                        class="w-4 h-4 border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.03] text-primary-500 focus:ring-primary-500/40"
+                        class="w-4 h-4 border-gray-300 dark:!border-gray-800 bg-white dark:!bg-white/[0.03] text-primary-500 focus:ring-primary-500/40 accent-primary-500"
                         @change="updateValue(fieldName(field), option.value)"
                     />
                     {{ option.label }}
@@ -284,25 +420,16 @@ const inputClassError = 'border-red-500/50 focus:ring-red-500/40 dark:border-red
             </div>
 
             <!-- multi_select -->
-            <div v-else-if="field.type === 'multi_select'" class="flex flex-wrap gap-2">
-                <label
-                    v-for="option in normalizedOptions(field)"
-                    :key="option.value"
-                    class="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-colors border"
-                    :class="(Array.isArray(values[fieldName(field)]) && (values[fieldName(field)] as string[]).includes(option.value))
-                        ? 'bg-primary-500/15 text-primary-700 dark:text-primary-300 border-primary-500/30'
-                        : 'bg-gray-50 dark:bg-white/[0.03] text-gray-600 dark:text-gray-400 border-gray-200 dark:border-white/10 hover:border-gray-400 dark:hover:border-white/20'"
-                    @click="toggleMultiSelectOption(field, option.value)"
-                >
-                    <input
-                        type="checkbox"
-                        :checked="Array.isArray(values[fieldName(field)]) && (values[fieldName(field)] as string[]).includes(option.value)"
-                        :disabled="disabled"
-                        class="sr-only"
-                    />
-                    {{ option.label }}
-                </label>
-            </div>
+            <AppSelect
+                v-else-if="field.type === 'multi_select'"
+                :model-value="Array.isArray(values[fieldName(field)]) ? values[fieldName(field)] as (string | number)[] : []"
+                :options="normalizedOptions(field)"
+                :placeholder="field.placeholder || `Select ${field.label.toLowerCase()}...`"
+                :disabled="disabled"
+                :error="fieldError(field)"
+                multiple
+                @update:model-value="updateValue(fieldName(field), $event)"
+            />
 
             <!-- hidden -->
             <input

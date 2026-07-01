@@ -15,13 +15,17 @@ class PageRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
+            'template' => $this->input('template') ?: 'default',
             'parent_id' => $this->input('parent_id') ?: null,
             'published_at' => $this->input('published_at') ?: null,
             'sort_order' => $this->input('sort_order', 0),
             'show_title' => $this->boolean('show_title'),
+            'center_title' => $this->boolean('center_title'),
             'show_breadcrumbs' => $this->boolean('show_breadcrumbs'),
             'show_featured_image' => $this->boolean('show_featured_image'),
             'show_sidebar' => $this->boolean('show_sidebar'),
+            'remove_featured_image' => $this->boolean('remove_featured_image'),
+            'remove_og_image' => $this->boolean('remove_og_image'),
         ]);
     }
 
@@ -46,11 +50,14 @@ class PageRequest extends FormRequest
             'parent_id' => ['nullable', 'integer', 'exists:pages,id', Rule::notIn([$pageId])],
             'sort_order' => ['nullable', 'integer'],
             'show_title' => ['required', 'boolean'],
+            'center_title' => ['required', 'boolean'],
             'show_breadcrumbs' => ['required', 'boolean'],
             'show_featured_image' => ['required', 'boolean'],
             'show_sidebar' => ['required', 'boolean'],
             'sidebar_position' => ['required', Rule::in(['left', 'right'])],
-            'container_width' => ['required', Rule::in(['default', 'wide', 'full', 'narrow'])],
+            'container_width' => ['required', Rule::in(['1280px', 'full', '1080px', '1536px'])],
+            'remove_featured_image' => ['nullable', 'boolean'],
+            'remove_og_image' => ['nullable', 'boolean'],
         ];
     }
 }

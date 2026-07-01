@@ -76,18 +76,16 @@ const regenerateRecoveryCodes = () => {
 
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $t('Security') }}</h1>
+            <div class="flex items-center gap-2">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $t('Security') }}</h1>
+                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" :class="twoFactor.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'">
+                    {{ twoFactor.enabled ? $t('2FA Enabled') : $t('2FA Not enabled') }}
+                </span>
+            </div>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $t('Manage your security and two-factor authentication settings.') }}</p>
         </div>
 
-        <!-- 2FA Status badge -->
-        <div class="flex items-center gap-4">
-            <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold" :class="twoFactor.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'">
-                {{ twoFactor.enabled ? $t('2FA Enabled') : $t('2FA Not enabled') }}
-            </span>
-        </div>
-
-        <div v-if="recoveryCodes.length" class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/40 dark:bg-amber-900/20">
+        <div v-if="recoveryCodes.length" class="rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-amber-900/40 dark:bg-amber-900/20">
             <h2 class="text-lg font-bold text-amber-950 dark:text-amber-100">{{ $t('Save these recovery codes now') }}</h2>
             <p class="mt-1 text-sm text-amber-800 dark:text-amber-200">{{ $t('Each code can be used once if you lose access to your authenticator app.') }}</p>
             <div class="mt-4 grid gap-2 sm:grid-cols-2">
@@ -98,7 +96,7 @@ const regenerateRecoveryCodes = () => {
         </div>
 
         <div v-if="!twoFactor.enabled" class="grid gap-6 lg:grid-cols-[1fr_360px]">
-            <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ $t('Set up authenticator app') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('Scan the QR code in Google Authenticator, 1Password, Authy, or any TOTP-compatible app.') }}</p>
                 <div class="mt-5 space-y-4">
@@ -122,11 +120,14 @@ const regenerateRecoveryCodes = () => {
                 </div>
             </div>
 
-            <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ $t('Confirm setup') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('Enter the 6-digit code from your authenticator app.') }}</p>
                 <form class="mt-5 space-y-4" @submit.prevent="enable">
-                    <input id="enable-code" v-model="enableForm.code" type="text" inputmode="numeric" maxlength="6" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-center text-lg font-bold tracking-widest text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    <div>
+                        <label for="enable-code" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Authenticator code') }}</label>
+                        <input id="enable-code" v-model="enableForm.code" type="text" inputmode="numeric" maxlength="6" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-center text-lg font-bold tracking-widest text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    </div>
                     <p v-if="enableForm.errors.code" class="text-sm text-red-500">{{ enableForm.errors.code }}</p>
                     <button type="submit" :disabled="enableForm.processing || enableForm.code.length !== 6" class="w-full rounded-lg bg-[#1F75FE] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1a65e0] disabled:cursor-not-allowed disabled:opacity-60">
                         {{ enableForm.processing ? $t('Enabling...') : $t('Enable Two-Factor') }}
@@ -136,13 +137,19 @@ const regenerateRecoveryCodes = () => {
         </div>
 
         <div v-else class="grid gap-6 lg:grid-cols-2">
-            <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ $t('Recovery codes') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('You have :count recovery codes remaining.', { count: twoFactor.recovery_codes_count }) }}</p>
                 <form class="mt-5 space-y-4" @submit.prevent="regenerateRecoveryCodes">
-                    <input v-model="recoveryForm.password" type="password" required autocomplete="current-password" :placeholder="$t('Current password')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    <div>
+                        <label for="recovery-password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Current password') }}</label>
+                        <input id="recovery-password" v-model="recoveryForm.password" type="password" required autocomplete="current-password" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    </div>
                     <p v-if="recoveryForm.errors.password" class="text-sm text-red-500">{{ recoveryForm.errors.password }}</p>
-                    <input v-model="recoveryForm.code" type="text" required :placeholder="$t('Authenticator or recovery code')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    <div>
+                        <label for="recovery-code" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Authenticator or recovery code') }}</label>
+                        <input id="recovery-code" v-model="recoveryForm.code" type="text" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    </div>
                     <p v-if="recoveryForm.errors.code" class="text-sm text-red-500">{{ recoveryForm.errors.code }}</p>
                     <button type="submit" :disabled="recoveryForm.processing" class="rounded-lg border border-[#1F75FE] px-4 py-2.5 text-sm font-semibold text-[#1F75FE] transition hover:bg-[#1F75FE]/5 dark:hover:bg-[#1F75FE]/10 disabled:cursor-not-allowed disabled:opacity-60">
                         {{ recoveryForm.processing ? $t('Regenerating...') : $t('Regenerate recovery codes') }}
@@ -150,13 +157,19 @@ const regenerateRecoveryCodes = () => {
                 </form>
             </div>
 
-            <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ $t('Disable two-factor') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $t('Disabling two-factor authentication lowers account protection.') }}</p>
                 <form class="mt-5 space-y-4" @submit.prevent="disable">
-                    <input v-model="disableForm.password" type="password" required autocomplete="current-password" :placeholder="$t('Current password')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    <div>
+                        <label for="disable-password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Current password') }}</label>
+                        <input id="disable-password" v-model="disableForm.password" type="password" required autocomplete="current-password" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    </div>
                     <p v-if="disableForm.errors.password" class="text-sm text-red-500">{{ disableForm.errors.password }}</p>
-                    <input v-model="disableForm.code" type="text" required :placeholder="$t('Authenticator or recovery code')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    <div>
+                        <label for="disable-code" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $t('Authenticator or recovery code') }}</label>
+                        <input id="disable-code" v-model="disableForm.code" type="text" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                    </div>
                     <p v-if="disableForm.errors.code" class="text-sm text-red-500">{{ disableForm.errors.code }}</p>
                     <button type="submit" :disabled="disableForm.processing" class="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60">
                         {{ disableForm.processing ? $t('Disabling...') : $t('Disable Two-Factor') }}

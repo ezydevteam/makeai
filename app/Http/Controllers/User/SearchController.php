@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
-use App\Models\Conversation;
 use App\Models\Document;
 use App\Models\AiTool;
 use App\Models\User;
@@ -28,24 +27,27 @@ class SearchController extends Controller
             ]);
         }
 
-        $conversations = Conversation::where('user_id', $user->id)
-            ->where(function ($q) use ($query) {
-                $q->where('title', 'like', "%{$query}%")
-                  ->orWhereHas('messages', function ($mq) use ($query) {
-                      $mq->where('content', 'like', "%{$query}%");
-                  });
-            })
-            ->latest('last_message_at')
-            ->take(10)
-            ->get()
-            ->map(fn (Conversation $conv) => [
-                'id' => $conv->id,
-                'ulid' => $conv->ulid,
-                'title' => $conv->title ?: 'Untitled',
-                'model' => $conv->model,
-                'message_count' => $conv->message_count,
-                'last_message_at' => optional($conv->last_message_at)->toISOString(),
-            ]);
+        $conversations = [];
+        if (is_addon_active('ai-chatbot')) {
+            $conversations = \Addons\AiChatbot\Models\Conversation::where('user_id', $user->id)
+                ->where(function ($q) use ($query) {
+                    $q->where('title', 'like', "%{$query}%")
+                      ->orWhereHas('messages', function ($mq) use ($query) {
+                          $mq->where('content', 'like', "%{$query}%");
+                      });
+                })
+                ->latest('last_message_at')
+                ->take(10)
+                ->get()
+                ->map(fn ($conv) => [
+                    'id' => $conv->id,
+                    'ulid' => $conv->ulid,
+                    'title' => $conv->title ?: 'Untitled',
+                    'model' => $conv->model,
+                    'message_count' => $conv->message_count,
+                    'last_message_at' => optional($conv->last_message_at)->toISOString(),
+                ]);
+        }
 
         $documents = Document::where('user_id', $user->id)
             ->where(function ($q) use ($query) {

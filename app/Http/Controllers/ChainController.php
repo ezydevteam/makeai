@@ -19,14 +19,14 @@ class ChainController extends Controller
             ->orderBy('updated_at', 'desc')
             ->get();
 
-        return Inertia::render('Chains/Index', ['chains' => $chains]);
+        return Inertia::render('User/Chains/Index', ['chains' => $chains]);
     }
 
     public function create(): Response
     {
         $tools = AiTool::active()->select('slug', 'name')->get();
 
-        return Inertia::render('Chains/Builder', ['tools' => $tools]);
+        return Inertia::render('User/Chains/Builder', ['tools' => $tools]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -65,7 +65,7 @@ class ChainController extends Controller
         $chain->load('runs');
         $tools = AiTool::active()->select('slug', 'name')->get();
 
-        return Inertia::render('Chains/Builder', [
+        return Inertia::render('User/Chains/Builder', [
             'chain' => $chain,
             'tools' => $tools,
             'editing' => true,

@@ -39,7 +39,7 @@ class SupportTicketController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return Inertia::render('Support/Index', [
+        return Inertia::render('User/Support/Index', [
             'tickets' => $tickets,
             'filters' => $request->only(['status', 'search']),
             'departments' => SupportDepartment::active()->orderBy('sort_order')->get(['id', 'name']),
@@ -81,7 +81,7 @@ class SupportTicketController extends Controller
         $ticket->update(['user_last_read_at' => now()]);
         $ticket->load(['department:id,name', 'assignedAdmin:id,name', 'replies']);
 
-        return Inertia::render('Support/Show', [
+        return Inertia::render('User/Support/Show', [
             'ticket' => $this->ticketPayload($ticket, false),
             'userLastReadAt' => $ticket->user_last_read_at?->toISOString() ?? $ticket->created_at->toISOString(),
             'settings' => $this->settings(),

@@ -118,7 +118,7 @@ const disableTwoFactor = () => {
 
 <template>
     <Head :title="`${user.name} - ${t('User Details')}`" />
-    <div class="mx-auto w-full sm:max-w-5xl px-6 py-8">
+    <div class="mx-auto w-full sm:max-w-5xl px-6 py-6">
         <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">{{ t('Edit User') }}: {{ user.name }}</h1>
@@ -258,7 +258,7 @@ const disableTwoFactor = () => {
                             <p class="text-[10px] text-gray-500 truncate mb-1">{{ log.user_agent }}</p>
                             <p class="text-[10px] text-gray-400">{{ formatDateTime(log.created_at) }}</p>
                         </div>
-                        <div v-if="!user.login_history?.length" class="px-6 py-8 text-center text-xs text-gray-500 italic">
+                        <div v-if="!user.login_history?.length" class="px-6 py-6 text-center text-xs text-gray-500 italic">
                             No login history available.
                         </div>
                     </div>

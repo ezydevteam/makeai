@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class SocialAuthController extends Controller
 {
-    private const PROVIDERS = ['google', 'github', 'facebook', 'reddit', 'twitter'];
+    private const PROVIDERS = ['google', 'github', 'facebook', 'reddit', 'twitter', 'linkedin'];
 
     public function redirect(Request $request, string $provider): RedirectResponse
     {
@@ -185,8 +185,10 @@ class SocialAuthController extends Controller
                 $config['oauth'] = 2;
             }
 
-            config()->set("services.{$provider}", $config);
-            $driver = $socialite->driver($provider);
+            $driverName = $provider === 'linkedin' ? 'linkedin-openid' : $provider;
+
+            config()->set("services.{$driverName}", $config);
+            $driver = $socialite->driver($driverName);
         }
 
         if (method_exists($driver, 'scopes')) {

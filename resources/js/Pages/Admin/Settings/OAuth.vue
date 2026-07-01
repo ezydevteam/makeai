@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
@@ -8,7 +8,7 @@ import { useTranslate } from '@/Composables/useTranslate'
 defineOptions({ layout: AdminLayout })
 
 interface SocialLoginProvider {
-    provider: 'google' | 'github' | 'facebook' | 'reddit' | 'twitter'
+    provider: 'google' | 'github' | 'facebook' | 'reddit' | 'twitter' | 'linkedin'
     label: string
     enabled: boolean
     client_id: string
@@ -46,6 +46,19 @@ const submitLabel = computed(() => {
 const submit = () => {
     form.post(route('admin.oauth.settings.update'), {
         preserveScroll: true,
+    })
+}
+
+const copiedProvider = ref<string | null>(null)
+
+const copyRedirectUrl = (providerName: string, url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+        copiedProvider.value = providerName
+        setTimeout(() => {
+            if (copiedProvider.value === providerName) {
+                copiedProvider.value = null
+            }
+        }, 2000)
     })
 }
 </script>
@@ -171,7 +184,26 @@ const submit = () => {
 
                             <label class="block">
                                 <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Redirect URL') }}</span>
-                                <input :value="provider.redirect_url" type="text" readonly class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300">
+                                <div class="relative flex items-center">
+                                    <input
+                                        :value="provider.redirect_url"
+                                        type="text"
+                                        readonly
+                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-3 pr-10 py-2 text-sm text-gray-500 focus:bg-white focus:text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:focus:bg-surface-900 dark:focus:text-white"
+                                        @focus="($event.target as HTMLInputElement).select()"
+                                    />
+                                    <button
+                                        type="button"
+                                        class="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                        @click="copyRedirectUrl(provider.provider, provider.redirect_url)"
+                                        :title="t('Copy redirect URL')"
+                                    >
+                                        <i
+                                            :class="copiedProvider === provider.provider ? 'ti ti-check text-green-600 dark:text-green-400' : 'ti ti-copy'"
+                                            class="text-base transition-colors duration-200"
+                                        />
+                                    </button>
+                                </div>
                             </label>
                         </div>
                     </div>

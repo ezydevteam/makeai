@@ -62,6 +62,15 @@ class GenerateController extends Controller
         $refineInstruction = $request->input('refine_instruction') ?? data_get($fields, 'refine_instruction');
         $isRefine = ($request->input('action') === 'refine') || (! empty($refineContent) && ! empty($refineInstruction));
 
+        if ($isRefine && ! $template->show_improve) {
+            abort(403, translate('Improve feature is disabled for this tool.'));
+        }
+
+        $variationIndex = data_get($fields, 'variation_index');
+        if ($variationIndex !== null && (int) $variationIndex > 0 && $template->max_variants <= 1) {
+            abort(403, translate('Variations are disabled for this tool.'));
+        }
+
         if ($isRefine) {
             if (empty($refineContent) || empty($refineInstruction)) {
                 abort(422, translate('Content and refinement instructions are required.'));
@@ -443,6 +452,15 @@ class GenerateController extends Controller
         $refineContent = $request->input('refine_content') ?? data_get($fields, 'refine_content');
         $refineInstruction = $request->input('refine_instruction') ?? data_get($fields, 'refine_instruction');
         $isRefine = ($request->input('action') === 'refine') || (! empty($refineContent) && ! empty($refineInstruction));
+
+        if ($isRefine && ! $template->show_improve) {
+            abort(403, translate('Improve feature is disabled for this tool.'));
+        }
+
+        $variationIndex = data_get($fields, 'variation_index');
+        if ($variationIndex !== null && (int) $variationIndex > 0 && $template->max_variants <= 1) {
+            abort(403, translate('Variations are disabled for this tool.'));
+        }
 
         if ($isRefine) {
             if (empty($refineContent) || empty($refineInstruction)) {

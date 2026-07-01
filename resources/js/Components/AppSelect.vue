@@ -74,7 +74,10 @@ const selectedValues = computed<(string | number)[]>(() => {
     return props.modelValue != null && props.modelValue !== '' ? [props.modelValue as string | number] : []
 })
 
-const isSelected = (value: string | number) => selectedValues.value.includes(value)
+const isSelected = (value: string | number | null) => {
+    if (value === null) return false
+    return selectedValues.value.some(sv => String(sv).toLowerCase() === String(value).toLowerCase())
+}
 
 const filtered = computed(() => {
     if (!searchQuery.value.trim()) return safeOptions.value
@@ -180,13 +183,15 @@ function select(option: SelectOption) {
 
     if (props.multiple) {
         const current = Array.isArray(props.modelValue) ? [...props.modelValue] : []
-        const idx = current.indexOf(option.value)
-        if (idx === -1) {
-            current.push(option.value)
-        } else {
-            current.splice(idx, 1)
+        if (option.value !== null) {
+            const idx = current.indexOf(option.value)
+            if (idx === -1) {
+                current.push(option.value)
+            } else {
+                current.splice(idx, 1)
+            }
+            emit('update:modelValue', current)
         }
-        emit('update:modelValue', current)
         vueNextTick(() => { if (showSearch.value) inputRef.value?.focus() })
         return
     }
@@ -195,16 +200,16 @@ function select(option: SelectOption) {
     isOpen.value = false
 }
 
-function removeTag(value: string | number, e: Event) {
+function removeTag(value: string | number | null, e: Event) {
     e.stopPropagation()
-    if (!props.multiple) return
+    if (!props.multiple || value === null) return
     const current = Array.isArray(props.modelValue) ? [...props.modelValue] : []
     emit('update:modelValue', current.filter((v) => v !== value))
 }
 
 function selectAll() {
     if (!props.multiple) return
-    const all = filtered.value.filter((o) => !o.disabled).map((o) => o.value)
+    const all = filtered.value.filter((o) => !o.disabled && o.value !== null).map((o) => o.value) as (string | number)[]
     emit('update:modelValue', all)
 }
 
@@ -297,7 +302,7 @@ watch(searchQuery, () => {
                 :id="id"
                 :name="name"
                 :disabled="disabled"
-                class="w-full min-w-0 min-h-[2.5rem] flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white text-left transition-colors focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+                class="w-full min-w-0 min-h-[2.5rem] flex items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white text-left transition-colors focus:ring-1 focus:ring-primary-500/40 focus:border-primary-500"
                 :class="multiple && compactMultiple ? 'h-10 overflow-hidden' : ''"
                 @click.stop="toggle"
                 @keydown="handleKeydown"
@@ -331,7 +336,7 @@ watch(searchQuery, () => {
                         :class="{ 'text-gray-400 dark:text-gray-500': !selectedOptions.length }"
                     >{{ displayText }}</span>
                 </span>
-                <svg class="h-4 w-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <svg class="h-3 w-3 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': isOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                 </svg>
             </button>

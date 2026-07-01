@@ -37,6 +37,8 @@
         "psr-4": {
             "App\\": "app/",
             "Addons\\AiAssistant\\": "addons/ai-assistant/app/",
+            "Addons\\AiChatbot\\": "addons/ai-chatbot/app/",
+            "Addons\\AiChatbot\\Database\\Seeders\\": "addons/ai-chatbot/database/seeders/",
             "Addons\\PublicKnowledgeBase\\": "addons/public-knowledge-base/app/",
             "Addons\\SocialScheduler\\": "addons/social-scheduler/app/",
             "Addons\\SocialScheduler\\Database\\Factories\\": "addons/social-scheduler/database/factories/",

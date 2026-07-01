@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, computed } from 'vue'
+import Pagination from '@/Components/Pagination.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 
@@ -10,7 +11,15 @@ const { t } = useTranslate()
 
 const props = defineProps<{
     folders: { id: number; name: string; color: string; projects_count: number }[]
-    projects: { data: any[] }
+    projects: {
+        data: any[]
+        links?: any[]
+        current_page?: number
+        last_page?: number
+        from?: number
+        to?: number
+        total?: number
+    }
     recent_renders: any[]
 }>()
 
@@ -33,11 +42,17 @@ function toggleProject(ulid: string) {
 <template>
     <Head :title="t('Video Library')" />
 
-    <div class="space-y-6 p-4 sm:p-6">
+    <div class="space-y-6">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h1 class="text-xl font-semibold">{{ t('Video Library') }}</h1>
-            <Link :href="route('addon.video.user.create')" class="btn btn-sm btn-emerald w-full justify-center sm:w-auto">
-                + {{ t('New Video') }}
+            <div class="space-y-1">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Video Library') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Manage your created videos.') }}
+                </p>
+            </div>
+            <Link :href="route('addon.video.user.create')" class="btn-primary rounded-full">
+                <i class="ti ti-plus"></i>
+                {{ t('New Video') }}
             </Link>
         </div>
 
@@ -92,6 +107,18 @@ function toggleProject(ulid: string) {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Pagination -->
+                <div v-if="projects.links && projects.links.length > 3" class="mt-6 flex justify-end">
+                    <Pagination
+                        :links="projects.links"
+                        :from="projects.from"
+                        :to="projects.to"
+                        :total="projects.total"
+                        :current-page="projects.current_page"
+                        :last-page="projects.last_page"
+                    />
                 </div>
             </div>
         </div>

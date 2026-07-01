@@ -83,18 +83,6 @@ class DemoSeeder extends Seeder
             'sort_order' => 1,
         ]);
 
-        $proPlan = Plan::firstOrCreate(['slug' => 'pro'], [
-            'name' => 'Pro',
-            'description' => 'Professional access',
-            'price_monthly' => 19.99,
-            'price_yearly' => 199.99,
-            'credits' => 5000,
-            'features' => json_encode(['All AI templates', 'GPT-4o + GPT-4o-mini', '50 chats', 'Priority support']),
-            'is_active' => true,
-            'is_free' => false,
-            'sort_order' => 2,
-        ]);
-
         $unlimitedPlan = Plan::firstOrCreate(['slug' => 'unlimited'], [
             'name' => 'Unlimited',
             'description' => 'Power user access',
@@ -610,22 +598,6 @@ class DemoSeeder extends Seeder
             'is_system' => true,
         ]);
 
-        Page::updateOrCreate(['slug' => 'privacy'], [
-            'title' => 'Privacy Policy',
-            'content' => '<h1>Privacy Policy</h1><p>We take your privacy seriously. This policy describes how we collect, use, and protect your personal information.</p>',
-            'excerpt' => 'How we collect, use, and protect your information.',
-            'meta_title' => 'Privacy Policy',
-            'meta_description' => 'How we collect, use, and protect your information.',
-            'status' => 'published',
-            'published_at' => now()->subDays(30),
-            'show_title' => true,
-            'show_breadcrumbs' => true,
-            'show_featured_image' => false,
-            'show_sidebar' => false,
-            'container_width' => 'default',
-            'is_system' => true,
-        ]);
-
         Page::updateOrCreate(['slug' => 'terms'], [
             'title' => 'Terms of Service',
             'content' => '<h1>Terms of Service</h1><p>By using MakeAI, you agree to these terms. Please read them carefully.</p>',
@@ -732,7 +704,7 @@ class DemoSeeder extends Seeder
             'parent_id' => null,
             'type' => 'page',
             'url' => null,
-            'page_id' => Page::where('slug', 'privacy')->value('id'),
+            'page_id' => Page::where('slug', 'privacy-policy')->value('id'),
             'route_name' => null,
             'target' => '_self',
             'icon' => null,

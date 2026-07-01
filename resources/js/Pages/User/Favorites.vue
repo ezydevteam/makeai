@@ -127,26 +127,26 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                 </p>
             </div>
 
-            <div class="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
+            <div class="inline-flex rounded-full border border-gray-200 bg-white p-1 shadow-sm dark:border-white/10 dark:bg-white/5">
                 <button
                     type="button"
-                    :class="viewMode === 'grid' ? 'bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
-                    class="rounded-lg px-3 py-2 text-sm font-semibold transition"
+                    :class="viewMode === 'grid' ? 'bg-primary-50 text-primary-700 dark:!bg-primary-500/20 dark:text-primary-500' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
+                    class="rounded-full px-3 py-1 text-sm font-semibold transition"
                     :aria-label="t('Grid view')"
                     :title="t('Grid view')"
                     @click="viewMode = 'grid'"
                 >
-                    <i class="ti-layout-grid"></i>
+                    <i class="ti ti-grid-dots"></i>
                 </button>
                 <button
                     type="button"
-                    :class="viewMode === 'list' ? 'bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
-                    class="rounded-lg px-3 py-2 text-sm font-semibold transition"
+                    :class="viewMode === 'list' ? 'bg-primary-50 text-primary-700 dark:!bg-primary-500/20 dark:text-primary-500' : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'"
+                    class="rounded-full px-3 py-1 text-sm font-semibold transition"
                     :aria-label="t('List view')"
                     :title="t('List view')"
                     @click="viewMode = 'list'"
                 >
-                    <i class="ti-list"></i>
+                    <i class="ti ti-menu-4"></i>
                 </button>
             </div>
         </div>
@@ -156,7 +156,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                 v-for="tab in tabs"
                 :key="tab.type"
                 type="button"
-                :class="activeType === tab.type ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-500/30 dark:bg-primary-500/15 dark:text-primary-200' : 'border-gray-200 bg-white text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-200'"
+                :class="activeType === tab.type ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400' : 'border-gray-200 bg-white text-gray-600 hover:border-primary-200 hover:text-primary-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-200'"
                 class="inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition"
                 @click="activeType = tab.type"
             >
@@ -170,7 +170,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                 v-for="item in visibleItems"
                 :key="`${item.type}-${item.model_id}`"
                 :class="viewMode === 'grid' ? 'flex flex-col' : 'flex items-center gap-4'"
-                class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-primary-200 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+                class="rounded-2xl border border-gray-200 bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition hover:border-primary-200 hover:shadow-md dark:border-surface-800 dark:bg-surface-900"
             >
                 <Link :href="item.url" :class="viewMode === 'grid' ? 'block flex-1' : 'flex min-w-0 flex-1 items-center gap-4'">
                     <div
@@ -182,8 +182,8 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                     </div>
                     <div
                         v-else
-                        :class="viewMode === 'grid' ? 'mb-4 h-12 w-12' : 'h-12 w-12 shrink-0'"
-                        class="flex items-center justify-center rounded-lg border"
+                        :class="viewMode === 'grid' ? 'mb-4 h-10 w-10' : 'h-10 w-10 shrink-0'"
+                        class="flex items-center justify-center rounded-xl border"
                         :style="{ background: `${item.color}15`, borderColor: `${item.color}30`, color: item.color }"
                     >
                         <i :class="[item.icon, 'text-xl']"></i>
@@ -198,13 +198,13 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
                     </div>
                 </Link>
 
-                <div :class="viewMode === 'grid' ? 'mt-4 flex justify-end gap-2 border-t border-gray-100 pt-4 dark:border-white/10' : 'shrink-0 flex items-center gap-2'">
+                <div :class="viewMode === 'grid' ? 'mt-4 flex justify-between gap-2 border-t border-gray-100 pt-4 dark:border-white/10' : 'shrink-0 flex items-center gap-2'">
                     <div v-if="item.type === 'ai_templates' && item.slug && props.collections.length > 0" class="relative" data-collection-dropdown>
                         <button
                             type="button"
                             @click="toggleDropdown(item.id)"
                             :aria-label="t('Add to collection')"
-                            class="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-300"
+                            class="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:text-primary-300"
                         >
                             <i class="ti ti-folders text-sm"></i>
                             <span>{{ t('Collect') }}</span>
@@ -254,7 +254,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
             </Link>
         </div>
 
-        <div v-if="!visibleItems.length" class="rounded-xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-sm dark:border-white/10 dark:bg-surface-900">
+        <div v-if="!visibleItems.length" class="rounded-2xl border border-dashed border-gray-200 bg-white px-6 py-14 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/15 dark:text-primary-300">
                 <i class="ti-heart text-2xl"></i>
             </div>

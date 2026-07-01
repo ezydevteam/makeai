@@ -250,22 +250,142 @@ class AddonService
             return [];
         }
 
-        return array_map(function ($setting) use ($slug) {
+        $settings = $config['settings'];
+
+        if ($slug === 'ai-chatbot') {
+            // Remove the hardcoded Pro Tier settings
+            $settings = array_filter($settings, function ($s) {
+                return ($s['group'] ?? '') !== 'pro_tier';
+            });
+
+            // Add new 5-hour, weekly, monthly limit settings to the Free Tier
+            $settings[] = [
+                'key' => 'free_max_messages_5h',
+                'type' => 'integer',
+                'label' => 'Free Tier: Max Messages per 5 Hours',
+                'default' => 0,
+                'group' => 'free_tier',
+                'description' => '0 for unlimited.'
+            ];
+            $settings[] = [
+                'key' => 'free_max_messages_weekly',
+                'type' => 'integer',
+                'label' => 'Free Tier: Max Messages per Week',
+                'default' => 0,
+                'group' => 'free_tier',
+                'description' => '0 for unlimited.'
+            ];
+            $settings[] = [
+                'key' => 'free_max_messages_monthly',
+                'type' => 'integer',
+                'label' => 'Free Tier: Max Messages per Month',
+                'default' => 0,
+                'group' => 'free_tier',
+                'description' => '0 for unlimited.'
+            ];
+
+            // Dynamically load active premium plans and create settings for each
+            if (class_exists(\App\Models\Plan::class)) {
+                $plans = \App\Models\Plan::active()->where('is_free', false)->get();
+                foreach ($plans as $plan) {
+                    $groupName = "plan_{$plan->slug}_tier";
+
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_credits_per_message",
+                        'type' => 'string',
+                        'label' => "{$plan->name} Plan: Credits per Message",
+                        'default' => '0',
+                        'group' => $groupName
+                    ];
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_max_tokens",
+                        'type' => 'integer',
+                        'label' => "{$plan->name} Plan: Max Tokens per Request",
+                        'default' => 4096,
+                        'group' => $groupName
+                    ];
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_max_file_size_mb",
+                        'type' => 'integer',
+                        'label' => "{$plan->name} Plan: Max File Upload Size (MB)",
+                        'default' => 50,
+                        'group' => $groupName
+                    ];
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_unlimited_history",
+                        'type' => 'boolean',
+                        'label' => "{$plan->name} Plan: Unlimited History",
+                        'default' => true,
+                        'group' => $groupName
+                    ];
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_max_messages_5h",
+                        'type' => 'integer',
+                        'label' => "{$plan->name} Plan: Max Messages per 5 Hours",
+                        'default' => 0,
+                        'group' => $groupName,
+                        'description' => '0 for unlimited.'
+                    ];
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_max_messages_weekly",
+                        'type' => 'integer',
+                        'label' => "{$plan->name} Plan: Max Messages per Week",
+                        'default' => 0,
+                        'group' => $groupName,
+                        'description' => '0 for unlimited.'
+                    ];
+                    $settings[] = [
+                        'key' => "plan_{$plan->slug}_max_messages_monthly",
+                        'type' => 'integer',
+                        'label' => "{$plan->name} Plan: Max Messages per Month",
+                        'default' => 0,
+                        'group' => $groupName,
+                        'description' => '0 for unlimited.'
+                    ];
+                }
+            }
+        }
+
+        return array_values(array_map(function ($setting) use ($slug) {
             $setting['value'] = settings("addon_{$slug}_{$setting['key']}", $setting['default'] ?? null);
 
             return $setting;
-        }, $config['settings']);
+        }, $settings));
     }
 
     public function saveAddonSettings(string $slug, array $values): void
     {
         $config = $this->getAddonConfig($slug);
-        $settingsMap = collect($config['settings'] ?? [])->keyBy('key');
+        $settings = $config['settings'] ?? [];
+
+        if ($slug === 'ai-chatbot') {
+            $settings = array_filter($settings, function ($s) {
+                return ($s['group'] ?? '') !== 'pro_tier';
+            });
+
+            $settings[] = ['key' => 'free_max_messages_5h', 'type' => 'integer'];
+            $settings[] = ['key' => 'free_max_messages_weekly', 'type' => 'integer'];
+            $settings[] = ['key' => 'free_max_messages_monthly', 'type' => 'integer'];
+
+            if (class_exists(\App\Models\Plan::class)) {
+                $plans = \App\Models\Plan::active()->where('is_free', false)->get();
+                foreach ($plans as $plan) {
+                    $settings[] = ['key' => "plan_{$plan->slug}_credits_per_message", 'type' => 'string'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_max_tokens", 'type' => 'integer'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_max_file_size_mb", 'type' => 'integer'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_unlimited_history", 'type' => 'boolean'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_max_messages_5h", 'type' => 'integer'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_max_messages_weekly", 'type' => 'integer'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_max_messages_monthly", 'type' => 'integer'];
+                }
+            }
+        }
+
+        $settingsMap = collect($settings)->keyBy('key');
 
         foreach ($values as $key => $value) {
             $type = $settingsMap[$key]['type'] ?? 'string';
-            // Honor encrypted type from manifest
-            if ($settingsMap[$key]['type'] ?? null === 'encrypted') {
+            if (($settingsMap[$key]['type'] ?? null) === 'encrypted') {
                 $type = 'encrypted';
             }
             settings_set("addon_{$slug}_{$key}", $value, $type, 'addon');

@@ -6,6 +6,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use Mpdf\Mpdf;
 use Illuminate\Http\Response;
 use Illuminate\Support\LazyCollection;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportService
 {
@@ -21,7 +22,7 @@ class ExportService
             ->chain([new \App\Jobs\NotifyExportReadyJob($adminId, $path, $filename)]);
     }
 
-    public function streamCsv(string $filename, array $headers, LazyCollection $rows, callable $mapper): Response
+    public function streamCsv(string $filename, array $headers, LazyCollection $rows, callable $mapper): StreamedResponse
     {
         return response()->stream(function () use ($headers, $rows, $mapper) {
             $handle = fopen('php://output', 'w');
@@ -48,6 +49,25 @@ class ExportService
         ], $options));
         $mpdf->SetTitle($filename);
         $mpdf->WriteHTML(view($view, $data)->render());
+
+        return response($mpdf->Output('', 'S'), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '.pdf"',
+        ]);
+    }
+
+    public function downloadPdfFromHtml(string $html, string $filename, array $options = []): Response
+    {
+        $mpdf = new Mpdf(array_merge([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'margin_top' => 20,
+            'margin_bottom' => 20,
+            'margin_left' => 15,
+            'margin_right' => 15,
+        ], $options));
+        $mpdf->SetTitle($filename);
+        $mpdf->WriteHTML($html);
 
         return response($mpdf->Output('', 'S'), 200, [
             'Content-Type' => 'application/pdf',

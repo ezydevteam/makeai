@@ -84,7 +84,6 @@ const isAiManagementActive = () =>
     isCurrentRoute(
         'admin.ai.index',
         'admin.ai.provider',
-        'admin.ai.integrations.*',
         'admin.ai.categories.*',
         'admin.ai.tools.*',
         'admin.ai.templates.*',
@@ -138,12 +137,12 @@ function autoExpandOnRoute(group: string, patterns: string[]) {
 }
 
 autoExpandOnRoute('users', ['admin.users.*', 'admin.admins.*', 'admin.roles.*'])
-autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.integrations.*', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
+autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
 autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.subscriptions.*', 'admin.coupons.*', 'admin.credit-settings.*'])
 autoExpandOnRoute('blog', ['admin.blog.posts.*', 'admin.blog.categories.*', 'admin.blog.tags.*', 'admin.blog.settings.*', 'admin.comments.*'])
 autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.activity.*', 'admin.appearance.*', 'admin.license.*'])
-autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.features.settings*', 'admin.gdpr.settings*', 'admin.oauth.settings.*', 'admin.notifications.settings*', 'admin.social-counters.settings.*'])
+autoExpandOnRoute('system-settings', ['admin.settings.index', 'admin.settings.update', 'admin.settings.integrations.*', 'admin.features.settings*', 'admin.gdpr.settings*', 'admin.oauth.settings.*', 'admin.notifications.settings*', 'admin.social-counters.settings.*'])
 
 if (route().current('admin.themes.settings')) {
     menuGroups.value['appearance'] = true
@@ -151,7 +150,7 @@ if (route().current('admin.themes.settings')) {
 
 // Auto-expand addon groups when on their pages
 for (const item of addonMenuItems.value) {
-  if (item?.slug && item?.route_pattern && route().current(item.route_pattern)) {
+  if (item?.slug && item?.route_pattern && route().current(item.route_pattern, item.route_params || {})) {
     menuGroups.value['addon-' + item.slug] = true
   }
 }
@@ -164,12 +163,12 @@ for (const item of addonMenuItems.value) {
     <div class="sidebar-logo">
       <div class="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
         <img v-if="sidebarLogo" :src="sidebarLogo" :alt="branding.site_name || $page.props.appName" class="h-8 w-auto max-w-32 object-contain shrink-0" />
-        <span v-else class="text-[15px] font-semibold text-[#111827] dark:text-white truncate">{{ $page.props.appName }}</span>
+        <span v-else class="sidebar-brand-name truncate">{{ $page.props.appName }}</span>
       </div>
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/5 lg:hidden"
+          class="sidebar-top-action shrink-0 w-7 h-7 flex items-center justify-center rounded-md transition-all lg:hidden"
           :aria-label="mobileSearchOpen ? t('Hide search') : t('Open search')"
           @click="mobileSearchOpen = !mobileSearchOpen"
         >
@@ -178,7 +177,7 @@ for (const item of addonMenuItems.value) {
         <Tooltip :content="t('Toggle sidebar')" placement="right" class="inline-flex">
           <button
             @click="emit('toggle')"
-            class="shrink-0 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/5"
+            class="sidebar-top-action shrink-0 w-7 h-7 flex items-center justify-center rounded-md transition-all"
           >
             <i
               :class="collapsed ? 'ti ti-layout-sidebar-left-expand' : 'ti ti-layout-sidebar-left-collapse'"
@@ -189,7 +188,7 @@ for (const item of addonMenuItems.value) {
         </Tooltip>
       </div>
     </div>
-    <div v-if="mobileSearchOpen" class="border-t border-gray-100 px-4 py-3 lg:hidden dark:border-surface-700">
+    <div v-if="mobileSearchOpen" class="sidebar-mobile-search border-t px-4 py-3 lg:hidden">
       <LiveSearch context="admin" compact />
     </div>
     </div>
@@ -233,7 +232,6 @@ for (const item of addonMenuItems.value) {
           <Link :href="route('admin.ai.templates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.templates.*') }">{{ t('Templates') }}</Link>
           <Link :href="route('admin.ai.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.categories.*') }">{{ t('Categories') }}</Link>
           <Link :href="route('admin.ai.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.index') || isActive('admin.ai.provider') }">{{ t('Providers') }}</Link>
-          <Link :href="route('admin.ai.integrations.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.integrations.*') }">{{ t('Integrations') }}</Link>
           <Link :href="route('admin.ai.access.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.access.*') }">{{ t('Access Control') }}</Link>
           <Link :href="route('admin.ai.rag.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.rag.*') }">{{ t('RAG Settings') }}</Link>
           <Link :href="route('admin.ai.logs.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.logs.*') }">{{ t('Usage & Logs') }}</Link>
@@ -244,7 +242,7 @@ for (const item of addonMenuItems.value) {
       <div v-if="isProAvailable && canAny(['plans.view', 'payments.view', 'payments.gateways'])">
         <Tooltip :content="t('Premium')" placement="right" :full-width="true" :disabled="!collapsed">
           <button @click="toggleGroup('premium')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('premium') || isActive('admin.plans.*') || isActive('admin.payment-gateways.*') || isActive('admin.subscriptions.*') || isActive('admin.coupons.*'), 'open': isGroupOpen('premium') }">
-            <svg class="sidebar-icon text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
+            <i class="ti ti-diamond text-base text-amber-500"></i>
             <span v-show="!collapsed" class="flex-1 text-left">{{ t('Premium') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
           </button>
@@ -296,6 +294,12 @@ for (const item of addonMenuItems.value) {
         </Link>
       </Tooltip>
       <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Communications') }}</div>
+      <Tooltip v-if="can('ai.tools')" :content="t('Tool Reviews')" placement="right" :full-width="true" :disabled="!collapsed">
+        <Link :href="route('admin.ai.reviews.index')" class="sidebar-item" :class="{ active: isActive('admin.ai.reviews.index') }">
+        <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
+        <span v-show="!collapsed">{{ t('Tool Reviews') }}</span>
+        </Link>
+      </Tooltip>
       <Tooltip v-if="can('content.pages') && contactEnabled" :content="t('Messages')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.contact.messages.index')" class="sidebar-item" :class="{ active: isContactMessagesActive() }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0l-7.5-4.615A2.25 2.25 0 012.25 6.993V6.75" /></svg>
@@ -330,7 +334,7 @@ for (const item of addonMenuItems.value) {
       <!-- System -->
       <div v-if="can('settings.manage')">
         <Tooltip :content="t('Settings')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('system-settings')" class="sidebar-item w-full" :class="{ 'active !font-medium': isActive('admin.settings.index') || isActive('admin.settings.update') || isActive('admin.features.settings*') || isActive('admin.gdpr.settings*') || isOAuthActive() || isActive('admin.notifications.settings*') || isSocialCountersActive(), 'open': isGroupOpen('system-settings') }">
+          <button @click="toggleGroup('system-settings')" class="sidebar-item w-full" :class="{ 'active !font-medium': isActive('admin.settings.index') || isActive('admin.settings.update') || isActive('admin.settings.integrations.*') || isActive('admin.features.settings*') || isActive('admin.gdpr.settings*') || isOAuthActive() || isActive('admin.notifications.settings*') || isSocialCountersActive(), 'open': isGroupOpen('system-settings') }">
             <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.213m5.102-4c0-1.315-.152-2.593-.44-3.815a.75.75 0 01.527-.895l.896-.24a.75.75 0 01.917.54C19.875 9.92 21 12.33 21 15s-1.125 5.08-3.264 7.605a.75.75 0 01-.917.54l-.896-.24a.75.75 0 01-.527-.895A21.036 21.036 0 0015.5 15c0-1.315-.152-2.593-.44-3.815z" /></svg>
             <span v-show="!collapsed" class="flex-1 text-left">{{ t('Settings') }}</span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
@@ -339,10 +343,11 @@ for (const item of addonMenuItems.value) {
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('system-settings') }">
           <Link :href="route('admin.settings.index')" class="sidebar-subitem" :class="{ active: isActive('admin.settings.index') }">{{ t('General') }}</Link>
           <Link :href="route('admin.features.settings')" class="sidebar-subitem" :class="{ active: isActive('admin.features.settings*') }">{{ t('Features') }}</Link>
-          <Link :href="route('admin.notifications.settings')" class="sidebar-subitem" :class="{ active: isActive('admin.notifications.settings*') }">{{ t('Notifications') }}</Link>
           <Link :href="route('admin.social-counters.settings.edit')" class="sidebar-subitem" :class="{ active: isSocialCountersActive() }">{{ t('Social') }}</Link>
           <Link :href="route('admin.gdpr.settings')" class="sidebar-subitem" :class="{ active: isActive('admin.gdpr.settings*') }">{{ t('GDPR') }}</Link>
           <Link :href="route('admin.oauth.settings.edit')" class="sidebar-subitem" :class="{ active: isOAuthActive() }">{{ t('OAuth') }}</Link>
+          <Link :href="route('admin.settings.integrations.index')" class="sidebar-subitem" :class="{ active: isActive('admin.settings.integrations.*') }">{{ t('Integrations') }}</Link>
+          <Link :href="route('admin.notifications.settings')" class="sidebar-subitem" :class="{ active: isActive('admin.notifications.settings*') }">{{ t('Notifications') }}</Link>
         </div>
         <Tooltip :content="t('System')" placement="right" :full-width="true" :disabled="!collapsed">
           <button @click="toggleGroup('system')" class="sidebar-item w-full" :class="{ 'active !font-medium': isSystemGroupActive(), 'open': isGroupOpen('system') }">
@@ -434,7 +439,7 @@ for (const item of addonMenuItems.value) {
                 class="sidebar-item w-full"
                 :class="{
                   'active !font-medium': isGroupOpen('addon-' + slug)
-                    || group.items.some((i: any) => i?.route_pattern && isActive(i.route_pattern)),
+                    || group.items.some((i: any) => i?.route_pattern && route().current(i.route_pattern, i.route_params || {})),
                   'open': isGroupOpen('addon-' + slug)
                 }"
               >
@@ -451,12 +456,12 @@ for (const item of addonMenuItems.value) {
                 :key="item.label ?? slug"
                 :href="route(item.route, item.route_params || {})"
                 class="sidebar-subitem"
-                :class="{ active: item.route_pattern ? isActive(item.route_pattern) : false }"
+                :class="{ active: item.route_pattern ? route().current(item.route_pattern, item.route_params || {}) : false }"
               >{{ item.label }}</Link>
             </div>
           </template>
           <Tooltip v-else v-for="item in group.items" :key="item.route ?? slug" :content="item.label" placement="right" :full-width="true" :disabled="!collapsed">
-            <Link :href="route(item.route, item.route_params || {})" class="sidebar-item" :class="{ active: item.route_pattern ? isActive(item.route_pattern) : false }">
+            <Link :href="route(item.route, item.route_params || {})" class="sidebar-item" :class="{ active: item.route_pattern ? route().current(item.route_pattern, item.route_params || {}) : false }">
               <i v-if="item.icon" :class="item.icon" class="sidebar-icon"></i>
               <span v-show="!collapsed">{{ item.label }}</span>
             </Link>
@@ -470,10 +475,21 @@ for (const item of addonMenuItems.value) {
 <style>
 /* === Sidebar Shell === */
 .admin-sidebar {
+  --sidebar-bg: var(--admin-sidebar-bg, #ffffff);
+  --sidebar-text: var(--admin-sidebar-text, #000000);
+  --sidebar-border: color-mix(in srgb, var(--sidebar-text) 16%, transparent);
+  --sidebar-text-item: color-mix(in srgb, var(--sidebar-text) 92%, transparent);
+  --sidebar-text-subitem: color-mix(in srgb, var(--sidebar-text) 82%, transparent);
+  --sidebar-text-muted: color-mix(in srgb, var(--sidebar-text) 72%, transparent);
+  --sidebar-text-subtle: color-mix(in srgb, var(--sidebar-text) 42%, transparent);
+  --sidebar-hover-bg: color-mix(in srgb, var(--sidebar-text) 5%, transparent);
+  --sidebar-hover-text: color-mix(in srgb, var(--sidebar-text) 96%, rgb(26, 24, 24) 4%);
+  --sidebar-active: var(--admin-accent, #a855f7);
+  --sidebar-active-bg: color-mix(in srgb, var(--sidebar-active) 16%, transparent);
   width: 260px;
   height: 100vh;
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   transition: width 0.25s ease;
@@ -485,10 +501,6 @@ for (const item of addonMenuItems.value) {
 .sidebar-mini {
   width: 64px !important;
 }
-html.dark .admin-sidebar {
-  background: #1a1a2e;
-  border-right-color: #30363d;
-}
 
 /* === Logo === */
 .sidebar-logo {
@@ -496,11 +508,27 @@ html.dark .admin-sidebar {
   display: flex;
   align-items: center;
   padding: 0 1.25rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--sidebar-border);
   flex-shrink: 0;
 }
-html.dark .sidebar-logo {
-  border-bottom-color: #30363d;
+
+.sidebar-brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sidebar-hover-text);
+}
+
+.sidebar-top-action {
+  color: var(--sidebar-text-muted);
+}
+
+.sidebar-top-action:hover {
+  color: var(--sidebar-hover-text);
+  background: var(--sidebar-hover-bg);
+}
+
+.sidebar-mobile-search {
+  border-top-color: var(--sidebar-border);
 }
 
 /* === Nav scroll area === */
@@ -532,11 +560,8 @@ html.dark .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 25
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--sidebar-text-subtle);
   padding: 1rem 1.25rem 0.375rem;
-}
-html.dark .sidebar-group-label {
-  color: rgba(255, 255, 255, 0.3);
 }
 
 /* === Nav Item === */
@@ -545,7 +570,7 @@ html.dark .sidebar-group-label {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1.25rem;
-  color: #4b5563;
+  color: var(--sidebar-text-item);
   font-size: 0.875rem;
   font-weight: 450;
   border-radius: 0;
@@ -557,21 +582,14 @@ html.dark .sidebar-group-label {
   background: transparent;
 }
 .sidebar-item:hover {
-  color: #111827;
-  background: #f3f4f6;
-}
-html.dark .sidebar-item {
-  color: #9ca3af;
-}
-html.dark .sidebar-item:hover {
-  color: #e6edf3;
-  background: rgba(255, 255, 255, 0.03);
+  color: var(--sidebar-hover-text);
+  background: var(--sidebar-hover-bg);
 }
 
 /* Active state — blue left bar + blue tint */
 .sidebar-item.active {
-  color: #1F75FE;
-  background: rgba(31, 117, 254, 0.08);
+  color: var(--sidebar-active);
+  background: var(--sidebar-active-bg);
 }
 .sidebar-item.active::before {
   content: '';
@@ -580,7 +598,7 @@ html.dark .sidebar-item:hover {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: #1F75FE;
+  background: var(--sidebar-active);
   border-radius: 0 2px 2px 0;
 }
 
@@ -598,7 +616,7 @@ html.dark .sidebar-item:hover {
 }
 .sidebar-item.active .sidebar-icon {
   opacity: 1;
-  color: #1F75FE;
+  color: var(--sidebar-active);
 }
 
 /* === Chevron === */
@@ -628,23 +646,17 @@ html.dark .sidebar-item:hover {
   align-items: center;
   gap: 0.5rem;
   padding: 0.375rem 1.25rem 0.375rem 3.25rem;
-  color: #6b7280;
-  font-size: 0.8125rem;
+  color: var(--sidebar-text-subitem);
+  font-size: 0.875rem;
   cursor: pointer;
   transition: color 0.15s;
   text-decoration: none;
 }
 .sidebar-subitem:hover {
-  color: #111827;
-}
-html.dark .sidebar-subitem {
-  color: #8b949e;
-}
-html.dark .sidebar-subitem:hover {
-  color: #e6edf3;
+  color: var(--sidebar-hover-text);
 }
 .sidebar-subitem.active {
-  color: #1F75FE;
+  color: var(--sidebar-active);
 }
 .sidebar-subitem::before {
   content: '';

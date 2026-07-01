@@ -26,8 +26,21 @@ interface Subscription {
     trial_ends_at: string | null
 }
 
+interface PlanData {
+    name: string
+    slug: string
+    is_free: boolean
+    features: string[] | null
+    subscription_status: string
+    subscription_ends_at: string | null
+    trial_ends_at: string | null
+    daily_limit: number | null
+    monthly_limit: number | null
+}
+
 const props = defineProps<{
     payments: Payment[]
+    plan: PlanData | null
     subscription: Subscription
 }>()
 
@@ -37,6 +50,22 @@ const { formatNumber, formatCurrency } = useNumberFormat()
 const page = usePage()
 
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+const planStatusLabel = computed(() => {
+    if (!props.plan) return t('No plan')
+    if (props.plan.subscription_status === 'active') return t('Active membership')
+    if (props.plan.subscription_status === 'trialing') return t('Trial access')
+    if (props.plan.is_free || props.plan.subscription_status === 'none') return t('Starter access')
+    return props.plan.name
+})
+const planStatusClass = computed(() => {
+    if (!props.plan) return 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'
+    if (props.plan.subscription_status === 'active') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+    if (props.plan.subscription_status === 'trialing') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+    return 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'
+})
+const planFeatures = computed(() => props.plan?.features?.slice(0, 4) ?? [])
+const planTrialEndsAt = computed(() => props.plan?.trial_ends_at ?? props.subscription.trial_ends_at)
+const planEndsAt = computed(() => props.plan?.subscription_ends_at ?? props.subscription.ends_at)
 
 const statusLabel = (status: string) => {
     const map: Record<string, string> = {
@@ -47,6 +76,25 @@ const statusLabel = (status: string) => {
         refunded: t('Refunded'),
     }
     return map[status] ?? status
+}
+
+const paymentTypeLabel = (type: string) => {
+    const map: Record<string, string> = {
+        bank_transfer: t('Bank transfer'),
+        credit_topup: t('Credit top-up'),
+        subscription: t('Subscription'),
+        payment: t('Payment'),
+    }
+
+    if (map[type]) {
+        return map[type]
+    }
+
+    return type
+        .split('_')
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ')
 }
 
 const statusClass = (status: string) => {
@@ -65,42 +113,77 @@ const statusClass = (status: string) => {
     <Head :title="t('Billing')" />
 
     <div class="space-y-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Billing & Invoices') }}</h1>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('View your payment history and manage your subscription.') }}</p>
+        </div>
+
         <!-- Not available -->
-        <div v-if="!isProAvailable" class="rounded-xl border border-gray-200 bg-white p-10 text-center shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <div v-if="!isProAvailable" class="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
             <p class="text-sm font-semibold text-gray-600 dark:text-gray-400">{{ t('Premium subscriptions are not available on this installation.') }}</p>
         </div>
 
         <template v-else>
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Billing & Invoices') }}</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ t('View your payment history and manage your subscription.') }}</p>
-        </div>
-
         <!-- Subscription Status -->
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800 p-6">
-            <h2 class="font-semibold text-gray-900 dark:text-white mb-4">{{ t('Current Subscription') }}</h2>
-            <div class="flex items-center gap-3 mb-3">
-                <span v-if="subscription.status === 'active'" class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
-                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> {{ t('Active') }}
-                </span>
-                <span v-else-if="subscription.status === 'trialing'" class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> {{ t('Trialing') }}
-                </span>
-                <span v-else class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                    {{ t('Inactive') }}
-                </span>
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
+            <div class="bg-[linear-gradient(135deg,_rgba(31,117,254,0.08),_rgba(139,92,246,0.08))] px-6 py-5 dark:bg-surface-900">
+                <div class="flex items-start justify-between gap-4">
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Current plan') }}</p>
+                        <h2 class="mt-2 break-words font-heading text-2xl font-bold text-gray-950 dark:!text-white">
+                            {{ plan?.name ?? t('No active plan') }}
+                        </h2>
+                        <p class="mt-2 break-words text-sm text-gray-500 dark:text-gray-400">{{ t('Your current plan, limits, and renewal details.') }}</p>
+                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/80 text-primary-700 shadow-sm dark:!bg-surface-900/80 dark:text-primary-500">
+                        <i class="ti ti-credit-card text-2xl"></i>
+                    </div>
+                </div>
             </div>
-            <p v-if="subscription.trial_ends_at" class="text-sm text-gray-500 mt-1">{{ t('Trial ends :date', { date: formatDate(subscription.trial_ends_at) }) }}</p>
-            <p v-if="subscription.ends_at" class="text-sm text-gray-500 mt-1">{{ t('Access until :date', { date: formatDate(subscription.ends_at) }) }}</p>
-            <div class="mt-4">
-                <Link :href="route('pricing')" class="inline-flex items-center gap-2 rounded-xl bg-[#1F75FE] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a65e0] transition">
-                    <i class="ti ti-arrow-up"></i> {{ t('Manage Plan') }}
+
+            <div class="space-y-5 px-6 py-5">
+                <div class="flex items-center gap-2">
+                    <span :class="planStatusClass" class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold">
+                        {{ planStatusLabel }}
+                    </span>
+                </div>
+
+                <p v-if="planTrialEndsAt" class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Trial ends :date', { date: formatDate(planTrialEndsAt) }) }}
+                </p>
+                <p v-else-if="planEndsAt" class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Access reserved through :date', { date: formatDate(planEndsAt) }) }}
+                </p>
+
+                <div v-if="planFeatures.length" class="space-y-3">
+                    <div v-for="feature in planFeatures" :key="feature" class="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50/80 px-4 py-3 dark:border-surface-800 dark:bg-surface-950/60">
+                        <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                            <i class="ti ti-check text-sm"></i>
+                        </div>
+                        <p class="break-words text-sm text-gray-600 dark:text-gray-300">{{ feature }}</p>
+                    </div>
+                </div>
+
+                <div v-if="plan?.daily_limit || plan?.monthly_limit" class="grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 dark:border-surface-800 dark:bg-surface-950/60">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Daily limit') }}</p>
+                        <p class="mt-2 font-heading text-2xl font-bold text-gray-950 dark:!text-white">{{ formatNumber(plan?.daily_limit ?? 0) }}</p>
+                    </div>
+                    <div class="rounded-2xl border border-gray-100 bg-gray-50/80 p-4 dark:border-surface-800 dark:bg-surface-950/60">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Monthly limit') }}</p>
+                        <p class="mt-2 font-heading text-2xl font-bold text-gray-950 dark:!text-white">{{ formatNumber(plan?.monthly_limit ?? 0) }}</p>
+                    </div>
+                </div>
+
+                <Link :href="route('pricing')" class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-700 dark:hover:text-primary-300">
+                    <i class="ti ti-arrow-up"></i>
+                    {{ t('Manage Plan') }}
                 </Link>
             </div>
-        </div>
+        </section>
 
         <!-- Payment History -->
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
             <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                 <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Payment History') }}</h2>
             </div>
@@ -123,7 +206,7 @@ const statusClass = (status: string) => {
                         <div class="text-sm font-bold text-gray-900 dark:text-white">
                             {{ formatCurrency(payment.amount, payment.currency) }}
                         </div>
-                        <div class="text-xs text-gray-400">{{ payment.type }}</div>
+                        <div class="text-xs text-gray-400">{{ paymentTypeLabel(payment.type) }}</div>
                     </div>
                 </div>
             </div>

@@ -16,14 +16,23 @@ const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
 const templates = import.meta.glob<{ default: DefineComponent }>('./Templates/**/*.vue')
 const addonPages = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Pages/**/*.vue')
 const addonComponents = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Components/**/*.vue')
+const addonTemplates = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Templates/**/*.vue')
 
 // Build lookup: { 'ai-assistant/Admin/Settings': importFn }
 const addonPageMap: Record<string, () => Promise<{ default: DefineComponent }>> = {}
+const addonTemplateMap: Record<string, () => Promise<{ default: DefineComponent }>> = {}
 
 for (const [path, importFn] of Object.entries(addonPages)) {
     const match = path.match(/addons\/([^/]+)\/resources\/js\/Pages\/(.+)\.vue$/)
     if (match) {
         addonPageMap[`${match[1]}/${match[2]}`] = importFn as () => Promise<{ default: DefineComponent }>
+    }
+}
+
+for (const [path, importFn] of Object.entries(addonTemplates)) {
+    const match = path.match(/addons\/([^/]+)\/resources\/js\/Templates\/(.+)\.vue$/)
+    if (match) {
+        addonTemplateMap[`${match[1]}/${match[2]}`] = importFn as () => Promise<{ default: DefineComponent }>
     }
 }
 
@@ -97,7 +106,10 @@ createInertiaApp({
         const page = pages[`./Pages/${name}.vue`]
             ?? (
                 name.startsWith('Templates/')
-                ? templates[`./Templates/${name.slice('Templates/'.length)}.vue`]
+                ? (
+                    templates[`./Templates/${name.slice('Templates/'.length)}.vue`]
+                    ?? addonTemplateMap[`ai-chatbot/${name.slice('Templates/'.length)}`]
+                  )
                 : null
             )
             ?? (
@@ -160,4 +172,13 @@ createInertiaApp({
         color: '#6366f1',
         showSpinner: true,
     },
+})
+
+// Listen for events from embedded tool frames (e.g. copy requests)
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'makeai-embed-copy' && event.data.text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(event.data.text).catch(() => {});
+        }
+    }
 })

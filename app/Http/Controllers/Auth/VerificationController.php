@@ -40,9 +40,11 @@ class VerificationController extends Controller
             $availableIn = max(1, (int) $user->otp_locked_until->diffInSeconds(now()));
 
             throw ValidationException::withMessages([
-                'code' => [translate('Too many failed attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $availableIn,
-                ])],
+                'code' => [
+                    $availableIn < 60
+                        ? translate('Too many failed attempts. Please try again in :seconds seconds.', ['seconds' => $availableIn])
+                        : translate('Too many failed attempts. Please try again in :minutes minutes.', ['minutes' => ceil($availableIn / 60)])
+                ],
             ]);
         }
 

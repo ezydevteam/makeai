@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import AppColorPicker from '@/Components/AppColorPicker.vue'
@@ -26,7 +26,6 @@ const form = useForm({
         accent_color: get('accent_color', '#3b82f6'),
         bg_color: get('bg_color', '#f0fdf8'),
         text_primary_color: get('text_primary_color', '#111827'),
-        text_secondary_color: get('text_secondary_color', '#6b7280'),
         sidebar_bg: get('sidebar_bg', '#0f1f17'),
         sidebar_text_color: get('sidebar_text_color', '#d1fae5'),
         navbar_bg: get('navbar_bg', '#ffffff'),
@@ -44,7 +43,7 @@ const submit = () => form.post(route('admin.appearance.update'))
 <template>
     <Head :title="t('Admin Panel Appearance')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Admin Panel Appearance') }}</h1>
@@ -68,7 +67,6 @@ const submit = () => form.post(route('admin.appearance.update'))
                                 <AppColorPicker v-model="settings.accent_color" :label="t('Accent')" />
                                 <AppColorPicker v-model="settings.bg_color" :label="t('Body BG Color')" />
                                 <AppColorPicker v-model="settings.text_primary_color" :label="t('Text Color')" />
-                                <AppColorPicker v-model="settings.text_secondary_color" :label="t('Muted Color')" />
                             </div>
                         </div>
 

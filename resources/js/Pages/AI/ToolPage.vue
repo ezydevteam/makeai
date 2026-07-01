@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import UserLayout from '@/Layouts/UserLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import DynamicForm, { type ToolField } from '@/Components/AI/DynamicForm.vue'
@@ -79,6 +79,7 @@ const props = defineProps<{
 const formValues = ref<Record<string, unknown>>({})
 const activeTab = ref('about')
 const reviewRating = ref(5)
+const hoverRating = ref(0)
 const reviewComment = ref('')
 const reviewMessage = ref('')
 const reviewSubmitting = ref(false)
@@ -104,6 +105,15 @@ const expandedExamples = ref<Record<number, boolean>>({})
 const reviewStats = ref(props.reviewStats)
 
 const isVariationsMode = ref(false)
+
+const formatReviewDate = (dateStr: string) => {
+    if (!dateStr) return ''
+    try {
+        return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(dateStr))
+    } catch {
+        return ''
+    }
+}
 const activeVariationTab = ref(0)
 const mainStream = useStream()
 const variationStreams = [useStream(), useStream(), useStream()]
@@ -127,6 +137,19 @@ const isAnyStreaming = computed(() => {
 const { t } = useTranslate()
 const toast = useToastr()
 const { isLimited, isNearLimit, remaining, formattedCountdown, parseHeaders } = useRateLimit()
+
+const page = usePage()
+const toolPageSettings = computed(() => {
+    const settings = page.props.frontendToolPageSettings as Record<string, any> || {}
+    return {
+        layout: settings.layout || 'default',
+        hide_breadcrumbs: settings.hide_breadcrumbs === true || settings.hide_breadcrumbs === '1',
+        hide_rating: settings.hide_rating === true || settings.hide_rating === '1',
+        hide_rating_count: settings.hide_rating_count === true || settings.hide_rating_count === '1',
+        hide_share: settings.hide_share === true || settings.hide_share === '1',
+        hide_favorite: settings.hide_favorite === true || settings.hide_favorite === '1'
+    }
+})
 
 const allStreams = [mainStream, ...variationStreams]
 allStreams.forEach((s) => {
@@ -176,7 +199,6 @@ const applyRefinement = async () => {
     })
 }
 
-const page = usePage()
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 const showLoginModal = ref(false)
 const showUpgradeModal = ref(false)
@@ -478,10 +500,10 @@ const generateVariations = async () => {
     const model = modelField ? String(formValues.value[fieldName(modelField)] || '') : ''
 
     await Promise.all(variationStreams.map((stream, index) => {
-        return stream.generate({ 
-            slug: props.tool.slug, 
-            fields: { ...formValues.value, variation_index: index }, 
-            model 
+        return stream.generate({
+            slug: props.tool.slug,
+            fields: { ...formValues.value, variation_index: index },
+            model
         })
     }))
 }
@@ -494,8 +516,8 @@ const regenerate = () => {
     }
 }
 
-const handleDocumentSaved = (document: Record<string, unknown>) => { 
-    activeStream.value.savedDocument.value = document 
+const handleDocumentSaved = (document: Record<string, unknown>) => {
+    activeStream.value.savedDocument.value = document
 }
 
 useToolPageShortcuts({
@@ -513,7 +535,79 @@ useToolPageShortcuts({
         }
     },
 })
-const applyExample = (example: { input?: Record<string, unknown> }) => { formValues.value = { ...formValues.value, ...(example.input || {}) } }
+const applyingExampleIndex = ref<number | null>(null)
+
+const applyExample = (example: any, index: number) => {
+    if (applyingExampleIndex.value !== null) return
+    applyingExampleIndex.value = index
+
+    setTimeout(() => {
+        const rawInput = example.input || {}
+        const parsedInput: Record<string, any> = {}
+
+        const fields = (props.tool.fields && typeof props.tool.fields === 'object')
+            ? (Array.isArray(props.tool.fields) ? props.tool.fields : Object.values(props.tool.fields))
+            : []
+
+        fields.forEach((field: any) => {
+            const name = field.name || field.key || field.id || ''
+            if (!name) return
+
+            let val = rawInput[name]
+            if (val === undefined) {
+                // Try case-insensitive matching
+                const matchedKey = Object.keys(rawInput).find(k => k.toLowerCase() === name.toLowerCase())
+                if (matchedKey !== undefined) {
+                    val = rawInput[matchedKey]
+                }
+            }
+
+            if (val === undefined) return
+
+            // If the field is multi_select or tags_input, and val is a string, split by comma
+            if (['multi_select', 'tags_input'].includes(field.type) && typeof val === 'string') {
+                val = val.split(',').map((s: string) => s.trim()).filter(Boolean)
+            }
+
+            parsedInput[name] = val
+        })
+
+        // Copy other keys
+        Object.keys(rawInput).forEach((k) => {
+            if (parsedInput[k] === undefined) {
+                parsedInput[k] = rawInput[k]
+            }
+        })
+
+        formValues.value = { ...formValues.value, ...parsedInput }
+        applyingExampleIndex.value = null
+
+        toast.success(t('Example data loaded successfully!'))
+
+        const formElement = document.querySelector('form')
+        if (formElement) {
+            formElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+    }, 500)
+}
+
+const getFieldLabel = (key: string): string => {
+    const fields = (props.tool.fields && typeof props.tool.fields === 'object')
+        ? (Array.isArray(props.tool.fields) ? props.tool.fields : Object.values(props.tool.fields))
+        : []
+
+    const field = fields.find((f: any) => {
+        const name = f.name || f.key || f.id || ''
+        return name.toLowerCase() === key.toLowerCase()
+    })
+
+    if (field && field.label) {
+        return field.label
+    }
+    // Fallback: capitalize first letter of each word and replace underscores with spaces
+    return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 const exampleOutput = (output: unknown): string => String(output ?? '')
 
 const truncatedOutput = (output: unknown, index: number): string => {
@@ -571,6 +665,30 @@ const submitReview = async () => {
         toast.error(reviewMessage.value)
     } finally { reviewSubmitting.value = false }
 }
+
+const isShareOpen = ref(false)
+const shareCopied = ref(false)
+
+const closeShareDropdown = () => {
+    isShareOpen.value = false
+}
+
+onMounted(() => {
+    document.addEventListener('click', closeShareDropdown)
+})
+
+onUnmounted(() => {
+    document.removeEventListener('click', closeShareDropdown)
+})
+
+const copyToolLink = () => {
+    navigator.clipboard.writeText(props.seo.canonical || window.location.href).then(() => {
+        shareCopied.value = true
+        setTimeout(() => {
+            shareCopied.value = false
+        }, 2000)
+    }).catch(() => {})
+}
 </script>
 
 <template>
@@ -588,11 +706,15 @@ const submitReview = async () => {
         <component v-for="(schema, i) in schemas" :key="i" :is="'script'" type="application/ld+json" v-html="JSON.stringify(schema)" />
     </Head>
 
-    <div class="relative flex-1 min-h-0 overflow-hidden">
-        <div class="relative mx-auto flex min-h-0 max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8">
-            <div class="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-card dark:border-white/5 dark:bg-[#111827] sm:px-6">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="flex flex-wrap items-center gap-2 text-sm">
+    <div class="relative flex-1 min-h-0 lg:overflow-hidden">
+        <div class="relative mx-auto flex min-h-0 flex-col px-4 py-6 sm:px-6" :class="[
+            toolPageSettings.layout === 'minimalist' ? 'max-w-4xl' : 'max-w-7xl',
+            'layout-' + toolPageSettings.layout
+        ]">
+            <!-- Header Card (Default Layout) -->
+            <div v-if="toolPageSettings.layout === 'default'" class="mb-6 rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-card dark:border-white/5 dark:bg-[#111827] sm:px-6">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between mb-4" :class="{ 'lg:justify-end': toolPageSettings.hide_breadcrumbs }">
+                    <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-2 text-sm">
                         <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-primary-400">
                             <i class="ti ti-home"></i>
                         </Link>
@@ -617,13 +739,29 @@ const submitReview = async () => {
                                 {{ formatViews(tool.views_count) }}
                             </span>
                         </Tooltip>
-                        <Tooltip :content="t('Average rating')" placement="bottom">
+                        <Tooltip v-if="!toolPageSettings.hide_rating" :content="t('Average rating')" placement="bottom">
                             <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
-                                <i class="ti ti-star-filled text-[13px] text-gray-600 dark:text-gray-200"></i>
+                                <i class="ti ti-star-filled text-[13px] text-warning-400"></i>
                                 {{ (tool.avg_rating || 0).toFixed(1) }}
                             </span>
                         </Tooltip>
-                        <Tooltip :content="tool.is_favorited ? t('Remove from favorites') : t('Add to favorites')" placement="bottom">
+
+                        <!-- Share Dropdown Button -->
+                        <div v-if="!toolPageSettings.hide_share" class="relative">
+                            <button
+                                type="button"
+                                @click.stop="isShareOpen = !isShareOpen"
+                                class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                            >
+                                <i class="ti ti-share text-[13px]"></i>
+                                {{ t('Share') }}
+                            </button>
+                            <div v-if="isShareOpen" class="absolute right-0 mt-2 w-72 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                                <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
+                            </div>
+                        </div>
+
+                        <Tooltip v-if="!toolPageSettings.hide_favorite" :content="tool.is_favorited ? t('Remove from favorites') : t('Add to favorites')" placement="bottom">
                             <FavoriteButton model-type="ai_templates" :model-id="tool.id" :is-favorited="Boolean(tool.is_favorited)" :count="tool.favorites_count" show-count size="sm" />
                         </Tooltip>
                     </div>
@@ -633,8 +771,8 @@ const submitReview = async () => {
                     <div class="card relative overflow-hidden bg-white dark:bg-white/[0.03]">
                         <div class="relative flex flex-col gap-3">
                             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                                <div class="flex items-center gap-4">
-                                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-surface-50 text-primary-600 shadow-sm dark:border-primary-500/20 dark:bg-primary-500/10 dark:text-primary-300">
+                                <div class="flex items-start sm:items-center gap-4">
+                                    <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-gray-100 bg-slate-100 text-primary-600 shadow-sm dark:border-gray-500/20 dark:bg-slate-800 dark:text-primary-300">
                                         <i :class="[tool.icon || 'ti ti-wand', 'text-[28px]']" :style="{ color: tool.color || '#1F75FE' }"></i>
                                     </div>
                                     <div class="min-w-0">
@@ -646,46 +784,212 @@ const submitReview = async () => {
                                                     {{ tool.category.name }}
                                                 </span>
                                             </Tooltip>
-                                            <span
-                                                class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] whitespace-nowrap shadow-sm"
-                                                :class="accessBadgeClass"
-                                            >
+                                            <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] whitespace-nowrap shadow-sm" :class="accessBadgeClass">
                                                 {{ accessBadgeLabel }}
-                                                </span>
+                                            </span>
                                         </div>
                                         <p class="max-w-5xl text-[15px] text-gray-500 dark:text-gray-400">
                                             {{ tool.description }}
                                         </p>
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
+            <!-- Card-less Header (Modern & Minimalist Layouts) -->
+            <div v-else-if="toolPageSettings.layout === 'modern' || toolPageSettings.layout === 'minimalist'" class="mb-8" :class="[
+                toolPageSettings.layout === 'minimalist' ? 'max-w-4xl mx-auto w-full' : ''
+            ]">
+                <!-- Top Row (Breadcrumbs & Meta) -->
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-3">
+                    <!-- Breadcrumbs -->
+                    <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-2 text-sm">
+                        <Link :href="routeTo('home')" class="inline-flex items-center gap-1.5 text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white">
+                            <i class="ti ti-home"></i>
+                        </Link>
+                        <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-xs"></i>
+                        <Link :href="routeTo('ai.tools.index')" class="text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-white">{{ t('AI Tools') }}</Link>
+                        <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-xs"></i>
+                        <Link v-if="tool.category" :href="routeTo('ai.tools.category', tool.category.slug)" class="text-gray-500 transition-colors hover:text-primary-600 dark:hover:text-primary-400">{{ tool.category.name }}</Link>
+                        <i v-if="tool.category" class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-xs"></i>
+                        <span class="text-gray-700 dark:text-gray-300">{{ tool.name }}</span>
+                    </div>
+
+                    <!-- Meta details (Ratings & Favorite button) -->
+                    <div class="flex items-center gap-2" :class="{ 'ml-auto': toolPageSettings.hide_breadcrumbs }">
+                        <Tooltip v-if="tool.avg_latency_ms" :content="t('Average generation time')" placement="bottom">
+                            <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                                <i class="ti ti-clock text-[13px] text-gray-600 dark:text-gray-200"></i>
+                                {{ formatLatency(tool.avg_latency_ms) }}
+                            </span>
+                        </Tooltip>
+                        <Tooltip v-if="tool.views_count" :content="t('Total views')" placement="bottom">
+                            <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                                <i class="ti ti-eye text-[13px] text-gray-600 dark:text-gray-200"></i>
+                                {{ formatViews(tool.views_count) }}
+                            </span>
+                        </Tooltip>
+                        <Tooltip v-if="!toolPageSettings.hide_rating" :content="t('Average rating')" placement="bottom">
+                            <span class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                                <i class="ti ti-star-filled text-[13px] text-warning-400"></i>
+                                {{ (tool.avg_rating || 0).toFixed(1) }}
+                            </span>
+                        </Tooltip>
+
+                        <!-- Share Dropdown Button -->
+                        <div v-if="!toolPageSettings.hide_share" class="relative">
+                            <button
+                                type="button"
+                                @click.stop="isShareOpen = !isShareOpen"
+                                class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-xs font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                            >
+                                <i class="ti ti-share text-[13px]"></i>
+                                {{ t('Share') }}
+                            </button>
+                            <div v-if="isShareOpen" class="absolute right-0 mt-2 w-72 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                                <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
+                            </div>
+                        </div>
+
+                        <Tooltip v-if="!toolPageSettings.hide_favorite" :content="tool.is_favorited ? t('Remove from favorites') : t('Add to favorites')" placement="bottom">
+                            <FavoriteButton model-type="ai_templates" :model-id="tool.id" :is-favorited="Boolean(tool.is_favorited)" :count="tool.favorites_count" show-count size="sm" />
+                        </Tooltip>
+                    </div>
+                </div>
+
+                <!-- Title & Description Row -->
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div class="flex items-start sm:items-center gap-4">
+                        <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-xs" :class="[
+                            toolPageSettings.layout === 'modern'
+                                ? 'bg-gradient-to-br from-blue-500 to-purple-500 text-white border border-transparent'
+                                : 'border border-gray-200 bg-white text-primary-600 dark:border-white/5 dark:bg-white/[0.03] dark:text-primary-400'
+                        ]">
+                            <i :class="[tool.icon || 'ti ti-wand', 'text-[28px]', toolPageSettings.layout === 'modern' ? 'text-white' : '']" :style="toolPageSettings.layout === 'modern' ? {} : { color: tool.color || '#1F75FE' }"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h1 class="font-heading text-[2rem] font-black tracking-tight text-gray-900 dark:text-white">{{ tool.name }}</h1>
+                                <Tooltip v-if="tool.category" :content="t('Tool category')" placement="bottom">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-500 shadow-xs dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                                        <i v-if="tool.category.icon" :class="tool.category.icon" class="text-[13px]"></i>
+                                        {{ tool.category.name }}
+                                    </span>
+                                </Tooltip>
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] whitespace-nowrap shadow-xs" :class="accessBadgeClass">
+                                    {{ accessBadgeLabel }}
+                                </span>
+                            </div>
+                            <p class="max-w-5xl text-[15px] text-gray-500 dark:text-gray-400 mt-1">
+                                {{ tool.description }}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <AdSection zone="tool_page_top" class="mx-auto mb-4 w-full max-w-7xl" />
 
-            <div class="grid min-h-0 grid-cols-1 gap-6 lg:grid-cols-12">
-                <div class="min-h-0 lg:col-span-4">
-                    <div class="card sticky top-6 flex h-full max-h-[calc(100vh-9rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white/90 dark:border-white/5 dark:bg-white/[0.03]">
+            <div class="grid min-h-0 gap-6 lg:grid-cols-12" :class="[
+                toolPageSettings.layout === 'minimalist' ? 'max-w-4xl mx-auto w-full' : '',
+                toolPageSettings.layout === 'modern' ? 'lg:gap-8' : ''
+            ]">
+                <!-- Left Column (Parameters Form) -->
+                <div class="min-h-0 min-w-0 w-full lg:col-span-4" :class="[
+                    toolPageSettings.layout === 'creative' ? 'flex flex-col gap-6' : ''
+                ]">
+                    <!-- Integrated Header for Creative Layout -->
+                    <div v-if="toolPageSettings.layout === 'creative'" class="relative rounded-2xl border border-gray-200 bg-linear-to-b from-gray-50/50 to-white p-6 shadow-sm dark:border-white/5 dark:from-white/[0.02] dark:to-white/[0.01]">
+                        <!-- Colored blur container to prevent overflow while keeping dropdown visible outside the card -->
+                        <div class="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+                            <!-- Colored blur background effect -->
+                            <div class="absolute -right-16 -top-16 h-32 w-32 rounded-full blur-3xl opacity-20 dark:opacity-30" :style="{ backgroundColor: tool.color || '#1F75FE' }"></div>
+                        </div>
+
+                        <!-- Breadcrumbs -->
+                        <div v-if="!toolPageSettings.hide_breadcrumbs" class="flex flex-wrap items-center gap-1.5 text-xs text-gray-500 mb-4">
+                            <Link :href="routeTo('home')" class="text-gray-500 hover:text-primary-600 dark:hover:!text-white">
+                                <i class="ti ti-home"></i>
+                            </Link>
+                            <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-[10px]"></i>
+                            <Link :href="routeTo('ai.tools.index')" class="text-gray-500 hover:text-primary-600 dark:hover:!text-white">{{ t('AI Tools') }}</Link>
+                            <i class="ti ti-chevron-right text-gray-400 dark:text-gray-600 text-[10px]"></i>
+                            <span class="text-gray-700 dark:text-gray-300 line-clamp-1">{{ tool.name }}</span>
+                        </div>
+
+                        <div class="flex items-start gap-4">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-gray-200 bg-white text-primary-600 shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:text-primary-400">
+                                <i :class="[tool.icon || 'ti ti-wand', 'text-2xl']" :style="{ color: tool.color || '#1F75FE' }"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <h1 class="font-heading text-xl font-bold text-gray-900 dark:text-white leading-none">{{ tool.name }}</h1>
+                                <div class="mt-1 flex flex-wrap items-center gap-2">
+                                    <span v-if="tool.category" class="inline-flex items-center gap-1 text-[10px] text-gray-500">
+                                        <i v-if="tool.category.icon" :class="tool.category.icon"></i>
+                                        {{ tool.category.name }}
+                                    </span>
+                                    <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider" :class="accessBadgeClass">
+                                        {{ accessBadgeLabel }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ tool.description }}</p>
+
+                        <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-4 dark:border-white/5">
+                            <Tooltip v-if="!toolPageSettings.hide_rating" :content="t('Average rating')" placement="bottom">
+                                <span class="inline-flex items-center gap-1 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                    <i class="ti ti-star-filled text-warning-400"></i>
+                                    {{ (tool.avg_rating || 0).toFixed(1) }}
+                                </span>
+                            </Tooltip>
+                            <div class="flex items-center gap-2">
+                                <!-- Share Dropdown Button -->
+                                <div v-if="!toolPageSettings.hide_share" class="relative">
+                                    <button
+                                        type="button"
+                                        @click.stop="isShareOpen = !isShareOpen"
+                                        class="inline-flex items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2.5 py-2 text-[11px] font-bold text-gray-700 transition-all hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+                                    >
+                                        <i class="ti ti-share text-[12px]"></i>
+                                        {{ t('Share') }}
+                                    </button>
+                                    <div v-if="isShareOpen" class="absolute right-0 mt-2 w-72 rounded-2xl border border-gray-200 bg-white p-3.5 shadow-lg z-50 dark:border-white/10 dark:bg-gray-800">
+                                        <SocialShare :url="seo.canonical || shareUrl" :title="tool.name" :style="'icon-label'" :networks="['facebook', 'x', 'linkedin', 'whatsapp', 'telegram', 'copy']" />
+                                    </div>
+                                </div>
+                                <FavoriteButton v-if="!toolPageSettings.hide_favorite" model-type="ai_templates" :model-id="tool.id" :is-favorited="Boolean(tool.is_favorited)" :count="tool.favorites_count" show-count size="sm" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Parameters Form Card -->
+                    <div :class="[
+                        toolPageSettings.layout === 'modern'
+                            ? 'card lg:sticky lg:top-6 flex flex-col lg:h-full lg:max-h-[calc(100vh-9rem)] lg:overflow-hidden rounded-2xl border border-gray-200 bg-gradient-to-br from-blue-500/5 to-purple-500/5 dark:border-white/5 dark:from-blue-500/[0.02] dark:to-purple-500/[0.02] shadow-sm w-full max-w-full'
+                            : 'card lg:sticky lg:top-6 flex flex-col lg:h-full lg:max-h-[calc(100vh-9rem)] lg:overflow-hidden rounded-2xl border border-gray-200 bg-white/90 dark:border-white/5 dark:bg-white/[0.03] w-full max-w-full'
+                    ]">
+                        <!-- Form Header -->
                         <div class="shrink-0 border-b border-gray-100 px-6 py-4 dark:border-white/5">
                             <div class="flex items-center justify-between gap-3">
                                 <div class="flex items-center gap-2">
-                                    <i :class="['ti ti-sparkles-2', 'text-[20px]']" :style="{ color: tool.color || '#1F75FE' }"></i>
+                                    <i :class="['ti ti-sparkles', 'text-[20px]']" :style="{ color: tool.color || '#1F75FE' }"></i>
                                     <div class="min-w-0 flex-1">
                                         <h6 class="text-sm font-semibold text-gray-700 dark:text-white">{{ t('Prompt Parameters') }}</h6>
                                     </div>
                                 </div>
-                                <Tooltip :content="t('Try example')" placement="left">
-                                    <button type="button" class="text-gray-400 transition-colors hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400" @click="regenerate">
-                                        <i class="ti ti-refresh text-[18px]"></i>
+                                <Tooltip v-if="hasUsageExamples && usageExamples.length > 0" :content="t('Try example')" placement="left">
+                                    <button type="button" :disabled="applyingExampleIndex !== null" class="text-gray-400 transition-colors hover:text-primary-600 dark:text-gray-300 dark:hover:text-primary-400 disabled:opacity-50" @click="applyExample(usageExamples[0], 0)">
+                                        <i class="ti ti-refresh text-base"></i>
                                     </button>
                                 </Tooltip>
                             </div>
                         </div>
+
+                        <!-- Form Body -->
                         <div class="flex-1 min-h-0 overflow-y-auto px-6 py-5">
                             <div v-if="!canGenerate" class="mb-4 rounded-xl border px-4 py-3 text-xs" :class="bannerClass">
                                 <div class="flex items-center gap-2 font-medium">
@@ -718,7 +1022,9 @@ const submitReview = async () => {
                                 </div>
                             </DynamicForm>
                         </div>
-                        <div class="shrink-0 border-t border-gray-100 bg-white/95 px-6 py-4 backdrop-blur-md dark:border-white/5 dark:bg-[#101418]/90">
+
+                        <!-- Form Footer -->
+                        <div class="shrink-0 border-t border-gray-100 bg-white/95 py-4 backdrop-blur-md dark:border-white/5 dark:bg-[#101418]/90 px-6">
                             <button type="button" :disabled="!canSubmit || !canGenerate" class="btn-primary w-full justify-center rounded-xl py-3 text-sm font-semibold shadow-lg disabled:cursor-not-allowed disabled:opacity-50" @click="runGenerate">
                                 <svg v-if="isAnyStreaming" class="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -738,32 +1044,61 @@ const submitReview = async () => {
                     </div>
                 </div>
 
-                <div class="min-h-0 lg:col-span-8 flex flex-col gap-3">
+                <!-- Right Column (Output Panel & Nested Tabs) -->
+                <div class="min-h-0 min-w-0 w-full flex flex-col gap-3 lg:col-span-8">
                     <!-- Variation Tabs -->
-                    <div v-if="isVariationsMode && (activeOutput || isAnyStreaming)" class="flex border-b border-gray-200 dark:border-white/5 gap-2 overflow-x-auto pb-px">
-                        <button 
-                            v-for="(stream, index) in variationStreams" 
-                            :key="index" 
-                            @click="activeVariationTab = index" 
-                            :class="[activeVariationTab === index ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" 
-                            class="px-4 py-2.5 text-xs transition-colors whitespace-nowrap flex items-center gap-1.5"
+                    <div v-if="isVariationsMode && (activeOutput || isAnyStreaming)" class="flex gap-2 overflow-x-auto pb-px" :class="[
+                        toolPageSettings.layout === 'default'
+                            ? 'border-b border-gray-200 dark:border-white/5'
+                            : 'mb-1 hide-scrollbar'
+                    ]">
+                        <button
+                            v-for="(stream, index) in variationStreams"
+                            :key="index"
+                            @click="activeVariationTab = index"
+                            :class="[
+                                activeVariationTab === index
+                                    ? (toolPageSettings.layout === 'default'
+                                        ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400 font-bold'
+                                        : 'bg-primary-500 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm')
+                                    : (toolPageSettings.layout === 'default'
+                                        ? 'border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium'
+                                        : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium px-3 py-1.5 rounded-lg'),
+                                toolPageSettings.layout === 'default' ? 'px-4 py-2.5 text-xs' : 'text-xs transition-all'
+                            ]"
+                            class="whitespace-nowrap flex items-center gap-1.5"
                         >
                             <span class="inline-flex h-2 w-2 rounded-full" :class="stream.isStreaming.value ? 'bg-primary-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'"></span>
                             {{ t('Variation :num', { num: index + 1 }) }}
                         </button>
                     </div>
 
-                    <div class="card flex-1 overflow-hidden rounded-2xl bg-white/90 dark:bg-white/[0.03]">
+                    <!-- Output Panel Card Wrapper -->
+                    <div :class="[
+                        toolPageSettings.layout === 'modern'
+                            ? 'card flex-1 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/20 shadow-lg backdrop-blur-md dark:border-white/5 dark:from-blue-500/[0.02] dark:to-purple-500/[0.02] dark:shadow-none relative w-full max-w-full'
+                            : (toolPageSettings.layout === 'creative'
+                                ? 'card flex-1 overflow-hidden rounded-2xl bg-white/90 dark:bg-white/[0.03] w-full max-w-full'
+                                : 'card flex-1 overflow-hidden rounded-2xl bg-white/90 dark:bg-white/[0.03] w-full max-w-full')
+                    ]" :style="[
+                        toolPageSettings.layout === 'creative'
+                            ? { boxShadow: `0 10px 30px -10px ${tool.color || '#1F75FE'}25`, border: `1px solid ${tool.color || '#1F75FE'}20` }
+                            : {}
+                    ]">
+                        <!-- Gradient accent top line for Modern layout -->
+                        <div v-if="toolPageSettings.layout === 'modern'" class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-t-2xl z-10"></div>
                         <OutputPanel :output="activeOutput" :reasoning="activeReasoning" :is-reasoning="activeIsReasoning" :output-type="tool.output_type || 'markdown'" :loading="activeIsStreaming" :usage="activeUsage" :saved-document="activeSavedDocument" :show-credit-costs="showCreditCosts" :can-save="Boolean(authUser)" :slug="tool.slug" :default-title="`${tool.name} Output`" @document-saved="handleDocumentSaved" />
                     </div>
-                    <div v-if="activeOutput" class="flex flex-wrap gap-2">
-                        <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="regenerate">
+
+                    <!-- Action Buttons -->
+                    <div v-if="activeOutput" class="flex flex-wrap gap-2 output-actions">
+                        <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:!bg-white/[0.03] dark:!text-gray-300 dark:hover:!border-gray-800 dark:hover:!text-white dark:hover:!bg-white/10 disabled:opacity-50" @click="regenerate">
                             <i class="ti ti-refresh text-[14px]"></i>
                             {{ t('Regenerate') }}
                         </button>
-                        
+
                         <Tooltip v-if="(tool.max_variants ?? 0) > 1" :content="t('Generates 3 alternatives simultaneously using 3x credits')" placement="top">
-                            <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="generateVariations">
+                            <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:!bg-white/[0.03] dark:!text-gray-300 dark:hover:!border-gray-800 dark:hover:!text-white dark:hover:!bg-white/10 disabled:opacity-50" @click="generateVariations">
                                 <svg v-if="isAnyStreaming && isVariationsMode" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -773,145 +1108,726 @@ const submitReview = async () => {
                             </button>
                         </Tooltip>
 
-                        <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 disabled:opacity-50" @click="isSidebarOpen = true">
+                        <button type="button" :disabled="isAnyStreaming || !canGenerate" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:!bg-white/[0.03] dark:!text-gray-300 dark:hover:!border-gray-800 dark:hover:!text-white dark:hover:!bg-white/10 disabled:opacity-50" @click="isSidebarOpen = true">
                             <i class="ti ti-sparkles text-[14px]"></i>
                             {{ t('Improve') }}
                         </button>
 
-                        <Link v-if="authUser && activeSavedDocument?.id" :href="activeSavedDocument?.id ? routeTo('documents.edit', activeSavedDocument.id) : '#'" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/5 no-underline">
+                        <Link v-if="authUser && activeSavedDocument?.id" :href="activeSavedDocument?.id ? routeTo('documents.edit', activeSavedDocument.id) : '#'" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition-colors hover:!border-primary-200 hover:!bg-primary-50 hover:text-primary-700 dark:border-white/10 dark:!bg-white/[0.03] dark:!text-gray-300 dark:hover:!border-gray-800 dark:hover:!text-white dark:hover:!bg-white/10 no-underline">
                             <i class="ti ti-edit text-[14px]"></i>
                             {{ t('Edit in Editor') }}
                         </Link>
                     </div>
 
-                    <div v-if="activeOutput" class="mt-3 pt-3 border-t border-gray-100 dark:border-white/5">
-                        <SocialShare
-                            :url="shareUrl"
-                            :title="tool.name"
-                            :style="'icon'"
-                        />
+                    <!-- Nested Content Tabs (Modern & Creative Layouts) -->
+                    <div v-if="contentTabsVisible && toolPageSettings.layout !== 'default' && toolPageSettings.layout !== 'minimalist'" class="mt-6 w-full max-w-full overflow-hidden" :class="[
+                        toolPageSettings.layout === 'modern'
+                            ? 'rounded-2xl bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/20 p-5 shadow-lg backdrop-blur-md dark:border-white/5 dark:from-blue-500/[0.02] dark:to-purple-500/[0.02] dark:shadow-none'
+                            : 'rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/5 dark:bg-white/[0.03]'
+                    ]">
+                        <!-- Nested Tabs Navigation -->
+                        <div class="mb-4 flex gap-2 overflow-x-auto pb-px hide-scrollbar">
+                            <button v-if="hasAbout" @click="activeTab = 'about'" :class="[activeTab === 'about' ? (toolPageSettings.layout === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold' : 'bg-primary-500 text-white font-bold') : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium', toolPageSettings.layout === 'modern' ? 'px-4 py-1.5 rounded-full' : 'px-3 py-1.5 rounded-lg']" class="text-xs font-semibold transition-all whitespace-nowrap">{{ t('About') }}</button>
+                            <button v-if="hasHowItWorks" @click="activeTab = 'how'" :class="[activeTab === 'how' ? (toolPageSettings.layout === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold' : 'bg-primary-500 text-white font-bold') : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium', toolPageSettings.layout === 'modern' ? 'px-4 py-1.5 rounded-full' : 'px-3 py-1.5 rounded-lg']" class="text-xs font-semibold transition-all whitespace-nowrap">{{ t('How It Works') }}</button>
+                            <button v-if="hasUsageExamples" @click="activeTab = 'examples'" :class="[activeTab === 'examples' ? (toolPageSettings.layout === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold' : 'bg-primary-500 text-white font-bold') : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium', toolPageSettings.layout === 'modern' ? 'px-4 py-1.5 rounded-full' : 'px-3 py-1.5 rounded-lg']" class="text-xs font-semibold transition-all whitespace-nowrap">{{ t('Examples') }}</button>
+                            <button v-if="hasFaqs" @click="activeTab = 'faqs'" :class="[activeTab === 'faqs' ? (toolPageSettings.layout === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold' : 'bg-primary-500 text-white font-bold') : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium', toolPageSettings.layout === 'modern' ? 'px-4 py-1.5 rounded-full' : 'px-3 py-1.5 rounded-lg']" class="text-xs font-semibold transition-all whitespace-nowrap">{{ t('FAQs') }}</button>
+                            <button v-if="tool.show_reviews && !toolPageSettings.hide_rating" @click="activeTab = 'reviews'" :class="[activeTab === 'reviews' ? (toolPageSettings.layout === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold' : 'bg-primary-500 text-white font-bold') : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium', toolPageSettings.layout === 'modern' ? 'px-4 py-1.5 rounded-full' : 'px-3 py-1.5 rounded-lg']" class="text-xs font-semibold transition-all whitespace-nowrap">{{ t('Reviews') }}</button>
+                                            <button v-if="tool.show_related_tools && relatedTools.length" @click="activeTab = 'related'" :class="[activeTab === 'related' ? (toolPageSettings.layout === 'modern' ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold' : 'bg-primary-500 text-white font-bold') : 'bg-gray-100 hover:bg-gray-200 dark:bg-white/5 dark:hover:bg-white/10 text-gray-600 dark:text-gray-300 font-medium', toolPageSettings.layout === 'modern' ? 'px-4 py-1.5 rounded-full' : 'px-3 py-1.5 rounded-lg']" class="text-xs font-semibold transition-all whitespace-nowrap">{{ t('Related') }}</button>
+                        </div>
+
+                        <!-- Nested Tabs Content -->
+                        <Transition name="tab-slide" mode="out-in">
+                            <div :key="activeTab" class="min-h-0">
+                                <div v-if="activeTab === 'about' && hasAbout" class="space-y-6">
+                                    <div class="min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('About :tool', { tool: tool.name }) }}</h3>
+                                        <p class="text-xs text-gray-500 mt-1">{{ t('Learn more about this tool and what it can generate.') }}</p>
+                                    </div>
+                                    <section class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300" v-html="tool.about_content"></section>
+                                </div>
+
+                                <div v-if="activeTab === 'how' && hasHowItWorks" class="space-y-6">
+                                    <div class="min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('How It Works') }}</h3>
+                                        <p class="text-xs text-gray-500 mt-1">{{ t('Follow these simple steps to get the best results.') }}</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                        <div v-for="(step, index) in howItWorks" :key="index" class="relative rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/5 dark:bg-[#111827]/40 shadow-xs">
+                                            <div class="absolute -top-3 -left-3 flex h-8 w-8 items-center justify-center rounded-full border border-primary-500/30 bg-primary-500/20 text-sm font-bold text-primary-600 dark:text-primary-400">
+                                                {{ step.step || index + 1 }}
+                                            </div>
+                                            <i :class="[step.icon || 'ti-check', 'mb-4 block text-2xl']" :style="{ color: tool.color || '#10b981' }"></i>
+                                            <h4 class="mb-2 font-semibold text-gray-900 dark:text-white leading-tight">{{ step.title }}</h4>
+                                            <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400">{{ step.description }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="activeTab === 'examples' && hasUsageExamples" class="space-y-6">
+                                    <div class="min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Usage Examples') }}</h3>
+                                        <p class="text-xs text-gray-500 mt-1">{{ t('Explore sample inputs and outputs for this tool.') }}</p>
+                                    </div>
+                                    <div v-for="(example, index) in usageExamples" :key="index" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02]">
+                                        <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50/50 px-6 py-4 dark:border-white/5 dark:bg-white/5">
+                                            <h4 class="font-medium text-gray-900 dark:text-white">{{ example.title }}</h4>
+                                            <button
+                                                :disabled="applyingExampleIndex !== null"
+                                                @click="applyExample(example, Number(index))"
+                                                class="try-example rounded-lg border border-primary-500/20 bg-primary-500/10 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-500/20 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400 dark:hover:bg-primary-500/30 disabled:opacity-50"
+                                            >
+                                                {{ applyingExampleIndex === Number(index) ? t('Applying...') : t('Try this example') }}
+                                            </button>
+                                        </div>
+                                        <div class="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0 dark:divide-white/5">
+                                            <div class="p-6">
+                                                <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Input Data') }}</div>
+                                                <div class="space-y-2">
+                                                    <div v-for="(value, key) in example.input" :key="key" class="flex gap-2">
+                                                        <span class="min-w-[100px] text-sm font-medium text-gray-500 dark:text-gray-400">{{ getFieldLabel(String(key)) }}:</span>
+                                                        <span class="break-words text-sm text-gray-700 dark:text-gray-300">{{ value }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="bg-gray-50/20 p-6 dark:bg-white/[0.01]">
+                                                <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Generated Output') }}</div>
+                                                <div class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ truncatedOutput(example.output, Number(index)) }}</div>
+                                                <button v-if="exampleOutput(example.output).length > 200" type="button" class="mt-3 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300" @click="expandedExamples[Number(index)] = !expandedExamples[Number(index)]">{{ expandedExamples[Number(index)] ? t('Show less') : t('See full output') }}</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="activeTab === 'faqs' && hasFaqs" class="space-y-6">
+                                    <div class="min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Frequently Asked Questions') }}</h3>
+                                        <p class="text-xs text-gray-500 mt-1">{{ t('Quick answers to common queries about :tool.', { tool: tool.name }) }}</p>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <details v-for="(faq, index) in faqItems" :key="index" class="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
+                                            <summary class="list-none flex cursor-pointer items-center justify-between px-6 py-4 font-medium text-gray-900 group-open:bg-gray-50 dark:text-white dark:group-open:bg-[#111827]/40">
+                                                {{ faq.question }}
+                                                <i class="ti ti-chevron-down text-gray-400 transition-transform dark:text-gray-500 group-open:rotate-180"></i>
+                                            </summary>
+                                            <div class="border-t border-gray-200 bg-gray-50/50 px-6 py-4 text-xs leading-relaxed text-gray-600 dark:border-white/5 dark:bg-white/[0.01] dark:text-gray-400" v-html="faq.answer"></div>
+                                        </details>
+                                    </div>
+                                </div>
+
+                                <div v-if="activeTab === 'related'" class="space-y-6">
+                                    <div class="min-w-0">
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Related AI Tools') }}</h3>
+                                        <p class="text-xs text-gray-500 mt-1">{{ t('Discover other helpful AI generators in our catalog.') }}</p>
+                                    </div>
+                                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                                        <Link
+                                            v-for="tool in relatedTools"
+                                            :key="tool.slug"
+                                            :href="routeTo('ai.tools.show', tool.slug)"
+                                            :class="[
+                                                'block rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md',
+                                                toolPageSettings.layout === 'modern'
+                                                    ? 'bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/10 dark:border-white/5 dark:from-blue-500/[0.01] dark:to-purple-500/[0.01]'
+                                                    : (toolPageSettings.layout === 'creative'
+                                                        ? 'bg-white/80 dark:bg-white/[0.02] shadow-xs'
+                                                        : 'border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02]')
+                                            ]"
+                                            :style="[
+                                                toolPageSettings.layout === 'creative'
+                                                    ? { border: `1px solid ${tool.color || '#1F75FE'}20`, boxShadow: `0 4px 20px -10px ${tool.color || '#1F75FE'}15` }
+                                                    : {}
+                                            ]"
+                                        >
+                                            <i :class="[tool.icon || 'ti ti-wand', 'mb-3 block text-2xl text-primary-600 dark:text-primary-400']" :style="{ color: tool.color }"></i>
+                                            <h4 class="mb-2 font-semibold text-gray-900 dark:text-white leading-tight">{{ tool.name }}</h4>
+                                            <p class="line-clamp-2 text-xs text-gray-500">{{ tool.description }}</p>
+                                        </Link>
+                                    </div>
+                                </div>
+
+                                <div v-if="activeTab === 'reviews'" class="space-y-6">
+                                    <div class="flex flex-wrap items-center justify-between gap-4">
+                                        <div class="min-w-0">
+                                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Reviews for :tool', { tool: tool.name }) }}</h3>
+                                            <p class="text-xs text-gray-500">
+                                                <span v-if="!tool.review_count || tool.review_count === 0">{{ t('No reviews for this tool yet.') }}</span>
+                                                <template v-else>
+                                                    {{ tool.avg_rating || 0 }}/5
+                                                    <span v-if="!toolPageSettings.hide_rating_count"> {{ t('from') }} {{ tool.review_count || 0 }} {{ t('reviews') }}</span>
+                                                    <span v-else> {{ t('reviews') }}</span>
+                                                </template>
+                                            </p>
+                                        </div>
+                                        <div v-if="tool.review_count && tool.review_count > 0" class="shrink-0 w-64">
+                                            <AppSelect v-model="reviewSort" :options="sortOptions" @update:model-value="changeReviewSort" />
+                                        </div>
+                                    </div>
+                                    <div v-if="tool.review_count && tool.review_count > 0" class="space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-white/5 dark:bg-white/[0.02]">
+                                        <div v-for="rating in [5, 4, 3, 2, 1]" :key="rating" class="grid grid-cols-[52px_1fr_42px] items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                            <span>{{ rating }} {{ t('star') }}</span>
+                                            <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:!bg-white/10"><div class="h-full rounded-full bg-warning-400" :style="{ width: `${reviewStats.distribution?.[rating]?.percent || 0}%` }"></div></div>
+                                            <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
+                                        </div>
+                                    </div>
+                                    <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
+                                        <div class="flex items-center gap-1.5 mb-2">
+                                            <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('Your Rating:') }}</span>
+                                            <div class="flex items-center gap-1" @mouseleave="hoverRating = 0">
+                                                <button
+                                                    v-for="star in 5"
+                                                    :key="star"
+                                                    type="button"
+                                                    @click="reviewRating = star"
+                                                    @mouseover="hoverRating = star"
+                                                    class="focus:outline-none transition-transform hover:scale-110"
+                                                >
+                                                    <i
+                                                        class="ti text-xl cursor-pointer"
+                                                        :class="[
+                                                            (hoverRating > 0 ? star <= hoverRating : star <= reviewRating)
+                                                                ? 'ti-star-filled text-warning-400'
+                                                                : 'ti-star text-gray-300 dark:text-gray-600'
+                                                        ]"
+                                                    ></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <textarea v-model="reviewComment" rows="3" maxlength="2000" class="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-xs text-gray-900 transition-all placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-white/10 dark:bg-[#111827]/40 dark:text-white dark:placeholder-gray-600" :placeholder="t('Share your experience with this tool')"></textarea>
+                                        <div class="flex items-center gap-3">
+                                            <button type="submit" :disabled="reviewSubmitting" class="btn-primary rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-50">{{ reviewSubmitting ? t('Submitting...') : t('Write Review') }}</button>
+                                            <span v-if="reviewMessage" class="text-xs text-gray-500 dark:text-gray-400">{{ reviewMessage }}</span>
+                                        </div>
+                                    </form>
+                                    <div v-else-if="authUser" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-600 dark:border-white/5 dark:bg-[#111827]/40 dark:text-gray-400 shadow-xs">{{ t('Generate with this tool once to unlock review writing.') }}</div>
+                                    <div v-if="reviews && reviews.length" class="space-y-4">
+                                        <div v-for="review in reviews" :key="review.id" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
+                                            <div class="mb-3 flex items-start justify-between">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gray-200 font-bold text-gray-600 dark:!bg-white/10 dark:!text-gray-300">
+                                                        <img v-if="review.user?.avatar" :src="'/storage/' + review.user.avatar" class="h-full w-full object-cover" />
+                                                        <span v-else>{{ review.user?.name?.charAt(0) || 'U' }}</span>
+                                                    </div>
+                                                    <div>
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="font-medium text-gray-800 dark:text-gray-200">{{ review.user?.name || 'Anonymous' }}</span>
+                                                            <span class="text-[10px] text-gray-400 dark:text-gray-500">• {{ formatReviewDate(review.created_at) }}</span>
+                                                        </div>
+                                                        <div class="flex items-center gap-1 text-xs text-warning-400">
+                                                            <i v-for="star in 5" :key="star" :class="star <= review.rating ? 'ti ti-star-filled text-warning-400' : 'ti ti-star text-gray-300 dark:text-gray-600'"></i>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="text-xs text-gray-500 hover:text-primary-600 dark:hover:text-primary-400" @click="voteReview(review, true)">{{ review.helpful_count || 0 }} {{ t('helpful') }}</button>
+                                            </div>
+                                            <p class="text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">{{ review.comment }}</p>
+
+                                            <!-- Redesigned Admin Reply -->
+                                            <div v-if="review.admin_reply" class="mt-4 ml-6 pl-4 border-l-2 border-primary-500/30 dark:border-primary-500/20 space-y-2">
+                                                <div class="flex items-center gap-2.5">
+                                                    <div class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary-500/10 text-xs font-bold text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+                                                        <i class="ti ti-shield-check text-sm"></i>
+                                                    </div>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-xs font-bold text-gray-900 dark:text-white">{{ t('Support Team') }}</span>
+                                                        <span class="inline-flex items-center rounded bg-primary-50 px-1.5 py-0.5 text-[9px] font-bold text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 uppercase tracking-wide">{{ t('Admin') }}</span>
+                                                        <span class="text-[10px] text-gray-400 dark:text-gray-500">• {{ formatReviewDate(review.updated_at) }}</span>
+                                                    </div>
+                                                </div>
+                                                <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.01] rounded-xl border border-gray-100 dark:border-white/5 p-3 whitespace-pre-wrap">{{ review.admin_reply }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div v-else class="rounded-2xl border border-gray-200 bg-gray-50 py-10 text-center dark:border-white/5 dark:bg-[#111827]/40 shadow-xs">
+                                        <i class="ti ti-star mb-3 block text-3xl text-gray-400 dark:text-gray-600"></i>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('No reviews yet for this tool.') }}</p>
+                                    </div>
+                                    <div v-if="reviewsPage < reviewsLastPage" class="text-center">
+                                        <button type="button" :disabled="reviewsLoading" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 transition-colors hover:border-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-200 disabled:opacity-50" @click="loadMoreReviews">{{ reviewsLoading ? t('Loading...') : t('Load more reviews') }}</button>
+                                    </div>
+                                </div>
+
+
+                            </div>
+                        </Transition>
                     </div>
                 </div>
             </div>
 
-            <div v-if="contentTabsVisible" class="mt-10 rounded-2xl border border-gray-200 bg-white/85 px-4 py-4 shadow-card backdrop-blur-md dark:border-white/5 dark:bg-white/[0.03] sm:px-6">
-                <div class="mb-4 flex gap-2 border-b border-gray-200 overflow-x-auto pb-px dark:border-white/5">
-                    <button v-if="hasAbout" @click="activeTab = 'about'" :class="[activeTab === 'about' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('About') }}</button>
-                    <button v-if="hasHowItWorks" @click="activeTab = 'how'" :class="[activeTab === 'how' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('How It Works') }}</button>
-                    <button v-if="hasUsageExamples" @click="activeTab = 'examples'" :class="[activeTab === 'examples' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('Examples') }}</button>
-                    <button v-if="hasFaqs" @click="activeTab = 'faqs'" :class="[activeTab === 'faqs' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('FAQs') }}</button>
-                    <button v-if="tool.show_reviews" @click="activeTab = 'reviews'" :class="[activeTab === 'reviews' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('Reviews') }}</button>
-                    <button v-if="tool.show_related_tools && relatedTools.length" @click="activeTab = 'related'" :class="[activeTab === 'related' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('Related') }}</button>
-                </div>
-
-                <section v-if="activeTab === 'about' && hasAbout" id="about" class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300 pb-8" v-html="tool.about_content"></section>
-
-                <div v-if="activeTab === 'how' && hasHowItWorks" class="grid grid-cols-1 gap-6 pb-8 md:grid-cols-3">
-                    <div v-for="(step, index) in howItWorks" :key="index" class="relative rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-white/5 dark:bg-white/[0.02]">
-                        <div class="absolute -top-3 -left-3 flex h-8 w-8 items-center justify-center rounded-full border border-primary-500/30 bg-primary-500/20 text-sm font-bold text-primary-600 dark:text-primary-400">
-                            {{ step.step || index + 1 }}
-                        </div>
-                        <i :class="[step.icon || 'ti-check', 'mb-4 block text-2xl']" :style="{ color: tool.color || '#10b981' }"></i>
-                        <h4 class="mb-2 font-semibold text-gray-900 dark:text-white">{{ step.title }}</h4>
-                        <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-500">{{ step.description }}</p>
+            <!-- Bottom Content (Default Layout Tabs & Minimalist Regular Content) -->
+            <div v-if="contentTabsVisible && (toolPageSettings.layout === 'default' || toolPageSettings.layout === 'minimalist')" :class="[
+                toolPageSettings.layout === 'minimalist'
+                    ? 'mt-10 max-w-4xl mx-auto w-full space-y-12 pb-12'
+                    : 'mt-10 rounded-2xl border border-gray-200 bg-white/85 px-4 py-4 shadow-card backdrop-blur-md dark:border-white/5 dark:bg-white/[0.03] sm:px-6'
+            ]">
+                <!-- Default Layout Tabs Navigation & Content -->
+                <template v-if="toolPageSettings.layout === 'default'">
+                    <div class="mb-4 flex gap-2 border-b border-gray-200 overflow-x-auto pb-px dark:border-white/5 hide-scrollbar">
+                        <button v-if="hasAbout" @click="activeTab = 'about'" :class="[activeTab === 'about' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('About') }}</button>
+                        <button v-if="hasHowItWorks" @click="activeTab = 'how'" :class="[activeTab === 'how' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('How It Works') }}</button>
+                        <button v-if="hasUsageExamples" @click="activeTab = 'examples'" :class="[activeTab === 'examples' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('Examples') }}</button>
+                        <button v-if="hasFaqs" @click="activeTab = 'faqs'" :class="[activeTab === 'faqs' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('FAQs') }}</button>
+                        <button v-if="tool.show_reviews && !toolPageSettings.hide_rating" @click="activeTab = 'reviews'" :class="[activeTab === 'reviews' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('Reviews') }}</button>
+                        <button v-if="tool.show_related_tools && relatedTools.length" @click="activeTab = 'related'" :class="[activeTab === 'related' ? 'border-b-primary-500 text-primary-600 dark:text-primary-400 font-bold' : 'border-b-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 font-medium']" class="border-b-2 px-4 py-3 text-sm font-semibold transition-colors whitespace-nowrap">{{ t('Related') }}</button>
                     </div>
-                </div>
 
-                <div v-if="activeTab === 'examples' && hasUsageExamples" class="space-y-6 pb-8">
-                    <div v-for="(example, index) in usageExamples" :key="index" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
-                        <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-white/5 dark:bg-white/5">
-                            <h4 class="font-medium text-gray-900 dark:text-white">{{ example.title }}</h4>
-                            <button @click="applyExample(example)" class="rounded-lg border border-primary-500/20 bg-primary-500/10 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-500/20 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400 dark:hover:bg-primary-500/30">{{ t('Try this example') }}</button>
-                        </div>
-                        <div class="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0 dark:divide-white/5">
-                            <div class="p-6">
-                                <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Input Data') }}</div>
-                                <div class="space-y-2">
-                                    <div v-for="(value, key) in example.input" :key="key" class="flex gap-2">
-                                        <span class="min-w-[100px] text-sm font-medium text-gray-500 dark:text-gray-400">{{ key }}:</span>
-                                        <span class="break-words text-sm text-gray-700 dark:text-gray-300">{{ value }}</span>
+                    <Transition name="tab-slide" mode="out-in">
+                        <div :key="activeTab" class="min-h-0">
+                            <div v-if="activeTab === 'about' && hasAbout" class="space-y-6 pb-8">
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('About :tool', { tool: tool.name }) }}</h3>
+                                    <p class="text-xs text-gray-500 mt-1">{{ t('Learn more about this tool and what it can generate.') }}</p>
+                                </div>
+                                <section id="about" class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300" v-html="tool.about_content"></section>
+                            </div>
+
+                            <div v-if="activeTab === 'how' && hasHowItWorks" class="space-y-6 pb-8">
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('How It Works') }}</h3>
+                                    <p class="text-xs text-gray-500 mt-1">{{ t('Follow these simple steps to get the best results.') }}</p>
+                                </div>
+                                <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+                                    <div v-for="(step, index) in howItWorks" :key="index" class="relative rounded-2xl border border-gray-200 bg-gray-50 p-6 dark:border-white/5 dark:bg-white/[0.02]">
+                                        <div class="absolute -top-3 -left-3 flex h-8 w-8 items-center justify-center rounded-full border border-primary-500/30 bg-primary-500/20 text-sm font-bold text-primary-600 dark:text-primary-400">
+                                            {{ step.step || index + 1 }}
+                                        </div>
+                                        <i :class="[step.icon || 'ti-check', 'mb-4 block text-2xl']" :style="{ color: tool.color || '#10b981' }"></i>
+                                        <h4 class="mb-2 font-semibold text-gray-900 dark:text-white">{{ step.title }}</h4>
+                                        <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-500">{{ step.description }}</p>
                                     </div>
                                 </div>
                             </div>
-                            <div class="bg-gray-50/50 p-6 dark:bg-white/[0.01]">
-                                <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Generated Output') }}</div>
-                                <div class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ truncatedOutput(example.output, Number(index)) }}</div>
-                                <button v-if="exampleOutput(example.output).length > 200" type="button" class="mt-3 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300" @click="expandedExamples[Number(index)] = !expandedExamples[Number(index)]">{{ expandedExamples[Number(index)] ? t('Show less') : t('See full output') }}</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <div v-if="activeTab === 'faqs' && hasFaqs" class="max-w-4xl space-y-4 pb-8">
-                    <details v-for="(faq, index) in faqItems" :key="index" class="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
-                        <summary class="list-none flex cursor-pointer items-center justify-between px-6 py-4 font-medium text-gray-900 group-open:bg-gray-50 dark:text-white dark:group-open:bg-white/[0.03]">
-                            {{ faq.question }}
-                            <i class="ti ti-chevron-down text-gray-400 transition-transform dark:text-gray-500 group-open:rotate-180"></i>
-                        </summary>
-                        <div class="border-t border-gray-200 bg-gray-50/50 px-6 py-4 text-sm leading-relaxed text-gray-600 dark:border-white/5 dark:bg-white/[0.01] dark:text-gray-400" v-html="faq.answer"></div>
-                    </details>
-                </div>
-
-                <div v-if="activeTab === 'reviews'" class="max-w-4xl space-y-6 pb-8">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ t('User Reviews') }}</h3>
-                            <p class="text-sm text-gray-500">{{ tool.avg_rating || 0 }}/5 {{ t('from') }} {{ tool.review_count || 0 }} {{ t('reviews') }}</p>
-                        </div>
-                        <div class="flex items-center gap-2"><AppSelect v-model="reviewSort" :options="sortOptions" @update:model-value="changeReviewSort" /></div>
-                        <div v-if="authUser && canReview" class="flex items-center gap-2"><AppSelect v-model="reviewRating" :options="ratingOptions" /></div>
-                    </div>
-                    <div class="space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-white/5 dark:bg-white/[0.02]">
-                        <div v-for="rating in [5, 4, 3, 2, 1]" :key="rating" class="grid grid-cols-[52px_1fr_42px] items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                            <span>{{ rating }} {{ t('star') }}</span>
-                            <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10"><div class="h-full rounded-full bg-warning-400" :style="{ width: `${reviewStats.distribution?.[rating]?.percent || 0}%` }"></div></div>
-                            <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
-                        </div>
-                    </div>
-                    <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
-                        <textarea v-model="reviewComment" rows="3" maxlength="2000" class="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 transition-all placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-600" :placeholder="t('Share your experience with this tool')"></textarea>
-                        <div class="flex items-center gap-3">
-                            <button type="submit" :disabled="reviewSubmitting" class="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">{{ reviewSubmitting ? t('Submitting...') : t('Write Review') }}</button>
-                            <span v-if="reviewMessage" class="text-xs text-gray-500 dark:text-gray-400">{{ reviewMessage }}</span>
-                        </div>
-                    </form>
-                    <div v-else-if="authUser" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/5 dark:bg-white/[0.02] dark:text-gray-400">{{ t('Generate with this tool once to unlock review writing.') }}</div>
-                    <div v-if="reviews && reviews.length" class="space-y-4">
-                        <div v-for="review in reviews" :key="review.id" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
-                            <div class="mb-3 flex items-start justify-between">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gray-200 font-bold text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                                        <img v-if="review.user?.avatar" :src="'/storage/' + review.user.avatar" class="h-full w-full object-cover" />
-                                        <span v-else>{{ review.user?.name?.charAt(0) || 'U' }}</span>
+                            <div v-if="activeTab === 'examples' && hasUsageExamples" class="space-y-6 pb-8">
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Usage Examples') }}</h3>
+                                    <p class="text-xs text-gray-500 mt-1">{{ t('Explore sample inputs and outputs for this tool.') }}</p>
+                                </div>
+                                <div v-for="(example, index) in usageExamples" :key="index" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
+                                    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-white/5 dark:bg-white/5">
+                                        <h4 class="font-medium text-gray-900 dark:text-white">{{ example.title }}</h4>
+                                        <button
+                                            :disabled="applyingExampleIndex !== null"
+                                            @click="applyExample(example, Number(index))"
+                                            class="rounded-lg border border-primary-500/20 bg-primary-500/10 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-500/20 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400 dark:hover:bg-primary-500/30 disabled:opacity-50"
+                                        >
+                                            {{ applyingExampleIndex === Number(index) ? t('Applying...') : t('Try this example') }}
+                                        </button>
                                     </div>
-                                    <div>
-                                        <div class="font-medium text-gray-800 dark:text-gray-200">{{ review.user?.name || 'Anonymous' }}</div>
-                                        <div class="flex items-center gap-1 text-xs text-warning-400">
-                                            <i v-for="star in 5" :key="star" :class="star <= review.rating ? 'ti-star text-warning-400' : 'ti-star text-gray-300 dark:text-gray-600'"></i>
+                                    <div class="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0 dark:divide-white/5">
+                                        <div class="p-6">
+                                            <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Input Data') }}</div>
+                                            <div class="space-y-2">
+                                                <div v-for="(value, key) in example.input" :key="key" class="flex gap-2">
+                                                    <span class="min-w-[100px] text-sm font-medium text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                                                    <span class="break-words text-sm text-gray-700 dark:text-gray-300">{{ value }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="bg-gray-50/50 p-6 dark:bg-white/[0.01]">
+                                            <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Generated Output') }}</div>
+                                            <div class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ truncatedOutput(example.output, Number(index)) }}</div>
+                                            <button v-if="exampleOutput(example.output).length > 200" type="button" class="mt-3 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300" @click="expandedExamples[Number(index)] = !expandedExamples[Number(index)]">{{ expandedExamples[Number(index)] ? t('Show less') : t('See full output') }}</button>
                                         </div>
                                     </div>
                                 </div>
-                                <button type="button" class="text-xs text-gray-500 hover:text-primary-600 dark:hover:text-primary-400" @click="voteReview(review, true)">{{ review.helpful_count || 0 }} {{ t('helpful') }}</button>
                             </div>
-                            <p class="text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">{{ review.comment }}</p>
-                            <p v-if="review.admin_reply" class="mt-3 rounded-xl border border-primary-500/20 bg-primary-500/10 px-4 py-3 text-sm text-primary-700 dark:text-primary-100">{{ review.admin_reply }}</p>
-                        </div>
-                    </div>
-                    <div v-else class="rounded-2xl border border-gray-200 bg-gray-50 py-10 text-center dark:border-white/5 dark:bg-white/[0.02]">
-                        <i class="ti ti-star mb-3 block text-4xl text-gray-400 dark:text-gray-600"></i>
-                        <p class="text-gray-500 dark:text-gray-400">{{ t('No reviews yet for this tool.') }}</p>
-                    </div>
-                    <div v-if="reviewsPage < reviewsLastPage" class="text-center">
-                        <button type="button" :disabled="reviewsLoading" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-200 disabled:opacity-50" @click="loadMoreReviews">{{ reviewsLoading ? t('Loading...') : t('Load more reviews') }}</button>
-                    </div>
-                </div>
 
-                <div v-if="activeTab === 'related'" class="grid grid-cols-1 gap-4 pb-8 md:grid-cols-3">
-                    <Link v-for="tool in relatedTools" :key="tool.slug" :href="routeTo('ai.tools.show', tool.slug)" class="block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-primary-500/30 dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
-                        <i :class="[tool.icon || 'ti ti-wand', 'mb-3 block text-2xl text-primary-600 dark:text-primary-400']"></i>
-                        <h4 class="mb-2 font-semibold text-gray-900 dark:text-white">{{ tool.name }}</h4>
-                        <p class="line-clamp-3 text-sm text-gray-500">{{ tool.description }}</p>
-                    </Link>
+                            <div v-if="activeTab === 'faqs' && hasFaqs" class="space-y-6 pb-8">
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Frequently Asked Questions') }}</h3>
+                                    <p class="text-xs text-gray-500 mt-1">{{ t('Quick answers to common queries about :tool.', { tool: tool.name }) }}</p>
+                                </div>
+                                <div class="space-y-4">
+                                    <details v-for="(faq, index) in faqItems" :key="index" class="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
+                                        <summary class="list-none flex cursor-pointer items-center justify-between px-6 py-4 font-medium text-gray-900 group-open:bg-gray-50 dark:text-white dark:group-open:bg-white/[0.03]">
+                                            {{ faq.question }}
+                                            <i class="ti ti-chevron-down text-gray-400 transition-transform dark:text-gray-500 group-open:rotate-180"></i>
+                                        </summary>
+                                        <div class="border-t border-gray-200 bg-gray-50/50 px-6 py-4 text-sm leading-relaxed text-gray-600 dark:border-white/5 dark:bg-white/[0.01] dark:text-gray-400" v-html="faq.answer"></div>
+                                    </details>
+                                </div>
+                            </div>
+
+                            <div v-if="activeTab === 'related'" class="space-y-6 pb-8">
+                                <div class="min-w-0">
+                                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Related AI Tools') }}</h3>
+                                    <p class="text-xs text-gray-500 mt-1">{{ t('Discover other helpful AI generators in our catalog.') }}</p>
+                                </div>
+                                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                                    <Link
+                                        v-for="tool in relatedTools"
+                                        :key="tool.slug"
+                                        :href="routeTo('ai.tools.show', tool.slug)"
+                                        :class="[
+                                            'block rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md',
+                                            toolPageSettings.layout === 'modern'
+                                                ? 'bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/10 dark:border-white/5 dark:from-blue-500/[0.01] dark:to-purple-500/[0.01]'
+                                                : (toolPageSettings.layout === 'creative'
+                                                    ? 'bg-white/80 dark:bg-white/[0.02] shadow-xs'
+                                                    : 'border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02]')
+                                        ]"
+                                        :style="[
+                                            toolPageSettings.layout === 'creative'
+                                                ? { border: `1px solid ${tool.color || '#1F75FE'}20`, boxShadow: `0 4px 20px -10px ${tool.color || '#1F75FE'}15` }
+                                                : {}
+                                        ]"
+                                    >
+                                        <i :class="[tool.icon || 'ti ti-wand', 'mb-3 block text-2xl text-primary-600 dark:text-primary-400']" :style="{ color: tool.color }"></i>
+                                        <h4 class="mb-2 font-semibold text-gray-900 dark:text-white leading-tight">{{ tool.name }}</h4>
+                                        <p class="line-clamp-3 text-sm text-gray-500">{{ tool.description }}</p>
+                                    </Link>
+                                </div>
+                            </div>
+
+                            <div v-if="activeTab === 'reviews'" class="max-w-4xl space-y-6 pb-8">
+                                <div class="flex flex-wrap items-center justify-between gap-4">
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Reviews for :tool', { tool: tool.name }) }}</h3>
+                                        <p class="text-sm text-gray-500">
+                                            <span v-if="!tool.review_count || tool.review_count === 0">{{ t('No reviews for this tool yet.') }}</span>
+                                            <template v-else>
+                                                {{ tool.avg_rating || 0 }}/5
+                                                <span v-if="!toolPageSettings.hide_rating_count"> {{ t('from') }} {{ tool.review_count || 0 }} {{ t('reviews') }}</span>
+                                                <span v-else> {{ t('reviews') }}</span>
+                                            </template>
+                                        </p>
+                                    </div>
+                                    <div v-if="tool.review_count && tool.review_count > 0" class="flex items-center gap-2"><AppSelect v-model="reviewSort" :options="sortOptions" @update:model-value="changeReviewSort" /></div>
+                                </div>
+                                <div v-if="tool.review_count && tool.review_count > 0" class="space-y-2 rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-white/5 dark:bg-white/[0.02]">
+                                    <div v-for="rating in [5, 4, 3, 2, 1]" :key="rating" class="grid grid-cols-[52px_1fr_42px] items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                        <span>{{ rating }} {{ t('star') }}</span>
+                                        <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:!bg-white/10"><div class="h-full rounded-full bg-warning-400" :style="{ width: `${reviewStats.distribution?.[rating]?.percent || 0}%` }"></div></div>
+                                        <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
+                                    </div>
+                                </div>
+                                <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
+                                    <div class="flex items-center gap-1.5 mb-2">
+                                        <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('Your Rating:') }}</span>
+                                        <div class="flex items-center gap-1" @mouseleave="hoverRating = 0">
+                                            <button
+                                                v-for="star in 5"
+                                                :key="star"
+                                                type="button"
+                                                @click="reviewRating = star"
+                                                @mouseover="hoverRating = star"
+                                                class="focus:outline-none transition-transform hover:scale-110"
+                                            >
+                                                <i
+                                                    class="ti text-xl cursor-pointer"
+                                                    :class="[
+                                                        (hoverRating > 0 ? star <= hoverRating : star <= reviewRating)
+                                                            ? 'ti-star-filled text-warning-400'
+                                                            : 'ti-star text-gray-300 dark:text-gray-600'
+                                                    ]"
+                                                ></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <textarea v-model="reviewComment" rows="3" maxlength="2000" class="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 transition-all placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-600" :placeholder="t('Share your experience with this tool')"></textarea>
+                                    <div class="flex items-center gap-3">
+                                        <button type="submit" :disabled="reviewSubmitting" class="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">{{ reviewSubmitting ? t('Submitting...') : t('Write Review') }}</button>
+                                        <span v-if="reviewMessage" class="text-xs text-gray-500 dark:text-gray-400">{{ reviewMessage }}</span>
+                                    </div>
+                                </form>
+                                <div v-else-if="authUser" class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/5 dark:bg-white/[0.02] dark:text-gray-400 shadow-xs">{{ t('Generate with this tool once to unlock review writing.') }}</div>
+                                <div v-if="reviews && reviews.length" class="space-y-4">
+                                    <div v-for="review in reviews" :key="review.id" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/5 dark:bg-white/[0.02] dark:shadow-none">
+                                        <div class="mb-3 flex items-start justify-between">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gray-200 font-bold text-gray-600 dark:!bg-white/10 dark:!text-gray-300">
+                                                    <img v-if="review.user?.avatar" :src="'/storage/' + review.user.avatar" class="h-full w-full object-cover" />
+                                                    <span v-else>{{ review.user?.name?.charAt(0) || 'U' }}</span>
+                                                </div>
+                                                <div>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="font-medium text-gray-800 dark:text-gray-200">{{ review.user?.name || 'Anonymous' }}</span>
+                                                        <span class="text-[10px] text-gray-400 dark:text-gray-500">• {{ formatReviewDate(review.created_at) }}</span>
+                                                    </div>
+                                                    <div class="flex items-center gap-1 text-xs text-warning-400">
+                                                        <i v-for="star in 5" :key="star" :class="star <= review.rating ? 'ti ti-star-filled text-warning-400' : 'ti ti-star text-gray-300 dark:text-gray-600'"></i>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button type="button" class="text-xs text-gray-500 hover:text-primary-600 dark:hover:text-primary-400" @click="voteReview(review, true)">{{ review.helpful_count || 0 }} {{ t('helpful') }}</button>
+                                        </div>
+                                        <p class="text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">{{ review.comment }}</p>
+
+                                        <!-- Redesigned Admin Reply -->
+                                        <div v-if="review.admin_reply" class="mt-4 ml-6 pl-4 border-l-2 border-primary-500/30 dark:border-primary-500/20 space-y-2">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary-500/10 text-xs font-bold text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+                                                    <i class="ti ti-shield-check text-sm"></i>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-xs font-bold text-gray-900 dark:text-white">{{ t('Support Team') }}</span>
+                                                    <span class="inline-flex items-center rounded bg-primary-50 px-1.5 py-0.5 text-[9px] font-bold text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 uppercase tracking-wide">{{ t('Admin') }}</span>
+                                                    <span class="text-[10px] text-gray-400 dark:text-gray-500">• {{ formatReviewDate(review.updated_at) }}</span>
+                                                </div>
+                                            </div>
+                                            <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.01] rounded-xl border border-gray-100 dark:border-white/5 p-3 whitespace-pre-wrap">{{ review.admin_reply }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div v-else class="rounded-2xl border border-gray-200 bg-gray-50 py-10 text-center dark:border-white/5 dark:bg-white/[0.02]">
+                                    <i class="ti ti-star mb-3 block text-4xl text-gray-400 dark:text-gray-600"></i>
+                                    <p class="text-gray-500 dark:text-gray-400">{{ t('No reviews yet for this tool.') }}</p>
+                                </div>
+                                <div v-if="reviewsPage < reviewsLastPage" class="text-center">
+                                    <button type="button" :disabled="reviewsLoading" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-200 disabled:opacity-50" @click="loadMoreReviews">{{ reviewsLoading ? t('Loading...') : t('Load more reviews') }}</button>
+                                </div>
+                            </div>
+
+                            <div v-if="activeTab === 'related'" class="grid grid-cols-1 gap-4 pb-8 sm:grid-cols-2 md:grid-cols-3">
+                                <Link
+                                    v-for="tool in relatedTools"
+                                    :key="tool.slug"
+                                    :href="routeTo('ai.tools.show', tool.slug)"
+                                    :class="[
+                                        'block rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md',
+                                        toolPageSettings.layout === 'modern'
+                                            ? 'bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/10 dark:border-white/5 dark:from-blue-500/[0.01] dark:to-purple-500/[0.01]'
+                                            : (toolPageSettings.layout === 'creative'
+                                                ? 'bg-white/80 dark:bg-white/[0.02] shadow-xs'
+                                                : 'border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02]')
+                                    ]"
+                                    :style="[
+                                        toolPageSettings.layout === 'creative'
+                                            ? { border: `1px solid ${tool.color || '#1F75FE'}20`, boxShadow: `0 4px 20px -10px ${tool.color || '#1F75FE'}15` }
+                                            : {}
+                                    ]"
+                                >
+                                    <i :class="[tool.icon || 'ti ti-wand', 'mb-3 block text-2xl text-primary-600 dark:text-primary-400']" :style="{ color: tool.color }"></i>
+                                    <h4 class="mb-2 font-semibold text-gray-900 dark:text-white leading-tight">{{ tool.name }}</h4>
+                                    <p class="line-clamp-3 text-sm text-gray-500">{{ tool.description }}</p>
+                                </Link>
+                            </div>
+                        </div>
+                    </Transition>
+                </template>
+
+                <!-- Minimalist Layout Sequential Page Content -->
+                <div v-else-if="toolPageSettings.layout === 'minimalist'" class="space-y-12">
+                    <!-- About Section -->
+                    <section v-if="hasAbout" class="space-y-6">
+                        <div class="min-w-0">
+                            <h3 class="text-xl font-heading font-bold text-gray-900 dark:text-white">{{ t('About :tool', { tool: tool.name }) }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">{{ t('Learn more about this tool and what it can generate.') }}</p>
+                        </div>
+                        <div class="prose dark:prose-invert prose-sm max-w-none text-gray-700 dark:text-gray-300" v-html="tool.about_content"></div>
+                    </section>
+
+                    <div v-if="hasAbout && (hasHowItWorks || hasUsageExamples || hasFaqs || tool.show_reviews || (tool.show_related_tools && relatedTools.length))" class="border-t border-gray-100 dark:border-white/5"></div>
+
+                    <!-- How It Works Section -->
+                    <section v-if="hasHowItWorks" class="space-y-6">
+                        <div class="min-w-0">
+                            <h3 class="text-xl font-heading font-bold text-gray-900 dark:text-white">{{ t('How It Works') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">{{ t('Follow these simple steps to get the best results.') }}</p>
+                        </div>
+                        <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+                            <div v-for="(step, index) in howItWorks" :key="index" class="relative rounded-2xl border border-gray-200 bg-white p-6 dark:border-white/5 dark:bg-white/[0.02] shadow-xs">
+                                <div class="absolute -top-3 -left-3 flex h-8 w-8 items-center justify-center rounded-full border border-primary-500/30 bg-primary-500/20 text-sm font-bold text-primary-600 dark:text-primary-400">
+                                    {{ step.step || index + 1 }}
+                                </div>
+                                <i :class="[step.icon || 'ti-check', 'mb-4 block text-2xl']" :style="{ color: tool.color || '#10b981' }"></i>
+                                <h4 class="mb-2 font-semibold text-gray-900 dark:text-white">{{ step.title }}</h4>
+                                <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ step.description }}</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div v-if="hasHowItWorks && (hasUsageExamples || hasFaqs || tool.show_reviews || (tool.show_related_tools && relatedTools.length))" class="border-t border-gray-100 dark:border-white/5"></div>
+
+                    <!-- Examples Section -->
+                    <section v-if="hasUsageExamples" class="space-y-6">
+                        <div class="min-w-0">
+                            <h3 class="text-xl font-heading font-bold text-gray-900 dark:text-white">{{ t('Usage Examples') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">{{ t('Explore sample inputs and outputs for this tool.') }}</p>
+                        </div>
+                        <div class="space-y-6">
+                            <div v-for="(example, index) in usageExamples" :key="index" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02]">
+                                <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50/50 px-6 py-4 dark:border-white/5 dark:bg-white/5">
+                                    <h4 class="font-medium text-gray-900 dark:text-white">{{ example.title }}</h4>
+                                    <button
+                                        :disabled="applyingExampleIndex !== null"
+                                        @click="applyExample(example, Number(index))"
+                                        class="rounded-lg border border-primary-500/20 bg-primary-500/10 px-3 py-1.5 text-xs font-medium text-primary-600 transition-colors hover:bg-primary-500/20 dark:border-primary-500/30 dark:bg-primary-500/20 dark:text-primary-400 dark:hover:bg-primary-500/30 disabled:opacity-50"
+                                    >
+                                        {{ applyingExampleIndex === Number(index) ? t('Applying...') : t('Try this example') }}
+                                    </button>
+                                </div>
+                                <div class="grid grid-cols-1 divide-y divide-gray-200 md:grid-cols-2 md:divide-x md:divide-y-0 dark:divide-white/5">
+                                    <div class="p-6">
+                                        <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Input Data') }}</div>
+                                        <div class="space-y-2">
+                                            <div v-for="(value, key) in example.input" :key="key" class="flex gap-2">
+                                                <span class="min-w-[100px] text-sm font-medium text-gray-500 dark:text-gray-400">{{ getFieldLabel(String(key)) }}:</span>
+                                                <span class="break-words text-sm text-gray-700 dark:text-gray-300">{{ value }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50/20 p-6 dark:bg-white/[0.01]">
+                                        <div class="mb-3 text-xs font-medium uppercase tracking-wider text-gray-500">{{ t('Generated Output') }}</div>
+                                        <div class="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ truncatedOutput(example.output, Number(index)) }}</div>
+                                        <button v-if="exampleOutput(example.output).length > 200" type="button" class="mt-3 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300" @click="expandedExamples[Number(index)] = !expandedExamples[Number(index)]">{{ expandedExamples[Number(index)] ? t('Show less') : t('See full output') }}</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div v-if="hasUsageExamples && (hasFaqs || tool.show_reviews || (tool.show_related_tools && relatedTools.length))" class="border-t border-gray-100 dark:border-white/5"></div>
+
+                    <!-- FAQs Section -->
+                    <section v-if="hasFaqs" class="space-y-6">
+                        <div class="min-w-0">
+                            <h3 class="text-xl font-heading font-bold text-gray-900 dark:text-white">{{ t('Frequently Asked Questions') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">{{ t('Quick answers to common queries about :tool.', { tool: tool.name }) }}</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div v-for="(faq, index) in faqItems" :key="index" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-white/5 dark:bg-white/[0.02]">
+                                <h4 class="mb-2 font-semibold text-gray-900 dark:text-white">{{ faq.question }}</h4>
+                                <p class="text-sm leading-relaxed text-gray-600 dark:text-gray-400" v-html="faq.answer"></p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div v-if="hasFaqs && (tool.show_reviews || (tool.show_related_tools && relatedTools.length))" class="border-t border-gray-100 dark:border-white/5"></div>
+
+                    <!-- Reviews Section -->
+                    <section v-if="tool.show_reviews" class="space-y-6">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-xl font-heading font-bold text-gray-900 dark:text-white">{{ t('Reviews') }}</h3>
+                                <p class="text-sm text-gray-500">
+                                    <span v-if="!tool.review_count || tool.review_count === 0">{{ t('No reviews yet.') }}</span>
+                                    <template v-else>
+                                        {{ tool.avg_rating || 0 }}/5
+                                        <span v-if="!toolPageSettings.hide_rating_count"> {{ t('from') }} {{ tool.review_count || 0 }} {{ t('reviews') }}</span>
+                                        <span v-else> {{ t('reviews') }}</span>
+                                    </template>
+                                </p>
+                            </div>
+                            <div v-if="tool.review_count && tool.review_count > 0" class="flex items-center gap-2"><AppSelect v-model="reviewSort" :options="sortOptions" @update:model-value="changeReviewSort" /></div>
+                        </div>
+                        <div v-if="tool.review_count && tool.review_count > 0" class="space-y-2 rounded-2xl border border-gray-200 bg-white p-5 shadow-xs dark:border-white/5 dark:bg-white/[0.02]">
+                            <div v-for="rating in [5, 4, 3, 2, 1]" :key="rating" class="grid grid-cols-[52px_1fr_42px] items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                <span>{{ rating }} {{ t('star') }}</span>
+                                <div class="h-2 overflow-hidden rounded-full bg-gray-200 dark:!bg-white/10"><div class="h-full rounded-full bg-warning-400" :style="{ width: `${reviewStats.distribution?.[rating]?.percent || 0}%` }"></div></div>
+                                <span class="text-end">{{ reviewStats.distribution?.[rating]?.percent || 0 }}%</span>
+                            </div>
+                        </div>
+                        <form v-if="authUser && canReview" class="space-y-3" @submit.prevent="submitReview">
+                            <div class="flex items-center gap-1.5 mb-2">
+                                <span class="text-xs font-medium text-gray-600 dark:text-gray-400">{{ t('Your Rating:') }}</span>
+                                <div class="flex items-center gap-1" @mouseleave="hoverRating = 0">
+                                    <button
+                                        v-for="star in 5"
+                                        :key="star"
+                                        type="button"
+                                        @click="reviewRating = star"
+                                        @mouseover="hoverRating = star"
+                                        class="focus:outline-none transition-transform hover:scale-110"
+                                    >
+                                        <i
+                                            class="ti text-xl cursor-pointer"
+                                            :class="[
+                                                (hoverRating > 0 ? star <= hoverRating : star <= reviewRating)
+                                                    ? 'ti-star-filled text-warning-400'
+                                                    : 'ti-star text-gray-300 dark:text-gray-600'
+                                            ]"
+                                        ></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea v-model="reviewComment" rows="3" maxlength="2000" class="w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 transition-all placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-600" :placeholder="t('Share your experience with this tool')"></textarea>
+                            <div class="flex items-center gap-3">
+                                <button type="submit" :disabled="reviewSubmitting" class="btn-primary rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50">{{ reviewSubmitting ? t('Submitting...') : t('Write Review') }}</button>
+                                <span v-if="reviewMessage" class="text-xs text-gray-500 dark:text-gray-400">{{ reviewMessage }}</span>
+                            </div>
+                        </form>
+                        <div v-else-if="authUser" class="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 dark:border-white/5 dark:bg-white/[0.02] dark:text-gray-400 shadow-xs">{{ t('Generate with this tool once to unlock review writing.') }}</div>
+                        <div v-if="reviews && reviews.length" class="space-y-4">
+                            <div v-for="review in reviews" :key="review.id" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-xs dark:border-white/5 dark:bg-white/[0.02]">
+                                <div class="mb-3 flex items-start justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-gray-200 font-bold text-gray-600 dark:!bg-white/10 dark:!text-gray-300">
+                                            <img v-if="review.user?.avatar" :src="'/storage/' + review.user.avatar" class="h-full w-full object-cover" />
+                                            <span v-else>{{ review.user?.name?.charAt(0) || 'U' }}</span>
+                                        </div>
+                                        <div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-medium text-gray-800 dark:text-gray-200">{{ review.user?.name || 'Anonymous' }}</span>
+                                                <span class="text-[10px] text-gray-400 dark:text-gray-500">• {{ formatReviewDate(review.created_at) }}</span>
+                                            </div>
+                                            <div class="flex items-center gap-1 text-xs text-warning-400">
+                                                <i v-for="star in 5" :key="star" :class="star <= review.rating ? 'ti ti-star-filled text-warning-400' : 'ti ti-star text-gray-300 dark:text-gray-600'"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="text-xs text-gray-500 hover:text-primary-600 dark:hover:text-primary-400" @click="voteReview(review, true)">{{ review.helpful_count || 0 }} {{ t('helpful') }}</button>
+                                </div>
+                                <p class="text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">{{ review.comment }}</p>
+
+                                <!-- Redesigned Admin Reply -->
+                                <div v-if="review.admin_reply" class="mt-4 ml-6 pl-4 border-l-2 border-primary-500/30 dark:border-primary-500/20 space-y-2">
+                                    <div class="flex items-center gap-2.5">
+                                        <div class="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary-500/10 text-xs font-bold text-primary-600 dark:bg-primary-500/20 dark:text-primary-400">
+                                            <i class="ti ti-shield-check text-sm"></i>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs font-bold text-gray-900 dark:text-white">{{ t('Support Team') }}</span>
+                                            <span class="inline-flex items-center rounded bg-primary-50 px-1.5 py-0.5 text-[9px] font-bold text-primary-600 dark:bg-primary-500/10 dark:text-primary-400 uppercase tracking-wide">{{ t('Admin') }}</span>
+                                            <span class="text-[10px] text-gray-400 dark:text-gray-500">• {{ formatReviewDate(review.updated_at) }}</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs leading-relaxed text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-white/[0.01] rounded-xl border border-gray-100 dark:border-white/5 p-3 whitespace-pre-wrap">{{ review.admin_reply }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-else class="rounded-2xl border border-gray-200 bg-white py-10 text-center dark:border-white/5 dark:bg-white/[0.02] shadow-xs">
+                            <i class="ti ti-star mb-3 block text-4xl text-gray-400 dark:text-gray-600"></i>
+                            <p class="text-gray-500 dark:text-gray-400">{{ t('No reviews yet for this tool.') }}</p>
+                        </div>
+                        <div v-if="reviewsPage < reviewsLastPage" class="text-center">
+                            <button type="button" :disabled="reviewsLoading" class="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-200 disabled:opacity-50" @click="loadMoreReviews">{{ reviewsLoading ? t('Loading...') : t('Load more reviews') }}</button>
+                        </div>
+                    </section>
+
+                    <div v-if="tool.show_reviews && (tool.show_related_tools && relatedTools.length)" class="border-t border-gray-100 dark:border-white/5"></div>
+
+                    <!-- Related Tools Section -->
+                    <section v-if="tool.show_related_tools && relatedTools.length" class="space-y-6">
+                        <div class="min-w-0">
+                            <h3 class="text-xl font-heading font-bold text-gray-900 dark:text-white">{{ t('Related AI Tools') }}</h3>
+                            <p class="text-xs text-gray-500 mt-1">{{ t('Discover other helpful AI generators in our catalog.') }}</p>
+                        </div>
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                            <Link
+                                v-for="tool in relatedTools"
+                                :key="tool.slug"
+                                :href="routeTo('ai.tools.show', tool.slug)"
+                                :class="[
+                                    'block rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-md',
+                                    toolPageSettings.layout === 'modern'
+                                        ? 'bg-gradient-to-br from-blue-500/5 to-purple-500/5 border border-white/10 dark:border-white/5 dark:from-blue-500/[0.01] dark:to-purple-500/[0.01]'
+                                        : (toolPageSettings.layout === 'creative'
+                                            ? 'bg-white/80 dark:bg-white/[0.02] shadow-xs'
+                                            : 'border border-gray-200 bg-white shadow-xs dark:border-white/5 dark:bg-white/[0.02]')
+                                ]"
+                                :style="[
+                                    toolPageSettings.layout === 'creative'
+                                        ? { border: `1px solid ${tool.color || '#1F75FE'}20`, boxShadow: `0 4px 20px -10px ${tool.color || '#1F75FE'}15` }
+                                        : {}
+                                ]"
+                            >
+                                <i :class="[tool.icon || 'ti ti-wand', 'mb-3 block text-2xl text-primary-600 dark:text-primary-400']" :style="{ color: tool.color }"></i>
+                                <h4 class="mb-2 font-semibold text-gray-900 dark:text-white leading-tight">{{ tool.name }}</h4>
+                                <p class="line-clamp-3 text-sm text-gray-500">{{ tool.description }}</p>
+                            </Link>
+                        </div>
+                    </section>
                 </div>
             </div>
         </div>
@@ -974,8 +1890,8 @@ const submitReview = async () => {
                             <div>
                                 <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">{{ t('Refinement Presets') }}</label>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <button 
-                                        v-for="preset in refinementPresets" 
+                                    <button
+                                        v-for="preset in refinementPresets"
                                         :key="preset.label"
                                         type="button"
                                         class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white p-3 text-left text-xs font-medium text-gray-700 shadow-sm transition-all hover:border-primary-500 hover:bg-primary-50/50 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:border-primary-500 dark:hover:bg-primary-500/10"
@@ -990,7 +1906,7 @@ const submitReview = async () => {
                             <!-- Custom Prompt -->
                             <div class="flex-1 flex flex-col">
                                 <label class="block text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">{{ t('Refinement Instruction') }}</label>
-                                <textarea 
+                                <textarea
                                     v-model="refineInstruction"
                                     rows="5"
                                     class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 transition-all placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-white/10 dark:bg-white/[0.03] dark:text-white dark:placeholder-gray-600"
@@ -1001,8 +1917,8 @@ const submitReview = async () => {
 
                         <!-- Footer Actions -->
                         <div class="border-t border-gray-100 pt-4 dark:border-white/5">
-                            <button 
-                                type="button" 
+                            <button
+                                type="button"
                                 :disabled="!refineInstruction.trim() || activeIsStreaming || !canGenerate"
                                 class="btn-primary w-full justify-center rounded-xl py-3 text-sm font-semibold shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
                                 @click="applyRefinement"
@@ -1022,3 +1938,134 @@ const submitReview = async () => {
         </Transition>
     </Teleport>
 </template>
+
+<style scoped>
+/* Glassmorphism Styles for Modern Layout */
+.layout-modern :deep(input),
+.layout-modern :deep(select),
+.layout-modern :deep(textarea) {
+    background-color: rgba(255, 255, 255, 0.45) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border-color: rgba(229, 231, 235, 0.5) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.dark .layout-modern :deep(input),
+.dark .layout-modern :deep(select),
+.dark .layout-modern :deep(textarea) {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.layout-modern :deep(input:focus),
+.layout-modern :deep(select:focus),
+.layout-modern :deep(textarea:focus) {
+    background-color: rgba(255, 255, 255, 0.65) !important;
+    border-color: var(--color-primary-500) !important;
+    box-shadow: 0 0 0 3px rgba(31, 117, 254, 0.15) !important;
+}
+
+.dark .layout-modern :deep(input:focus),
+.dark .layout-modern :deep(select:focus),
+.dark .layout-modern :deep(textarea:focus) {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    box-shadow: 0 0 0 3px rgba(31, 117, 254, 0.25) !important;
+}
+
+/* De-border inner cards nested inside outer layout cards for Modern layout */
+.layout-modern :deep(.card .card) {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Scrollbar Hiding */
+.hide-scrollbar::-webkit-scrollbar {
+    display: none !important;
+}
+.hide-scrollbar {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+.layout-modern :deep(.overflow-y-auto)::-webkit-scrollbar {
+    display: none !important;
+}
+.layout-modern :deep(.overflow-y-auto) {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+}
+
+/* Modern Layout Headings: Gradient text from blue to purple */
+.layout-modern h1,
+.layout-modern h2,
+.layout-modern h3,
+.layout-modern h4,
+.layout-modern h5,
+.layout-modern h6,
+.layout-modern :deep(h1),
+.layout-modern :deep(h2),
+.layout-modern :deep(h3),
+.layout-modern :deep(h4),
+.layout-modern :deep(h5),
+.layout-modern :deep(h6) {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+    background-clip: text !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: transparent !important;
+}
+
+/* Modern Layout Primary Buttons: Gradient background from blue to purple */
+.layout-modern .btn-primary,
+.layout-modern :deep(.btn-primary) {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6) !important;
+    border: none !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2) !important;
+}
+.layout-modern .btn-primary:hover:not(:disabled),
+.layout-modern :deep(.btn-primary:hover:not(:disabled)) {
+    opacity: 0.95 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Modern Layout Secondary Action buttons */
+.layout-modern .output-actions button:not(.btn-primary):not([disabled]),
+.layout-modern .output-actions a.inline-flex:not(.btn-primary),
+.layout-modern .try-example,
+.layout-modern :deep(.output-actions button:not(.btn-primary):not([disabled])),
+.layout-modern :deep(.output-actions a.inline-flex:not(.btn-primary)),
+.layout-modern :deep(.try-example) {
+    background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.05), rgba(139, 92, 246, 0.05)) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    transition: all 0.2s ease-in-out !important;
+}
+.layout-modern .output-actions button:not(.btn-primary):not([disabled]):hover,
+.layout-modern .output-actions a.inline-flex:not(.btn-primary):hover,
+.layout-modern .try-example:hover,
+.layout-modern :deep(.output-actions button:not(.btn-primary):not([disabled]):hover),
+.layout-modern :deep(.output-actions a.inline-flex:not(.btn-primary):hover),
+.layout-modern :deep(.try-example:hover) {
+    background: linear-gradient(to bottom right, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1)) !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Smooth sliding tab transition */
+.tab-slide-enter-active,
+.tab-slide-leave-active {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.tab-slide-enter-from {
+    opacity: 0;
+    transform: translateX(12px);
+}
+.tab-slide-leave-to {
+    opacity: 0;
+    transform: translateX(-12px);
+}
+</style>
+

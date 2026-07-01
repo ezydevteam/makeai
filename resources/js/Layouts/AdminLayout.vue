@@ -10,12 +10,18 @@ import NotificationBell from '@/Components/NotificationBell.vue'
 import AdminSidebar from '@/Components/AdminSidebar.vue'
 import AiAssistantLoader from '@/Components/Addons/AiAssistantLoader.vue'
 import LanguageSwitcher from '@/Components/LanguageSwitcher.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 
 const { isDark, toggleDark } = useTheme()
 const { t } = useTranslate()
 const page = usePage()
 const slots = useSlots()
 useFlashToasts()
+
+type Branding = {
+    site_name?: string
+    site_support_url?: string
+}
 
 const mobileSidebarOpen = ref(false)
 const sidebarCollapsed = ref(false)
@@ -42,6 +48,23 @@ const demoBannerColor = computed(() => {
 })
 
 const envatoUrl = computed(() => (page.props as any).app?.envato_url ?? 'https://codecanyon.net')
+const branding = computed<Branding>(() => (page.props.branding as Branding | undefined) ?? {})
+const siteName = computed(() => String(branding.value.site_name || page.props.appName || t('Application')))
+const currentYear = new Date().getFullYear()
+const adminFooterLinks = computed(() => [
+    {
+        label: t('Docs'),
+        href: envatoUrl.value,
+    },
+    {
+        label: t('Support'),
+        href: branding.value.site_support_url?.trim() || envatoUrl.value,
+    },
+    {
+        label: t('Buy More'),
+        href: envatoUrl.value,
+    },
+])
 
 function dismissDemoBanner() {
     demoDismissed.value = true
@@ -75,19 +98,21 @@ const adminAvatarUrl = computed(() => {
 
     return `/storage/${avatar}`
 })
-const adminActionsLabel = computed(() => t('Admin actions'))
+const adminActionsLabel = computed(() => t('Actions'))
+const languageSwitcherLabel = computed(() => t('Language'))
+const themeToggleLabel = computed(() => isDark.value ? t('Light mode') : t('Dark mode'))
+const notificationsLabel = computed(() => t('Notifications'))
 const isSuperAdmin = computed(() => (page.props.admin as any)?.isSuperAdmin ?? false)
 const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
-const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 const cronStatus = computed(() => page.props.cronStatus as { is_configured?: boolean; setup_url?: string; last_run_at?: string | null } | undefined)
 const showCronBanner = computed(() => Boolean(admin.value && cronStatus.value && cronStatus.value.is_configured === false))
 const shellInsetClass = 'px-8 sm:px-11 lg:px-11 xl:px-14 2xl:px-16'
 const contentInsetClass = 'p-4 sm:p-5 lg:p-5 xl:p-6 2xl:p-6'
 const hasHeaderTitle = computed(() => Boolean(slots.header || slots.title))
-const headerIconButtonClass = 'inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100/90 text-gray-500 shadow-sm shadow-gray-200/40 transition-all duration-200 hover:-translate-y-0.5 hover:bg-gray-200/85 hover:text-gray-900 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-200/70 dark:bg-surface-800 dark:text-gray-400 dark:shadow-black/20 dark:hover:bg-surface-700 dark:hover:text-white'
-const circularHeaderControlClass = '!h-10 !w-10 !min-w-10 !rounded-full !border-0 !bg-gray-100/90 dark:!bg-surface-800'
+const headerIconButtonClass = 'admin-header-icon-button inline-flex h-10 w-10 items-center justify-center rounded-full bg-transparent shadow-none transition-all duration-300 ease-out focus:!outline-none focus:outline-none focus:ring-0 focus-visible:!outline-none focus-visible:outline-none focus-visible:ring-0'
+const circularHeaderControlClass = '!h-10 !w-10 !min-w-10 !rounded-full !border-0 !shadow-none'
 const circularHeaderIconClass = '!text-[18px] !leading-none'
-const languageSwitcherButtonClass = `${headerIconButtonClass} ${circularHeaderControlClass} header-soft-icon-button--icon-only !text-gray-500 hover:!text-gray-900 dark:!text-gray-400 dark:hover:!text-white`
+const languageSwitcherButtonClass = `${headerIconButtonClass} ${circularHeaderControlClass} header-soft-icon-button header-soft-icon-button--icon-only`
 const notificationBellUi = {
     triggerClass: `${headerIconButtonClass} ${circularHeaderControlClass} header-soft-icon-button header-soft-icon-button--icon-only`,
     iconClass: `ti ti-bell ${circularHeaderIconClass}`,
@@ -138,16 +163,37 @@ const closeHeaderMenus = () => {
     actionsOpen.value = false
 }
 const adminSettings = computed(() => (page.props.appearanceAdminSettings as Record<string, string>) || {})
-watch(adminSettings, (settings) => {
+const adminCssVars: Record<string, string> = {
+    primary_color: '--admin-primary',
+    accent_color: '--admin-accent',
+    bg_color: '--admin-bg',
+    text_primary_color: '--admin-text-primary',
+    sidebar_bg: '--admin-sidebar-bg',
+    sidebar_text_color: '--admin-sidebar-text',
+    navbar_bg: '--admin-navbar-bg',
+    navbar_text_color: '--admin-navbar-text',
+    font_family: '--admin-font',
+    base_font_size: '--admin-font-size',
+    heading_weight: '--admin-heading-weight',
+}
+
+const applyAdminCssVars = (settings: Record<string, string> = {}) => {
     const root = document.documentElement
-    if (settings.primary_color) root.style.setProperty('--admin-primary', settings.primary_color)
-    if (settings.sidebar_bg) root.style.setProperty('--admin-sidebar-bg', settings.sidebar_bg)
-    if (settings.sidebar_text_color) root.style.setProperty('--admin-sidebar-text', settings.sidebar_text_color)
-    if (settings.navbar_bg) root.style.setProperty('--admin-navbar-bg', settings.navbar_bg)
-    if (settings.navbar_text_color) root.style.setProperty('--admin-navbar-text', settings.navbar_text_color)
-    if (settings.accent_color) root.style.setProperty('--admin-accent', settings.accent_color)
-    if (settings.font_family) root.style.setProperty('--admin-font', settings.font_family)
-    if (settings.base_font_size) root.style.setProperty('--admin-font-size', settings.base_font_size)
+
+    Object.entries(adminCssVars).forEach(([settingKey, cssVar]) => {
+        const value = settings[settingKey]?.trim()
+
+        if (value) {
+            root.style.setProperty(cssVar, value)
+            return
+        }
+
+        root.style.removeProperty(cssVar)
+    })
+}
+
+watch(adminSettings, (settings) => {
+    applyAdminCssVars(settings)
 }, { immediate: true })
 
 onMounted(() => {
@@ -157,11 +203,12 @@ onMounted(() => {
 onUnmounted(() => {
     document.removeEventListener('click', closeHeaderMenus)
     document.removeEventListener('keydown', onKeydown)
+    applyAdminCssVars()
 })
 </script>
 
 <template>
-    <div class="admin-layout min-h-screen bg-[#f5f6fa] dark:bg-[#0d1117] text-gray-900 dark:text-gray-100 transition-colors duration-300 flex">
+    <div class="admin-layout min-h-screen transition-colors duration-300 flex">
         <!-- Desktop Sidebar -->
         <div class="hidden lg:block shrink-0">
             <AdminSidebar :collapsed="sidebarCollapsed" @toggle="sidebarCollapsed = !sidebarCollapsed" />
@@ -181,7 +228,7 @@ onUnmounted(() => {
         </Teleport>
 
         <!-- ═══ Main ═══ -->
-        <div class="flex-1 flex flex-col min-w-0">
+        <div class="admin-main-panel flex-1 flex flex-col min-w-0">
             <!-- Demo Notice -->
             <div v-if="$page.props.app?.demo && !demoDismissed" :class="demoBannerColor" class="px-4 py-2.5 text-center relative overflow-hidden">
                 <div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
@@ -211,7 +258,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Header -->
-            <header :class="shellInsetClass" class="sticky top-0 z-30 flex h-[60px] items-center justify-between border-b border-gray-200 bg-white/95 backdrop-blur-sm shrink-0 transition-colors duration-300 dark:border-gray-700 dark:bg-[#161b22]/95">
+            <header :class="shellInsetClass" class="admin-shell-header sticky top-0 z-30 flex h-[60px] items-center justify-between border-b backdrop-blur-sm shrink-0 transition-colors duration-300">
                 <div class="flex min-w-0 items-center gap-3">
                     <!-- Mobile hamburger -->
                     <button type="button" :aria-label="t('Open navigation')" :class="['lg:hidden', headerIconButtonClass]" @click="mobileSidebarOpen = true">
@@ -230,21 +277,23 @@ onUnmounted(() => {
                 </div>
 
                 <!-- Profile -->
-                <div class="flex items-center gap-2 lg:gap-4">
+                <div class="flex items-center gap-1.5 lg:gap-3">
                     <div class="relative" @click.stop>
-                        <button
-                            type="button"
-                            :class="headerIconButtonClass"
-                            :aria-label="adminActionsLabel"
-                            :disabled="cacheClearing"
-                            @click="actionsOpen = !actionsOpen"
-                        >
-                            <i v-if="cacheClearing" class="ti ti-loader-2 h-5 w-5 text-xl animate-spin leading-none"></i>
-                            <i v-else class="ti ti-dots-vertical h-5 w-5 text-xl leading-none"></i>
-                        </button>
+                        <Tooltip :content="adminActionsLabel" placement="bottom">
+                            <button
+                                type="button"
+                                :class="headerIconButtonClass"
+                                :aria-label="adminActionsLabel"
+                                :disabled="cacheClearing"
+                                @click="actionsOpen = !actionsOpen"
+                            >
+                                <i v-if="cacheClearing" class="ti ti-loader-2 h-5 w-5 text-xl animate-spin leading-none"></i>
+                                <i v-else class="ti ti-dots-vertical h-5 w-5 text-xl leading-none"></i>
+                            </button>
+                        </Tooltip>
 
                         <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
-                            <div v-if="actionsOpen" class="absolute right-0 z-50 mt-2 min-w-44 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl dark:border-surface-700 dark:bg-surface-800 rtl:left-0 rtl:right-auto">
+                            <div v-if="actionsOpen" class="admin-header-menu absolute right-0 z-50 mt-2 min-w-44 rounded-xl border py-1.5 shadow-xl rtl:left-0 rtl:right-auto">
                                 <a :href="route('home')" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2.5 text-sm text-green-600 transition-colors hover:bg-green-50">
                                     <i class="ti ti-eye"></i>
                                     {{ t('Visit Site') }}
@@ -264,18 +313,24 @@ onUnmounted(() => {
                         </Transition>
                     </div>
 
-                    <LanguageSwitcher display="icon" :ui="languageSwitcherUi" />
+                    <Tooltip :content="languageSwitcherLabel" placement="bottom">
+                        <LanguageSwitcher display="icon" :ui="languageSwitcherUi" />
+                    </Tooltip>
 
-                    <button type="button" :aria-label="isDark ? t('Switch to light mode') : t('Switch to dark mode')" :class="headerIconButtonClass" @click="toggleDark()">
-                        <i v-if="isDark" class="ti ti-sun text-xl leading-none"></i>
-                        <i v-else class="ti ti-moon text-xl leading-none"></i>
-                    </button>
+                    <Tooltip :content="themeToggleLabel" placement="bottom">
+                        <button type="button" :aria-label="themeToggleLabel" :class="headerIconButtonClass" @click="toggleDark()">
+                            <i v-if="isDark" class="ti ti-sun text-xl leading-none"></i>
+                            <i v-else class="ti ti-moon text-xl leading-none"></i>
+                        </button>
+                    </Tooltip>
 
-                    <NotificationBell context="admin" :ui="notificationBellUi" />
+                    <Tooltip :content="notificationsLabel" placement="bottom">
+                        <NotificationBell context="admin" :ui="notificationBellUi" />
+                    </Tooltip>
 
                     <div class="relative" @click.stop>
-                        <button @click="profileOpen = !profileOpen" class="flex items-center rounded-full text-gray-700 transition-all duration-200 lg:gap-3 lg:bg-gray-100/90 lg:py-1.5 lg:pl-1.5 lg:pr-2.5 lg:shadow-sm lg:shadow-gray-200/30 lg:hover:bg-gray-200/85 dark:text-gray-200 dark:lg:bg-surface-800 dark:lg:shadow-black/20 dark:lg:hover:bg-surface-700">
-                            <div :class="['h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold', adminAvatarFallbackClass]">
+                        <button @click="profileOpen = !profileOpen" class="admin-profile-trigger flex items-center rounded-full transition-all duration-200 lg:gap-2 lg:py-1 lg:pl-1.5 lg:pr-2.5 lg:shadow-sm">
+                            <div :class="['h-8 w-8 rounded-full flex items-center justify-center text-sm font-bold', adminAvatarFallbackClass]">
                                 <img v-if="adminAvatarUrl" :src="adminAvatarUrl" :alt="admin?.name ?? adminDisplayName" class="h-full w-full rounded-full object-cover" />
                                 <span v-else>{{ admin?.name?.charAt(0) ?? 'A' }}</span>
                             </div>
@@ -284,7 +339,7 @@ onUnmounted(() => {
                         </button>
 
                         <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 scale-95" enter-to-class="opacity-100 scale-100" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 scale-100" leave-to-class="opacity-0 scale-95">
-                            <div v-if="profileOpen" class="absolute right-0 rtl:right-auto rtl:left-0 mt-2 w-56 bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 rounded-xl shadow-xl py-1.5 z-50">
+                            <div v-if="profileOpen" class="admin-profile-menu absolute right-0 rtl:right-auto rtl:left-0 mt-2 w-56 border rounded-xl shadow-xl py-1.5 z-50">
                                 <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-surface-700">
                                     <div :class="['h-10 w-10 shrink-0 overflow-hidden rounded-full flex items-center justify-center', adminAvatarFallbackClass]">
                                         <img v-if="adminAvatarUrl" :src="adminAvatarUrl" :alt="admin?.name ?? adminDisplayName" class="h-full w-full object-cover" />
@@ -315,9 +370,32 @@ onUnmounted(() => {
             </header>
 
             <!-- Content -->
-            <main :class="contentInsetClass" class="flex-1">
+            <main :class="contentInsetClass" class="admin-shell-main flex-1">
                 <slot />
             </main>
+
+            <footer :class="shellInsetClass" class="border-t border-gray-200/80 py-3 text-xs text-gray-500 dark:border-surface-800 dark:text-gray-400">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="min-w-0">
+                        {{ t('© :year :site_name', { year: currentYear, site_name: siteName }) }}
+                        <span class="mx-1 text-gray-300 dark:text-gray-600">•</span>
+                        {{ t('Developed by MakeAI') }}
+                    </p>
+
+                    <nav class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <a
+                            v-for="item in adminFooterLinks"
+                            :key="item.label"
+                            :href="item.href"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="transition hover:text-primary-600 dark:hover:text-primary-300"
+                        >
+                            {{ item.label }}
+                        </a>
+                    </nav>
+                </div>
+            </footer>
         </div>
 
         <ActionConfirmModal
@@ -334,3 +412,163 @@ onUnmounted(() => {
         <AiAssistantLoader />
     </div>
 </template>
+
+<style>
+.admin-layout {
+    --admin-bg-color: var(--admin-bg, #ffffff);
+    --admin-surface: color-mix(in srgb, var(--admin-navbar-bg, #ffffff) 92%, white);
+    --admin-border: color-mix(in srgb, var(--admin-navbar-text, #111827) 14%, transparent);
+    --admin-primary-color: var(--admin-primary, #9028f1);
+    --admin-secondary-color: var(--admin-text-primary, #111827);
+
+    /* Local overrides for Tailwind CSS v4 color variables inside Admin Layout */
+    --color-primary: var(--admin-primary-color);
+    --color-primary-50: color-mix(in srgb, var(--admin-primary-color) 8%, #ffffff);
+    --color-primary-100: color-mix(in srgb, var(--admin-primary-color) 18%, #ffffff);
+    --color-primary-200: color-mix(in srgb, var(--admin-primary-color) 32%, #ffffff);
+    --color-primary-300: color-mix(in srgb, var(--admin-primary-color) 48%, #ffffff);
+    --color-primary-400: color-mix(in srgb, var(--admin-primary-color) 72%, #ffffff);
+    --color-primary-500: var(--admin-primary-color);
+    --color-primary-600: color-mix(in srgb, var(--admin-primary-color) 86%, #000000);
+    --color-primary-700: color-mix(in srgb, var(--admin-primary-color) 74%, #000000);
+    --color-primary-800: color-mix(in srgb, var(--admin-primary-color) 62%, #000000);
+    --color-primary-900: color-mix(in srgb, var(--admin-primary-color) 50%, #000000);
+    --color-primary-950: color-mix(in srgb, var(--admin-primary-color) 36%, #000000);
+
+    --color-secondary: var(--admin-secondary-color);
+    --color-secondary-50: color-mix(in srgb, var(--admin-secondary-color) 8%, #ffffff);
+    --color-secondary-100: color-mix(in srgb, var(--admin-secondary-color) 18%, #ffffff);
+    --color-secondary-200: color-mix(in srgb, var(--admin-secondary-color) 32%, #ffffff);
+    --color-secondary-300: color-mix(in srgb, var(--admin-secondary-color) 48%, #ffffff);
+    --color-secondary-400: color-mix(in srgb, var(--admin-secondary-color) 72%, #ffffff);
+    --color-secondary-500: var(--admin-secondary-color);
+    --color-secondary-600: color-mix(in srgb, var(--admin-secondary-color) 86%, #000000);
+    --color-secondary-700: color-mix(in srgb, var(--admin-secondary-color) 74%, #000000);
+    --color-secondary-800: color-mix(in srgb, var(--admin-secondary-color) 62%, #000000);
+    --color-secondary-900: color-mix(in srgb, var(--admin-secondary-color) 50%, #000000);
+    --color-secondary-950: color-mix(in srgb, var(--admin-secondary-color) 36%, #000000);
+
+    --admin-primary-soft: color-mix(in srgb, var(--admin-primary-color) 16%, transparent);
+    --admin-primary-soft-strong: color-mix(in srgb, var(--admin-primary-color) 24%, transparent);
+    --admin-primary-contrast: color-mix(in srgb, var(--admin-primary-color) 82%, black);
+    --admin-text-main: var(--admin-text-primary, #111827);
+    --admin-accent-soft: color-mix(in srgb, var(--admin-accent, #3b82f6) 12%, transparent);
+    background: var(--admin-bg-color);
+    color: var(--admin-text-main);
+    font-family: var(--admin-font, Inter), sans-serif;
+    font-size: var(--admin-font-size, 14px);
+}
+
+.dark .admin-layout {
+    --admin-bg-color: #0b0f19;
+    --admin-surface: #111827;
+    --admin-border: #1f2937;
+    --admin-secondary-color: #f3f4f6;
+    --admin-text-main: #e5e7eb;
+    --admin-navbar-bg: #111827;
+    --admin-navbar-text: #f3f4f6;
+    --admin-sidebar-bg: #111827;
+    --admin-sidebar-text: #e5e7eb;
+}
+
+.admin-layout :is(button, input, select, textarea, a) {
+    font-family: inherit;
+}
+
+.admin-layout *:focus-visible {
+    outline: 2px solid var(--admin-primary-color);
+    outline-offset: 2px;
+}
+
+.admin-layout :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus,
+.admin-layout :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus-visible {
+    border-color: var(--admin-primary-color) !important;
+    box-shadow: 0 0 0 3px var(--admin-primary-soft) !important;
+    outline: none !important;
+}
+
+.admin-layout input[type="checkbox"]:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--admin-primary-color) 45%, #d1d5db);
+}
+
+.admin-layout input[type="checkbox"]:checked {
+    border-color: var(--admin-primary-color);
+    background: var(--admin-primary-color);
+}
+
+.admin-layout input[type="checkbox"]:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--admin-primary-soft-strong);
+}
+
+.admin-layout .app-switch:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--admin-primary-soft-strong);
+}
+
+.admin-layout .app-switch[aria-checked="true"] {
+    border-color: var(--admin-primary-color);
+    background: var(--admin-primary-color);
+}
+
+.admin-layout .btn-primary-admin,
+.admin-layout .btn-primary {
+    background: linear-gradient(135deg, var(--admin-primary-color), var(--color-primary-600));
+    border-color: var(--admin-primary-color);
+    color: #ffffff;
+}
+
+.admin-layout .btn-primary-admin:hover,
+.admin-layout .btn-primary:hover {
+    background: linear-gradient(135deg, var(--color-primary-600), var(--admin-primary-color));
+    border-color: var(--admin-primary-contrast);
+}
+
+.admin-layout .btn-primary-admin:focus-visible,
+.admin-layout .btn-primary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--admin-primary-soft-strong), var(--shadow-sm);
+}
+
+.admin-main-panel,
+.admin-shell-main {
+    color: var(--admin-text-main);
+}
+
+.admin-shell-header {
+    --header-soft-icon-bg: transparent;
+    --header-soft-icon-border: transparent;
+    --header-soft-icon-color: color-mix(in srgb, var(--admin-navbar-text, #111827) 58%, transparent);
+    --header-soft-icon-hover-bg: var(--admin-accent-soft);
+    --header-soft-icon-hover-bg-dark: var(--admin-accent-soft);
+    --header-soft-icon-hover-color: var(--admin-accent, #3b82f6);
+    background: color-mix(in srgb, var(--admin-navbar-bg, #ffffff) 94%, transparent);
+    border-bottom-color: var(--admin-border);
+    color: var(--admin-navbar-text, #111827);
+}
+
+.admin-header-icon-button {
+    color: color-mix(in srgb, var(--admin-navbar-text, #111827) 58%, transparent);
+}
+
+.admin-header-icon-button:hover {
+    background: var(--admin-accent-soft);
+    color: var(--admin-accent, #3b82f6);
+}
+
+.admin-header-menu,
+.admin-profile-menu {
+    background: var(--admin-surface);
+    border-color: var(--admin-border);
+}
+
+.admin-profile-trigger {
+    color: var(--admin-navbar-text, #111827);
+    background: color-mix(in srgb, var(--admin-navbar-bg, #ffffff) 78%, var(--admin-text-main) 5%);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--admin-text-main) 12%, transparent);
+}
+
+.admin-profile-trigger:hover {
+    background: color-mix(in srgb, var(--admin-navbar-bg, #ffffff) 68%, var(--admin-accent, #3b82f6) 10%);
+}
+</style>

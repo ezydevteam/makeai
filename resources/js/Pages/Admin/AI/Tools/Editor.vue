@@ -77,6 +77,22 @@ const ensureArray = (val: any) => {
     return []
 }
 
+const mapUsageExamplesOnLoad = (examples: any) => {
+    return ensureArray(examples).map((ex: any) => {
+        let inputText = ''
+        if (ex.input && typeof ex.input === 'object') {
+            inputText = Object.entries(ex.input)
+                .map(([key, val]) => `${key}: ${val}`)
+                .join('\n')
+        }
+        return {
+            title: ex.title || '',
+            input_text: inputText,
+            output: ex.output || '',
+        }
+    })
+}
+
 const form = useForm({
     // Basic
     name: props.tool?.name || '',
@@ -108,12 +124,15 @@ const form = useForm({
     avg_output_tokens: props.tool?.avg_output_tokens || '',
 
     // Fields
-    fields: props.tool?.type === 'rag' ? props.tool.fields : ensureArray(props.tool?.fields),
+    fields: (props.tool?.type === 'rag' ? props.tool.fields : ensureArray(props.tool?.fields)).map((f: any) => ({
+        ...f,
+        options_string: Array.isArray(f.options) ? f.options.join(', ') : (typeof f.options === 'string' ? f.options : '')
+    })),
 
     // Content
     about_content: props.tool?.about_content || '',
     how_it_works: ensureArray(props.tool?.how_it_works),
-    usage_examples: ensureArray(props.tool?.usage_examples),
+    usage_examples: mapUsageExamplesOnLoad(props.tool?.usage_examples),
     faq_items: ensureArray(props.tool?.faq_items),
     show_about: props.tool?.show_about ?? true,
     show_how_it_works: props.tool?.show_how_it_works ?? true,
@@ -140,7 +159,7 @@ const accessLevelOptions = computed(() => {
     if (props.accessLevels) {
         return props.accessLevels
     }
-    
+
     // Fallback: only include premium if isProAvailable
     const isProAvailable = page.props.isProAvailable ?? false
     const options = [
@@ -148,11 +167,11 @@ const accessLevelOptions = computed(() => {
         { value: 'guest', label: t('Guest (Free)') },
         { value: 'login', label: t('Login Required') },
     ]
-    
+
     if (isProAvailable) {
         options.push({ value: 'premium', label: t('Premium (Any Plan)') })
     }
-    
+
     return options
 })
 
@@ -185,6 +204,7 @@ const fieldTypeOptions = [
     { value: 'tone_select', label: t('Tone Select') },
     { value: 'language_select', label: t('Language Select') },
     { value: 'length_select', label: t('Length Select') },
+    { value: 'audience_select', label: t('Audience Select') },
     { value: 'model_select', label: t('Model Select') },
     { value: 'image_upload', label: t('Image Upload') },
     { value: 'file_upload', label: t('File Upload') },
@@ -241,7 +261,7 @@ const removeOgImage = () => {
 // ─── Field management ─────────────────────────
 
 const addField = () => {
-    form.fields.push({ name: '', key: '', label: '', type: 'text', required: false, placeholder: '', options: [] })
+    form.fields.push({ name: '', key: '', label: '', type: 'text', required: false, placeholder: '', options: [], options_string: '' })
 }
 
 const fieldRemoveIndex = ref<number | null>(null)
@@ -283,7 +303,7 @@ const executeRemoveStep = () => {
 // ─── Usage Examples ───────────────────────────
 
 const addExample = () => {
-    form.usage_examples.push({ title: '', description: '', output: '' })
+    form.usage_examples.push({ title: '', input_text: '', output: '' })
 }
 const exampleRemoveIndex = ref<number | null>(null)
 const confirmRemoveExample = (index: number) => { exampleRemoveIndex.value = index }
@@ -295,6 +315,10 @@ const executeRemoveExample = () => {
 }
 
 // ─── Submit ───────────────────────────────────
+
+const updateFieldOptions = (field: { options_string?: string; options?: string[] }) => {
+    field.options = (field.options_string || '').split(',').map((s) => s.trim()).filter(Boolean)
+}
 
 const submit = () => {
     if (isEditing.value) {
@@ -343,14 +367,12 @@ const submit = () => {
             <aside class="space-y-4 xl:sticky xl:top-6 xl:self-start">
                 <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800">
-                        <div class="space-y-1">
-                            <h6 class="text-base mb-0 font-semibold text-gray-700 dark:text-gray-200">
-                                {{ form.name || t('Untitled Tool') }}
-                            </h6>
-                            <p class="text-xs font-medium lowercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
-                                {{ form.slug || t('no-slug') }}
-                            </p>
-                        </div>
+                        <h6 class="text-base mb-0 font-semibold text-gray-700 dark:text-gray-200">
+                            {{ form.name || t('Untitled Tool') }}
+                        </h6>
+                        <p class="mb-0 text-xs font-medium lowercase tracking-[0.14em] text-gray-400 dark:text-gray-500">
+                            {{ form.slug || t('no-slug') }}
+                        </p>
                     </div>
                     <div class="grid gap-2 p-3 sm:grid-cols-2 xl:grid-cols-1">
                         <button
@@ -632,6 +654,61 @@ const submit = () => {
                                 </button>
                             </div>
                         </div>
+
+                        <!-- Options for select, radio, multi_select, audience_select, and language_select -->
+                        <div v-if="['select', 'radio', 'multi_select', 'audience_select', 'language_select'].includes(field.type)" class="mt-4">
+                            <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+                                {{ t('Options (comma-separated)') }}
+                                <span v-if="['audience_select', 'language_select'].includes(field.type)" class="text-gray-400 font-normal"> ({{ t('leave blank to use default') }})</span>
+                            </label>
+                            <textarea
+                                v-model="field.options_string"
+                                rows="2"
+                                :placeholder="t('Option 1, Option 2, Option 3')"
+                                class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm resize-y"
+                                @input="updateFieldOptions(field)"
+                            />
+                        </div>
+
+                        <!-- Limits for slider -->
+                        <div v-if="field.type === 'slider'" class="mt-4 grid grid-cols-4 gap-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{{ t('Lower Limit (Min)') }}</label>
+                                <input
+                                    v-model="field.min"
+                                    type="text"
+                                    placeholder="0 or 10%"
+                                    class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{{ t('Upper Limit (Max)') }}</label>
+                                <input
+                                    v-model="field.max"
+                                    type="text"
+                                    placeholder="1 or 100%"
+                                    class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{{ t('Step') }}</label>
+                                <input
+                                    v-model="field.step"
+                                    type="text"
+                                    placeholder="0.1 or 1"
+                                    class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm"
+                                />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{{ t('Default Value') }}</label>
+                                <input
+                                    v-model="field.default"
+                                    type="text"
+                                    placeholder="0.5 or 50%"
+                                    class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm"
+                                />
+                            </div>
+                        </div>
                     </div>
                     <button @click="addField" class="w-full py-3 border-2 border-dashed border-gray-200 dark:border-surface-700 rounded-xl text-sm font-semibold text-gray-400 hover:text-primary-500 hover:border-primary-300 transition-colors">
                         {{ t('+ Add Field') }}
@@ -733,12 +810,14 @@ const submit = () => {
                                 <input v-model="example.title" type="text" :placeholder="t('Example title')" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
                             </div>
                             <div class="mb-3">
-                                <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Description') }}</label>
-                                <textarea v-model="example.description" rows="3" @input="autoExpand" :placeholder="t('Describe the input scenario for this example...')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                                <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Input') }}</label>
+                                <textarea v-model="example.input_text" rows="3" @input="autoExpand" :placeholder="t('field_key: value\nanother_field: another value')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                                <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ t('Enter each field on a new line using field_key: value (e.g., topic: artificial intelligence).') }}</p>
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Output') }}</label>
                                 <textarea v-model="example.output" rows="4" @input="autoExpand" :placeholder="t('Generated output preview')" class="w-full resize-none overflow-hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900" />
+                                <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ t('Enter the expected AI output preview for this example.') }}</p>
                             </div>
                         </div>
                         <button type="button" class="text-sm font-semibold text-primary-600 hover:text-primary-700" @click="addExample">{{ t('+ Add Example') }}</button>
@@ -819,7 +898,7 @@ const submit = () => {
                         <p class="text-xs text-gray-400 mt-1">{{ t(':count / 155 characters', { count: textLength(form.meta_description) }) }}</p>
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('OG Image') }}</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Open Graph Image') }}</label>
                         <div v-if="form.og_image || ogImagePreview" class="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-surface-700 dark:bg-surface-800 flex items-center gap-3">
                             <img :src="ogImagePreview || `/storage/${form.og_image}`" :alt="t('OG Image')" class="h-16 w-auto max-w-[200px] rounded object-cover" />
                             <button type="button" @click="removeOgImage" class="text-xs font-medium text-danger-500 hover:underline">{{ t('Remove') }}</button>

@@ -98,6 +98,8 @@ class AiToolController extends Controller
             $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
         }
 
+        $data = $this->processUsageExamples($data);
+
         if ($request->hasFile('og_image_file')) {
             $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
         }
@@ -142,6 +144,8 @@ class AiToolController extends Controller
         if ($tool->type !== 'rag') {
             $data['fields'] = $this->normalizeFields($data['fields'] ?? []);
         }
+
+        $data = $this->processUsageExamples($data);
 
         if ($request->hasFile('og_image_file')) {
             $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
@@ -311,14 +315,14 @@ class AiToolController extends Controller
                 'fields.*.key' => 'nullable|string|max:100',
                 'fields.*.name' => 'nullable|string|max:100',
                 'fields.*.label' => 'required_with:fields|string|max:255',
-                'fields.*.type' => 'required_with:fields|string|in:text,textarea,select,number,toggle,slider,color,tags_input,tone_select,language_select,length_select,model_select,image_upload,file_upload,code_input,url,date,datetime_local,radio,multi_select,hidden',
+                'fields.*.type' => 'required_with:fields|string|in:text,textarea,select,number,toggle,slider,color,tags_input,tone_select,language_select,length_select,model_select,image_upload,file_upload,code_input,url,date,datetime_local,radio,multi_select,hidden,audience_select',
                 'fields.*.required' => 'boolean',
                 'fields.*.options' => 'nullable|array',
                 'fields.*.placeholder' => 'nullable|string|max:255',
                 'fields.*.default' => 'nullable',
-                'fields.*.min' => 'nullable|numeric',
-                'fields.*.max' => 'nullable|numeric',
-                'fields.*.step' => 'nullable|numeric|min:0',
+                'fields.*.min' => 'nullable|string|max:20',
+                'fields.*.max' => 'nullable|string|max:20',
+                'fields.*.step' => 'nullable|string|max:20',
                 'fields.*.rows' => 'nullable|integer|min:1|max:50',
                 'fields.*.max_length' => 'nullable|integer|min:1',
             ];
@@ -334,7 +338,7 @@ class AiToolController extends Controller
             'how_it_works.*.step' => 'nullable|integer|min:1',
             'usage_examples' => 'nullable|array',
             'usage_examples.*.title' => 'required_with:usage_examples|string|max:255',
-            'usage_examples.*.input' => 'nullable|array',
+            'usage_examples.*.input_text' => 'nullable|string|max:5000',
             'usage_examples.*.output' => 'required_with:usage_examples|string|max:5000',
             'faq_items' => 'nullable|array',
             'faq_items.*.question' => 'required_with:faq_items|string|max:500',
@@ -417,6 +421,7 @@ class AiToolController extends Controller
         return array_values(array_map(function (array $field): array {
             $key = $field['key'] ?? $field['name'] ?? $field['id'] ?? null;
             $name = $field['name'] ?? $key;
+            unset($field['options_string']);
 
             return array_merge($field, [
                 'name' => $name,
@@ -432,6 +437,50 @@ class AiToolController extends Controller
         }
 
         return array_values($data);
+    }
+
+    private function processUsageExamples(array $data): array
+    {
+        if (isset($data['usage_examples']) && is_array($data['usage_examples'])) {
+            foreach ($data['usage_examples'] as $i => $example) {
+                $inputText = $example['input_text'] ?? '';
+                $data['usage_examples'][$i]['input'] = $this->parseExampleInputText($inputText);
+                unset($data['usage_examples'][$i]['input_text']);
+            }
+        }
+        return $data;
+    }
+
+    private function parseExampleInputText(?string $text): array
+    {
+        if (empty($text)) {
+            return [];
+        }
+
+        $input = [];
+        $lines = preg_split('/\r\n|\r|\n/', $text);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                continue;
+            }
+
+            // Match key: value format by splitting at the first colon
+            $parts = explode(':', $line, 2);
+            if (count($parts) === 2) {
+                $key = trim($parts[0]);
+                
+                // Normalize key: lowercase, replace spaces/hyphens with underscores, remove non-alphanumeric/underscore
+                $key = strtolower($key);
+                $key = preg_replace('/[\s-]+/', '_', $key);
+                $key = preg_replace('/[^a-z0-9_]/', '', $key);
+
+                $val = trim($parts[1]);
+                $input[$key] = $val;
+            }
+        }
+
+        return $input;
     }
 
     private function findToolOrFail(string $tool, bool $withTrashed = false): AiTool
@@ -452,5 +501,28 @@ class AiToolController extends Controller
                 }
             })
             ->firstOrFail();
+    }
+
+    public function updateGlobalSettings(Request $request)
+    {
+        $validated = $request->validate([
+            'global_tools_brand_voice_enabled' => ['required', 'boolean'],
+            'global_tools_variations_enabled' => ['required', 'boolean'],
+            'global_tools_regenerate_enabled' => ['required', 'boolean'],
+            'global_tools_improve_enabled' => ['required', 'boolean'],
+            'global_tools_editor_enabled' => ['required', 'boolean'],
+            'global_tools_show_about_enabled' => ['required', 'boolean'],
+            'global_tools_show_how_it_works_enabled' => ['required', 'boolean'],
+            'global_tools_show_usage_examples_enabled' => ['required', 'boolean'],
+            'global_tools_show_faqs_enabled' => ['required', 'boolean'],
+            'global_tools_show_reviews_enabled' => ['required', 'boolean'],
+            'global_tools_embeddable_enabled' => ['required', 'boolean'],
+        ]);
+
+        foreach ($validated as $key => $value) {
+            settings_set($key, (bool) $value, 'boolean');
+        }
+
+        return back()->with('success', translate('Global tools settings updated successfully.'));
     }
 }

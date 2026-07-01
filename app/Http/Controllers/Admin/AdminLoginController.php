@@ -43,10 +43,13 @@ class AdminLoginController extends Controller
         $result = $rateLimiter->attempt('auth', $throttleKey);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'email' => [translate('Too many login attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'email' => [
+                    $seconds < 60
+                        ? translate('Too many login attempts. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many login attempts. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 
@@ -126,10 +129,13 @@ class AdminLoginController extends Controller
         $result = $rateLimiter->attempt('otp', $throttleKey, 5, 900);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'code' => [translate('Too many verification attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'code' => [
+                    $seconds < 60
+                        ? translate('Too many verification attempts. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many verification attempts. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 
@@ -180,10 +186,13 @@ class AdminLoginController extends Controller
         $result = $rateLimiter->attempt('otp', $throttleKey, 3, 3600);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'email' => [translate('Too many reset requests. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'email' => [
+                    $seconds < 60
+                        ? translate('Too many reset requests. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many reset requests. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 
@@ -226,10 +235,13 @@ class AdminLoginController extends Controller
         $result = $rateLimiter->attempt('otp', $throttleKey, 5, 900);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'code' => [translate('Too many reset attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'code' => [
+                    $seconds < 60
+                        ? translate('Too many reset attempts. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many reset attempts. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 

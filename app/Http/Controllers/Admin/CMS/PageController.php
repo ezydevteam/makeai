@@ -81,10 +81,21 @@ class PageController extends Controller
     {
         $validated = $this->normalizePageData($request->validated(), $page);
 
-        if ($request->hasFile('featured_image')) {
+        if ($request->boolean('remove_featured_image')) {
+            if ($page->featured_image) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($page->featured_image);
+            }
+            $validated['featured_image'] = null;
+        } elseif ($request->hasFile('featured_image')) {
             $validated['featured_image'] = $request->file('featured_image')->store('pages', 'public');
         }
-        if ($request->hasFile('og_image')) {
+
+        if ($request->boolean('remove_og_image')) {
+            if ($page->og_image) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($page->og_image);
+            }
+            $validated['og_image'] = null;
+        } elseif ($request->hasFile('og_image')) {
             $validated['og_image'] = $request->file('og_image')->store('pages', 'public');
         }
 
@@ -144,6 +155,7 @@ class PageController extends Controller
 
     public function preview(Page $page)
     {
+        $page->load('parent');
         return Inertia::render('Page', [
             'page' => $page,
             'seo' => [

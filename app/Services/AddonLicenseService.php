@@ -2,7 +2,7 @@
  
 namespace App\Services;
  
-use App\DataTransferObjects\LicenseResult;
+use App\DTO\LicenseResult;
 use App\Models\AddonLicense;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;

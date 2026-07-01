@@ -2,7 +2,7 @@
     <Head :title="t('Create User')" />
 
     <AdminLayout>
-        <div class="py-12">
+        <div class="py-6">
             <div class="mx-auto max-w-5xl sm:px-6 lg:px-8">
                 <div class="mb-8 flex items-center gap-3">
                     <Link

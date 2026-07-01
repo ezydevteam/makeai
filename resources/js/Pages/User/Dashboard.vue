@@ -248,7 +248,7 @@ const statCards = computed<StatCard[]>(() => [
         hint: t('Ready for new AI workflows'),
         icon: 'ti ti-bolt',
         iconClass: 'bg-primary-500/12 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300',
-        cardClass: 'border-primary-100/80 bg-white/95 dark:border-primary-900/60 dark:!bg-gray-900',
+        cardClass: 'border-primary-100/80 bg-white/95 dark:border-primary-900/60 dark:!bg-surface-900',
     },
     {
         key: 'monthly',
@@ -257,7 +257,7 @@ const statCards = computed<StatCard[]>(() => [
         hint: t('Healthy creator momentum'),
         icon: 'ti ti-chart-histogram',
         iconClass: 'bg-violet-500/12 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
-        cardClass: 'border-violet-100/80 bg-white/95 dark:border-violet-900/60 dark:!bg-gray-900',
+        cardClass: 'border-violet-100/80 bg-white/95 dark:border-violet-900/60 dark:!bg-surface-900',
     },
     {
         key: 'documents',
@@ -266,7 +266,7 @@ const statCards = computed<StatCard[]>(() => [
         hint: t('Saved outputs and drafts'),
         icon: 'ti ti-file-text',
         iconClass: 'bg-sky-500/12 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
-        cardClass: 'border-sky-100/80 bg-white/95 dark:border-sky-900/60 dark:!bg-gray-900',
+        cardClass: 'border-sky-100/80 bg-white/95 dark:border-sky-900/60 dark:!bg-surface-900',
     },
     {
         key: 'conversations',
@@ -275,7 +275,7 @@ const statCards = computed<StatCard[]>(() => [
         hint: t('Live ideation sessions'),
         icon: 'ti ti-message-2',
         iconClass: 'bg-emerald-500/12 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
-        cardClass: 'border-emerald-100/80 bg-white/95 dark:border-emerald-900/60 dark:!bg-gray-900',
+        cardClass: 'border-emerald-100/80 bg-white/95 dark:border-emerald-900/60 dark:!bg-surface-900',
     },
     {
         key: 'lifetime',
@@ -284,7 +284,7 @@ const statCards = computed<StatCard[]>(() => [
         hint: t('Believable production volume'),
         icon: 'ti ti-activity-heartbeat',
         iconClass: 'bg-amber-500/12 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
-        cardClass: 'border-amber-100/80 bg-white/95 dark:border-amber-900/60 dark:!bg-gray-900',
+        cardClass: 'border-amber-100/80 bg-white/95 dark:border-amber-900/60 dark:!bg-surface-900',
     },
 ])
 
@@ -433,15 +433,13 @@ const drawChart = async () => {
                     ticks: {
                         callback: (value) => formatNumber(Number(value)),
                         stepSize: Math.max(1, Math.ceil(maxValue / 4)),
+                        color: tickColor,
                     },
                     grid: {
                         color: gridColor,
                     },
                     border: {
                         display: false,
-                    },
-                    ticks: {
-                        color: tickColor,
                     },
                 },
                 x: {
@@ -478,7 +476,7 @@ watch(isDark, () => {
 
     <UserDashboardLayout>
         <div class="space-y-6">
-            <section class="relative overflow-hidden rounded-[28px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.22),_transparent_34%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(239,246,255,0.92),_rgba(248,250,252,0.98))] p-6 shadow-xl shadow-primary-100/40 dark:border-primary-900/60 dark:bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.24),_transparent_34%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(17,24,39,0.96),_rgba(15,23,42,0.98))] dark:shadow-black/20 lg:p-8">
+            <section class="relative overflow-hidden rounded-2xl border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.22),_transparent_34%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(239,246,255,0.92),_rgba(248,250,252,0.98))] p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-primary-900/60 dark:bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.24),_transparent_34%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(17,24,39,0.96),_rgba(15,23,42,0.98))] lg:p-8">
                 <div class="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_center,_rgba(139,92,246,0.16),_transparent_58%)] lg:block"></div>
                 <div class="relative grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_20rem]">
                     <div class="min-w-0 space-y-5">
@@ -506,14 +504,14 @@ watch(isDark, () => {
                                 <i class="ti ti-wand"></i>
                                 {{ t('Explore AI tools') }}
                             </Link>
-                            <Link :href="route('user.dashboard.documents.index')" class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-700 dark:border-gray-200 dark:!bg-gray-800 dark:text-gray-200 dark:hover:border-primary-700 dark:hover:text-primary-300">
+                            <Link :href="route('user.dashboard.documents.index')" class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/80 px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-300 hover:text-primary-700 dark:border-gray-200 dark:!bg-surface-700 dark:text-gray-200 dark:hover:border-primary-700 dark:hover:text-primary-300">
                                 <i class="ti ti-folders"></i>
                                 {{ t('Open content library') }}
                             </Link>
                         </div>
                     </div>
 
-                    <div class="min-w-0 rounded-[24px] border border-white/80 bg-white/90 p-5 shadow-lg backdrop-blur dark:border-surface-800 dark:!bg-gray-800">
+                    <div class="min-w-0 rounded-2xl border border-gray-200 bg-white/90 p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] backdrop-blur dark:border-surface-800 dark:!bg-surface-900">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Current balance') }}</p>
@@ -546,35 +544,35 @@ watch(isDark, () => {
             <DashboardChecklist />
 
             <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <ContextualTooltip tooltip-key="dashboard.stats" :content="t('Track credits, saved work, and momentum at a glance.')">
-                    <article class="group h-full rounded-[24px] border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:shadow-black/30" :class="statCards[0].cardClass">
-                        <div class="flex flex-col items-start justify-between gap-4">
+                <ContextualTooltip tooltip-key="dashboard.stats" :content="t('Track credits, saved work, and momentum at a glance.')" full-width>
+                    <article class="group h-full rounded-2xl border p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg" :class="statCards[0].cardClass">
+                        <div class="flex flex-col items-start justify-between gap-4 w-full">
                             <div :class="statCards[0].iconClass" class="shrink-0 flex h-10 w-10 items-center justify-center rounded-2xl">
                                 <i :class="statCards[0].icon" class="text-2xl"></i>
                             </div>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400">{{ statCards[0].label }}</p>
-                                <p class="mt-3 font-heading text-3xl font-bold text-gray-950 dark:!text-white">{{ statCards[0].value }}</p>
+                            <div class="min-w-0 w-full">
+                                <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{{ statCards[0].label }}</p>
+                                <p class="mt-3 font-heading text-xl font-bold text-gray-950 dark:!text-white tracking-tight sm:text-xl xl:text-2xl" :title="statCards[0].value">{{ statCards[0].value }}</p>
                             </div>
                         </div>
                     </article>
                 </ContextualTooltip>
 
-                <article v-for="card in statCards.slice(1)" :key="card.key" class="group rounded-[24px] border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg dark:shadow-black/30" :class="card.cardClass">
-                    <div class="flex flex-col items-start justify-between gap-4">
+                <article v-for="card in statCards.slice(1)" :key="card.key" class="group rounded-2xl border p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-lg" :class="card.cardClass">
+                    <div class="flex flex-col items-start justify-between gap-4 w-full">
                         <div :class="card.iconClass" class="shrink-0 flex h-10 w-10 items-center justify-center rounded-2xl">
                             <i :class="card.icon" class="text-2xl"></i>
                         </div>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400">{{ card.label }}</p>
-                            <p class="mt-3 font-heading text-3xl font-bold text-gray-950 dark:!text-white">{{ card.value }}</p>
+                        <div class="min-w-0 w-full">
+                            <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 truncate">{{ card.label }}</p>
+                            <p class="mt-3 font-heading text-xl font-bold text-gray-950 dark:!text-white tracking-tight sm:text-xl xl:text-2xl" :title="card.value">{{ card.value }}</p>
                         </div>
                     </div>
                 </article>
             </section>
 
             <section>
-                <div class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                     <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">
                         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div class="min-w-0 space-y-2">
@@ -622,7 +620,7 @@ watch(isDark, () => {
             </section>
 
             <section class="grid gap-6 xl:grid-cols-2">
-                <section class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <div class="bg-[linear-gradient(135deg,_rgba(31,117,254,0.08),_rgba(139,92,246,0.08))] px-6 py-5 dark:bg-surface-900">
                             <div class="flex items-start justify-between gap-4">
                                 <div class="min-w-0">
@@ -685,7 +683,7 @@ watch(isDark, () => {
                         </div>
                 </section>
 
-                <section class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                         <div class="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 dark:border-surface-800 sm:flex-row sm:items-center sm:justify-between">
                             <div class="min-w-0">
                                 <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent login history') }}</h2>
@@ -730,7 +728,7 @@ watch(isDark, () => {
                         v-for="tool in quickTools"
                         :key="tool.slug"
                         :href="route('ai.tools.show', tool.slug)"
-                        class="group rounded-[24px] border bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl dark:bg-surface-900"
+                        class="group rounded-2xl border bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition hover:-translate-y-1 hover:shadow-xl dark:bg-surface-900"
                         :class="toolCardClass(tool)"
                     >
                         <div class="flex items-start justify-between gap-4">
@@ -757,7 +755,7 @@ watch(isDark, () => {
             </section>
 
             <section class="grid gap-6 xl:grid-cols-2">
-                <div class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                     <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                         <div class="min-w-0">
                             <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent conversations') }}</h2>
@@ -779,7 +777,7 @@ watch(isDark, () => {
                     </div>
                 </div>
 
-                <div class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                     <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                         <div class="min-w-0">
                             <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Recent documents') }}</h2>
@@ -802,7 +800,7 @@ watch(isDark, () => {
                 </div>
             </section>
 
-            <section class="overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-surface-900">
                 <div class="flex flex-col gap-2 border-b border-gray-100 px-6 py-4 dark:border-surface-800 sm:flex-row sm:items-center sm:justify-between">
                     <div class="min-w-0">
                         <h2 class="font-heading text-lg font-bold text-gray-950 dark:!text-white">{{ t('Wallet activity') }}</h2>

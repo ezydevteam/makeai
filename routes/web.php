@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\SocialAuthController;
 use App\Http\Controllers\Auth\TwoFactorLoginController;
 use App\Http\Controllers\Auth\VerificationController;
+use App\Http\Controllers\Billing\PaymentWebhookController;
 use App\Http\Controllers\Billing\StripeController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CheckoutController;
@@ -40,8 +41,8 @@ use App\Http\Controllers\User\DashboardController;
 use App\Http\Controllers\User\OnboardingController;
 use App\Http\Controllers\User\PrivacyController;
 use App\Http\Controllers\User\SettingsController as UserSettingsController;
-use App\Http\Controllers\Webhooks\PaymentWebhookController;
 use App\Http\Resources\SiteTemplateResource;
+use App\Http\Middleware\EmbedCorsMiddleware;
 use App\Models\AiTool;
 use App\Models\Page;
 use App\Models\SiteTemplate;
@@ -73,14 +74,14 @@ Route::middleware('web')->prefix('admin')->group(base_path('routes/admin.php'));
 Route::get('/', function () {
     $slug = settings('homepage_template', 'default');
 
-    if ($slug === 'ai-chatbot') {
-        return Inertia::render('Chat/Index', [
-            'hide_header' => (bool) settings('hide_site_header', false),
-            'hide_footer' => (bool) settings('hide_site_footer', false),
-            'default_chat_model' => settings('default_chat_model', 'gpt-4o-mini'),
-            'allow_model_select' => (bool) settings('allow_model_select', true),
-            'show_friendly_model_names' => (bool) settings('show_friendly_model_names', false),
-            'allow_guest_messages' => (bool) settings('allow_guest_messages', false),
+    if ($slug === 'ai-chatbot' && is_addon_active('ai-chatbot')) {
+        return Inertia::render('Addons/ai-chatbot/Chat/Index', [
+            'hide_header' => (bool) addon_setting('ai-chatbot', 'hide_site_header', false),
+            'hide_footer' => (bool) addon_setting('ai-chatbot', 'hide_site_footer', false),
+            'default_chat_model' => addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini'),
+            'allow_model_select' => (bool) addon_setting('ai-chatbot', 'allow_model_select', true),
+            'show_friendly_model_names' => (bool) addon_setting('ai-chatbot', 'show_friendly_model_names', false),
+            'allow_guest_messages' => (bool) addon_setting('ai-chatbot', 'allow_guest_messages', false),
             'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
         ]);
     }
@@ -271,7 +272,7 @@ Route::middleware('auth')->group(function () {
             // Profile actions (PUT endpoints, no UI page)
             Route::put('/profile', [UserSettingsController::class, 'updateProfile'])->name('profile.update');
             Route::put('/profile/password', [UserSettingsController::class, 'updatePassword'])->name('password.update');
-            Route::put('/profile/avatar', [UserSettingsController::class, 'updateAvatar'])->name('avatar.update');
+            Route::post('/profile/avatar', [UserSettingsController::class, 'updateAvatar'])->name('avatar.update');
 
             // API Keys
             Route::get('/api-keys', [UserSettingsController::class, 'apiKeys'])->name('api-keys');
@@ -279,7 +280,7 @@ Route::middleware('auth')->group(function () {
             Route::delete('/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('api-keys.destroy');
 
             // Billing
-            Route::get('/billing', [\App\Http\Controllers\User\BillingController::class, 'index'])->name('billing');
+            Route::get('/billing', [\App\Http\Controllers\Billing\BillingController::class, 'index'])->name('billing');
 
             // Credit Top-Up
             Route::middleware('premium')->group(function () {
@@ -298,6 +299,7 @@ Route::middleware('auth')->group(function () {
             // Affiliate
             Route::middleware('affiliate')->group(function () {
                 Route::get('/affiliate', [AffiliateController::class, 'dashboard'])->name('affiliate');
+                Route::get('/affiliate/chart', [AffiliateController::class, 'chartData'])->name('affiliate.chart');
                 Route::post('/affiliate/alias', [AffiliateController::class, 'updateAlias'])->name('affiliate.alias.update');
                 Route::post('/affiliate/payouts', [AffiliateController::class, 'storePayout'])->name('affiliate.payouts.store');
             });
@@ -331,6 +333,7 @@ Route::middleware('auth')->group(function () {
 
             // Usage Dashboard
             Route::get('/usage', [UsageDashboardController::class, 'index'])->name('usage.index');
+            Route::get('/usage/chart', [UsageDashboardController::class, 'chart'])->name('usage.chart');
             Route::post('/usage/export', [UsageDashboardController::class, 'export'])->name('usage.export');
 
             // Dashboard Chart API
@@ -429,9 +432,13 @@ Route::get('/shared/rag/{token}', [App\Http\Controllers\RagToolController::class
 Route::get('/playground/s/{uuid}', [PlaygroundController::class, 'showShare'])->name('playground.share.show');
 
 // Public embed routes
-Route::get('/embed/{token}', [EmbedController::class, 'show'])->name('embed.show')->middleware('throttle:public_tool,60,3600');
-Route::post('/embed/{token}/run', [EmbedController::class, 'run'])->name('embed.run')->middleware('throttle:public_tool,30,3600');
-Route::post('/embed/{token}/unlock', [EmbedController::class, 'unlock'])->name('embed.unlock')->middleware('throttle:public,5,900');
+Route::middleware([EmbedCorsMiddleware::class])->group(function () {
+    Route::get('/embed/{token}', [EmbedController::class, 'show'])->name('embed.show')->middleware('throttle:public_tool,60,3600');
+    Route::options('/embed/{token}/run', [EmbedController::class, 'runOptions'])->name('embed.run.options');
+    Route::post('/embed/{token}/run', [EmbedController::class, 'run'])->name('embed.run')->middleware('throttle:public_tool,30,3600');
+    Route::options('/embed/{token}/unlock', [EmbedController::class, 'unlockOptions'])->name('embed.unlock.options');
+    Route::post('/embed/{token}/unlock', [EmbedController::class, 'unlock'])->name('embed.unlock')->middleware('throttle:public,5,900');
+});
 
 // ─── Blog ───────────────────────────────────
 Route::middleware('blog')->group(function () {
@@ -475,28 +482,6 @@ Route::post('/webhooks/coingate', [PaymentWebhookController::class, 'handle'])->
 Route::post('/webhooks/paystack', [PaymentWebhookController::class, 'handle'])->name('webhooks.paystack')->defaults('gateway', 'paystack');
 Route::match(['get', 'post'], '/webhooks/2checkout', [PaymentWebhookController::class, 'handle'])->name('webhooks.2checkout')->defaults('gateway', '2checkout');
 
-// ─── Chat Routes ────────────────────────────
-Route::get('/chat/{ulid?}', function (?string $ulid = null) {
-    return Inertia::render('Chat/Index', [
-        'hide_header' => (bool) settings('hide_site_header', false),
-        'hide_footer' => (bool) settings('hide_site_footer', false),
-        'default_chat_model' => settings('default_chat_model', 'gpt-4o-mini'),
-        'allow_model_select' => (bool) settings('allow_model_select', true),
-        'show_friendly_model_names' => (bool) settings('show_friendly_model_names', false),
-        'allow_guest_messages' => (bool) settings('allow_guest_messages', false),
-        'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
-        'chat_credits_low_threshold' => (int) settings('chat_credits_low_threshold', 100),
-        'active_chat_ulid' => $ulid,
-        'kb_available' => class_exists(\Addons\PublicKnowledgeBase\Services\KbSearchService::class),
-    ]);
-})->name('chat.index');
-
-// ─── Shared Conversation View ─────────────────
-Route::get('/share/{token}', function (string $token) {
-    return Inertia::render('Chat/SharedView', [
-        'share_token' => $token,
-    ]);
-})->name('chat.share');
 
 // ─── Dynamic CMS Pages ──────────────────────
 Route::post('/{slug}/password', function (Request $request, string $slug) {
@@ -556,7 +541,7 @@ Route::middleware(['web', 'auth'])->prefix('content-repurposer')->name('addon.rp
 });
 
 Route::get('/{slug}', function (string $slug) {
-    $page = Page::query()->where('slug', $slug)->published()->firstOrFail();
+    $page = Page::query()->with('parent')->where('slug', $slug)->published()->firstOrFail();
     $isPasswordProtected = filled($page->getAttribute('password'));
     $isUnlocked = ! $isPasswordProtected || session()->has("page_unlocked_{$page->id}");
 

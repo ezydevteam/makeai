@@ -73,7 +73,7 @@ const filter = () => router.get(route('admin.support.canned-responses.index'), {
 <template>
     <Head :title="t('Canned Responses')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
+    <div class="mx-auto max-w-7xl px-6 py-6">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Canned Responses') }}</h1>

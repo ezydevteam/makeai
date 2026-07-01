@@ -126,10 +126,10 @@ const initAnimations = async () => {
             trigger: sectionRef.value,
             start: 'top 85%',
             once: true,
-            onComplete: () => {
-              headerAnimated = true
-            }
           },
+          onComplete: () => {
+            headerAnimated = true
+          }
         })
       }
     }

@@ -15,6 +15,7 @@ const props = defineProps<{
         notifications_enabled: boolean
         registration_enabled: boolean
         email_verification_enabled: boolean
+        tools_review_approval_enabled: boolean
     }
 }>()
 
@@ -29,6 +30,7 @@ const form = useForm({
     notifications_enabled: props.features.notifications_enabled,
     registration_enabled: props.features.registration_enabled,
     email_verification_enabled: props.features.email_verification_enabled,
+    tools_review_approval_enabled: props.features.tools_review_approval_enabled,
 })
 
 const submit = () => {
@@ -46,6 +48,7 @@ const featureToggles = [
     { key: 'notifications_enabled', label: 'Notifications', description: 'Hide notification bells and stop delivery when disabled.' },
     { key: 'registration_enabled', label: 'User Registration', description: 'Allow new users to register on the site.' },
     { key: 'email_verification_enabled', label: 'Email Verification', description: 'Require email verification after registration.' },
+    { key: 'tools_review_approval_enabled', label: 'Tools Review Approval', description: 'Require admin approval before new tool reviews are published.' },
 ] as const
 </script>
 

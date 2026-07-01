@@ -440,7 +440,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="isEditing ? t('Edit Blog Post') : t('Create Blog Post')" />
 
-    <div class="max-w-7xl mx-auto px-6 py-8">
+    <div class="max-w-7xl mx-auto px-6 py-6">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -463,13 +463,13 @@ onBeforeUnmount(() => {
                     </a>
                     <div ref="publishMenuRef" class="relative">
                         <div class="inline-flex overflow-hidden rounded-lg shadow-sm ring-1 ring-primary-600/20">
-                            <button @click="submit" :disabled="form.processing" type="button" class="inline-flex items-center justify-center gap-2 bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
+                            <button @click="submit" :disabled="form.processing" type="button" class="btn-primary-admin inline-flex items-center justify-center gap-2 rounded-none px-4 py-2 text-sm font-medium text-white disabled:opacity-60">
                                 <i class="ti ti-device-floppy text-base"></i>
                                 {{ form.processing ? t('Saving...') : primaryActionLabel }}
                             </button>
                             <button
                                 type="button"
-                                class="inline-flex items-center justify-center bg-primary-600 px-3 text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+                                class="btn-primary-admin inline-flex items-center justify-center rounded-none px-3 text-white disabled:opacity-60"
                                 :aria-label="t('Change post status')"
                                 @click="publishMenuOpen = !publishMenuOpen"
                             >

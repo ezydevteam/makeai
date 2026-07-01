@@ -61,13 +61,14 @@ class ThrottleAiRequests
         $result = $this->rateLimiter->attempt($category, $key, $maxAttempts, $windowSeconds, $user);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             return response()->json([
                 'success' => false,
                 'code' => 'RATE_LIMITED',
-                'message' => translate('Too many requests. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ]),
-                'retry_after' => $result['retry_after_seconds'],
+                'message' => $seconds < 60
+                    ? translate('Too many requests. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                    : translate('Too many requests. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)]),
+                'retry_after' => $seconds,
             ], 429)->withHeaders($this->rateLimitHeaders($result));
         }
 

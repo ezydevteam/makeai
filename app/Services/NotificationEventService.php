@@ -10,6 +10,7 @@ use App\Models\Document;
 use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\User;
+use App\Models\ToolReview;
 use App\Support\CountryCatalog;
 use Illuminate\Support\Facades\Cache;
 
@@ -583,6 +584,65 @@ class NotificationEventService
             });
 
         return $count;
+    }
+
+    public function newToolReviewSubmitted(ToolReview $review): void
+    {
+        $review->loadMissing('tool');
+        $toolName = $review->tool?->name ?? $review->tool_slug;
+
+        $this->notifications->notifyAdminsWithPermission('ai.tools', [
+            'title' => translate('New tool review submitted'),
+            'message' => translate('A new review has been submitted for :tool.', ['tool' => $toolName]),
+            'level' => 'info',
+            'category' => 'ai_tool',
+            'icon' => 'ti ti-star',
+            'action_url' => route('admin.ai.reviews.index'),
+            'action_label' => translate('Moderate reviews'),
+            'meta' => ['review_id' => $review->id],
+        ]);
+    }
+
+    public function toolReviewReply(ToolReview $review): void
+    {
+        $review->loadMissing(['user', 'tool']);
+        if (!$review->user) {
+            return;
+        }
+
+        $toolName = $review->tool?->name ?? $review->tool_slug;
+
+        $this->notifications->send($review->user, [
+            'title' => translate('Tool review reply from admin'),
+            'message' => translate('Admin has replied to your review on :tool.', ['tool' => $toolName]),
+            'level' => 'info',
+            'category' => 'ai_tool',
+            'icon' => 'ti ti-message-dots',
+            'action_url' => route('ai.tools.show', $review->tool_slug),
+            'action_label' => translate('View review'),
+            'meta' => ['review_id' => $review->id],
+        ]);
+    }
+
+    public function toolReviewApproved(ToolReview $review): void
+    {
+        $review->loadMissing(['user', 'tool']);
+        if (!$review->user) {
+            return;
+        }
+
+        $toolName = $review->tool?->name ?? $review->tool_slug;
+
+        $this->notifications->send($review->user, [
+            'title' => translate('Tool review approved'),
+            'message' => translate('Your review on :tool has been approved.', ['tool' => $toolName]),
+            'level' => 'success',
+            'category' => 'ai_tool',
+            'icon' => 'ti ti-circle-check',
+            'action_url' => route('ai.tools.show', $review->tool_slug),
+            'action_label' => translate('View review'),
+            'meta' => ['review_id' => $review->id],
+        ]);
     }
 
     private function sendOnce(string $key, callable $callback): void

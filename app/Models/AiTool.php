@@ -90,6 +90,95 @@ class AiTool extends Model
         return is_array($value) ? $value : [];
     }
 
+    public function getSupportsBrandVoiceAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) $value;
+        }
+        return settings('global_tools_brand_voice_enabled', true) && (bool) $value;
+    }
+
+    public function getMaxVariantsAttribute($value): int
+    {
+        $val = (int) ($value ?? 1);
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return $val;
+        }
+        return settings('global_tools_variations_enabled', true) ? $val : 1;
+    }
+
+    public function getShowRegenerateAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_regenerate_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowImproveAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_improve_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowEditorAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_editor_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowAboutAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_show_about_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowHowItWorksAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_show_how_it_works_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowUsageExamplesAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_show_usage_examples_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowFaqsAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? true);
+        }
+        return settings('global_tools_show_faqs_enabled', true) && (bool) ($value ?? true);
+    }
+
+    public function getShowReviewsAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? false);
+        }
+        return settings('global_tools_show_reviews_enabled', true) && (bool) ($value ?? false);
+    }
+
+    public function getIsEmbeddableAttribute($value): bool
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return (bool) ($value ?? false);
+        }
+        return settings('global_tools_embeddable_enabled', true) && (bool) ($value ?? false);
+    }
+
     public function getHowItWorksAttribute($value)
     {
         if (is_string($value)) {

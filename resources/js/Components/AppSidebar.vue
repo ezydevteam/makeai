@@ -24,7 +24,10 @@ const { t } = useTranslate()
 const sidebarConfig = computed<SidebarConfig>(() => (page.props.sidebarConfig as SidebarConfig) || { blocks: [], position: 'right', sticky: true, show_on_pages: [] });
 const sidebarData = computed(() => (page.props.sidebarData as Record<string, any>) || {});
 
-const currentRoute = computed(() => route().current() ?? '');
+const currentRoute = computed<string>(() => {
+    const cur = route().current();
+    return typeof cur === 'string' ? cur : '';
+});
 const isVisible = computed(() => {
     const pages = sidebarConfig.value.show_on_pages ?? [];
     if (pages.length === 0) return true;

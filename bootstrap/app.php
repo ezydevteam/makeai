@@ -53,6 +53,7 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'webhooks/*',
             'social/accounts/*/callback',
+            'embed/*',
         ]);
 
         $middleware->alias([

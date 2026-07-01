@@ -1,0 +1,44 @@
+{
+    "slug": "ai-chatbot",
+    "name": "AI Chatbot",
+    "version": "1.0.0",
+    "description": "Modular AI Chatbot system with customizable personas, streaming responses, branching, tags, sharing, and limits.",
+    "author": "MakeAI",
+    "min_makeai_version": "1.0.0",
+    "envato_item_id": null,
+    "requires_license": false,
+    "requires_pro": false,
+    "admin_menu": [
+        {
+            "parent": "AI Tools",
+            "label": "Chatbot Settings",
+            "route": "admin.addons.settings",
+            "route_params": { "slug": "ai-chatbot" },
+            "route_pattern": "admin.addons.settings",
+            "icon": "ti ti-message-2-code",
+            "permission": "settings.manage"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",                         "type": "boolean",   "label": "Enable Chatbot",                         "default": true,             "group": "general" },
+        { "key": "hide_site_header",                "type": "boolean",   "label": "Hide Site Header on Chat Page",          "default": false,            "group": "general" },
+        { "key": "hide_site_footer",                "type": "boolean",   "label": "Hide Site Footer on Chat Page",          "default": false,            "group": "general" },
+        { "key": "allow_model_select",              "type": "boolean",   "label": "Allow Users to Select AI Model",         "default": true,             "group": "ai" },
+        { "key": "show_friendly_model_names",       "type": "boolean",   "label": "Show Friendly Model Names",              "default": false,            "group": "ai" },
+        { "key": "default_chat_model",              "type": "string",    "label": "Default AI Model",                       "default": "gpt-4o-mini",    "group": "ai" },
+        { "key": "allow_guest_messages",            "type": "boolean",   "label": "Allow Guests to Chat",                   "default": false,            "group": "guests" },
+        { "key": "guest_max_messages",              "type": "integer",   "label": "Max Guest Messages",                     "default": 10,               "group": "guests" },
+        { "key": "guest_max_tokens",                "type": "integer",   "label": "Max Guest Tokens per Request",           "default": 1000,             "group": "guests" },
+        { "key": "free_credits_per_message",        "type": "integer",   "label": "Free Tier: Credits per Message",         "default": 1,                "group": "free_tier" },
+        { "key": "free_max_tokens",                  "type": "integer",   "label": "Free Tier: Max Tokens per Request",      "default": 2048,             "group": "free_tier" },
+        { "key": "free_max_chat_history",           "type": "integer",   "label": "Free Tier: Max Chat History Messages",   "default": 50,               "group": "free_tier" },
+        { "key": "free_max_file_size_mb",           "type": "integer",   "label": "Free Tier: Max File Upload Size (MB)",   "default": 10,               "group": "free_tier" },
+        { "key": "show_token_usage",                "type": "boolean",   "label": "Show Token Usage",                       "default": false,            "group": "technical" },
+        { "key": "show_credits_charged",            "type": "boolean",   "label": "Show Credits Charged",                   "default": true,             "group": "technical" }
+    ],
+    "permissions": [
+        { "slug": "addon.chatbot.use",              "name": "Use AI Chatbot",                          "group": "Chatbot" },
+        { "slug": "addon.chatbot.settings",         "name": "Manage Chatbot Settings",                  "group": "Chatbot" }
+    ],
+    "hooks": []
+}

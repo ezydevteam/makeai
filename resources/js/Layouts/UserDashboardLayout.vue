@@ -11,6 +11,14 @@ const { t } = useTranslate()
 const affiliateEnabled = computed(() => Boolean(page.props.affiliateEnabled))
 const ticketsEnabled = computed(() => Boolean(page.props.ticketsEnabled))
 const referralUser = computed(() => page.props.auth?.user as any)
+const userAvatarUrl = computed(() => {
+    const avatar = referralUser.value?.avatar
+    if (!avatar) return null
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+        return avatar
+    }
+    return `/storage/${avatar}`
+})
 
 const sidebarOpen = ref(false)
 const onboardingOpen = ref(false)
@@ -88,8 +96,8 @@ const mobileBottomHeaderHeight = computed(() => {
     return mobileBottom.hide_menu_labels === true ? 48 : 60
 })
 const dashboardShellStyle = computed(() => ({
-    paddingTop: 'calc(var(--header-height, 64px) + 0rem)',
-    paddingBottom: `${32 + mobileBottomHeaderHeight.value}px`,
+    paddingTop: '32px',
+    paddingBottom: '24px',
 }))
 const mobileSidebarInsetStyle = computed(() => ({
     top: 'var(--header-height, 64px)',
@@ -157,8 +165,7 @@ const navItems = computed<NavItem[]>(() => {
             sectionKey: 'social',
             children: [
                 { label: t('Calendar'), routeName: 'addon.social.user.calendar', active: is('addon.social.user.calendar') },
-                { label: t('Composer'), routeName: 'addon.social.user.posts.create', active: is('addon.social.user.posts.create') },
-                { label: t('Posts'), routeName: 'addon.social.user.posts.index', active: is('addon.social.user.posts.*') },
+                { label: t('Posts'), routeName: 'addon.social.user.posts.index', active: is('addon.social.user.posts.index') || is('addon.social.user.posts.edit') },
                 { label: t('Accounts'), routeName: 'addon.social.user.accounts', active: is('addon.social.user.accounts') },
                 { label: t('Analytics'), routeName: 'addon.social.user.analytics', active: is('addon.social.user.analytics') },
             ],
@@ -172,7 +179,7 @@ const navItems = computed<NavItem[]>(() => {
             children: [
                 { label: t('Profile'), routeName: 'user.dashboard.profile', active: is('user.dashboard.profile*') },
                 { label: t('Security'), routeName: 'user.dashboard.security', active: is('user.dashboard.security*') },
-                { label: t('API Keys'), routeName: 'user.dashboard.api-keys', active: is('user.dashboard.api-keys.*') },
+                { label: t('API Keys'), routeName: 'user.dashboard.api-keys', active: is('user.dashboard.api-keys') || is('user.dashboard.api-keys.*') },
                 { label: t('Billing'), routeName: 'user.dashboard.billing', active: is('user.dashboard.billing*') },
                 { label: t('Buy Credits'), routeName: 'user.dashboard.credit-topup', active: is('user.dashboard.credit-topup*') },
                 { label: t('Privacy'), routeName: 'user.dashboard.privacy', active: is('user.dashboard.privacy*') },
@@ -195,12 +202,24 @@ function isSectionOpen(key: string): boolean {
 }
 
 function toggleSection(key: string) {
-    if (key === 'workspace') workspaceOpen.value = !workspaceOpen.value
-    if (key === 'library') libraryOpen.value = !libraryOpen.value
-    if (key === 'account') accountOpen.value = !accountOpen.value
-    if (key === 'social') socialOpen.value = !socialOpen.value
-    if (key === 'video') videoOpen.value = !videoOpen.value
-    if (key === 'voiceover') voiceoverOpen.value = !voiceoverOpen.value
+    const sections: Record<string, typeof workspaceOpen> = {
+        workspace: workspaceOpen,
+        library: libraryOpen,
+        account: accountOpen,
+        social: socialOpen,
+        video: videoOpen,
+        voiceover: voiceoverOpen,
+    }
+
+    const currentVal = sections[key].value
+
+    // Close all first
+    Object.keys(sections).forEach(k => {
+        sections[k].value = false
+    })
+
+    // Toggle current
+    sections[key].value = !currentVal
 }
 </script>
 
@@ -227,28 +246,49 @@ function toggleSection(key: string) {
                     <aside
                         :class="[
                             sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-                            'fixed left-0 z-40 flex w-[min(18rem,calc(100vw-1.5rem))] max-w-full flex-col border-r border-gray-200 bg-white shadow-xl transition-transform duration-200 dark:border-gray-700 dark:bg-gray-950 dark:shadow-black/30 lg:static lg:h-auto lg:w-[260px] lg:translate-x-0 lg:self-start lg:rounded-xl lg:border lg:shadow-sm'
+                            'fixed left-0 z-40 flex w-[min(18rem,calc(100vw-1.5rem))] max-w-full flex-col border-r border-gray-100 bg-white shadow-xl transition-transform duration-200 dark:border-surface-800 dark:bg-surface-900 dark:shadow-black/30 lg:static lg:h-auto lg:w-[260px] lg:translate-x-0 lg:self-start lg:rounded-xl lg:border lg:shadow-[0_18px_40px_rgba(15,23,42,0.06)]'
                         ]"
                         :style="appliedMobileSidebarInsetStyle"
                     >
-                        <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800 lg:hidden">
+                        <div class="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-surface-800 lg:hidden">
                             <div>
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Dashboard Menu') }}</p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Navigate your workspace') }}</p>
                             </div>
-                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-white" :aria-label="t('Close menu')" @click="closeSidebar">
+                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200 dark:hover:border-surface-600 dark:hover:bg-surface-750 dark:hover:text-white" :aria-label="t('Close menu')" @click="closeSidebar">
                                 <i class="ti ti-x text-lg" aria-hidden="true"></i>
                             </button>
                         </div>
 
-                        <nav class="flex-1 space-y-1 overflow-y-auto p-3 dark:bg-gray-950/60">
+                        <!-- User Profile Info -->
+                        <div class="flex items-center gap-3 border-b border-gray-100 px-4 py-4 dark:border-surface-800">
+                            <!-- Avatar -->
+                            <div class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-primary-100 dark:bg-primary-500/10">
+                                <img
+                                    v-if="userAvatarUrl"
+                                    :src="userAvatarUrl"
+                                    :alt="referralUser?.name"
+                                    class="h-full w-full object-cover"
+                                />
+                                <div v-else class="flex h-full w-full items-center justify-center font-semibold text-primary-700 dark:text-primary-300 uppercase">
+                                    {{ referralUser?.name ? referralUser.name.charAt(0) : 'U' }}
+                                </div>
+                            </div>
+                            <!-- Name & Email -->
+                            <div class="min-w-0 flex-1">
+                                <p class="truncate text-sm font-semibold text-gray-900 dark:text-white" :title="referralUser?.name">{{ referralUser?.name }}</p>
+                                <p class="truncate text-xs text-gray-500 dark:text-gray-400" :title="referralUser?.email">{{ referralUser?.email }}</p>
+                            </div>
+                        </div>
+
+                        <nav class="flex-1 space-y-1 overflow-y-auto p-3 dark:bg-surface-900/60">
                             <template v-for="item in navItems" :key="item.label">
                                 <!-- Section header (collapsible) -->
                                 <button
                                     v-if="item.children && item.children.length"
                                     @click="toggleSection(item.sectionKey!)"
-                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-500/15 dark:text-primary-200' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 dark:hover:text-white'"
-                                    class="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition"
+                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800/40 dark:!bg-primary-500/15 dark:!text-primary-300' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white'"
+                                    class="flex w-full items-center gap-3 rounded-full border px-3 py-2.5 text-sm font-semibold transition"
                                 >
                                     <i :class="item.icon" class="text-lg shrink-0"></i>
                                     <span class="flex-1 text-left">{{ item.label }}</span>
@@ -256,13 +296,13 @@ function toggleSection(key: string) {
                                 </button>
 
                                 <!-- Collapsible children -->
-                                <div v-if="item.children && isSectionOpen(item.sectionKey!)" class="ml-4 space-y-1 border-l border-gray-200 pl-3 dark:border-gray-700/80">
+                                <div v-if="item.children && isSectionOpen(item.sectionKey!)" class="ml-4 space-y-1 border-l border-gray-200 pl-3 dark:border-surface-800/80">
                                     <Link
                                         v-for="child in item.children"
                                         :key="child.routeName"
                                         :href="route(child.routeName)"
-                                        :class="child.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-500/15 dark:text-primary-200' : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800/80 dark:hover:text-white'"
-                                        class="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition"
+                                        :class="child.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800/40 dark:!bg-primary-500/15 dark:!text-primary-300' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-white'"
+                                        class="flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition"
                                         @click="closeSidebar"
                                     >
                                         <span>{{ child.label }}</span>
@@ -273,8 +313,8 @@ function toggleSection(key: string) {
                                 <Link
                                     v-else-if="item.routeName"
                                     :href="route(item.routeName)"
-                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-500/15 dark:text-primary-200' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 dark:hover:text-white'"
-                                    class="flex items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-semibold transition"
+                                    :class="item.active ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800/40 dark:!bg-primary-500/15 dark:!text-primary-300' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white'"
+                                    class="flex items-center gap-3 rounded-full border px-3 py-2.5 text-sm font-semibold transition"
                                     @click="closeSidebar"
                                 >
                                     <i :class="item.icon" class="text-lg shrink-0"></i>
@@ -283,14 +323,14 @@ function toggleSection(key: string) {
                             </template>
                         </nav>
 
-                        <div class="shrink-0 border-t border-gray-100 bg-white/90 p-3 dark:border-gray-800 dark:bg-gray-950">
+                        <div class="shrink-0 rounded-b-xl border-t border-gray-100 bg-white/90 p-3 dark:border-surface-800 dark:bg-surface-900">
                             <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">{{ t('Credit Balance') }}</p>
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="text-lg font-bold text-gray-900 dark:text-white">{{ referralUser?.credits ?? 0 }}</div>
                                     <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('credits available') }}</div>
                                 </div>
-                                <Link :href="route('user.dashboard.credit-topup')" class="inline-flex items-center gap-1 rounded-full bg-primary-600 px-3 py-1.5 text-xs font-semibold !text-white hover:bg-primary-700 transition-colors">
+                                <Link :href="route('user.dashboard.credit-topup')" class="inline-flex items-center gap-1 rounded-full bg-primary-500 px-3 py-1.5 text-xs font-semibold !text-white hover:bg-primary-700 transition-colors">
                                     <i class="ti ti-plus text-sm"></i>
                                     {{ t('Top Up') }}
                                 </Link>

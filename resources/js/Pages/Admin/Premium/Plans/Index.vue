@@ -664,7 +664,7 @@ const submit = () => {
                             </div>
 
                             <div class="p-6">
-                                <div v-if="form.features.length === 0" class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                                <div v-if="form.features.length === 0" class="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
                                     {{ t('No features added.') }}
                                 </div>
 

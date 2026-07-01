@@ -111,7 +111,7 @@ class UserManagementController extends Controller
     public function show(User $user)
     {
         return Inertia::render('Admin/Roles/Users/Show', [
-            'user' => $user->load(['plan', 'loginHistory' => fn ($q) => $q->latest()->limit(5)]),
+            'user' => $user->load(['plan', 'loginHistory' => fn($q) => $q->latest()->limit(5)]),
             'plans' => Plan::active()->get(['id', 'name']),
             'usageHistory' => AiUsageLog::query()
                 ->where('user_id', $user->id)
@@ -138,7 +138,7 @@ class UserManagementController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,'.$user->id,
+            'email' => 'required|email|unique:users,email,' . $user->id,
             'credits' => 'required|numeric|min:0',
             'plan_id' => 'nullable|exists:plans,id',
             'is_active' => 'required|boolean',
@@ -342,10 +342,10 @@ class UserManagementController extends Controller
     {
         $adminId = session('admin_impersonator_id');
         session()->forget('admin_impersonator_id');
-        
+
         // Log out the web guard (user)
         Auth::guard('web')->logout();
-        
+
         // Regenerate session to prevent session fixation and clear residual user data
         session()->regenerate();
 
@@ -365,7 +365,7 @@ class UserManagementController extends Controller
      */
     public function export()
     {
-        $fileName = 'users_'.date('Y-m-d_H-i-s').'.csv';
+        $fileName = 'users_' . date('Y-m-d_H-i-s') . '.csv';
         $users = User::all();
 
         $headers = [

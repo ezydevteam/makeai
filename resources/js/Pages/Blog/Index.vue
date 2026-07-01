@@ -75,7 +75,7 @@ const formatDate = (value: string | null) => {
     </Head>
 
     <div class="min-h-screen bg-emerald-50/50 dark:bg-surface-950">
-        <div class="max-w-7xl mx-auto px-6 py-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-10">
             <div class="mb-8">
                 <Link :href="route('home')" class="text-sm text-primary-600 hover:text-primary-700">{{ t('Home') }}</Link>
                 <h1 class="mt-3 text-4xl font-bold text-gray-900 dark:text-white">{{ heading }}</h1>

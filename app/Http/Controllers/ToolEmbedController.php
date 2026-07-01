@@ -21,7 +21,7 @@ class ToolEmbedController extends Controller
         $tools = AiTool::active()->select('slug', 'name')->get()
             ->map(fn ($t) => ['slug' => $t->slug, 'name' => $t->name]);
 
-        return Inertia::render('ToolEmbeds/Index', [
+        return Inertia::render('User/ToolEmbeds', [
             'embeds' => $embeds,
             'tools' => $tools,
         ]);
@@ -45,7 +45,7 @@ class ToolEmbedController extends Controller
             'tool_slug' => $validated['tool_slug'],
             'label' => $validated['label'] ?? null,
             'allowed_origins' => $validated['allowed_origins'] ?? null,
-            'password_hash' => ! empty($validated['password']) ? bcrypt($validated['password']) : null,
+            'password_hash' => ! blank($validated['password']) ? bcrypt($validated['password']) : null,
             'theme' => $validated['theme'] ?? 'auto',
             'primary_color' => $validated['primary_color'] ?? null,
             'show_branding' => $validated['show_branding'] ?? true,
@@ -71,7 +71,7 @@ class ToolEmbedController extends Controller
         ]);
 
         if (array_key_exists('password', $validated)) {
-            $validated['password_hash'] = ! empty($validated['password']) ? bcrypt($validated['password']) : null;
+            $validated['password_hash'] = ! blank($validated['password']) ? bcrypt($validated['password']) : null;
             unset($validated['password']);
         }
 

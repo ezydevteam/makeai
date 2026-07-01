@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
+use App\Models\AiTool;
 use App\Models\AiUsageLog;
 use App\Models\ToolReview;
 use App\Models\ToolReviewVote;
@@ -23,6 +24,15 @@ class ToolReviewController extends Controller
      */
     public function index(Request $request, string $slug): JsonResponse
     {
+        $template = AiTool::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        if (! $template->show_reviews) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Reviews are disabled for this tool.'),
+            ], 403);
+        }
+
         $validated = $request->validate([
             'sort' => ['nullable', Rule::in(['recent', 'helpful', 'highest', 'lowest'])],
         ]);
@@ -55,6 +65,13 @@ class ToolReviewController extends Controller
     public function store(Request $request, string $slug): JsonResponse
     {
         $template = AiTool::where('slug', $slug)->where('is_active', true)->firstOrFail();
+
+        if (! $template->show_reviews) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Reviews are disabled for this tool.'),
+            ], 403);
+        }
 
         $validated = $request->validate([
             'rating' => 'required|integer|min:1|max:5',
@@ -92,7 +109,7 @@ class ToolReviewController extends Controller
             $existing->update([
                 'rating' => $validated['rating'],
                 'comment' => $validated['comment'] ?? $existing->comment,
-                'is_approved' => $existing->shouldAutoApprove(),
+                'is_approved' => ! settings('tools_review_approval_enabled', true) || $existing->shouldAutoApprove(),
             ]);
 
             return response()->json([
@@ -107,12 +124,19 @@ class ToolReviewController extends Controller
             'user_id' => $user->id,
             'rating' => $validated['rating'],
             'comment' => $validated['comment'],
-            'is_approved' => false,
+            'is_approved' => ! settings('tools_review_approval_enabled', true),
         ]);
 
         // Check auto-approve
-        if ($review->shouldAutoApprove()) {
+        if ($review->is_approved === false && $review->shouldAutoApprove()) {
             $review->update(['is_approved' => true]);
+        }
+
+        // Notify Admins
+        try {
+            app(\App\Services\NotificationEventService::class)->newToolReviewSubmitted($review);
+        } catch (\Exception $e) {
+            \Log::error('Failed to send tool review notification to admin: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -129,6 +153,15 @@ class ToolReviewController extends Controller
      */
     public function vote(Request $request, ToolReview $review): JsonResponse
     {
+        $template = AiTool::where('slug', $review->tool_slug)->first();
+
+        if (! $template || ! $template->show_reviews) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Reviews are disabled for this tool.'),
+            ], 403);
+        }
+
         $validated = $request->validate([
             'is_helpful' => 'required|boolean',
         ]);

@@ -62,12 +62,12 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div v-if="!dismissed" class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800">
+    <div v-if="!dismissed" class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-            <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Getting Started') }}</h2>
+            <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Getting Started!') }}</h2>
             <button
                 @click="dismissed = true"
-                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                class="rounded-full w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-300 transition"
                 :aria-label="t('Dismiss')"
             >
                 <i class="ti ti-x text-lg"></i>
@@ -80,9 +80,9 @@ onMounted(async () => {
 
         <div v-else class="p-6 space-y-4">
             <div class="flex items-center gap-3">
-                <div class="flex-1 h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                <div class="flex-1 h-2 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
                     <div
-                        class="h-full rounded-full bg-[#1F75FE] transition-all duration-500"
+                        class="h-full rounded-full bg-primary-500 transition-all duration-500"
                         :style="{ width: `${percent}%` }"
                     ></div>
                 </div>
@@ -97,13 +97,13 @@ onMounted(async () => {
                 >
                     <span
                         class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition"
-                        :class="items[def.key as keyof ChecklistItems] ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'"
+                        :class="items[def.key as keyof ChecklistItems] ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-200 dark:!bg-slate-800'"
                     >
                         <i
                             v-if="items[def.key as keyof ChecklistItems]"
                             class="ti ti-check text-xs text-green-600"
                         ></i>
-                        <i v-else :class="def.icon" class="text-xs text-gray-400"></i>
+                        <i v-else :class="def.icon" class="text-xs text-gray-500"></i>
                     </span>
                     <span class="text-sm"
                         :class="items[def.key as keyof ChecklistItems] ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white font-medium'"

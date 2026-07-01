@@ -39,10 +39,10 @@ export const resolveNotificationIconClass = (item: NotificationIconSource) => {
     }
 
     return ({
-        success: 'ti ti-badge-check',
+        success: 'ti ti-circle-check',
         warning: 'ti ti-alert-triangle',
-        error: 'ti ti-bell-ringing',
-        info: 'ti ti-bell',
+        error: 'ti ti-alert-circle',
+        info: 'ti ti-info-circle',
     }[item.level] ?? 'ti ti-bell')
 }
 

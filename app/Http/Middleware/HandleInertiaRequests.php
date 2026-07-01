@@ -98,6 +98,7 @@ class HandleInertiaRequests extends Middleware
         $frontendHomepageSettings = $frontendPresetService->getResolvedFrontendHomepage();
         $frontendHomepageConfig = $frontendPresetService->getResolvedFrontendHomepageConfig();
         $frontendCustomCodeSettings = $frontendPresetService->getStoredCustomCodeSettings();
+        $frontendToolPageSettings = $frontendPresetService->getResolvedFrontendToolPage();
 
         $resolveImage = fn (?string $path) => $path ? (str_starts_with($path, 'http') ? $path : Storage::disk('public')->url($path)) : '';
         // Use relative paths for local storage URLs to avoid mixed-content on HTTPS pages
@@ -243,6 +244,7 @@ class HandleInertiaRequests extends Middleware
             'frontendHomepageSettings' => fn () => $frontendHomepageSettings,
             'frontendHomepageConfig' => fn () => $frontendHomepageConfig,
             'frontendCustomCodeSettings' => fn () => $frontendCustomCodeSettings,
+            'frontendToolPageSettings' => fn () => $frontendToolPageSettings,
 
             'footerData' => fn () => [
                 'recentPosts' => BlogPost::published()
@@ -319,8 +321,23 @@ class HandleInertiaRequests extends Middleware
             'addonMenuItems' => fn () => app(\App\Services\AddonService::class)->getActiveAddonMenuItems(),
 
             'appearanceAdminSettings' => fn () => AppearanceSetting::getForScope('admin'),
+            
+            'globalToolSettings' => fn () => [
+                'brand_voice' => (bool) settings('global_tools_brand_voice_enabled', true),
+                'variations' => (bool) settings('global_tools_variations_enabled', true),
+                'regenerate' => (bool) settings('global_tools_regenerate_enabled', true),
+                'improve' => (bool) settings('global_tools_improve_enabled', true),
+                'editor' => (bool) settings('global_tools_editor_enabled', true),
+                'show_about' => (bool) settings('global_tools_show_about_enabled', true),
+                'show_how_it_works' => (bool) settings('global_tools_show_how_it_works_enabled', true),
+                'show_usage_examples' => (bool) settings('global_tools_show_usage_examples_enabled', true),
+                'show_faqs' => (bool) settings('global_tools_show_faqs_enabled', true),
+                'show_reviews' => (bool) settings('global_tools_show_reviews_enabled', true),
+                'embeddable' => (bool) settings('global_tools_embeddable_enabled', true),
+            ],
 
             'appearanceThemeSettings' => fn () => $frontendThemeSettings,
+            'appearanceToolPageSettings' => fn () => $frontendToolPageSettings,
         ];
     }
 
@@ -337,6 +354,7 @@ class HandleInertiaRequests extends Middleware
             'facebook' => translate('Facebook'),
             'reddit' => translate('Reddit'),
             'twitter' => translate('Twitter'),
+            'linkedin' => translate('LinkedIn'),
         ])
             ->filter(fn (string $label, string $provider) => (bool) settings("social_login_{$provider}_enabled", false)
                 && filled(settings("social_login_{$provider}_client_id", ''))
@@ -385,6 +403,8 @@ class HandleInertiaRequests extends Middleware
                 'name' => $user->name,
                 'email' => $user->email,
                 'avatar' => $user->avatar,
+                'country' => $user->country,
+                'profession' => $user->profession,
                 'credits' => (float) $user->credits,
                 'plan_id' => $user->plan_id,
                 'is_pro' => isProAvailable() && $user->isPro(),
@@ -483,7 +503,8 @@ class HandleInertiaRequests extends Middleware
             ];
         }
 
-        $notifiable = auth('admin')->user() ?: $request->user();
+        $isAdminRequest = $request->is('admin') || $request->is('admin/*');
+        $notifiable = $isAdminRequest ? auth('admin')->user() : $request->user();
         if (! $notifiable) {
             return [
                 'enabled' => (bool) settings('notifications_enabled', true),

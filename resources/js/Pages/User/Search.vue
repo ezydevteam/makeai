@@ -89,7 +89,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Search Input -->
-        <div class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800 p-6">
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
             <div class="relative">
                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
                     <i class="ti ti-search text-xl"></i>
@@ -110,7 +110,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Conversations -->
-        <div v-if="conversations.length > 0" class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div v-if="conversations.length > 0" class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
             <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                 <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Conversations') }} ({{ conversations.length }})</h2>
             </div>
@@ -126,7 +126,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Documents -->
-        <div v-if="documents.length > 0" class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div v-if="documents.length > 0" class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
             <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                 <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('Documents') }} ({{ documents.length }})</h2>
             </div>
@@ -142,7 +142,7 @@ onUnmounted(() => {
         </div>
 
         <!-- Tools -->
-        <div v-if="tools.length > 0" class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800">
+        <div v-if="tools.length > 0" class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
             <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                 <h2 class="font-semibold text-gray-900 dark:text-white">{{ t('AI Tools') }} ({{ tools.length }})</h2>
             </div>
@@ -151,7 +151,7 @@ onUnmounted(() => {
                     v-for="tool in tools"
                     :key="tool.slug"
                     :href="route('ai.tools.show', tool.slug)"
-                    class="group flex items-start gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition hover:border-primary-500 hover:shadow-md dark:bg-gray-900 dark:border-gray-800"
+                    class="group flex items-start gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition hover:border-primary-500 hover:shadow-md dark:border-surface-800 dark:bg-gray-900"
                 >
                     <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg" :style="{ background: (tool.color || '#1F75FE') + '18', color: tool.color || '#1F75FE' }">
                         <i :class="tool.icon || 'ti ti-wand'" class="text-xl"></i>
@@ -168,7 +168,7 @@ onUnmounted(() => {
         </div>
 
         <!-- No Results -->
-        <div v-if="query && totalResults === 0" class="bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-gray-900 dark:border-gray-800 p-10 text-center">
+        <div v-if="query && totalResults === 0" class="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">
             <i class="ti ti-search-off text-4xl text-gray-300 dark:text-gray-600"></i>
             <p class="mt-4 text-gray-500 dark:text-gray-400">{{ t('No results found for ":query"', { query }) }}</p>
             <p class="text-sm text-gray-400 dark:text-gray-500 mt-2">{{ t('Try different keywords or check your spelling.') }}</p>

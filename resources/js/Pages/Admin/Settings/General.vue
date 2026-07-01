@@ -90,100 +90,92 @@ const saveSettings = () => {
         </div>
 
         <form class="space-y-6" @submit.prevent="saveSettings">
-            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                <div class="space-y-6">
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
-                        <div class="mb-5">
-                            <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Site Identity') }}</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('These values define the public brand across navigation, emails, SEO surfaces, and footer areas.') }}</p>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Site name') }}
-                                <input v-model="form.site_name" type="text" :placeholder="t('Enter site name')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                                <span v-if="form.errors.site_name" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_name }}</span>
-                            </label>
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Tagline') }}
-                                <input v-model="form.site_tagline" type="text" :placeholder="t('Enter site tagline')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
-                                {{ t('Description') }}
-                                <textarea v-model="form.site_description" rows="3" :placeholder="t('Describe your site for visitors and search previews')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
-                            </label>
-
-                        </div>
-                    </section>
-
+            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                <div class="mb-5">
+                    <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Site Identity') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('These values define the public brand across navigation, emails, SEO surfaces, and footer areas.') }}</p>
                 </div>
 
-                <div class="space-y-6">
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
-                        <div class="mb-5">
-                            <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Site URL & Links') }}</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Keep your canonical address, support entry points, and policy destinations easy to maintain from a single panel.') }}</p>
-                        </div>
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Site name') }}
+                        <input v-model="form.site_name" type="text" :placeholder="t('Enter site name')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <span v-if="form.errors.site_name" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_name }}</span>
+                    </label>
 
-                        <div class="grid grid-cols-1 gap-5">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Site URL') }}
-                                <input v-model="form.site_url" type="url" :placeholder="t('https://example.com')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                                <span v-if="form.errors.site_url" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_url }}</span>
-                            </label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Tagline') }}
+                        <input v-model="form.site_tagline" type="text" :placeholder="t('Enter site tagline')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
 
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Support email') }}
-                                <input v-model="form.site_support_email" type="email" :placeholder="t('support@example.com')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Support URL') }}
-                                <input v-model="form.site_support_url" type="url" :placeholder="t('https://example.com/support')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Terms of Service URL') }}
-                                <input v-model="form.site_terms_url" type="url" :placeholder="t('https://example.com/terms')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Privacy Policy URL') }}
-                                <input v-model="form.site_privacy_url" type="url" :placeholder="t('https://example.com/privacy')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
-                        <div class="mb-5">
-                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Language, Currency & Timezone') }}</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set sensible defaults for first-time visitors and keep price formatting aligned across the product.') }}</p>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-5">
-                            <AppSelect v-model="form.default_language" :label="t('Default language')" :options="languageOptions" :live-search="true" />
-
-                            <AppSelect v-model="form.app_timezone" :label="t('Timezone')" :options="timezoneOptions" :live-search="true" />
-
-                            <AppSelect v-model="form.default_currency" :label="t('Default currency')" :options="currencyOptions" :live-search="true" />
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Currency symbol') }}
-                                <input v-model="form.currency_symbol" type="text" :placeholder="t('Enter currency symbol')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-
-                            <AppSelect v-model="form.currency_position" :label="t('Currency position')" :options="positionOptions" />
-
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Currency decimals') }}
-                                <input v-model.number="form.currency_decimals" type="number" min="0" max="4" :placeholder="t('Enter decimal places')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            </label>
-                        </div>
-                    </section>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                        {{ t('Description') }}
+                        <textarea v-model="form.site_description" rows="3" :placeholder="t('Describe your site for visitors and search previews')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                    </label>
                 </div>
-            </div>
+            </section>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                <div class="mb-5">
+                    <h2 class="mt-2 text-lg font-bold text-gray-900 dark:text-white">{{ t('Site URL & Links') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Keep your canonical address, support entry points, and policy destinations easy to maintain from a single panel.') }}</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Site URL') }}
+                        <input v-model="form.site_url" type="url" :placeholder="t('https://example.com')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <span v-if="form.errors.site_url" class="mt-1 block text-xs text-danger-600">{{ form.errors.site_url }}</span>
+                    </label>
+
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Support email') }}
+                        <input v-model="form.site_support_email" type="email" :placeholder="t('support@example.com')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Support URL') }}
+                        <input v-model="form.site_support_url" type="url" :placeholder="t('https://example.com/support')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Terms of Service URL') }}
+                        <input v-model="form.site_terms_url" type="url" :placeholder="t('https://example.com/terms')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                        {{ t('Privacy Policy URL') }}
+                        <input v-model="form.site_privacy_url" type="url" :placeholder="t('https://example.com/privacy')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+                </div>
+            </section>
+
+            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900">
+                <div class="mb-5">
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Language, Currency & Timezone') }}</h2>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set sensible defaults for first-time visitors and keep price formatting aligned across the product.') }}</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <AppSelect v-model="form.default_language" :label="t('Default language')" :options="languageOptions" :live-search="true" />
+
+                    <AppSelect v-model="form.app_timezone" :label="t('Timezone')" :options="timezoneOptions" :live-search="true" />
+
+                    <AppSelect v-model="form.default_currency" :label="t('Default currency')" :options="currencyOptions" :live-search="true" />
+
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Currency symbol') }}
+                        <input v-model="form.currency_symbol" type="text" :placeholder="t('Enter currency symbol')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+
+                    <AppSelect v-model="form.currency_position" :label="t('Currency position')" :options="positionOptions" />
+
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Currency decimals') }}
+                        <input v-model.number="form.currency_decimals" type="number" min="0" max="4" :placeholder="t('Enter decimal places')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                    </label>
+                </div>
+            </section>
         </form>
     </div>
 </template>

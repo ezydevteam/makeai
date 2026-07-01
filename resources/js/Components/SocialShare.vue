@@ -35,7 +35,7 @@ const toast = useToastr()
 
 const networkLabels: Record<ShareNetwork, string> = {
     facebook: 'Facebook',
-    x: 'X',
+    x: 'Twitter X',
     linkedin: 'LinkedIn',
     whatsapp: 'WhatsApp',
     telegram: 'Telegram',
@@ -46,15 +46,15 @@ const networkLabels: Record<ShareNetwork, string> = {
 }
 
 const networkClasses: Record<ShareNetwork, string> = {
-    facebook: 'hover:border-blue-500 hover:bg-blue-600 hover:text-white',
-    x: 'hover:border-gray-900 hover:bg-gray-900 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-gray-950',
-    linkedin: 'hover:border-sky-700 hover:bg-sky-700 hover:text-white',
-    whatsapp: 'hover:border-emerald-500 hover:bg-emerald-500 hover:text-white',
-    telegram: 'hover:border-sky-500 hover:bg-sky-500 hover:text-white',
-    pinterest: 'hover:border-red-600 hover:bg-red-600 hover:text-white',
-    reddit: 'hover:border-orange-500 hover:bg-orange-500 hover:text-white',
-    email: 'hover:border-primary-500 hover:text-white',
-    copy: 'hover:border-gray-900 hover:bg-gray-900 hover:text-white dark:hover:border-white dark:hover:bg-white dark:hover:text-gray-950',
+    facebook: 'hover:!border-blue-500 hover:!bg-blue-600 hover:!text-white',
+    x: 'hover:!border-gray-900 hover:!bg-gray-900 hover:!text-white dark:hover:!border-white dark:hover:!bg-white dark:hover:!text-gray-950',
+    linkedin: 'hover:!border-sky-700 hover:!bg-sky-700 hover:!text-white',
+    whatsapp: 'hover:!border-emerald-500 hover:!bg-emerald-500 hover:!text-white',
+    telegram: 'hover:!border-sky-500 hover:!bg-sky-500 hover:!text-white',
+    pinterest: 'hover:!border-red-600 hover:!bg-red-600 hover:!text-white',
+    reddit: 'hover:!border-orange-500 hover:!bg-orange-500 hover:!text-white',
+    email: 'hover:!border-primary-500 hover:!text-white',
+    copy: 'hover:!border-gray-900 hover:!bg-gray-900 hover:!text-white dark:hover:!border-white dark:hover:!bg-white dark:hover:!text-gray-950',
 }
 
 const encodedUrl = computed(() => encodeURIComponent(props.url))

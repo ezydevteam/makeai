@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 const props = withDefaults(defineProps<{
@@ -32,9 +32,22 @@ const swatches = [
 ]
 
 const isOpen = ref(false)
+const wrapperRef = ref<HTMLElement | null>(null)
 const pickerRef = ref<HTMLElement | null>(null)
 const triggerRef = ref<HTMLElement | null>(null)
 const nativeInput = ref<HTMLInputElement | null>(null)
+
+const initialValue = ref(props.modelValue || '')
+
+watch(() => props.modelValue, (newVal) => {
+    if (!initialValue.value && newVal) {
+        initialValue.value = newVal
+    }
+})
+
+const resetColor = () => {
+    hexValue.value = initialValue.value
+}
 
 const hexValue = computed({
     get: () => props.modelValue || '',
@@ -64,7 +77,7 @@ const close = () => {
 
 const clickOutside = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (!pickerRef.value?.contains(target) && !triggerRef.value?.contains(target)) {
+    if (!wrapperRef.value?.contains(target)) {
         close()
     }
 }
@@ -84,7 +97,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="relative w-full min-w-0">
+    <div ref="wrapperRef" class="relative w-full min-w-0">
         <label v-if="label" :for="id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             {{ label }}
         </label>
@@ -104,7 +117,7 @@ onUnmounted(() => {
                 class="w-full cursor-pointer rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-3 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                 :class="{ 'opacity-60 pointer-events-none': disabled }"
                 readonly
-                @click="toggle"
+                @click.stop="toggle"
             />
         </div>
 
@@ -150,8 +163,8 @@ onUnmounted(() => {
                     />
                 </div>
 
-                <!-- Native color picker -->
-                <div>
+                <!-- Native color picker & Reset -->
+                <div class="flex gap-2">
                     <input
                         ref="nativeInput"
                         type="color"
@@ -161,13 +174,22 @@ onUnmounted(() => {
                     />
                     <button
                         type="button"
-                        class="flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                        class="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
                         @click="openNative"
                     >
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                         </svg>
-                        {{ t('Custom Color') }}
+                        {{ t('Custom') }}
+                    </button>
+                    <button
+                        v-if="hexValue.toLowerCase() !== initialValue.toLowerCase()"
+                        type="button"
+                        class="flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                        :title="t('Reset color')"
+                        @click="resetColor"
+                    >
+                        <i class="ti ti-rotate text-sm" />
                     </button>
                 </div>
             </div>

@@ -2,7 +2,7 @@
     <Head :title="t('Pricing Settings')" />
 
     <AdminLayout>
-        <div class="py-12">
+        <div class="py-6">
             <div class="mx-auto max-w-5xl sm:px-6 lg:px-8">
                 <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>

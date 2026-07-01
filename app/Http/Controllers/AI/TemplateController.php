@@ -188,7 +188,7 @@ class TemplateController extends Controller
             'canReview' => auth()->check() && AiUsageLog::where('user_id', auth()->id())
                 ->where('type', 'template')
                 ->where('status', 'completed')
-                ->where('metadata->tool_slug', $tool->slug)
+                ->where('tool_slug', $tool->slug)
                 ->exists(),
             'restoredHistory' => $restoredHistory,
             'effectiveMaxTokens' => $effectiveMaxTokens,

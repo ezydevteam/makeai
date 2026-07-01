@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\DataTransferObjects\LicenseResult;
+use App\DTO\LicenseResult;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;

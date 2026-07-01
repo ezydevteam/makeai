@@ -262,19 +262,7 @@ const hasMissingCredentialsForEnable = (slug: string) => {
 }
 
 const toggleIntegrationEnabled = (slug: string) => {
-    const nextValue = !form.integrations[slug].enabled
-
-    if (!nextValue) {
-        form.integrations[slug].enabled = false
-        return
-    }
-
-    if (hasMissingCredentialsForEnable(slug)) {
-        toast.error(t('Add the required API credentials before enabling this integration.'))
-        return
-    }
-
-    form.integrations[slug].enabled = true
+    form.integrations[slug].enabled = !form.integrations[slug].enabled
 }
 
 const submit = () => {
@@ -311,7 +299,7 @@ const submit = () => {
                 },
             ]),
         ),
-    })).post(route('admin.ai.integrations.update'), {
+    })).post(route('admin.settings.integrations.update'), {
         preserveScroll: true,
     })
 }
@@ -339,7 +327,7 @@ const testConnection = async (slug: string) => {
     }
 
     try {
-        const res = await fetch(route('admin.ai.integrations.test-connection', { integration: slug }), {
+        const res = await fetch(route('admin.settings.integrations.test-connection', { integration: slug }), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -507,13 +495,13 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="p-4 sm:p-6">
-                    <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    <div class="columns-1 xl:columns-2 gap-5">
                         <section
                             v-for="[slug, integration] in filteredIntegrations"
                             :key="slug"
-                            class="rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:border-primary-300 hover:shadow-md dark:border-surface-800 dark:bg-surface-950/40"
+                            class="break-inside-avoid inline-block w-full mb-5 rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:border-primary-300 hover:shadow-md dark:border-surface-800 dark:bg-surface-950/40"
                         >
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                            <div class="px-6 py-4">
                                 <div class="flex items-start justify-between gap-4">
                                     <div class="flex items-start gap-3">
                                         <div class="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
@@ -553,158 +541,167 @@ onBeforeUnmount(() => {
                                 </div>
                             </div>
 
-                            <div class="space-y-5 p-6">
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                                    <div v-if="hasProviderSwitcher(integration)" class="md:col-span-2">
-                                        <AppSelect
-                                            v-model="form.integrations[slug].provider"
-                                            :label="t('Provider')"
-                                            :options="providerOptions[slug]"
-                                        />
-                                    </div>
-
-                                    <div v-else class="md:col-span-2">
-                                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Provider') }}</label>
-                                        <p class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400">—</p>
-                                    </div>
-
-                                    <div>
-                                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Timeout (s)') }}</label>
-                                        <input
-                                            v-model="form.integrations[slug].timeout"
-                                            type="number"
-                                            min="5"
-                                            max="180"
-                                            :placeholder="t('30')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        />
-                                    </div>
-
-                                    <div class="md:col-span-3">
-                                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Fixed Credit Cost') }}</label>
-                                        <input
-                                            v-model="form.integrations[slug].fixed_credit_cost"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            :placeholder="t('0.00')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div
-                                    v-if="isDefaultAi(slug)"
-                                    class="rounded-xl border border-violet-100 bg-violet-50/80 px-4 py-4 dark:border-violet-900/30 dark:bg-violet-900/10"
-                                >
-                                    <div class="flex items-start gap-3">
-                                        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-sm text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                                            <i class="ti ti-sparkles"></i>
+                            <Transition
+                                enter-active-class="transition-all duration-300 ease-out"
+                                enter-from-class="max-h-0 opacity-0 overflow-hidden"
+                                enter-to-class="max-h-[1000px] opacity-100"
+                                leave-active-class="transition-all duration-200 ease-in"
+                                leave-from-class="max-h-[1000px] opacity-100"
+                                leave-to-class="max-h-0 opacity-0 overflow-hidden"
+                            >
+                                <div v-show="form.integrations[slug].enabled" class="border-t border-gray-100 dark:border-surface-850 space-y-5 p-6 overflow-hidden">
+                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                        <div v-if="hasProviderSwitcher(integration)" class="md:col-span-2">
+                                            <AppSelect
+                                                v-model="form.integrations[slug].provider"
+                                                :label="t('Provider')"
+                                                :options="providerOptions[slug]"
+                                            />
                                         </div>
+
+                                        <div v-else class="md:col-span-2">
+                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Provider') }}</label>
+                                            <p class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400">—</p>
+                                        </div>
+
                                         <div>
-                                            <p class="text-sm font-medium text-violet-700 dark:text-violet-300">
-                                                {{ t('Using System Default AI Model') }}
-                                            </p>
-                                            <p class="mt-0.5 text-xs text-violet-600/80 dark:text-violet-200/80">
-                                                {{ t('This integration will use :provider as the fallback LLM. No dedicated API credentials are needed.', { provider: defaultAiName }) }}
-                                            </p>
-                                            <p class="mt-1.5 text-xs text-violet-600/70 dark:text-violet-200/70">
-                                                {{ t('Manage API keys in') }}
-                                                <Link :href="aiIndexUrl" class="underline hover:text-violet-700 dark:hover:text-violet-200">
-                                                    {{ t('Providers & Keys') }}
-                                                </Link>
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div v-else class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
-                                    <div class="mb-4 flex items-center justify-between gap-3">
-                                        <div>
-                                            <h4 v-if="getProvider(slug)" class="text-sm font-semibold text-gray-900 dark:text-white">
-                                                {{ getProvider(slug)!.name }}
-                                                <span v-if="Object.keys(getProvider(slug)!.secrets).length + Object.keys(getProvider(slug)!.options).length === 0" class="font-normal text-gray-500">
-                                                    — {{ t('No credentials required') }}
-                                                </span>
-                                                <span v-else class="font-normal text-gray-500">
-                                                    — {{ t('Credentials') }}
-                                                </span>
-                                            </h4>
+                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Timeout (s)') }}</label>
+                                            <input
+                                                v-model="form.integrations[slug].timeout"
+                                                type="number"
+                                                min="5"
+                                                max="180"
+                                                :placeholder="t('30')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                            />
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            :disabled="testing[slug]"
-                                            class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200"
-                                            @click="testConnection(slug)"
-                                        >
-                                            <svg
-                                                v-if="testing[slug]"
-                                                class="h-3.5 w-3.5 animate-spin"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                            >
-                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                                            </svg>
-                                            <i v-else class="ti ti-plug-connected text-sm"></i>
-                                            <span>{{ testing[slug] ? t('Testing...') : t('Test Connection') }}</span>
-                                        </button>
+                                        <div class="md:col-span-3">
+                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Fixed Credit Cost') }}</label>
+                                            <input
+                                                v-model="form.integrations[slug].fixed_credit_cost"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                :placeholder="t('0.00')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div
-                                        v-if="testResults[slug]"
-                                        :class="testResults[slug].success
-                                            ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900/30 dark:bg-green-900/10 dark:text-green-200'
-                                            : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-200'"
-                                        class="mb-4 rounded-lg border px-4 py-3 text-sm"
+                                        v-if="isDefaultAi(slug)"
+                                        class="rounded-xl border border-violet-100 bg-violet-50/80 px-4 py-4 dark:border-violet-900/30 dark:bg-violet-900/10 font-sans"
                                     >
-                                        <div class="flex items-center gap-2">
-                                            <i :class="testResults[slug].success ? 'ti ti-circle-check text-base' : 'ti ti-alert-circle text-base'"></i>
-                                            <span>{{ testResults[slug].success ? testResults[slug].message : (testResults[slug].error || t('Connection failed')) }}</span>
+                                        <div class="flex items-start gap-3">
+                                            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-sm text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                                                <i class="ti ti-sparkles"></i>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-medium text-violet-700 dark:text-violet-300">
+                                                    {{ t('Using System Default AI Model') }}
+                                                </p>
+                                                <p class="mt-0.5 text-xs text-violet-600/80 dark:text-violet-200/80">
+                                                    {{ t('This integration will use :provider as the fallback LLM. No dedicated API credentials are needed.', { provider: defaultAiName }) }}
+                                                </p>
+                                                <p class="mt-1.5 text-xs text-violet-600/70 dark:text-violet-200/70">
+                                                    {{ t('Manage API keys in') }}
+                                                    <Link :href="aiIndexUrl" class="underline hover:text-violet-700 dark:hover:text-violet-200">
+                                                        {{ t('Providers & Keys') }}
+                                                    </Link>
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                        <template v-if="getProvider(slug)">
-                                            <div
-                                                v-for="(_, secretKey) in getProvider(slug)!.secrets"
-                                                :key="secretKey"
-                                            >
-                                                <label class="mb-1.5 block text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
-                                                    {{ String(secretKey).replaceAll('_', ' ') }}
-                                                </label>
-                                                <input
-                                                    v-model="form.integrations[slug].providers[form.integrations[slug].provider].secrets[secretKey]"
-                                                    type="text"
-                                                    autocomplete="new-password"
-                                                    :placeholder="t('Enter key...')"
-                                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
-                                                    @focus="clearMaskedSecretOnFocus(slug, form.integrations[slug].provider, secretKey)"
-                                                />
-                                                <p class="mt-1 text-xs text-gray-400">
-                                                    {{ isSecretConfigured(slug, secretKey) ? t('Encrypted value saved. Leave blank to keep it.') : t('Not configured yet.') }}
-                                                </p>
+                                    <div v-else class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
+                                        <div class="mb-4 flex items-center justify-between gap-3">
+                                            <div>
+                                                <h4 v-if="getProvider(slug)" class="text-sm font-semibold text-gray-900 dark:text-white">
+                                                    {{ getProvider(slug)!.name }}
+                                                    <span v-if="Object.keys(getProvider(slug)!.secrets).length + Object.keys(getProvider(slug)!.options).length === 0" class="font-normal text-gray-500">
+                                                        — {{ t('No credentials required') }}
+                                                    </span>
+                                                    <span v-else class="font-normal text-gray-500">
+                                                        — {{ t('Credentials') }}
+                                                    </span>
+                                                </h4>
                                             </div>
 
-                                            <div
-                                                v-for="(_, optionKey) in getProvider(slug)!.options"
-                                                :key="optionKey"
+                                            <button
+                                                type="button"
+                                                :disabled="testing[slug]"
+                                                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200"
+                                                @click="testConnection(slug)"
                                             >
-                                                <label class="mb-1.5 block text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
-                                                    {{ String(optionKey).replaceAll('_', ' ') }}
-                                                </label>
-                                                <input
-                                                    v-model="form.integrations[slug].providers[form.integrations[slug].provider].options[optionKey]"
-                                                    type="text"
-                                                    :placeholder="t('Enter value...')"
-                                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
-                                                />
+                                                <svg
+                                                    v-if="testing[slug]"
+                                                    class="h-3.5 w-3.5 animate-spin"
+                                                    fill="none"
+                                                    viewBox="0 0 24 24"
+                                                >
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                                </svg>
+                                                <i v-else class="ti ti-plug-connected text-sm"></i>
+                                                <span>{{ testing[slug] ? t('Testing...') : t('Test Connection') }}</span>
+                                            </button>
+                                        </div>
+
+                                        <div
+                                            v-if="testResults[slug]"
+                                            :class="testResults[slug].success
+                                                ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-900/30 dark:bg-green-900/10 dark:text-green-200'
+                                                : 'border-red-200 bg-red-50 text-red-800 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-200'"
+                                            class="mb-4 rounded-lg border px-4 py-3 text-sm"
+                                        >
+                                            <div class="flex items-center gap-2">
+                                                <i :class="testResults[slug].success ? 'ti ti-circle-check text-base' : 'ti ti-alert-circle text-base'"></i>
+                                                <span>{{ testResults[slug].success ? testResults[slug].message : (testResults[slug].error || t('Connection failed')) }}</span>
                                             </div>
-                                        </template>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                            <template v-if="getProvider(slug)">
+                                                <div
+                                                    v-for="(_, secretKey) in getProvider(slug)!.secrets"
+                                                    :key="secretKey"
+                                                >
+                                                    <label class="mb-1.5 block text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
+                                                        {{ String(secretKey).replaceAll('_', ' ') }}
+                                                    </label>
+                                                    <input
+                                                        v-model="form.integrations[slug].providers[form.integrations[slug].provider].secrets[secretKey]"
+                                                        type="text"
+                                                        autocomplete="new-password"
+                                                        :placeholder="t('Enter key...')"
+                                                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                                                        @focus="clearMaskedSecretOnFocus(slug, form.integrations[slug].provider, secretKey)"
+                                                    />
+                                                    <p class="mt-1 text-xs text-gray-400">
+                                                        {{ isSecretConfigured(slug, secretKey) ? t('Encrypted value saved. Leave blank to keep it.') : t('Not configured yet.') }}
+                                                    </p>
+                                                </div>
+
+                                                <div
+                                                    v-for="(_, optionKey) in getProvider(slug)!.options"
+                                                    :key="optionKey"
+                                                >
+                                                    <label class="mb-1.5 block text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
+                                                        {{ String(optionKey).replaceAll('_', ' ') }}
+                                                    </label>
+                                                    <input
+                                                        v-model="form.integrations[slug].providers[form.integrations[slug].provider].options[optionKey]"
+                                                        type="text"
+                                                        :placeholder="t('Enter value...')"
+                                                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                                                    />
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </Transition>
                         </section>
 
                         <div

@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
+use Addons\AiChatbot\Database\Seeders\ChatbotProductSeeder;
+
 class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;

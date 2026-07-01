@@ -207,25 +207,25 @@ const saveDocument = async () => {
 </script>
 
 <template>
-    <div class="h-full min-h-[400px] overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/5 dark:bg-white/[0.03] dark:shadow-none flex flex-col">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-white/5">
+    <div class="h-full min-h-[400px] overflow-hidden rounded-2xl border border-gray-200 bg-white px-6 py-4 shadow-sm dark:border-white/5 dark:bg-white/[0.03] dark:shadow-none flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3 pb-3 border-b border-gray-200 dark:border-white/5">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                 <i class="ti ti-align-left text-primary-600 dark:text-primary-400"></i> {{ t('Output Result') }}
             </h3>
             <div class="flex flex-wrap items-center gap-2">
-                <button v-if="output" type="button" @click="copyOutput" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
-                    <i :class="copied ? 'ti-check text-success-500' : 'ti-copy'"></i>
+                <button v-if="output" type="button" @click="copyOutput" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:!text-gray-400 hover:text-gray-900 dark:hover:!text-white bg-gray-100 dark:!bg-white/5 hover:bg-gray-200 dark:hover:!bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
+                    <i :class="copied ? 'ti ti-check text-success-500' : 'ti ti-copy'"></i>
                     {{ copied ? t('Copied') : t('Copy') }}
                 </button>
-                <button v-if="output && canSave && !savedDocument" type="button" :disabled="saving" @click="openSaveModal" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50">
+                <button v-if="output && canSave && !savedDocument" type="button" :disabled="saving" @click="openSaveModal" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:!text-gray-400 hover:text-gray-900 dark:hover:!text-white bg-gray-100 dark:!bg-white/5 hover:bg-gray-200 dark:hover:!bg-white/10 rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-50">
                     <i class="ti ti-device-floppy"></i>
                     {{ t('Save') }}
                 </button>
-                <a v-if="output && isMedia && mediaUrl" :href="mediaUrl" :download="`${slug}-output`" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
+                <a v-if="output && isMedia && mediaUrl" :href="mediaUrl" :download="`${slug}-output`" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:!text-gray-400 hover:text-gray-900 dark:hover:!text-white bg-gray-100 dark:!bg-white/5 hover:bg-gray-200 dark:hover:!bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
                     <i class="ti ti-download"></i>
                     {{ t('Download') }}
                 </a>
-                <button v-else-if="output" type="button" @click="downloadOutput" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
+                <button v-else-if="output" type="button" @click="downloadOutput" class="px-3 py-1.5 text-xs font-medium text-gray-600 dark:!text-gray-400 hover:text-gray-900 dark:hover:!text-white bg-gray-100 dark:!bg-white/5 hover:bg-gray-200 dark:hover:!bg-white/10 rounded-lg transition-all flex items-center gap-1.5">
                     <i class="ti ti-download"></i>
                     {{ t('Export') }}
                 </button>

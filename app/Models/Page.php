@@ -27,6 +27,7 @@ class Page extends Model
         'template',
         'featured_image',
         'show_title',
+        'center_title',
         'show_breadcrumbs',
         'show_featured_image',
         'show_sidebar',
@@ -43,6 +44,7 @@ class Page extends Model
 
     protected $casts = [
         'show_title' => 'boolean',
+        'center_title' => 'boolean',
         'show_breadcrumbs' => 'boolean',
         'show_featured_image' => 'boolean',
         'show_sidebar' => 'boolean',

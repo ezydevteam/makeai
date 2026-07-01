@@ -37,7 +37,8 @@ const gatewayLabel = computed(() => props.payment.gateway.replace(/_/g, ' ').rep
     <Head :title="t('Payment Pending')" />
 
     <Layout>
-        <div class="mx-auto flex max-w-3xl flex-col items-center px-4 py-16 text-center sm:px-6">
+        <div class="w-full pt-6 md:pt-10 pb-16">
+            <div class="mx-auto flex max-w-3xl flex-col items-center px-4 text-center sm:px-6">
             <div class="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-amber-700">
                 <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" /></svg>
             </div>
@@ -102,5 +103,6 @@ const gatewayLabel = computed(() => props.payment.gateway.replace(/_/g, ' ').rep
                 </Link>
             </div>
         </div>
-    </Layout>
+    </div>
+</Layout>
 </template>

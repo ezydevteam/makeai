@@ -157,7 +157,7 @@ const runAiAssist = async (action: string) => {
 <template>
     <Head :title="pageTitle" />
 
-    <div class="w-full space-y-6 px-4 py-8 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mx-auto max-w-7xl">
             <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>

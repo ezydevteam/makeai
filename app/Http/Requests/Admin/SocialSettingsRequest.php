@@ -20,7 +20,7 @@ class SocialSettingsRequest extends FormRequest
                 'settings' => ['required', 'array'],
                 'settings.social_share_blog_style' => ['required', 'string', Rule::in(['icon', 'icon-label'])],
                 'social_login_providers' => ['required', 'array'],
-                'social_login_providers.*.provider' => ['required', 'string', Rule::in(['google', 'github', 'facebook', 'reddit', 'twitter'])],
+                'social_login_providers.*.provider' => ['required', 'string', Rule::in(['google', 'github', 'facebook', 'reddit', 'twitter', 'linkedin'])],
                 'social_login_providers.*.enabled' => ['required', 'boolean'],
                 'social_login_providers.*.client_id' => ['nullable', 'string', 'max:500'],
                 'social_login_providers.*.client_secret' => ['nullable', 'string', 'max:2000'],

@@ -18,11 +18,8 @@ class ThemeCssController extends Controller
         $secondary = $settings['secondary_color'] ?? '#3b82f6';
         $accent = $settings['accent_color'] ?? '#8b5cf6';
         $background = $settings['bg_color'] ?? '#f0fdf8';
-        $backgroundImage = $settings['bg_image'] ?? '';
-        $gradientEnabled = filter_var($settings['gradient_scheme_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
-        $gradientStart = $settings['gradient_start_color'] ?? $primary;
-        $gradientEnd = $settings['gradient_end_color'] ?? $secondary;
-        $gradientDirection = $settings['bg_gradient_direction'] ?? 'to right';
+        $bgImageEnabled = filter_var($settings['bg_image_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        $backgroundImage = $bgImageEnabled ? ($settings['bg_image'] ?? '') : '';
         $fontBody = $settings['font_body'] ?? 'Inter';
         $fontHeading = $settings['heading_font'] ?? 'Plus Jakarta Sans';
         $baseFontSize = $settings['base_font_size'] ?? '15px';
@@ -46,10 +43,6 @@ class ThemeCssController extends Controller
         $softPrimary = $this->mixColors($primary, '#ffffff', 88);
         $softSecondary = $this->mixColors($secondary, '#ffffff', 88);
         $softAccent = $this->mixColors($accent, '#ffffff', 88);
-        $softGradientStart = $this->mixColors($gradientStart, '#ffffff', 90);
-        $softGradientEnd = $this->mixColors($gradientEnd, '#ffffff', 86);
-        $buttonGradient = "linear-gradient({$gradientDirection}, {$gradientStart}, {$gradientEnd})";
-        $softGradient = "linear-gradient({$gradientDirection}, {$softGradientStart}, {$softGradientEnd})";
         $fontBodyStack = $this->fontStack($fontBody);
         $fontHeadingStack = $this->fontStack($fontHeading, $fontBody);
 
@@ -221,80 +214,47 @@ class ThemeCssController extends Controller
         ];
 
         if ($backgroundImage !== '') {
+            $bgUrl = $backgroundImage;
+            if (! str_starts_with($bgUrl, 'http://') && ! str_starts_with($bgUrl, 'https://') && ! str_starts_with($bgUrl, '/')) {
+                $bgUrl = asset('storage/' . $bgUrl);
+            }
             $lines[] = '';
             $lines[] = '.frontend-theme {';
-            $lines[] = "  background-image: url('{$backgroundImage}') !important;";
+            $lines[] = "  background-image: url('{$bgUrl}') !important;";
             $lines[] = '  background-size: cover !important;';
             $lines[] = '  background-repeat: no-repeat !important;';
             $lines[] = '  background-position: center !important;';
             $lines[] = '}';
         }
 
-        if ($gradientEnabled) {
-            $lines[] = '';
-            $lines[] = '.frontend-theme .text-gradient,';
-            $lines[] = '.frontend-theme .heading-gradient {';
-            $lines[] = "  background-image: {$buttonGradient};";
-            $lines[] = '  -webkit-background-clip: text;';
-            $lines[] = '  background-clip: text;';
-            $lines[] = '  color: transparent !important;';
-            $lines[] = '}';
-            $lines[] = '';
-            $lines[] = '.frontend-theme .btn-primary {';
-            $lines[] = "  background-image: {$buttonGradient} !important;";
-            $lines[] = "  background-color: {$gradientStart} !important;";
-            $lines[] = '  border-color: transparent !important;';
-            $lines[] = '}';
-            $lines[] = '';
-            $lines[] = '.frontend-theme .btn-primary:hover {';
-            $lines[] = "  background-image: linear-gradient({$gradientDirection}, {$this->mixColors($gradientStart, '#000000', 10)}, {$this->mixColors($gradientEnd, '#000000', 10)}) !important;";
-            $lines[] = '  border-color: transparent !important;';
-            $lines[] = '}';
-            $lines[] = '';
-            $lines[] = '.frontend-theme .btn-outline {';
-            $lines[] = "  border-image: {$buttonGradient} 1 !important;";
-            $lines[] = "  color: {$gradientStart} !important;";
-            $lines[] = '}';
-            $lines[] = '';
-            $lines[] = '.frontend-theme .bg-primary-50,';
-            $lines[] = '.frontend-theme .bg-secondary-50,';
-            $lines[] = '.frontend-theme .bg-accent-50,';
-            $lines[] = '.frontend-theme .bg-white\\/95,';
-            $lines[] = '.frontend-theme .bg-white\\/90,';
-            $lines[] = '.frontend-theme .bg-white\\/80,';
-            $lines[] = '.frontend-theme .bg-gray-50\\/90 {';
-            $lines[] = "  background-image: {$softGradient} !important;";
-            $lines[] = '}';
-        } else {
-            $lines[] = '';
-            $lines[] = '.frontend-theme .btn-primary {';
-            $lines[] = "  background-color: {$primary} !important;";
-            $lines[] = "  border-color: {$primary} !important;";
-            $lines[] = '}';
-            $lines[] = '';
-            $lines[] = '.frontend-theme .btn-primary:hover {';
-            $lines[] = "  background-color: {$primaryPalette[600]} !important;";
-            $lines[] = "  border-color: {$primaryPalette[600]} !important;";
-            $lines[] = '}';
-            $lines[] = '';
-            $lines[] = '.frontend-theme .btn-outline {';
-            $lines[] = "  border-color: {$primary} !important;";
-            $lines[] = "  color: {$primary} !important;";
-            $lines[] = '}';
-        }
+        $lines[] = '';
+        $lines[] = '.frontend-theme .btn-primary {';
+        $lines[] = "  background-color: {$primary} !important;";
+        $lines[] = "  border-color: {$primary} !important;";
+        $lines[] = '}';
+        $lines[] = '';
+        $lines[] = '.frontend-theme .btn-primary:hover {';
+        $lines[] = "  background-color: {$primaryPalette[600]} !important;";
+        $lines[] = "  border-color: {$primaryPalette[600]} !important;";
+        $lines[] = '}';
+        $lines[] = '';
+        $lines[] = '.frontend-theme .btn-outline {';
+        $lines[] = "  border-color: {$primary} !important;";
+        $lines[] = "  color: {$primary} !important;";
+        $lines[] = '}';
 
         $lines[] = '';
         $lines[] = '/* Dark Mode Overrides for Frontend Theme */';
         $lines[] = '.dark .frontend-theme, html.dark .frontend-theme, .dark.frontend-theme, html.dark.frontend-theme {';
-        $lines[] = '  --color-bg: #0a0a14 !important;';
-        $lines[] = '  --color-surface: #11111b !important;';
+        $lines[] = '  --color-bg: #050814 !important;';
+        $lines[] = '  --color-surface: #0e1526 !important;';
         $lines[] = '  --color-heading: #ffffff !important;';
-        $lines[] = '  --color-text-primary: #e4e4e7 !important;';
-        $lines[] = '  --color-text-secondary: #a1a1aa !important;';
-        $lines[] = '  --color-border: #181825 !important;';
-        $lines[] = '  background-color: #0a0a14 !important;';
+        $lines[] = '  --color-text-primary: #f1f5f9 !important;';
+        $lines[] = '  --color-text-secondary: #94a3b8 !important;';
+        $lines[] = '  --color-border: #19253d !important;';
+        $lines[] = '  background-color: #050814 !important;';
         $lines[] = '  background-image: none !important;';
-        $lines[] = '  color: #e4e4e7 !important;';
+        $lines[] = '  color: #f1f5f9 !important;';
         $lines[] = '}';
         $lines[] = '';
         $lines[] = '.dark .frontend-theme .bg-white,';
@@ -303,7 +263,7 @@ class ThemeCssController extends Controller
         $lines[] = 'html.dark .frontend-theme .bg-white,';
         $lines[] = 'html.dark .frontend-theme .bg-gray-50,';
         $lines[] = 'html.dark .frontend-theme .bg-gray-100 {';
-        $lines[] = '  background-color: #11111b !important;';
+        $lines[] = '  background-color: #0e1526 !important;';
         $lines[] = '  background-image: none !important;';
         $lines[] = '}';
         $lines[] = '';
@@ -328,7 +288,7 @@ class ThemeCssController extends Controller
         $lines[] = 'html.dark .frontend-theme .text-gray-500,';
         $lines[] = 'html.dark .frontend-theme .text-gray-400,';
         $lines[] = 'html.dark .frontend-theme .text-slate-500 {';
-        $lines[] = '  color: #a1a1aa !important;';
+        $lines[] = '  color: #94a3b8 !important;';
         $lines[] = '}';
         $lines[] = '';
         $lines[] = '.dark .frontend-theme .text-gray-700,';
@@ -341,7 +301,7 @@ class ThemeCssController extends Controller
         $lines[] = 'html.dark .frontend-theme .text-gray-800,';
         $lines[] = 'html.dark .frontend-theme .text-slate-800,';
         $lines[] = 'html.dark .frontend-theme .text-slate-600 {';
-        $lines[] = '  color: #e4e4e7 !important;';
+        $lines[] = '  color: #f1f5f9 !important;';
         $lines[] = '}';
         $lines[] = '';
         $lines[] = '.dark .frontend-theme .border-gray-300,';
@@ -352,7 +312,7 @@ class ThemeCssController extends Controller
         $lines[] = 'html.dark .frontend-theme .border-gray-200,';
         $lines[] = 'html.dark .frontend-theme .border-gray-100,';
         $lines[] = 'html.dark .frontend-theme .border-slate-200 {';
-        $lines[] = '  border-color: #181825 !important;';
+        $lines[] = '  border-color: #19253d !important;';
         $lines[] = '}';
         $lines[] = '';
         $lines[] = '.dark .frontend-theme .bg-primary-50,';
@@ -370,7 +330,7 @@ class ThemeCssController extends Controller
         $lines[] = 'html.dark .frontend-theme .bg-white\\/80,';
         $lines[] = 'html.dark .frontend-theme .bg-gray-50\\/90 {';
         $lines[] = '  background-image: none !important;';
-        $lines[] = '  background-color: rgba(30, 41, 59, 0.2) !important;';
+        $lines[] = '  background-color: rgba(79, 70, 229, 0.15) !important;';
         $lines[] = '}';
         $lines[] = '';
         $lines[] = '.dark .frontend-theme input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),';
@@ -379,9 +339,9 @@ class ThemeCssController extends Controller
         $lines[] = 'html.dark .frontend-theme input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),';
         $lines[] = 'html.dark .frontend-theme textarea,';
         $lines[] = 'html.dark .frontend-theme select {';
-        $lines[] = '  background-color: #11111b !important;';
-        $lines[] = '  color: #e4e4e7 !important;';
-        $lines[] = '  border-color: #181825 !important;';
+        $lines[] = '  background-color: #0e1526 !important;';
+        $lines[] = '  color: #f1f5f9 !important;';
+        $lines[] = '  border-color: #19253d !important;';
         $lines[] = '}';
 
         $customCss = $settings['custom_css'] ?? '';

@@ -18,6 +18,8 @@ class ThemeSettingsService
 
     private const CUSTOM_CODE_SETTINGS_KEY = 'frontend_custom_code';
 
+    private const TOOL_PAGE_SETTINGS_KEY = 'frontend_tool_page_settings';
+
     private ?array $defaultsCache = null;
 
     /**
@@ -78,6 +80,11 @@ class ThemeSettingsService
         return $this->normalizeStoredSettings(settings(self::CUSTOM_CODE_SETTINGS_KEY, []));
     }
 
+    public function getStoredToolPageSettings(): array
+    {
+        return $this->normalizeStoredSettings(settings(self::TOOL_PAGE_SETTINGS_KEY, []));
+    }
+
     public function getStoredHomepageConfig(): array
     {
         return $this->normalizeStoredSettings(settings(self::HOMEPAGE_CONFIG_KEY, []));
@@ -103,6 +110,11 @@ class ThemeSettingsService
     public function getResolvedFrontendHomepage(): array
     {
         return array_replace($this->getDefaults('homepage'), $this->filterHomepageSettings($this->getStoredHomepageSettings()));
+    }
+
+    public function getResolvedFrontendToolPage(): array
+    {
+        return array_replace($this->getDefaults('tool_page'), $this->filterToolPageSettings($this->getStoredToolPageSettings()));
     }
 
     public function getResolvedFrontendHomepageConfig(): array
@@ -199,6 +211,14 @@ class ThemeSettingsService
         return $filtered;
     }
 
+    public function saveToolPageSettings(array $settings): array
+    {
+        $filtered = $this->filterToolPageSettings($settings);
+        settings_set(self::TOOL_PAGE_SETTINGS_KEY, $filtered, 'json', 'appearance');
+
+        return $filtered;
+    }
+
     // ─── Filter methods (use settings.json defaults) ───
 
     private function normalizeStoredSettings(mixed $settings): array
@@ -246,11 +266,16 @@ class ThemeSettingsService
         return array_intersect_key($settings, $this->getDefaults('custom_code'));
     }
 
+    private function filterToolPageSettings(array $settings): array
+    {
+        return array_intersect_key($settings, $this->getDefaults('tool_page'));
+    }
+
     // ─── Restore defaults ───
 
     /**
      * Delete stored settings for a section so the next render falls back to defaults.
-     * Sections: theme, header, footer, homepage, custom_code
+     * Sections: theme, header, footer, homepage, custom_code, tool_page
      */
     public function restoreDefaults(string $section): void
     {
@@ -260,6 +285,7 @@ class ThemeSettingsService
             'footer'      => self::FOOTER_SETTINGS_KEY,
             'homepage'    => self::HOMEPAGE_SETTINGS_KEY,
             'custom_code' => self::CUSTOM_CODE_SETTINGS_KEY,
+            'tool_page'   => self::TOOL_PAGE_SETTINGS_KEY,
         ];
 
         if (isset($keyMap[$section])) {

@@ -35,10 +35,13 @@ class PasswordResetController extends Controller
         $result = $rateLimiter->attempt('otp', $throttleKey, 3, 3600);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'email' => [translate('Too many reset requests. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'email' => [
+                    $seconds < 60
+                        ? translate('Too many reset requests. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many reset requests. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 
@@ -89,10 +92,13 @@ class PasswordResetController extends Controller
         $result = $rateLimiter->attempt('otp', $throttleKey, 5, 900);
 
         if (! $result['allowed']) {
+            $seconds = $result['retry_after_seconds'];
             throw ValidationException::withMessages([
-                'code' => [translate('Too many reset attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $result['retry_after_seconds'],
-                ])],
+                'code' => [
+                    $seconds < 60
+                        ? translate('Too many reset attempts. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                        : translate('Too many reset attempts. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)])
+                ],
             ]);
         }
 
@@ -113,9 +119,11 @@ class PasswordResetController extends Controller
             $availableIn = max(1, (int) $user->otp_locked_until->diffInSeconds(now()));
 
             throw ValidationException::withMessages([
-                'code' => [translate('Too many failed attempts. Please try again in :seconds seconds.', [
-                    'seconds' => $availableIn,
-                ])],
+                'code' => [
+                    $availableIn < 60
+                        ? translate('Too many failed attempts. Please try again in :seconds seconds.', ['seconds' => $availableIn])
+                        : translate('Too many failed attempts. Please try again in :minutes minutes.', ['minutes' => ceil($availableIn / 60)])
+                ],
             ]);
         }
 

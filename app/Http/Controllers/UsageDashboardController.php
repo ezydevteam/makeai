@@ -108,7 +108,7 @@ class UsageDashboardController extends Controller
             ];
         });
 
-        return Inertia::render('Usage/Index', ['stats' => $stats]);
+        return Inertia::render('User/Usage', ['stats' => $stats]);
     }
 
     public function export(): \Symfony\Component\HttpFoundation\BinaryFileResponse
@@ -303,6 +303,82 @@ class UsageDashboardController extends Controller
         return response()->download($tmp, $filename, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ])->deleteFileAfterSend();
+    }
+
+    public function chart(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = Auth::user();
+        $period = $request->input('period', '1M');
+        $data = $this->getChartData($user->id, $period);
+        return response()->json($data);
+    }
+
+    private function getChartData(int $userId, string $period): array
+    {
+        switch ($period) {
+            case '1D':
+                $twentyFourHoursAgo = now()->subHours(24);
+                $rows = AiUsageLog::where('user_id', $userId)
+                    ->where('created_at', '>=', $twentyFourHoursAgo)
+                    ->selectRaw('DATE(created_at) as label_date, HOUR(created_at) as label_hour, SUM(credits_used) as credits')
+                    ->groupBy('label_date', 'label_hour')
+                    ->orderBy('label_date', 'asc')
+                    ->orderBy('label_hour', 'asc')
+                    ->get();
+                
+                return $rows->map(fn ($row) => [
+                    'label' => \Carbon\Carbon::parse($row->label_date)->setHour($row->label_hour)->translatedFormat('M j, g A'),
+                    'value' => (float) $row->credits,
+                    'is_current' => \Carbon\Carbon::parse($row->label_date)->setHour($row->label_hour)->isCurrentHour()
+                ])->values()->toArray();
+
+            case '7D':
+                $sevenDaysAgo = now()->subDays(7);
+                $rows = AiUsageLog::where('user_id', $userId)
+                    ->where('created_at', '>=', $sevenDaysAgo)
+                    ->selectRaw('DATE(created_at) as date, SUM(credits_used) as credits')
+                    ->groupBy('date')
+                    ->orderBy('date', 'asc')
+                    ->get();
+                
+                return $rows->map(fn ($row) => [
+                    'label' => \Carbon\Carbon::parse($row->date)->translatedFormat('M j'),
+                    'value' => (float) $row->credits,
+                    'is_current' => \Carbon\Carbon::parse($row->date)->isToday()
+                ])->values()->toArray();
+
+            case '1Y':
+                $oneYearAgo = now()->subMonths(12)->startOfMonth();
+                $rows = AiUsageLog::where('user_id', $userId)
+                    ->where('created_at', '>=', $oneYearAgo)
+                    ->selectRaw('YEAR(created_at) as year, MONTH(created_at) as month, SUM(credits_used) as credits')
+                    ->groupBy('year', 'month')
+                    ->orderBy('year', 'asc')
+                    ->orderBy('month', 'asc')
+                    ->get();
+                
+                return $rows->map(fn ($row) => [
+                    'label' => \Carbon\Carbon::create($row->year, $row->month, 1)->translatedFormat('M Y'),
+                    'value' => (float) $row->credits,
+                    'is_current' => \Carbon\Carbon::create($row->year, $row->month, 1)->isCurrentMonth()
+                ])->values()->toArray();
+
+            case '1M':
+            default:
+                $thirtyDaysAgo = now()->subDays(30);
+                $rows = AiUsageLog::where('user_id', $userId)
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->selectRaw('DATE(created_at) as date, SUM(credits_used) as credits')
+                    ->groupBy('date')
+                    ->orderBy('date', 'asc')
+                    ->get();
+                
+                return $rows->map(fn ($row) => [
+                    'label' => \Carbon\Carbon::parse($row->date)->translatedFormat('M j'),
+                    'value' => (float) $row->credits,
+                    'is_current' => \Carbon\Carbon::parse($row->date)->isToday()
+                ])->values()->toArray();
+        }
     }
 
     private static function colLetter(int $i): string

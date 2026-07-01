@@ -11,7 +11,8 @@
         "simple_header_settings": true,
         "simple_footer_settings": true,
         "simple_homepage_settings": true,
-        "custom_code": true
+        "custom_code": true,
+        "tool_page": true
     },
     "defaults": {
         "theme": {
@@ -25,15 +26,11 @@
             "accent_color": "#8b5cf6",
             "bg_color": "#f0fdf8",
             "bg_image": "",
+            "bg_image_enabled": false,
             "heading_color": "#111827",
             "body_text_color": "#374151",
             "muted_text_color": "#6b7280",
             "border_color": "#dbe4ea",
-            "gradient_scheme_enabled": false,
-            "gradient_palette": "aurora",
-            "gradient_start_color": "#10b981",
-            "gradient_end_color": "#3b82f6",
-            "bg_gradient_direction": "to right",
             "font_body": "Inter",
             "heading_font": "Plus Jakarta Sans",
             "base_font_size": "15px",
@@ -549,6 +546,24 @@
             "custom_css": "",
             "custom_header_code": "",
             "custom_footer_code": ""
+        },
+        "tool_page": {
+            "layout": "default",
+            "hide_breadcrumbs": false,
+            "hide_rating": false,
+            "hide_share": false,
+            "hide_favorite": false,
+            "archive_layout": "default",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": true,
+            "archive_show_open_button": true,
+            "archive_pagination": "numbered",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": false,
+            "category_pagination": "numbered"
         }
     }
 }

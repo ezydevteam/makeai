@@ -39,7 +39,7 @@ class AffiliateController extends Controller
         $totalReferrals = AffiliateReferral::where('referrer_id', $user->id)->whereNotNull('referred_id')->count();
         $conversions = AffiliateCommission::where('referrer_id', $user->id)->distinct('referred_id')->count('referred_id');
 
-        return Inertia::render('Affiliate/Dashboard', [
+        return Inertia::render('User/Affiliate', [
             'program' => [
                 'commission_type' => $program->commission_type,
                 'commission_value' => (float) $program->commission_value,
@@ -66,7 +66,7 @@ class AffiliateController extends Controller
                 'link' => route('register', ['ref' => $user->referral_code]),
                 'alias_link' => $user->affiliate_custom_slug ? route('affiliate.capture', $user->affiliate_custom_slug) : null,
             ],
-            'chart' => $this->chart($user->id),
+            'chart' => $this->getChartData($user->id, '1M'),
             'marketing' => [
                 'banners' => $program->marketing_banners ?: [],
                 'emails' => $program->promotional_emails ?: [],
@@ -222,18 +222,74 @@ class AffiliateController extends Controller
         ];
     }
 
-    private function chart(int $userId): array
+    public function chartData(Request $request): \Illuminate\Http\JsonResponse
     {
-        $days = collect(range(29, 0))->map(fn (int $daysAgo) => now()->subDays($daysAgo)->toDateString());
+        $user = $request->user();
+        $period = $request->input('period', '1M');
+        $data = $this->getChartData($user->id, $period);
+        return response()->json($data);
+    }
 
-        return $days->map(function (string $date) use ($userId) {
-            return [
-                'date' => $date,
-                'clicks' => AffiliateReferral::where('referrer_id', $userId)->whereDate('landed_at', $date)->count(),
-                'registrations' => AffiliateReferral::where('referrer_id', $userId)->whereDate('converted_at', $date)->count(),
-                'conversions' => AffiliateCommission::where('referrer_id', $userId)->whereDate('created_at', $date)->count(),
-            ];
-        })->values()->all();
+    private function getChartData(int $userId, string $period): array
+    {
+        switch ($period) {
+            case '1D':
+                $hours = collect(range(23, 0))->map(fn (int $hoursAgo) => now()->subHours($hoursAgo));
+                return $hours->map(function ($time) use ($userId) {
+                    $start = $time->copy()->startOfHour();
+                    $end = $time->copy()->endOfHour();
+                    return [
+                        'label' => $time->translatedFormat('M j, g A'),
+                        'clicks' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('landed_at', [$start, $end])->count(),
+                        'registrations' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('converted_at', [$start, $end])->count(),
+                        'conversions' => AffiliateCommission::where('referrer_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+                        'is_current' => $time->isCurrentHour(),
+                    ];
+                })->values()->toArray();
+
+            case '7D':
+                $days = collect(range(6, 0))->map(fn (int $daysAgo) => now()->subDays($daysAgo));
+                return $days->map(function ($date) use ($userId) {
+                    $start = $date->copy()->startOfDay();
+                    $end = $date->copy()->endOfDay();
+                    return [
+                        'label' => $date->translatedFormat('M j'),
+                        'clicks' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('landed_at', [$start, $end])->count(),
+                        'registrations' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('converted_at', [$start, $end])->count(),
+                        'conversions' => AffiliateCommission::where('referrer_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+                        'is_current' => $date->isToday(),
+                    ];
+                })->values()->toArray();
+
+            case '1Y':
+                $months = collect(range(11, 0))->map(fn (int $monthsAgo) => now()->subMonths($monthsAgo));
+                return $months->map(function ($month) use ($userId) {
+                    $start = $month->copy()->startOfMonth();
+                    $end = $month->copy()->endOfMonth();
+                    return [
+                        'label' => $month->translatedFormat('M Y'),
+                        'clicks' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('landed_at', [$start, $end])->count(),
+                        'registrations' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('converted_at', [$start, $end])->count(),
+                        'conversions' => AffiliateCommission::where('referrer_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+                        'is_current' => $month->isCurrentMonth(),
+                    ];
+                })->values()->toArray();
+
+            case '1M':
+            default:
+                $days = collect(range(29, 0))->map(fn (int $daysAgo) => now()->subDays($daysAgo));
+                return $days->map(function ($date) use ($userId) {
+                    $start = $date->copy()->startOfDay();
+                    $end = $date->copy()->endOfDay();
+                    return [
+                        'label' => $date->translatedFormat('M j'),
+                        'clicks' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('landed_at', [$start, $end])->count(),
+                        'registrations' => AffiliateReferral::where('referrer_id', $userId)->whereBetween('converted_at', [$start, $end])->count(),
+                        'conversions' => AffiliateCommission::where('referrer_id', $userId)->whereBetween('created_at', [$start, $end])->count(),
+                        'is_current' => $date->isToday(),
+                    ];
+                })->values()->toArray();
+        }
     }
 
     private function maskEmail(string $email): string

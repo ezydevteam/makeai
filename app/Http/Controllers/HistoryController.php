@@ -23,7 +23,7 @@ class HistoryController extends Controller
 
         $history = $this->historyService->getHistory($user, $toolSlug, 20);
 
-        return Inertia::render('History/Index', [
+        return Inertia::render('User/History', [
             'history' => $history->items(),
             'pagination' => [
                 'current_page' => $history->currentPage(),
@@ -40,7 +40,7 @@ class HistoryController extends Controller
         $user = Auth::user();
         $history = $this->historyService->getHistory($user, $toolSlug, 20);
 
-        return Inertia::render('History/Index', [
+        return Inertia::render('User/History', [
             'history' => $history->items(),
             'pagination' => [
                 'current_page' => $history->currentPage(),

@@ -22,8 +22,27 @@ class SocialAccountService
     public function getRedirectUrl(string $platform): string
     {
         $this->validatePlatform($platform);
+        $this->checkPlatformConfigured($platform);
 
         return $this->buildDriver($platform)->redirect()->getTargetUrl();
+    }
+
+    public function checkPlatformConfigured(string $platform): void
+    {
+        $this->validatePlatform($platform);
+        $provider = $platform === 'instagram' ? 'facebook' : $platform;
+
+        $enabled = (bool) settings("social_login_{$provider}_enabled", false);
+        $clientId = trim((string) settings("social_login_{$provider}_client_id", ''));
+        $clientSecret = trim((string) settings("social_login_{$provider}_client_secret", ''));
+
+        if (! $enabled) {
+            throw new \RuntimeException(translate("The :platform connection is currently disabled by the administrator.", ['platform' => ucfirst($platform)]));
+        }
+
+        if ($clientId === '' || $clientSecret === '') {
+            throw new \RuntimeException(translate("The :platform integration is not fully configured. Please contact the administrator.", ['platform' => ucfirst($platform)]));
+        }
     }
 
     public function handleCallback(string $platform, User $user): SsSocialAccount
@@ -202,12 +221,14 @@ class SocialAccountService
 
     private function clientId(string $platform): string
     {
-        return (string) settings("social_login_{$platform}_client_id", '');
+        $provider = $platform === 'instagram' ? 'facebook' : $platform;
+        return (string) settings("social_login_{$provider}_client_id", '');
     }
 
     private function clientSecret(string $platform): string
     {
-        return (string) settings("social_login_{$platform}_client_secret", '');
+        $provider = $platform === 'instagram' ? 'facebook' : $platform;
+        return (string) settings("social_login_{$provider}_client_secret", '');
     }
 
     private function defaultScopes(string $platform): array

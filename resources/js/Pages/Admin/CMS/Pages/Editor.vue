@@ -71,13 +71,16 @@ const form = useForm({
     parent_id: props.page?.parent_id ?? null,
     sort_order: props.page?.sort_order ?? 0,
     show_title: props.page?.show_title ?? true,
+    center_title: props.page?.center_title ?? false,
     show_breadcrumbs: props.page?.show_breadcrumbs ?? true,
     show_featured_image: props.page?.show_featured_image ?? true,
     show_sidebar: props.page?.show_sidebar ?? false,
     sidebar_position: props.page?.sidebar_position ?? 'right',
-    container_width: props.page?.container_width ?? 'default',
+    container_width: props.page?.container_width ?? '1280px',
     featured_image: null as File | null,
     og_image: null as File | null,
+    remove_featured_image: false,
+    remove_og_image: false,
 });
 
 const featuredPreview = ref(props.page?.featured_image ? `/storage/${props.page.featured_image}` : null);
@@ -103,13 +106,6 @@ const primaryActionLabel = computed(() => {
     return t('Save Draft')
 })
 
-const templateOptions = computed(() => [
-    { value: 'default', label: t('Default') },
-    { value: 'full_width', label: t('Full Width') },
-    { value: 'blank', label: t('Blank Canvas') },
-    { value: 'landing', label: t('Landing Page') },
-]);
-
 const parentOptions = computed(() => [
     { value: null, label: t('None (Top Level)') },
     ...props.parents.map((parent) => ({
@@ -119,10 +115,10 @@ const parentOptions = computed(() => [
 ]);
 
 const containerWidthOptions = computed(() => [
-    { value: 'default', label: t('Default') },
-    { value: 'narrow', label: t('Narrow') },
-    { value: 'wide', label: t('Wide') },
-    { value: 'full', label: t('Full') },
+    { value: '1280px', label: t('Default') },
+    { value: 'full', label: t('Full Width') },
+    { value: '1080px', label: t('Boxed') },
+    { value: '1536px', label: t('Stretched') },
 ]);
 
 const sidebarPositionOptions = computed(() => [
@@ -245,6 +241,7 @@ const handleFeaturedChange = (e: Event) => {
     if (file) {
         form.featured_image = file;
         featuredPreview.value = URL.createObjectURL(file);
+        form.remove_featured_image = false;
     }
 };
 
@@ -253,7 +250,20 @@ const handleOgChange = (e: Event) => {
     if (file) {
         form.og_image = file;
         ogPreview.value = URL.createObjectURL(file);
+        form.remove_og_image = false;
     }
+};
+
+const removeFeaturedImage = () => {
+    form.featured_image = null;
+    featuredPreview.value = null;
+    form.remove_featured_image = true;
+};
+
+const removeOgImage = () => {
+    form.og_image = null;
+    ogPreview.value = null;
+    form.remove_og_image = true;
 };
 
 const submit = () => {
@@ -363,14 +373,14 @@ onClickOutside(publishMenuRef, () => {
                                 @click="submit"
                                 :disabled="form.processing"
                                 type="button"
-                                class="inline-flex items-center justify-center gap-2 bg-primary-500 px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60"
+                                class="btn-primary-admin inline-flex items-center justify-center gap-2 rounded-none px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
                             >
                                 <i class="ti ti-device-floppy text-base"></i>
                                 {{ form.processing ? t('Saving...') : primaryActionLabel }}
                             </button>
                             <button
                                 type="button"
-                                class="inline-flex items-center justify-center bg-primary-500 px-3 text-white transition-colors disabled:opacity-60"
+                                class="btn-primary-admin inline-flex items-center justify-center rounded-none px-3 text-white disabled:opacity-60"
                                 :aria-label="t('Change page status')"
                                 @click="publishMenuOpen = !publishMenuOpen"
                             >
@@ -409,7 +419,7 @@ onClickOutside(publishMenuRef, () => {
         <div class="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
             <!-- Editor Column -->
             <div class="space-y-6">
-                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="space-y-6">
                     <div>
                         <label class="mb-3 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Title') }}</label>
@@ -449,7 +459,7 @@ onClickOutside(publishMenuRef, () => {
                 </div>
 
                 <!-- SEO Card -->
-                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('SEO') }}</h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control how this page appears in search engines and social sharing previews.') }}</p>
@@ -477,10 +487,16 @@ onClickOutside(publishMenuRef, () => {
                                     <img v-if="ogPreview" :src="ogPreview" class="h-full w-full object-cover">
                                     <svg v-else class="w-7 h-7 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                 </div>
-                                <label class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:text-primary-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:text-primary-300">
-                                    <input type="file" class="hidden" @change="handleOgChange" accept="image/*">
-                                    {{ t('Upload Image') }}
-                                </label>
+                                <div class="flex flex-col gap-2">
+                                    <label class="cursor-pointer rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:text-primary-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:text-primary-300">
+                                        <input type="file" class="hidden" @change="handleOgChange" accept="image/*">
+                                        {{ t('Upload Image') }}
+                                    </label>
+                                    <button v-if="ogPreview" @click="removeOgImage" type="button" class="text-xs font-semibold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                                        <i class="ti ti-trash text-sm"></i>
+                                        {{ t('Remove Image') }}
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -490,17 +506,12 @@ onClickOutside(publishMenuRef, () => {
             <!-- Settings Column -->
             <div class="space-y-6">
                 <!-- Page Attributes -->
-                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Attributes') }}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control template choice, structure, visibility, and layout behavior.') }}</p>
                     </div>
                     <div class="space-y-4">
-                        <div>
-                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Template') }}</label>
-                            <AppSelect v-model="form.template" :options="templateOptions" :placeholder="t('Select template')" />
-                            <p v-if="form.errors.template" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.template }}</p>
-                        </div>
+
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Parent Page') }}</label>
                             <AppSelect v-model="form.parent_id" :options="parentOptions" :placeholder="t('Select parent page')" />
@@ -531,10 +542,9 @@ onClickOutside(publishMenuRef, () => {
                 </div>
 
                 <!-- Featured Image -->
-                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Featured Image') }}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the main visual used for listings and page presentation.') }}</p>
                     </div>
                     <div class="relative group">
                         <div class="aspect-video overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 flex items-center justify-center dark:border-surface-800 dark:bg-surface-800">
@@ -546,19 +556,40 @@ onClickOutside(publishMenuRef, () => {
                             <span class="text-white text-sm font-semibold">{{ t('Update Image') }}</span>
                         </label>
                     </div>
+                    <button v-if="featuredPreview" @click="removeFeaturedImage" type="button" class="mt-4 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                        <i class="ti ti-trash text-sm"></i>
+                        {{ t('Remove Featured Image') }}
+                    </button>
                 </div>
 
                 <!-- Layout Options -->
-                <div class="rounded-xl border border-gray-100 bg-white p-8 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Toggle visible elements and adjust how this page is framed on the frontend.') }}</p>
                     </div>
                     <div class="space-y-4">
                         <label class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Title') }}</span>
                             <button @click="form.show_title = !form.show_title" type="button" :class="form.show_title ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
                                 <span :class="form.show_title ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
+                            </button>
+                        </label>
+                        <label v-if="form.show_title" class="flex items-center justify-between cursor-pointer group pl-4 border-l-2 border-gray-100 dark:border-surface-800">
+                            <span class="text-sm font-medium text-gray-500 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white">{{ t('Center Align Title') }}</span>
+                            <button @click="form.center_title = !form.center_title" type="button" :class="form.center_title ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
+                                <span :class="form.center_title ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
+                            </button>
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Breadcrumbs') }}</span>
+                            <button @click="form.show_breadcrumbs = !form.show_breadcrumbs" type="button" :class="form.show_breadcrumbs ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
+                                <span :class="form.show_breadcrumbs ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
+                            </button>
+                        </label>
+                        <label class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Featured Image') }}</span>
+                            <button @click="form.show_featured_image = !form.show_featured_image" type="button" :class="form.show_featured_image ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
+                                <span :class="form.show_featured_image ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
                             </button>
                         </label>
                         <label class="flex items-center justify-between cursor-pointer group">

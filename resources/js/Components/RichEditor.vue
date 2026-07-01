@@ -18,6 +18,7 @@ import { Image } from '@tiptap/extension-image'
 import { Placeholder } from '@tiptap/extension-placeholder'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
+import AppColorPicker from '@/Components/AppColorPicker.vue'
 import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
 import { RICH_EDITOR_FONT_OPTIONS } from '@/config/fontFamilies'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
@@ -205,6 +206,7 @@ watch(() => props.aiAssistLoadingKey, (newVal) => {
 })
 const formatOpen = ref(false)
 const linkModalOpen = ref(false)
+const linkEditing = ref(false)
 const imageModalOpen = ref(false)
 const emojiOpen = ref(false)
 const tablePickerOpen = ref(false)
@@ -249,8 +251,26 @@ const activeCodeBlockPos = ref(0)
 let autosaveTimer: number | undefined
 const linkTooltip = ref({ visible: false, url: '', x: 0, y: 0 })
 const exporting = ref(false)
+const restoreVersionSelection = ref<string | null>(null)
 
 const fontOptions: SelectOption[] = RICH_EDITOR_FONT_OPTIONS
+const linkTargetOptions = computed<SelectOption[]>(() => [
+    { value: '_self', label: t('Same tab') },
+    { value: '_blank', label: t('New tab') },
+])
+const imageAlignmentOptions = computed<SelectOption[]>(() => [
+    { value: 'left', label: t('Left') },
+    { value: 'center', label: t('Center') },
+    { value: 'right', label: t('Right') },
+    { value: 'float-left', label: t('Float left') },
+    { value: 'float-right', label: t('Float right') },
+])
+const versionHistoryOptions = computed<SelectOption[]>(() =>
+    versionHistory.value.map((version) => ({
+        value: version.html,
+        label: `${version.savedAt.toLocaleTimeString()} - ${version.words} ${t('words')}`,
+    })),
+)
 
 const codeLanguages = [
     'javascript', 'typescript', 'python', 'html', 'css', 'json', 'php', 'ruby', 'go', 'rust',
@@ -400,6 +420,13 @@ const saveVersionSnapshot = () => {
     versionHistory.value = [{ id: Date.now(), html, savedAt: new Date(), words: textStats.value.words }, ...versionHistory.value].slice(0, 20)
 }
 const restoreVersion = (html: string) => { editor.value?.commands.setContent(html); sourceContent.value = html }
+const handleRestoreVersion = (value: string | number | null | (string | number)[]) => {
+    if (typeof value !== 'string' || !value) return
+    restoreVersion(value)
+    nextTick(() => {
+        restoreVersionSelection.value = null
+    })
+}
 
 // ---- Expose ----
 const getSelectedText = () => editor.value ? editor.value.state.doc.textBetween(editor.value.state.selection.from, editor.value.state.selection.to, '\n').trim() : ''
@@ -412,13 +439,20 @@ const extractColor = (style: string | undefined) => style?.match(/color:\s*([^;]
 
 const openLinkModal = (link?: HTMLAnchorElement) => {
     const attrs = editor.value?.getAttributes('link') || {}
-    linkUrl.value = link?.getAttribute('href') || attrs.href || ''
-    linkTitle.value = link?.getAttribute('title') || attrs.title || ''
-    linkTarget.value = (link?.getAttribute('target') || attrs.target) === '_blank' ? '_blank' : '_self'
-    linkColor.value = extractColor(link?.getAttribute('style') || attrs.style)
+    const href = link?.getAttribute('href') || attrs.href || ''
+    const title = link?.getAttribute('title') || attrs.title || ''
+    const target = link?.getAttribute('target') || attrs.target
+    const style = link?.getAttribute('style') || attrs.style
+    const selectionText = getSelectedText()
+
+    linkEditing.value = Boolean(href)
+    linkUrl.value = href
+    linkTitle.value = title || (!href ? selectionText : '')
+    linkTarget.value = target === '_blank' ? '_blank' : '_self'
+    linkColor.value = extractColor(style)
     linkModalOpen.value = true; overflowOpen.value = false; aiAssistOpen.value = false; linkTooltip.value.visible = false
 }
-const closeLinkModal = () => { linkModalOpen.value = false }
+const closeLinkModal = () => { linkModalOpen.value = false; linkEditing.value = false }
 const applyLink = () => {
     const url = linkUrl.value.trim()
     if (!url) { editor.value?.chain().focus().extendMarkRange('link').unsetLink().run(); closeLinkModal(); return }
@@ -724,7 +758,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="border border-gray-100 dark:border-surface-800 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-primary-500/20 transition-all bg-white dark:bg-surface-900">
+    <div class="border border-gray-100 dark:border-surface-800 rounded-2xl overflow-hidden focus-within:ring-1 focus-within:ring-primary-500/40 transition-all bg-white dark:bg-surface-900">
         <!-- Main Toolbar -->
         <div v-if="editor && !isSourceMode" class="relative flex flex-wrap items-center gap-1 p-2 bg-gray-50 dark:bg-surface-800/50 border-b border-gray-100 dark:border-surface-800 overflow-visible">
             <!-- Undo/Redo -->
@@ -734,11 +768,11 @@ onBeforeUnmount(() => {
             <button type="button" @click="editor.chain().focus().redo().run()" :disabled="!editor.can().redo()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-700 text-gray-600 dark:text-gray-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Redo">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3"/></svg>
             </button>
-            <div class="w-px h-5 bg-gray-200 dark:bg-surface-700 mx-1"></div>
+            <div class="w-px h-5 bg-gray-200 dark:!bg-gray-600 mx-1"></div>
 
             <!-- Format dropdown -->
             <div v-if="variant === 'full'" data-rich-editor-format class="relative shrink-0">
-                <button type="button" @click.stop="formatOpen = !formatOpen" class="inline-flex h-8 min-w-20 items-center justify-between gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-bold text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700" title="Format">
+                <button type="button" @click.stop="formatOpen = !formatOpen" class="inline-flex h-8 min-w-20 items-center justify-between gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-bold text-gray-700 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:!border-gray-800 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700" title="Format">
                     <span>{{ activeFormatLabel }}</span>
                     <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
                 </button>
@@ -774,7 +808,7 @@ onBeforeUnmount(() => {
             </template>
 
             <!-- Divisor + Lists -->
-            <div v-if="variant !== 'minimal'" class="w-px h-5 bg-gray-200 dark:bg-surface-700 mx-1"></div>
+            <div v-if="variant !== 'minimal'" class="w-px h-5 bg-gray-200 dark:!bg-gray-600 mx-1"></div>
             <button v-if="variant !== 'minimal'" type="button" @click="editor.chain().focus().toggleBulletList().run()" :class="{ 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400': editor.isActive('bulletList') }" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-700 text-gray-600 dark:text-gray-400 transition-colors" title="Bullet List">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
             </button>
@@ -785,7 +819,7 @@ onBeforeUnmount(() => {
             <button v-if="variant === 'full'" type="button" @click="clearFormatting()" class="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 transition-colors text-xs font-bold" title="Clear formatting">Tx</button>
 
             <!-- Divisor + Link -->
-            <div class="w-px h-5 bg-gray-200 dark:bg-surface-700 mx-1"></div>
+            <div class="w-px h-5 bg-gray-200 dark:!bg-gray-600 mx-1"></div>
             <button type="button" @click="openLinkModal()" :class="{ 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400': editor.isActive('link') }" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-surface-700 text-gray-600 dark:text-gray-400 transition-colors" title="Link">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244"/></svg>
             </button>
@@ -838,14 +872,14 @@ onBeforeUnmount(() => {
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     </button>
                     <div v-if="exportOpen" class="absolute end-0 top-10 z-40 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                        <button type="button" @click="exportContent('html')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Download HTML') }}</button>
-                        <button type="button" @click="exportContent('markdown')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Download Markdown') }}</button>
-                        <button type="button" @click="exportContent('text')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Download Plain Text') }}</button>
-                        <button type="button" @click="exportContent('docx')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Download DOCX') }}</button>
-                        <button type="button" @click="exportContent('pdf')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Download PDF') }}</button>
-                        <div class="my-2 h-px bg-gray-100 dark:bg-surface-800"></div>
-                        <button type="button" @click="copyContent('html')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Copy HTML') }}</button>
-                        <button type="button" @click="copyContent('markdown')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200">{{ t('Copy Markdown') }}</button>
+                        <button type="button" @click="exportContent('html')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Download HTML') }}</button>
+                        <button type="button" @click="exportContent('markdown')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Download Markdown') }}</button>
+                        <button type="button" @click="exportContent('text')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Download Plain Text') }}</button>
+                        <button type="button" @click="exportContent('docx')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Download DOCX') }}</button>
+                        <button type="button" @click="exportContent('pdf')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Download PDF') }}</button>
+                        <div class="my-2 h-px bg-gray-200 dark:!bg-gray-700"></div>
+                        <button type="button" @click="copyContent('html')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Copy HTML') }}</button>
+                        <button type="button" @click="copyContent('markdown')" class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 hover:bg-primary-50 dark:text-gray-200 dark:hover:bg-white/5">{{ t('Copy Markdown') }}</button>
                     </div>
                 </div>
                 <button v-if="variant === 'full'" type="button" data-rich-editor-overflow @click.stop="overflowOpen = !overflowOpen" class="p-2 rounded-lg bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-surface-700 hover:bg-primary-50 dark:hover:bg-surface-700 transition-colors" title="More tools">
@@ -967,10 +1001,14 @@ onBeforeUnmount(() => {
             </div>
             <div v-if="variant === 'full'" class="flex flex-wrap items-center gap-2">
                 <span>{{ t('Versions') }}: {{ versionHistory.length }}/20</span>
-                <select v-if="versionHistory.length > 1" @change="restoreVersion(($event.target as HTMLSelectElement).value)" class="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs dark:border-surface-700 dark:bg-surface-900">
-                    <option value="">{{ t('Restore version') }}</option>
-                    <option v-for="v in versionHistory" :key="v.id" :value="v.html">{{ v.savedAt.toLocaleTimeString() }} - {{ v.words }} {{ t('words') }}</option>
-                </select>
+                <AppSelect
+                    v-if="versionHistory.length > 1"
+                    v-model="restoreVersionSelection"
+                    :options="versionHistoryOptions"
+                    :placeholder="t('Restore version')"
+                    :size="6"
+                    @update:model-value="handleRestoreVersion"
+                />
             </div>
         </div>
 
@@ -1007,24 +1045,24 @@ onBeforeUnmount(() => {
 
         <!-- Modals: Link, Image, Video, Attachment -->
         <div v-if="linkModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeLinkModal">
-            <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Edit link') }}</h3></div>
+            <div class="w-full max-w-[540px] overflow-visible rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ linkEditing ? t('Edit link') : t('Add link') }}</h3></div>
                 <div class="space-y-4 p-5">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('URL') }}<input v-model="linkUrl" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Link title') }}<input v-model="linkTitle" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Link target') }}<select v-model="linkTarget" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"><option value="_self">{{ t('Same tab') }}</option><option value="_blank">{{ t('New tab') }}</option></select></label>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Link color') }}<div class="mt-2 flex items-center gap-3"><input v-model="linkColor" type="color" class="h-10 w-12 cursor-pointer rounded-lg border border-gray-200 bg-white p-1 dark:border-surface-700 dark:bg-surface-800"><input v-model="linkColor" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></div></label>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Link Text') }}<input v-model="linkTitle" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
+                    <AppSelect v-model="linkTarget" :label="t('Link Target')" :options="linkTargetOptions" />
+                    <AppColorPicker v-model="linkColor" :label="t('Link Color')" />
                 </div>
-                <div class="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-4 dark:border-surface-800 dark:bg-surface-950">
-                    <button type="button" @click="removeLink" class="rounded-lg px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20">{{ t('Remove link') }}</button>
-                    <div class="flex items-center gap-2"><button type="button" @click="closeLinkModal" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="applyLink" class="rounded-lg btn-primary transition-colors">{{ t('Apply') }}</button></div>
+                <div class="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-surface-950">
+                    <button v-if="linkEditing" type="button" @click="removeLink" class="rounded-lg px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20">{{ t('Remove link') }}</button><span v-else></span>
+                    <div class="flex items-center gap-2"><button type="button" @click="closeLinkModal" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="applyLink" class="rounded-lg btn-primary transition-colors">{{ linkEditing ? t('Apply') : t('Add link') }}</button></div>
                 </div>
             </div>
         </div>
 
         <div v-if="imageModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeImageModal">
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Add image') }}</h3></div>
+                <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Add image') }}</h3></div>
                 <div class="space-y-4 p-5">
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Upload image') }}</label>
@@ -1038,7 +1076,11 @@ onBeforeUnmount(() => {
                             <input ref="imageInputRef" type="file" accept="image/*" @change="handleImageUpload" class="hidden">
                         </div>
                     </div>
-                    <div class="relative text-center text-xs font-medium uppercase text-gray-400"><span class="bg-white px-3 dark:bg-surface-900">{{ t('or') }}</span><div class="absolute inset-x-0 top-1/2 -z-0 h-px bg-gray-100 dark:bg-surface-800"></div></div>
+                    <div class="flex items-center gap-3 text-center text-xs font-medium uppercase text-gray-400">
+                        <div class="h-px flex-1 bg-gray-200 dark:!bg-surface-700"></div>
+                        <span class="shrink-0">{{ t('or') }}</span>
+                        <div class="h-px flex-1 bg-gray-200 dark:!bg-surface-700"></div>
+                    </div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image URL') }}<input v-model="imageUrl" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Alt text') }}<input v-model="imageAlt" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
@@ -1048,11 +1090,11 @@ onBeforeUnmount(() => {
                     <p v-if="imageUploading" class="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">{{ t('Uploading image...') }}</p>
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image width') }}<input v-model="imageWidth" type="text" :placeholder="t('Auto, 480, 80%, 32rem')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image alignment') }}<select v-model="imageAlignment" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"><option value="left">{{ t('Left') }}</option><option value="center">{{ t('Center') }}</option><option value="right">{{ t('Right') }}</option><option value="float-left">{{ t('Float left') }}</option><option value="float-right">{{ t('Float right') }}</option></select></label>
+                        <AppSelect v-model="imageAlignment" :label="t('Image alignment')" :options="imageAlignmentOptions" />
                     </div>
                     <p v-if="imageError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{{ imageError }}</p>
                 </div>
-                <div class="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-4 dark:border-surface-800 dark:bg-surface-950">
+                <div class="flex items-center justify-between border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-surface-950">
                     <button v-if="imageEditing" type="button" @click="removeImage" class="rounded-lg px-4 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20">{{ t('Remove image') }}</button><span v-else></span>
                     <div class="flex items-center gap-2"><button type="button" @click="closeImageModal" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="applyImageUrl" class="rounded-lg btn-primary transition-colors">{{ imageEditing ? t('Apply') : t('Insert image') }}</button></div>
                 </div>
@@ -1061,15 +1103,15 @@ onBeforeUnmount(() => {
 
         <div v-if="videoModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="videoModalOpen = false">
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Embed video') }}</h3></div>
+                <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Embed video') }}</h3></div>
                 <div class="space-y-4 p-5"><label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('YouTube or Vimeo URL') }}<input v-model="videoUrl" type="url" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"></label><p v-if="videoError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{{ videoError }}</p></div>
-                <div class="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 dark:border-surface-800 dark:bg-surface-950"><button type="button" @click="videoModalOpen = false" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="insertVideo" class="rounded-lg btn-primary transition-colors">{{ t('Insert video') }}</button></div>
+                <div class="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-surface-950"><button type="button" @click="videoModalOpen = false" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="insertVideo" class="rounded-lg btn-primary transition-colors">{{ t('Insert video') }}</button></div>
             </div>
         </div>
 
         <div v-if="attachmentModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="attachmentModalOpen = false">
             <div class="w-full max-w-[540px] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Attach file') }}</h3></div>
+                <div class="border-b border-gray-100 px-5 py-3 dark:border-surface-800"><h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Attach file') }}</h3></div>
                 <div class="space-y-4 p-5">
                     <div>
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Upload file') }}</label>
@@ -1089,7 +1131,7 @@ onBeforeUnmount(() => {
                     <p v-if="attachmentFileName" class="rounded-lg bg-primary-50 px-3 py-2 text-sm text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">{{ attachmentFileName }}</p>
                     <p v-if="attachmentError" class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{{ attachmentError }}</p>
                 </div>
-                <div class="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-4 dark:border-surface-800 dark:bg-surface-950"><button type="button" @click="attachmentModalOpen = false" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="insertAttachment" class="rounded-lg btn-primary transition-colors">{{ t('Insert file') }}</button></div>
+                <div class="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-surface-950"><button type="button" @click="attachmentModalOpen = false" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button><button type="button" @click="insertAttachment" class="rounded-lg btn-primary transition-colors">{{ t('Insert file') }}</button></div>
             </div>
         </div>
     </div>

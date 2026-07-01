@@ -21,6 +21,7 @@ interface HistoryItem {
   paramsLeft: Record<string, unknown>
   paramsRight: Record<string, unknown>
   createdAt: string
+  shareUrl?: string
 }
 
 const defaultPanel = (provider = 'openai', model = 'gpt-4o-mini'): PanelState => ({

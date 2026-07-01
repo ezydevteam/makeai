@@ -8,9 +8,11 @@ const props = withDefaults(defineProps<{
     content: string
     placement?: 'top' | 'bottom' | 'left' | 'right'
     delay?: number
+    fullWidth?: boolean
 }>(), {
     placement: 'bottom',
     delay: 500,
+    fullWidth: false,
 })
 
 const page = usePage()
@@ -57,8 +59,10 @@ function dismiss() {
         v-if="visible && !isDismissed"
         :content="content"
         :placement="placement"
+        :full-width="fullWidth"
+        :class="[fullWidth && 'w-full h-full']"
     >
-        <span class="contextual-tooltip-wrapper">
+        <span class="contextual-tooltip-wrapper" :class="{ 'full-width': fullWidth }">
             <slot />
             <button
                 v-if="visible"
@@ -70,6 +74,9 @@ function dismiss() {
             </button>
         </span>
     </Tooltip>
+    <div v-else-if="fullWidth" class="contextual-tooltip-fallback-block">
+        <slot />
+    </div>
     <span v-else><slot /></span>
 </template>
 
@@ -78,6 +85,18 @@ function dismiss() {
     position: relative;
     display: inline-flex;
     align-items: center;
+}
+.contextual-tooltip-wrapper.full-width {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+}
+.contextual-tooltip-fallback-block {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 .tooltip-dismiss-btn {
     position: absolute;

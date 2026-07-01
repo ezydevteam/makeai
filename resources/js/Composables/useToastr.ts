@@ -54,14 +54,39 @@ export function useToastr() {
 export function useFlashToasts() {
     const page = usePage()
     const toast = useToastr()
+    let lastFlashSignature = ''
 
     watch(
         () => page.props.flash as any,
         (flash) => {
-            if (flash?.success) toast.success(flash.success)
-            if (flash?.error) toast.error(flash.error)
-            if (flash?.warning) toast.warning(flash.warning)
-            if (flash?.info) toast.info(flash.info)
+            const signature = [flash?.success, flash?.error, flash?.warning, flash?.info]
+                .map(value => value ?? '')
+                .join('|')
+
+            if (signature === lastFlashSignature) {
+                return
+            }
+
+            lastFlashSignature = signature
+
+            if (flash?.success) {
+                toast.success(flash.success)
+                return
+            }
+
+            if (flash?.error) {
+                toast.error(flash.error)
+                return
+            }
+
+            if (flash?.warning) {
+                toast.warning(flash.warning)
+                return
+            }
+
+            if (flash?.info) {
+                toast.info(flash.info)
+            }
         },
         { immediate: true },
     )

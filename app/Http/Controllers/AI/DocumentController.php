@@ -49,12 +49,19 @@ class DocumentController extends Controller
     {
         abort_unless($document->user_id === $request->user()->id, 403);
 
+        $toolName = null;
+        if ($document->tool_slug) {
+            $tool = AiTool::where('slug', $document->tool_slug)->first();
+            $toolName = $tool?->name;
+        }
+
         return Inertia::render('AI/DocumentEditor', [
             'document' => [
                 'id' => $document->id,
                 'title' => $document->title,
                 'content' => $document->content,
                 'tool_slug' => $document->tool_slug,
+                'tool_name' => $toolName,
                 'word_count' => $document->word_count,
                 'folder_id' => $document->folder_id,
                 'updated_at' => optional($document->updated_at)->toISOString(),
@@ -121,7 +128,7 @@ class DocumentController extends Controller
             'updated_at' => $document->updated_at?->toISOString(),
         ])->all();
 
-        return Inertia::render('Documents/Index', [
+        return Inertia::render('User/Documents', [
             'documents' => $mappedDocuments,
             'filters' => [
                 'search' => $search,
@@ -151,4 +158,3 @@ class DocumentController extends Controller
         return back()->with('success', translate('Document deleted successfully.'));
     }
 }
-

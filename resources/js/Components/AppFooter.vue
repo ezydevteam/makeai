@@ -319,7 +319,7 @@ const visibleMenuItems = (menu: GlobalMenu | null) => {
     if (!menu) return []
 
     const loggedIn = Boolean(page.props.auth?.user)
-    const isProUser = page.props.auth?.user?.subscription_status === 'active'
+    const isProUser = (page.props.auth?.user as any)?.subscription_status === 'active'
 
     return (menu.items ?? [])
         .filter((item) => item.is_active !== false)
@@ -628,7 +628,7 @@ const copyrightLine = computed(() => {
         .replaceAll('{site_name}', appName.value)
 })
 
-const backToTopShapeClass = (shape: ConfigValue, hasLabel: boolean) => {
+const backToTopShapeClass = (shape: ConfigValue | undefined, hasLabel: boolean) => {
     if (shape === 'square') return 'h-9 w-9 rounded-none px-0'
     if (shape === 'pill') return hasLabel ? 'rounded-full px-3.5' : 'h-9 w-9 rounded-full px-0'
     if (shape === 'circle') return 'h-9 w-9 rounded-full px-0'
@@ -781,7 +781,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
                                     <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
-                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none dark:!text-gray-100">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
                                     </form>
                                 </div>
@@ -835,7 +835,7 @@ const hasFooterContent = computed(() => {
                         <h3 class="footer-heading-title text-base">{{ newsletterTitle }}</h3>
                         <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
                         <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3 sm:flex-row">
-                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none dark:!text-gray-100">
                             <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">
                                 {{ newsletterButtonLabel }}
                             </button>
@@ -878,7 +878,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
                                     <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
-                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input min-w-0 flex-1 rounded-xl border border-white/14 bg-white/8 px-4 py-3 text-sm focus:border-white/30 focus:outline-none dark:!text-gray-100">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
                                     </form>
                                 </div>
@@ -913,7 +913,7 @@ const hasFooterContent = computed(() => {
                         </div>
                         <form method="post" action="/newsletter/subscribe" class="spotlight-newsletter-form w-full">
                             <div class="spotlight-newsletter-input-wrap">
-                                <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="spotlight-newsletter-input min-w-0 flex-1 rounded-full border px-5 py-3 pe-32 text-sm focus:outline-none sm:pe-40">
+                                <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="spotlight-newsletter-input min-w-0 flex-1 rounded-full border px-5 py-3 pe-32 text-sm focus:outline-none sm:pe-40 dark:!text-gray-100">
                                 <button type="submit" :aria-label="newsletterButtonLabel" class="spotlight-newsletter-button">
                                     <span class="hidden sm:inline">{{ newsletterButtonLabel }}</span>
                                     <i class="ti ti-arrow-up-right text-base sm:ms-2" aria-hidden="true"></i>
@@ -1139,7 +1139,7 @@ const hasFooterContent = computed(() => {
                             <p class="floating-newsletter-copy">{{ newsletterDescription }}</p>
                         </div>
                         <form method="post" action="/newsletter/subscribe" class="floating-newsletter-form relative">
-                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="floating-newsletter-input w-full">
+                            <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="floating-newsletter-input w-full dark:!text-gray-100">
                             <button type="submit" :aria-label="newsletterButtonLabel" class="floating-newsletter-button">
                                 {{ newsletterButtonLabel }}
                             </button>
@@ -1198,7 +1198,7 @@ const hasFooterContent = computed(() => {
                                     <h3 v-if="newsletterColumnTitle" class="footer-heading-title">{{ newsletterColumnTitle }}</h3>
                                     <p class="footer-copy text-sm leading-7">{{ newsletterDescription }}</p>
                                     <form method="post" action="/newsletter/subscribe" class="flex flex-col gap-3">
-                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input footer-input-ghost min-w-0 flex-1 rounded-xl border border-white/18 bg-transparent px-4 py-3 text-sm focus:border-white/36 focus:outline-none">
+                                        <input type="email" name="email" required :placeholder="newsletterPlaceholder" class="footer-input footer-input-ghost min-w-0 flex-1 rounded-xl border border-white/18 bg-transparent px-4 py-3 text-sm focus:border-white/36 focus:outline-none dark:!text-gray-100">
                                         <button type="submit" :aria-label="newsletterButtonLabel" :class="newsletterButtonClass">{{ newsletterButtonLabel }}</button>
                                     </form>
                                 </div>
@@ -1554,6 +1554,16 @@ const hasFooterContent = computed(() => {
     color: color-mix(in srgb, var(--footer-heading-color, #ffffff) 52%, transparent) !important;
 }
 
+.dark .footer-input {
+    color: rgb(241 245 249) !important;
+    -webkit-text-fill-color: rgb(241 245 249);
+    caret-color: rgb(241 245 249);
+}
+
+.dark .footer-input::placeholder {
+    color: rgb(148 163 184 / 0.94) !important;
+}
+
 .split-band-newsletter-form {
     display: flex;
     flex-direction: column;
@@ -1581,6 +1591,25 @@ const hasFooterContent = computed(() => {
 
 .split-band-newsletter-input::placeholder {
     color: rgb(100 116 139);
+}
+
+.dark .split-band-newsletter-input,
+.dark .spotlight-newsletter-input,
+.dark .card-grid-newsletter-input,
+.dark .floating-newsletter-input {
+    border-color: rgb(71 85 105 / 0.8);
+    background: rgb(15 23 42 / 0.82);
+    color: rgb(241 245 249);
+    -webkit-text-fill-color: rgb(241 245 249);
+    caret-color: rgb(241 245 249);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.dark .split-band-newsletter-input::placeholder,
+.dark .spotlight-newsletter-input::placeholder,
+.dark .card-grid-newsletter-input::placeholder,
+.dark .floating-newsletter-input::placeholder {
+    color: rgb(148 163 184 / 0.94);
 }
 
 .default-newsletter-form {

@@ -1,33 +1,61 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
-import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
 
-interface Setting { key: string; label: string; type: string; default: unknown; value: unknown; options?: string[]; description?: string }
-interface AddonConfig { name: string; slug: string; version: string }
-type FormValue = string | number | boolean | null | (string | number)[]
+interface Setting {
+    key: string
+    label: string
+    type: string
+    default: unknown
+    value: unknown
+    options?: string[]
+    description?: string
+    group?: string
+}
 
-const props = defineProps<{ addon: AddonConfig; settings: Setting[] }>()
+interface AddonConfig {
+    name: string
+    slug: string
+    version: string
+    description?: string
+}
+
+type FormValue = string | number | boolean | null | File | (string | number)[]
+
+type SettingGroup = {
+    key: string
+    title: string
+    description: string
+    settings: Setting[]
+}
+
+const props = defineProps<{
+    addon: AddonConfig
+    settings: Setting[]
+    aiModels?: Array<{ value: string; label: string; provider: string }>
+}>()
 const { t } = useTranslate()
 
 const form = useForm<Record<string, FormValue>>(
-    Object.fromEntries(props.settings.map((s) => [s.key, (s.value ?? s.default) as FormValue])),
+    Object.fromEntries(props.settings.map((setting) => [setting.key, (setting.value ?? setting.default) as FormValue])),
 )
 
-const save = () => form.post(route('admin.addons.settings.save', { slug: props.addon.slug }), {
-    preserveScroll: true,
-})
+const formErrors = computed(() => form.errors as Record<string, string | undefined>)
 
 const resolveBoolean = (value: unknown): boolean => {
     return value === true || value === 1 || value === '1' || value === 'true'
 }
 
 const selectOptions = (setting: Setting): Array<{ value: string; label: string }> => {
-    return (setting.options ?? []).map((opt) => ({ value: opt, label: opt }))
+    return (setting.options ?? []).map((option) => ({
+        value: option,
+        label: option,
+    }))
 }
 
 const getFormValue = (key: string): FormValue => form[key]
@@ -43,109 +71,332 @@ const setBooleanValue = (key: string): void => {
 const setNumberValue = (key: string, value: string): void => {
     form[key] = value === '' ? null : Number(value)
 }
+
+const setFileValue = (key: string, event: Event): void => {
+    const file = (event.target as HTMLInputElement | null)?.files?.[0] ?? null
+    form[key] = file
+}
+
+const titleCase = (value: string): string => {
+    return value
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (match) => match.toUpperCase())
+}
+
+const groupMeta = (groupKey: string): { title: string; description: string } => {
+    const group = groupKey.toLowerCase()
+
+    if (group === 'general') {
+        return {
+            title: t('General'),
+            description: t('Core visibility and page behavior settings for this addon.'),
+        }
+    }
+
+    if (group === 'ai') {
+        return {
+            title: t('AI Model Controls'),
+            description: t('Choose how model selection and default AI behavior should work for chatbot sessions.'),
+        }
+    }
+
+    if (group === 'guests') {
+        return {
+            title: t('Guest Access'),
+            description: t('Define whether guests can chat and how tightly their usage should be limited.'),
+        }
+    }
+
+    if (group === 'free_tier') {
+        return {
+            title: t('Free Tier Limits'),
+            description: t('Control message cost, token limits, history size, and upload allowances for free users.'),
+        }
+    }
+
+
+
+    if (group.startsWith('plan_')) {
+        const planSlug = groupKey.replace('plan_', '').replace('_tier', '')
+        const planName = titleCase(planSlug)
+        return {
+            title: t(`${planName} Plan Limits`),
+            description: t(`Set the chat allowances and usage rules for the ${planName} plan.`),
+        }
+    }
+
+    if (group === 'technical') {
+        return {
+            title: t('Technical Visibility'),
+            description: t('Decide which lower-level usage details are exposed to end users inside the chatbot experience.'),
+        }
+    }
+
+    return {
+        title: titleCase(groupKey),
+        description: t('Manage the settings in this section.'),
+    }
+}
+
+const groupedSettings = computed<SettingGroup[]>(() => {
+    const groups = new Map<string, Setting[]>()
+
+    for (const setting of props.settings) {
+        const rawKey = setting.group || 'general'
+        const key = rawKey === 'technical' ? 'general' : rawKey
+        groups.set(key, [...(groups.get(key) ?? []), setting])
+    }
+
+    return Array.from(groups.entries()).map(([key, settings]) => {
+        const meta = groupMeta(key)
+
+        return {
+            key,
+            title: meta.title,
+            description: meta.description,
+            settings,
+        }
+    })
+})
+
+const booleanSettings = (settings: Setting[]): Setting[] => {
+    return settings.filter((setting) => setting.type === 'boolean')
+}
+
+const nonBooleanSettings = (settings: Setting[]): Setting[] => {
+    return settings.filter((setting) => setting.type !== 'boolean')
+}
+
+const inlineAiSettings = (group: SettingGroup): Setting[] => {
+    if (group.key !== 'ai') {
+        return []
+    }
+
+    return nonBooleanSettings(group.settings).filter((setting) => setting.key === 'default_chat_model' || setting.key === 'model')
+}
+
+const guestToggleSetting = (group: SettingGroup): Setting | null => {
+    if (group.key !== 'guests') {
+        return null
+    }
+
+    return group.settings.find((setting) => setting.key === 'allow_guest_messages') ?? null
+}
+
+const guestAccessEnabled = (group: SettingGroup): boolean => {
+    const setting = guestToggleSetting(group)
+
+    return setting ? resolveBoolean(getFormValue(setting.key)) : true
+}
+
+const visibleBooleanSettings = (group: SettingGroup): Setting[] => {
+    if (group.key !== 'guests') {
+        return booleanSettings(group.settings)
+    }
+
+    return booleanSettings(group.settings).filter((setting) => setting.key !== 'allow_guest_messages')
+}
+
+const stackedSettings = (group: SettingGroup): Setting[] => {
+    if (group.key !== 'ai') {
+        if (group.key === 'guests') {
+            return nonBooleanSettings(group.settings).filter((setting) => setting.key !== 'allow_guest_messages')
+        }
+
+        return nonBooleanSettings(group.settings)
+    }
+
+    return nonBooleanSettings(group.settings).filter((setting) => setting.key !== 'default_chat_model' && setting.key !== 'model')
+}
+
+const save = () => form.post(route('admin.addons.settings.save', { slug: props.addon.slug }), {
+    preserveScroll: true,
+    forceFormData: props.settings.some((setting) => setting.type === 'file'),
+})
 </script>
 
 <template>
     <Head :title="`${addon.name} ${t('Settings')} — Admin`" />
+
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="space-y-6 py-6">
-            <div class="mb-6 flex items-start justify-between gap-4">
-                <div class="flex items-start gap-4">
-                    <Link :href="route('admin.addons')" class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 shadow-sm transition hover:border-primary-200 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300">
-                        <i class="ti ti-arrow-left text-lg"></i>
-                    </Link>
-                    <div>
-                        <div class="mb-2 inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/20 dark:text-primary-300">
-                            <i class="ti ti-puzzle text-sm"></i>
-                            {{ t('Addon Settings') }}
-                        </div>
-                        <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">{{ addon.name }} {{ t('Settings') }}</h1>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Version') }} {{ addon.version }}</p>
-                    </div>
-                </div>
-                <div class="hidden md:flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                    <i class="ti ti-settings text-primary-500"></i>
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Unified admin layout') }}</span>
-                </div>
+        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ addon.name }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ addon.description || t('Configure this addon from a cleaner, grouped settings page built for easier admin setup.') }}
+                </p>
             </div>
 
-            <form @submit.prevent="save" class="space-y-6">
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Addon Configuration') }}</h2>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Adjust the addon settings below. Each field uses a simple buyer-friendly control.') }}</p>
-                        </div>
-                        <Tooltip :content="t('Save settings')" placement="left">
-                            <button type="submit" :disabled="form.processing" class="btn-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
-                                <i class="ti ti-device-floppy text-base"></i>
-                                {{ form.processing ? t('Saving...') : t('Save Settings') }}
-                            </button>
-                        </Tooltip>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                    <div v-for="setting in settings" :key="setting.key" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card transition hover:border-primary-200 hover:shadow-md dark:border-surface-700 dark:bg-surface-900">
-                        <div class="mb-4">
-                            <label class="block text-sm font-semibold text-gray-900 dark:text-white">{{ setting.label }}</label>
-                            <p v-if="setting.description" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ setting.description }}</p>
-                        </div>
-
-                        <div v-if="setting.type === 'boolean'" class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
-                            <div>
-                                <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ resolveBoolean(getFormValue(setting.key)) ? t('Enabled') : t('Disabled') }}</p>
-                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Toggle this option on or off.') }}</p>
-                            </div>
-                            <button type="button" @click="setBooleanValue(setting.key)" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors" :class="resolveBoolean(getFormValue(setting.key)) ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'">
-                                <span class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="resolveBoolean(getFormValue(setting.key)) ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                            </button>
-                        </div>
-
-                        <AppSelect
-                            v-else-if="setting.type === 'select'"
-                            :model-value="String(getFormValue(setting.key) ?? '')"
-                            :options="selectOptions(setting)"
-                            :placeholder="t('Select an option...')"
-                            @update:model-value="setFormValue(setting.key, $event)"
-                        />
-
-                        <input
-                            v-else-if="setting.type === 'integer'"
-                            :value="getFormValue(setting.key) ?? ''"
-                            type="number"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                            @input="setNumberValue(setting.key, ($event.target as HTMLInputElement).value)"
-                        >
-
-                        <textarea
-                            v-else-if="setting.type === 'textarea'"
-                            :value="String(getFormValue(setting.key) ?? '')"
-                            rows="4"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                            @input="setFormValue(setting.key, ($event.target as HTMLTextAreaElement).value)"
-                        ></textarea>
-
-                        <input
-                            v-else
-                            :value="String(getFormValue(setting.key) ?? '')"
-                            type="text"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                            @input="setFormValue(setting.key, ($event.target as HTMLInputElement).value)"
-                        >
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-card dark:border-surface-700 dark:bg-surface-900">
-                    <Link :href="route('admin.addons')" class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
-                        {{ t('Cancel') }}
-                    </Link>
-                    <button type="submit" :disabled="form.processing" class="btn-primary inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60">
-                        <i class="ti ti-device-floppy text-base"></i>
-                        {{ form.processing ? t('Saving...') : t('Save Settings') }}
-                    </button>
-                </div>
-            </form>
+            <div class="flex items-center gap-3">
+                <Link
+                    :href="route('admin.addons')"
+                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                >
+                    {{ t('Back to Addons') }}
+                </Link>
+                <button
+                    type="button"
+                    :disabled="form.processing"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+                    @click="save"
+                >
+                    <i class="ti ti-device-floppy text-base"></i>
+                    {{ form.processing ? t('Saving...') : t('Save Settings') }}
+                </button>
             </div>
         </div>
+
+        <form class="space-y-6" @submit.prevent="save">
+            <section
+                v-for="group in groupedSettings"
+                :key="group.key"
+                class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-gray-900"
+            >
+                <div class="mb-5">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ group.title }}</h2>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ group.description }}</p>
+                        </div>
+                        <button
+                            v-if="guestToggleSetting(group)"
+                            type="button"
+                            role="switch"
+                            :aria-checked="guestAccessEnabled(group)"
+                            class="relative mt-1 inline-flex h-6 w-11 shrink-0 rounded-full transition"
+                            :class="guestAccessEnabled(group) ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                            @click="setBooleanValue(guestToggleSetting(group)!.key)"
+                        >
+                            <span
+                                class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
+                                :class="guestAccessEnabled(group) ? 'translate-x-5' : 'translate-x-0.5'"
+                            ></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="visibleBooleanSettings(group).length || inlineAiSettings(group).length" class="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div
+                        v-for="setting in visibleBooleanSettings(group)"
+                        :key="setting.key"
+                        class="rounded-xl border border-gray-100 bg-gray-50/80 p-4 dark:border-surface-800 dark:bg-surface-800/60"
+                    >
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ setting.label }}</h3>
+                                <p v-if="setting.description" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ setting.description }}</p>
+                                <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Enable or disable this behavior for the addon.') }}</p>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                :aria-checked="resolveBoolean(getFormValue(setting.key))"
+                                class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition"
+                                :class="resolveBoolean(getFormValue(setting.key)) ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                                @click="setBooleanValue(setting.key)"
+                            >
+                                <span
+                                    class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
+                                    :class="resolveBoolean(getFormValue(setting.key)) ? 'translate-x-5' : 'translate-x-0.5'"
+                                ></span>
+                            </button>
+                        </div>
+
+                        <p v-if="formErrors[setting.key]" class="mt-2 text-xs text-danger-600">{{ formErrors[setting.key] }}</p>
+                    </div>
+
+                    <div
+                        v-for="setting in inlineAiSettings(group)"
+                        :key="setting.key"
+                        class="rounded-xl border border-gray-100 bg-gray-50/80 p-4 dark:border-surface-800 dark:bg-surface-800/60"
+                    >
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ setting.label }}
+                            <span v-if="setting.description" class="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">{{ setting.description }}</span>
+
+                            <AppSelect
+                                :model-value="String(getFormValue(setting.key) ?? '')"
+                                :options="aiModels ?? []"
+                                :placeholder="t('Select a model...')"
+                                class="mt-3"
+                                @update:model-value="setFormValue(setting.key, $event)"
+                            />
+                        </label>
+
+                        <p v-if="formErrors[setting.key]" class="mt-2 text-xs text-danger-600">{{ formErrors[setting.key] }}</p>
+                    </div>
+                </div>
+
+                <div
+                    v-if="stackedSettings(group).length && (group.key !== 'guests' || guestAccessEnabled(group))"
+                    class="grid grid-cols-1 gap-5"
+                    :class="group.key.startsWith('plan_') ? 'md:grid-cols-2 xl:grid-cols-3' : 'md:grid-cols-2'"
+                >
+                    <div
+                        v-for="setting in stackedSettings(group)"
+                        :key="setting.key"
+                        class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/50"
+                    >
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ setting.label }}
+                            <span v-if="setting.description" class="mt-1 block text-xs font-normal text-gray-500 dark:text-gray-400">{{ setting.description }}</span>
+
+                            <AppSelect
+                                v-if="setting.type === 'select'"
+                                :model-value="String(getFormValue(setting.key) ?? '')"
+                                :options="selectOptions(setting)"
+                                :placeholder="t('Select an option...')"
+                                class="mt-2"
+                                @update:model-value="setFormValue(setting.key, $event)"
+                            />
+
+                            <AppSelect
+                                v-else-if="(setting.key === 'default_chat_model' || setting.key === 'model') && aiModels?.length"
+                                :model-value="String(getFormValue(setting.key) ?? '')"
+                                :options="aiModels"
+                                :placeholder="t('Select a model...')"
+                                class="mt-2"
+                                @update:model-value="setFormValue(setting.key, $event)"
+                            />
+
+                            <input
+                                v-else-if="setting.type === 'integer'"
+                                :value="getFormValue(setting.key) ?? ''"
+                                type="number"
+                                class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                                @input="setNumberValue(setting.key, ($event.target as HTMLInputElement).value)"
+                            >
+
+                            <textarea
+                                v-else-if="setting.type === 'textarea'"
+                                :value="String(getFormValue(setting.key) ?? '')"
+                                rows="4"
+                                class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                                @input="setFormValue(setting.key, ($event.target as HTMLTextAreaElement).value)"
+                            ></textarea>
+
+                            <input
+                                v-else-if="setting.type === 'file'"
+                                type="file"
+                                class="mt-2 block w-full rounded-lg border border-dashed border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
+                                @change="setFileValue(setting.key, $event)"
+                            >
+
+                            <input
+                                v-else
+                                :value="String(getFormValue(setting.key) ?? '')"
+                                :type="setting.type === 'encrypted' ? 'password' : 'text'"
+                                class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-white"
+                                @input="setFormValue(setting.key, ($event.target as HTMLInputElement).value)"
+                            >
+                        </label>
+
+                        <p v-if="formErrors[setting.key]" class="mt-2 text-xs text-danger-600">{{ formErrors[setting.key] }}</p>
+                    </div>
+                </div>
+            </section>
+        </form>
+    </div>
 </template>

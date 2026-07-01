@@ -64,12 +64,12 @@ class ToolCatalogCacheService
                 ->orderBy('name')
                 ->get()
                 ->map(fn (AiTool $tool) => $this->serializeTool($tool));
-        });
+        })->map(fn ($tool) => $this->applyGlobalOverrides($tool));
     }
 
     public function toolBySlug(string $slug): array
     {
-        return Cache::remember(self::TOOL_KEY_PREFIX.$slug, self::TOOL_TTL_SECONDS, function () use ($slug) {
+        $tool = Cache::remember(self::TOOL_KEY_PREFIX.$slug, self::TOOL_TTL_SECONDS, function () use ($slug) {
             $tool = AiTool::query()
                 ->select($this->toolDetailColumns())
                 ->active()
@@ -82,6 +82,16 @@ class ToolCatalogCacheService
                 'related_tools' => $this->relatedTools($tool),
             ]);
         });
+
+        $overridden = $this->applyGlobalOverrides($tool);
+
+        if (! empty($overridden['related_tools'])) {
+            $overridden['related_tools'] = array_map(function ($item) {
+                return $this->applyGlobalOverrides($item);
+            }, $overridden['related_tools']);
+        }
+
+        return $overridden;
     }
 
     public static function forgetCategories(): void
@@ -350,5 +360,26 @@ class ToolCatalogCacheService
             'show_usage_examples',
             'show_faqs',
         ]);
+    }
+
+    private function applyGlobalOverrides(array $tool): array
+    {
+        if (request()->is('admin/*') || request()->is('api/v1/admin/*')) {
+            return $tool;
+        }
+
+        $tool['supports_brand_voice'] = (bool) ($tool['supports_brand_voice'] ?? false) && settings('global_tools_brand_voice_enabled', true);
+        $tool['max_variants'] = settings('global_tools_variations_enabled', true) ? (int) ($tool['max_variants'] ?? 1) : 1;
+        $tool['show_regenerate'] = (bool) ($tool['show_regenerate'] ?? true) && settings('global_tools_regenerate_enabled', true);
+        $tool['show_improve'] = (bool) ($tool['show_improve'] ?? true) && settings('global_tools_improve_enabled', true);
+        $tool['show_editor'] = (bool) ($tool['show_editor'] ?? true) && settings('global_tools_editor_enabled', true);
+        $tool['show_about'] = (bool) ($tool['show_about'] ?? true) && settings('global_tools_show_about_enabled', true);
+        $tool['show_how_it_works'] = (bool) ($tool['show_how_it_works'] ?? true) && settings('global_tools_show_how_it_works_enabled', true);
+        $tool['show_usage_examples'] = (bool) ($tool['show_usage_examples'] ?? true) && settings('global_tools_show_usage_examples_enabled', true);
+        $tool['show_faqs'] = (bool) ($tool['show_faqs'] ?? true) && settings('global_tools_show_faqs_enabled', true);
+        $tool['show_reviews'] = (bool) ($tool['show_reviews'] ?? false) && settings('global_tools_show_reviews_enabled', true);
+        $tool['is_embeddable'] = (bool) ($tool['is_embeddable'] ?? false) && settings('global_tools_embeddable_enabled', true);
+
+        return $tool;
     }
 }

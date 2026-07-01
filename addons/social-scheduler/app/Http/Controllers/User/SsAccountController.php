@@ -37,12 +37,17 @@ class SsAccountController extends Controller
         ]);
     }
 
-    public function redirect(string $platform): RedirectResponse
+    public function redirect(string $platform): \Symfony\Component\HttpFoundation\Response
     {
-        app(SocialAccountService::class)->checkAccountLimit(auth()->user());
-        $url = app(SocialAccountService::class)->getRedirectUrl($platform);
+        try {
+            app(SocialAccountService::class)->checkAccountLimit(auth()->user());
+            $url = app(SocialAccountService::class)->getRedirectUrl($platform);
 
-        return redirect()->away($url);
+            return \Inertia\Inertia::location($url);
+        } catch (\Throwable $e) {
+            return redirect()->route('addon.social.user.accounts')
+                ->with('error', $e->getMessage());
+        }
     }
 
     public function callback(string $platform): RedirectResponse

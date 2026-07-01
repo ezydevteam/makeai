@@ -187,7 +187,7 @@ const removeBackground = () => {
 <template>
     <Head :title="t('System Tools')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
+    <div class="mx-auto max-w-7xl px-6 py-6">
         <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('System Tools') }}</h1>

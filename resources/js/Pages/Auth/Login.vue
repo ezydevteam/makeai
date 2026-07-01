@@ -88,6 +88,7 @@ const submit = () => {
                         </div>
 
                         <form class="space-y-6" @submit.prevent="submit">
+                            <p v-if="form.errors.email" class="auth-error">{{ form.errors.email }}</p>
                             <div class="auth-floating-group">
                                 <input
                                     id="email"
@@ -104,7 +105,6 @@ const submit = () => {
                                     <i class="ti ti-mail text-[1.15rem]"></i>
                                 </span>
                             </div>
-                            <p v-if="form.errors.email" class="auth-error">{{ form.errors.email }}</p>
 
                             <div class="auth-floating-group">
                                 <input

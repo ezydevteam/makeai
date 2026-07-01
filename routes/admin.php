@@ -15,25 +15,26 @@ use App\Http\Controllers\Admin\AI\AiManagementController;
 use App\Http\Controllers\Admin\AI\AiToolCategoryController;
 use App\Http\Controllers\Admin\AI\AiToolController;
 use App\Http\Controllers\Admin\AI\AiUsageLogController;
+use App\Http\Controllers\Admin\AI\ToolReviewController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogCategoryController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogPostController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogSettingsController;
 use App\Http\Controllers\Admin\CMS\Blog\BlogTagController;
 use App\Http\Controllers\Admin\Marketing\AnnouncementController;
 use App\Http\Controllers\Admin\CMS\Blog\CommentModerationController;
-use App\Http\Controllers\Admin\ContactMessageController;
-use App\Http\Controllers\Admin\ContactSettingsController;
-use App\Http\Controllers\Admin\FeatureSettingsController;
+use App\Http\Controllers\Admin\Contact\ContactMessageController;
+use App\Http\Controllers\Admin\Contact\ContactSettingsController;
+use App\Http\Controllers\Admin\Settings\FeatureSettingsController;
 use App\Http\Controllers\Admin\ExportCenterController;
 use App\Http\Controllers\Admin\CMS\FaqController;
-use App\Http\Controllers\Admin\GdprSettingsController;
-use App\Http\Controllers\Admin\GeneralSettingsController;
+use App\Http\Controllers\Admin\Settings\GdprSettingsController;
+use App\Http\Controllers\Admin\Settings\GeneralSettingsController;
 use App\Http\Controllers\Admin\LanguageController;
 use App\Http\Controllers\Admin\LicenseSettingsController;
-use App\Http\Controllers\Admin\MailController;
-use App\Http\Controllers\Admin\MailLogController;
-use App\Http\Controllers\Admin\MailTemplateController;
-use App\Http\Controllers\Admin\MenuController;
+use App\Http\Controllers\Admin\Mail\MailController;
+use App\Http\Controllers\Admin\Mail\MailLogController;
+use App\Http\Controllers\Admin\Mail\MailTemplateController;
+use App\Http\Controllers\Admin\Appearance\MenuController;
 use App\Http\Controllers\Admin\Marketing\NewsletterController;
 use App\Http\Controllers\Admin\NotificationController as AdminNotificationController;
 use App\Http\Controllers\Admin\CMS\PageController;
@@ -46,17 +47,17 @@ use App\Http\Controllers\Admin\Roles\Admins\RoleController;
 use App\Http\Controllers\Admin\Settings\NotificationSettingsController;
 use App\Http\Controllers\Admin\Settings\OAuthSettingsController;
 use App\Http\Controllers\Admin\Settings\SocialCountersController;
-use App\Http\Controllers\Admin\SidebarBuilderController;
+use App\Http\Controllers\Admin\Appearance\SidebarController;
 use App\Http\Controllers\Admin\AI\SiteTemplateController;
 use App\Http\Controllers\Admin\Support\CannedResponseController as SupportCannedResponseController;
 use App\Http\Controllers\Admin\Support\DepartmentController as SupportDepartmentController;
 use App\Http\Controllers\Admin\Support\SettingsController as SupportSettingsController;
 use App\Http\Controllers\Admin\Support\TicketController as SupportTicketController;
-use App\Http\Controllers\Admin\SystemController;
+use App\Http\Controllers\Admin\System\SystemController;
 use App\Http\Controllers\Admin\System\CustomStyleController;
 use App\Http\Controllers\Admin\System\RateLimitController;
 use App\Http\Controllers\Admin\CMS\TestimonialController;
-use App\Http\Controllers\Admin\ThemeAddonController;
+use App\Http\Controllers\Admin\Appearance\ThemeAddonController;
 use App\Http\Controllers\Admin\TranslationController;
 use App\Http\Controllers\Admin\Roles\Users\UserManagementController;
 use Illuminate\Support\Facades\Route;
@@ -131,7 +132,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('appearance/addons/upload', [ThemeAddonController::class, 'installAddon'])->name('admin.addons.upload');
         Route::get('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'addonSettings'])->name('admin.addons.settings');
         Route::post('appearance/addons/{slug}/settings', [ThemeAddonController::class, 'saveAddonSettings'])->name('admin.addons.settings.save');
-        
+
         // Bulk actions
         Route::post('appearance/addons/bulk-activate', [ThemeAddonController::class, 'bulkActivate'])->name('admin.addons.bulk-activate');
         Route::post('appearance/addons/bulk-deactivate', [ThemeAddonController::class, 'bulkDeactivate'])->name('admin.addons.bulk-deactivate');
@@ -334,8 +335,8 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('system/style', [CustomStyleController::class, 'update'])->name('admin.appearance.update');
 
         // Appearance: Sidebar Builder
-        Route::get('appearance/sidebar', [SidebarBuilderController::class, 'index'])->name('admin.sidebar.index');
-        Route::post('appearance/sidebar', [SidebarBuilderController::class, 'update'])->name('admin.sidebar.update');
+        Route::get('appearance/sidebar', [SidebarController::class, 'index'])->name('admin.sidebar.index');
+        Route::post('appearance/sidebar', [SidebarController::class, 'update'])->name('admin.sidebar.update');
 
         // AI: Templates
         Route::prefix('ai/templates')->name('admin.ai.templates.')->group(function () {
@@ -368,6 +369,9 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('settings/social-counters', [SocialCountersController::class, 'updateFollow'])->name('admin.social-counters.settings.update');
         Route::get('settings/oauth', [OAuthSettingsController::class, 'edit'])->name('admin.oauth.settings.edit');
         Route::post('settings/oauth', [OAuthSettingsController::class, 'update'])->name('admin.oauth.settings.update');
+        Route::get('settings/integrations', [AiManagementController::class, 'integrations'])->name('admin.settings.integrations.index');
+        Route::post('settings/integrations', [AiManagementController::class, 'updateIntegrations'])->name('admin.settings.integrations.update');
+        Route::post('settings/integrations/{integration}/test-connection', [AiManagementController::class, 'testIntegrationConnection'])->name('admin.settings.integrations.test-connection');
     });
 
     // General Settings
@@ -512,10 +516,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     Route::prefix('ai')->name('admin.ai.')->middleware('admin.permission:ai.tools')->group(function () {
         Route::get('/providers', [AiManagementController::class, 'index'])->name('index');
         Route::get('/provider/{slug}', [AiManagementController::class, 'provider'])->name('provider');
-        Route::get('/integrations', [AiManagementController::class, 'integrations'])->name('integrations.index');
         Route::post('/settings', [AiManagementController::class, 'updateSettings'])->name('settings.update');
-        Route::post('/integrations', [AiManagementController::class, 'updateIntegrations'])->name('integrations.update');
-        Route::post('/integrations/{integration}/test-connection', [AiManagementController::class, 'testIntegrationConnection'])->name('integrations.test-connection');
         Route::post('/provider/{provider}/key', [AiManagementController::class, 'storeKey'])->name('key.store');
         Route::delete('/key/{key}', [AiManagementController::class, 'deleteKey'])->name('key.delete');
         Route::post('/model/{model}', [AiManagementController::class, 'updateModel'])->name('model.update');
@@ -535,6 +536,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::get('/logs', [AiUsageLogController::class, 'index'])->name('logs.index');
 
         // Tools (Full CRUD)
+        Route::post('/tools/global-settings', [AiToolController::class, 'updateGlobalSettings'])->name('tools.global-settings');
         Route::post('/tools/bulk', [AiToolController::class, 'bulk'])->name('tools.bulk');
         Route::post('/tools/{tool}/toggle', [AiToolController::class, 'toggle'])->name('tools.toggle');
         Route::get('/tools/trash', [AiToolController::class, 'trash'])->name('tools.trash');
@@ -542,6 +544,13 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('/tools/{tool}/restore', [AiToolController::class, 'restore'])->withTrashed()->name('tools.restore');
         Route::delete('/tools/{tool}/force-delete', [AiToolController::class, 'forceDelete'])->withTrashed()->name('tools.force-delete');
         Route::post('/tools/reviews/{review}/action', [AiToolController::class, 'reviewAction'])->name('tools.reviews.action');
+
+        // Tool Reviews Management
+        Route::get('/reviews', [ToolReviewController::class, 'index'])->name('reviews.index');
+        Route::post('/reviews/{review}/approve', [ToolReviewController::class, 'approve'])->name('reviews.approve');
+        Route::post('/reviews/{review}/disapprove', [ToolReviewController::class, 'disapprove'])->name('reviews.disapprove');
+        Route::post('/reviews/{review}/reply', [ToolReviewController::class, 'reply'])->name('reviews.reply');
+        Route::delete('/reviews/{review}', [ToolReviewController::class, 'destroy'])->name('reviews.destroy');
         Route::post('/categories/{category}/toggle-active', [AiToolCategoryController::class, 'toggleActive'])->name('categories.toggle-active');
         Route::resource('categories', AiToolCategoryController::class)->except(['create', 'show', 'edit']);
         Route::resource('tools', AiToolController::class)->except(['show']);

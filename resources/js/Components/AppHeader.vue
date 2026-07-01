@@ -67,6 +67,7 @@ type SimpleDesktopHeaderSettings = {
 }
 type SimpleMobileTopHeaderSettings = {
     enabled?: boolean
+    sticky?: boolean
     layout?: string
     height?: number
     bg_color?: string
@@ -421,6 +422,7 @@ const buildSimplifiedHeaderConfig = (settings: SimpleHeaderSettings) => {
             background: { color: mobileTop.bg_color || '', image_url: '', overlay_opacity: 0 },
             text_color: mobileTop.text_color || '',
             custom_css: '',
+            column_flex: 'default',
             blocks: mobileBlocks,
         },
         mobile_bottom: {
@@ -506,13 +508,16 @@ const isLightGradient = computed(() => {
 })
 
 const supportsTransparentHeroHeader = computed(() => {
+    if (page.component !== 'Welcome') {
+        return false
+    }
     if (!isHeroBgEnabled.value && !isHeroGradEnabled.value) {
         return false
     }
     if (!isHeroBgEnabled.value && isHeroGradEnabled.value && isLightGradient.value) {
         return false
     }
-    return desktopTransparentOnHero.value || headerConfig.value?.transparent_homepage === true
+    return desktopTransparentOnHero.value || (headerConfig.value as any)?.transparent_homepage === true
 })
 const isTransparentDesktopHeaderActive = computed(() => supportsTransparentHeroHeader.value && isHeroOverlayActive.value)
 const isTransparentMainHeaderActive = computed(() => isTransparentDesktopHeaderActive.value)
@@ -573,7 +578,7 @@ const mainCenterNavClass = computed(() => {
 const mainColumnGroupClass = (col: 'left' | 'center' | 'right') => {
     return col === 'right' ? 'gap-2.5 shrink-0 flex-nowrap [&>*]:shrink-0' : 'gap-2.5'
 }
-const mainNavClass = (zone: 'left' | 'center') => {
+const mainNavClass = (zone: 'left' | 'center' | 'right') => {
     const classes = ['hidden', 'items-center']
 
     if (zone === 'left') {
@@ -588,6 +593,11 @@ const mainNavClass = (zone: 'left' | 'center') => {
             classes.push('md:flex', 'min-w-0', 'gap-1')
         }
 
+        return classes
+    }
+
+    if (zone === 'right') {
+        classes.push('md:flex', 'min-w-0', 'gap-1')
         return classes
     }
 
@@ -711,6 +721,9 @@ const containerClass = (config: any, mobile = false) => {
 }
 
 const sectionBackgroundStyle = (config: any): CSSProperties => {
+    if (isDark.value) {
+        return {}
+    }
     const bg = config?.background
     const style: CSSProperties = {}
     if (bg) {
@@ -727,6 +740,9 @@ const sectionBackgroundStyle = (config: any): CSSProperties => {
     return style
 }
 const sectionAccentStyle = (config: any): HeaderStyle => {
+    if (isDark.value) {
+        return {}
+    }
     const style: HeaderStyle = {}
     const textColor = typeof config?.text_color === 'string' ? config.text_color : ''
     const hoverColor = typeof config?.menu_hover_color === 'string' && config.menu_hover_color
@@ -968,7 +984,7 @@ const buttonShapeClass = (shapeValue: unknown) => {
 }
 const ctaShapeClass = (block: any) => buttonShapeClass(block.config?.shape)
 const buttonVariantClass = (styleValue: string) => [
-    styleValue === 'primary' || styleValue === 'filled' ? 'btn-primary shadow-lg shadow-primary-600/20' : '',
+    styleValue === 'primary' || styleValue === 'filled' ? 'btn-primary-admin shadow-lg shadow-primary-600/20' : '',
     styleValue === 'dark' ? 'bg-gray-900 text-white hover:bg-black dark:bg-surface-700 dark:hover:bg-surface-600' : '',
     styleValue === 'danger' ? 'bg-danger-600 text-white hover:bg-danger-700 shadow-lg shadow-danger-600/20' : '',
     styleValue === 'success' || styleValue === 'green' ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20' : '',
@@ -1295,7 +1311,7 @@ const blockVisualStyle = (block: any): CSSProperties => {
 const iconSurfaceClass = (block: any, baseClass: string) => [
     baseClass,
     block.config?.bg_style === 'transparent' ? 'bg-transparent dark:bg-transparent' : '',
-    block.config?.bg_style === 'filled' ? 'btn-primary hover:text-white dark:bg-primary-600 dark:text-white dark:hover:bg-primary-600' : '',
+    block.config?.bg_style === 'filled' ? 'btn-primary-admin text-white hover:text-white dark:text-white' : '',
     block.config?.bg_style === 'custom' ? 'hover:opacity-90' : '',
 ]
 
@@ -1354,18 +1370,27 @@ const guestRegisterIconClass = (block: any) => String(block.config?.guest_regist
 const guestLoginText = (block: any) => String(block.config?.guest_login_text || t('Login'))
 const guestRegisterText = (block: any) => String(block.config?.guest_register_text || t('Register'))
 const userMenuInitial = computed(() => String(user.value?.name || 'U').trim().charAt(0).toUpperCase() || 'U')
-const userMenuAvatarUrl = computed(() => {
-    const avatar = String(user.value?.avatar || '').trim()
+const resolveUserAvatarUrl = (path?: string | null): string => {
+    const avatar = String(path || '').trim()
 
     if (!avatar) {
         return ''
     }
 
-    if (avatar.startsWith('http://') || avatar.startsWith('https://') || avatar.startsWith('/')) {
+    if (
+        avatar.startsWith('http://')
+        || avatar.startsWith('https://')
+        || avatar.startsWith('/')
+        || avatar.startsWith('data:')
+        || avatar.startsWith('blob:')
+    ) {
         return avatar
     }
 
     return `/storage/${avatar}`
+}
+const userMenuAvatarUrl = computed(() => {
+    return resolveUserAvatarUrl(user.value?.avatar)
 })
 const userMenuLinks = computed(() => {
     const links = [
@@ -1434,6 +1459,16 @@ const updateScrollState = () => {
     scrollProgress.value = Math.min(100, Math.max(0, (currentY / scrollable) * 100))
 }
 
+const userFirstName = computed(() => {
+    const fullName = user.value?.name?.trim() ?? ''
+
+    if (!fullName) {
+        return ''
+    }
+
+    return fullName.split(/\s+/)[0] ?? ''
+})
+
 const toggleUserMenu = (menu: 'main') => {
     activeUserMenu.value = activeUserMenu.value === menu ? null : menu
 }
@@ -1479,14 +1514,15 @@ onUnmounted(() => {
 <template>
     <CommandPalette />
     <!-- Custom CSS injection -->
-    <component
-        v-for="(_, sectionKey) in { main: headerConfig, mobile: mobileHeaderConfig, mobile_bottom: mobileBottomHeaderConfig }"
-        :is="'style'"
-        v-if="(_ as any)?.custom_css"
-        data-header-custom-css
-    >
-        {{ (_ as any).custom_css }}
-    </component>
+    <template v-for="(secConfig, sectionKey) in { main: headerConfig, mobile: mobileHeaderConfig, mobile_bottom: mobileBottomHeaderConfig }" :key="sectionKey">
+        <component
+            v-if="secConfig?.custom_css"
+            :is="'style'"
+            data-header-custom-css
+        >
+            {{ secConfig.custom_css }}
+        </component>
+    </template>
 
     <!-- Main Header -->
     <header :class="[
@@ -1946,8 +1982,14 @@ onUnmounted(() => {
                         <svg v-else class="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" :style="blockVisualStyle(block)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
                     </button>
                     <Link v-else-if="block.type === 'user_menu_icon'" class="mobile-header-utility-btn" :href="userIconHref" :class="iconSurfaceClass(block, [mobileIconButtonClass, mobileHeaderConfig?.text_color ? 'text-current' : 'text-gray-600 dark:text-gray-300'].join(' '))" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
-                        <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
-                        <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
+                        <span v-if="user" class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary-500 to-accent-500 text-xs font-bold text-white">
+                            <img v-if="userMenuAvatarUrl" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" />
+                            <span v-else>{{ userMenuInitial }}</span>
+                        </span>
+                        <template v-else>
+                            <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-[20px] leading-none']" aria-hidden="true" />
+                            <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
+                        </template>
                     </Link>
                     <button v-else-if="block.type === 'command_palette'" type="button" :class="notificationButtonClass(block).join(' ')" :style="softIconSurfaceStyle(block)" :aria-label="t('Open search')" @click="openCommandPalette()">
                         <i :class="[blockIconClass(block, 'ti ti-search'), 'text-[18px] leading-none']" aria-hidden="true" />
@@ -2002,7 +2044,7 @@ onUnmounted(() => {
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
                             </button>
                         </div>
-                        <nav class="flex-1 space-y-1 overflow-y-auto p-4">
+                        <nav class="flex-1 space-y-1 overflow-y-auto px-1 py-2">
                             <template v-if="getMenu(mobileDrawerMenuSlug)">
                                 <div v-for="item in topMenuItems(mobileDrawerMenuSlug)" :key="menuItemId(item)" class="space-y-1">
                                     <template v-if="hasSubmenuItems(mobileDrawerMenuSlug, menuItemId(item))">
@@ -2161,7 +2203,7 @@ onUnmounted(() => {
         :style="{ height: `${Number(mobileBottomHeaderConfig?.height ?? 60)}px`, ...sectionBackgroundStyle(mobileBottomHeaderConfig) }"
         class="fixed inset-x-0 bottom-0 z-50 transform-gpu will-change-transform md:hidden header-section-overlay"
     >
-        <div class="flex h-full items-center justify-around gap-1" :class="containerClass({ ...mobileBottomHeaderConfig, container_width: '1280px' }, true)">
+        <div class="flex h-full items-center justify-between gap-1" :class="containerClass({ ...mobileBottomHeaderConfig, container_width: '1280px' }, true)">
             <template v-for="block in activeMobileBottomBlocks" :key="block.id">
                 <Link v-if="block.type === 'home_link'" :href="String(block.config.link || '/')" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Home')">
                     <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
@@ -2176,9 +2218,15 @@ onUnmounted(() => {
                     <NotificationBell context="user" :label="showBlockLabel(block) ? blockLabel(block, t('Notifications')) : ''" :ui="{ wrapperClass: 'flex min-w-0 w-full', triggerClass: notificationButtonClass(block, true).join(' '), triggerStyle: softIconSurfaceStyle(block), dropdownClass: 'fixed inset-x-4 bottom-20 z-50 max-h-[70vh] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900', iconClass: blockIconClass(block), iconStyle: blockVisualStyle(block) }" />
                 </div>
                 <Link v-else-if="block.type === 'user_menu_icon'" :href="userIconHref" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="userIconLabel">
-                    <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
-                    <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
-                    <span v-if="showBlockLabel(block)">{{ user ? blockLabel(block, t('Account')) : String(block.config?.guest_label || blockLabel(block, t('Sign In'))) }}</span>
+                    <span v-if="user" class="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary-500 to-accent-500 text-[10px] font-bold text-white">
+                        <img v-if="userMenuAvatarUrl" :src="userMenuAvatarUrl" :alt="user.name || t('User avatar')" class="h-full w-full object-cover" />
+                        <span v-else>{{ userMenuInitial }}</span>
+                    </span>
+                    <template v-else>
+                        <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />
+                        <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" /></svg>
+                    </template>
+                    <span v-if="showBlockLabel(block)">{{ user ? userFirstName : String(block.config?.guest_label || blockLabel(block, t('Sign In'))) }}</span>
                 </Link>
                 <button v-else-if="block.type === 'hamburger'" type="button" :class="iconSurfaceClass(block, mobileBottomItemClass)" :style="blockVisualStyle(block)" :aria-label="t('Open menu')" @click="mobileMenuOpen = !mobileMenuOpen">
                     <i v-if="blockIconClass(block)" :class="[blockIconClass(block), 'text-xl leading-none']" aria-hidden="true" />

@@ -94,7 +94,7 @@ const typeBadge = (type: string) => {
 <template>
     <Head :title="t(':provider — AI Management', { provider: provider.name })" />
 
-    <div class="max-w-7xl mx-auto px-6 py-8">
+    <div class="max-w-7xl mx-auto px-6 py-6">
         <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div>

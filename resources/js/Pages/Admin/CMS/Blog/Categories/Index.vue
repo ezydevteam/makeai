@@ -229,7 +229,7 @@ const confirmDelete = (category: Category) => {
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+                    class="inline-flex items-center justify-center gap-2 btn-primary-admin px-4 py-2 text-sm font-medium text-white"
                     @click="openCreate"
                 >
                     <i class="ti ti-plus text-base"></i>
@@ -405,7 +405,7 @@ const confirmDelete = (category: Category) => {
                     <button
                         type="button"
                         :disabled="form.processing"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="btn-primary-admin inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                         @click="submit"
                     >
                         {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Create Category') }}

@@ -43,7 +43,7 @@ const levelClass = (level: NotificationItem['level']) => ({
 <template>
     <Head :title="t('Admin Notifications')" />
 
-    <div class="mx-auto max-w-7xl space-y-6 px-6 py-8">
+    <div class="mx-auto max-w-7xl space-y-6 px-6 py-6">
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div>

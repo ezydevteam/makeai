@@ -225,7 +225,8 @@ const slidingPillStyle = computed(() => ({
     <Head :title="t('Pricing')" />
 
     <Layout>
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-16">
+        <div class="w-full pt-6 md:pt-10 pb-16">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6">
             <div class="text-center mb-16">
                 <h1 class="text-4xl sm:text-5xl font-black text-gray-900 dark:text-white mb-4 tracking-tight">
                     {{ t('Simple, transparent') }} <span class="bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">{{ t('pricing') }}</span>
@@ -313,5 +314,6 @@ const slidingPillStyle = computed(() => ({
                 </div>
             </div>
         </div>
-    </Layout>
+    </div>
+</Layout>
 </template>

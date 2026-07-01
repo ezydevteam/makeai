@@ -32,7 +32,7 @@ class PlaygroundController extends Controller
             ];
         }
 
-        return Inertia::render('Playground/Index', [
+        return Inertia::render('User/Playground/Index', [
             'providers' => $providers,
             'defaultProvider' => settings('default_ai_provider', 'openai'),
             'defaultModel' => settings('default_ai_model', 'gpt-4o-mini'),
@@ -153,8 +153,8 @@ class PlaygroundController extends Controller
             'prompt' => 'required|string|max:5000',
             'params_left' => 'required|array',
             'params_right' => 'required|array',
-            'output_left' => 'required|string|max:5000',
-            'output_right' => 'required|string|max:5000',
+            'output_left' => 'present|nullable|string|max:5000',
+            'output_right' => 'present|nullable|string|max:5000',
         ]);
 
         $uuid = $this->playground->share($validated);
@@ -170,6 +170,6 @@ class PlaygroundController extends Controller
             abort(404);
         }
 
-        return Inertia::render('Playground/Share', ['snapshot' => $snapshot]);
+        return Inertia::render('User/Playground/Share', ['snapshot' => $snapshot]);
     }
 }

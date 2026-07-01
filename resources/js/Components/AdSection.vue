@@ -89,7 +89,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div v-if="hasRenderableAd" ref="adRef" class="ad-container overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900">
+    <div v-if="hasRenderableAd && ad" ref="adRef" class="ad-container overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-primary-200 dark:border-gray-800 dark:bg-gray-900">
         <a v-if="ad.type === 'image_link' && ad.image_url && ad.click_url" :href="ad.click_url" :target="ad.link_target" rel="noopener noreferrer" class="block">
             <img :src="ad.image_url" :alt="ad.title" class="h-auto w-full object-cover" loading="lazy" />
         </a>

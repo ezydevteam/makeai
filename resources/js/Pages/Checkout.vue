@@ -180,7 +180,8 @@ const applyCoupon = async () => {
     <Head :title="t('Checkout')" />
 
     <Layout>
-        <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div class="w-full pt-6 md:pt-10 pb-12">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6">
             <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
                 <div>
                     <p class="text-sm font-bold uppercase tracking-widest text-primary-600">{{ t('Secure Checkout') }}</p>
@@ -304,5 +305,6 @@ const applyCoupon = async () => {
                 </aside>
             </div>
         </div>
-    </Layout>
+    </div>
+</Layout>
 </template>

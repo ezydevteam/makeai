@@ -153,7 +153,6 @@ body {
 button,
 a,
 summary,
-label,
 select,
 input[type="button"],
 input[type="submit"],
@@ -176,7 +175,6 @@ input[type="radio"]:disabled,
 [data-clickable="true"][aria-disabled="true"] {
     cursor: not-allowed;
 }
-
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
@@ -528,7 +526,8 @@ input[type="checkbox"]:disabled {
 .admin-auth-page :where(input:not(.ai-tools-search):not(.chat-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus,
 .admin-auth-page :where(input:not(.ai-tools-search):not(.chat-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus-visible {
     border-color: var(--admin-auth-primary-500) !important;
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--admin-auth-primary-500) 12%, transparent) !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
 .admin-auth-page .auth-floating-input:focus + .auth-floating-label,
@@ -633,7 +632,8 @@ input[type="checkbox"]:disabled {
 .auth-input:focus {
     background: #fff;
     border-color: var(--color-primary-500);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 12%, transparent);
+    box-shadow: none;
+    outline: none;
 }
 
 .dark .auth-input:focus {
@@ -643,7 +643,7 @@ input[type="checkbox"]:disabled {
 :where(input:not(.ai-tools-search):not(.chat-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus,
 :where(input:not(.ai-tools-search):not(.chat-input):not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea:not(.chat-textarea), select):focus-visible {
     border-color: var(--color-primary-500) !important;
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary-500) 12%, transparent) !important;
+    box-shadow: none !important;
     outline: none !important;
 }
 
@@ -764,7 +764,7 @@ input[type="checkbox"]:disabled {
 .auth-floating-input:focus {
     border-color: var(--color-primary-500);
     background: #ffffff;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-500) 16%, transparent);
+    box-shadow: none;
     outline: none;
 }
 
@@ -1075,6 +1075,7 @@ input[type="checkbox"]:disabled {
 }
 
 /* Button utilities */
+.btn-primary-admin,
 .btn-primary,
 .btn-secondary,
 .btn-success {
@@ -1082,31 +1083,36 @@ input[type="checkbox"]:disabled {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  min-height: 2.5rem;
   border: 1px solid transparent;
+  border-radius: 0.5rem;
   padding: 0.5rem 1.25rem;
   font-size: var(--text-sm);
   font-weight: 500;
   line-height: 1.25rem;
   transition:
-    background-color 0.15s ease,
+    background 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
     box-shadow 0.15s ease,
     transform 0.15s ease;
 }
 
+.btn-primary-admin,
 .btn-primary {
-  background: var(--color-primary-500);
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
   color: #ffffff;
   box-shadow: var(--shadow-sm);
 }
 
+.btn-primary-admin:hover,
 .btn-primary:hover {
-  background: var(--color-primary-600);
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-500));
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
 
+.btn-primary-admin:active,
 .btn-primary:active {
   transform: translateY(0);
   box-shadow: var(--shadow-sm);
@@ -1183,6 +1189,7 @@ input[type="checkbox"]:disabled {
   box-shadow: var(--shadow-sm);
 }
 
+.btn-primary-admin:focus-visible,
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible,
 .btn-success:focus-visible,
@@ -1192,6 +1199,7 @@ input[type="checkbox"]:disabled {
   box-shadow: 0 0 0 3px rgb(16 185 129 / 0.18), var(--shadow-sm);
 }
 
+.dark .btn-primary-admin,
 .dark .btn-primary,
 .dark .btn-secondary,
 .dark .btn-success,
@@ -1201,12 +1209,14 @@ input[type="checkbox"]:disabled {
   box-shadow: var(--shadow-sm);
 }
 
+.dark .btn-primary-admin,
 .dark .btn-primary {
-  background: var(--color-primary-500);
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
 }
 
+.dark .btn-primary-admin:hover,
 .dark .btn-primary:hover {
-  background: var(--color-primary-600);
+  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-500));
 }
 
 .dark .btn-secondary {
@@ -1242,6 +1252,7 @@ input[type="checkbox"]:disabled {
   background: linear-gradient(135deg, var(--color-danger-600), var(--color-danger-700));
 }
 
+.dark .btn-primary-admin:focus-visible,
 .dark .btn-primary:focus-visible,
 .dark .btn-secondary:focus-visible,
 .dark .btn-success:focus-visible,

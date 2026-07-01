@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Crypt;
 
 class UserApiKey extends Model
 {
-    public $timestamps = false;
+    public $timestamps = true;
+
+    public const UPDATED_AT = null;
 
     protected $fillable = [
         'user_id', 'provider', 'api_key', 'is_active',

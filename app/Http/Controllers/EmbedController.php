@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\AiTool;
 use App\Models\ToolEmbed;
+use App\Models\Language;
+use App\Models\AiModel;
 use App\Services\AI\PromptBuilder;
 use App\Services\AI\ProviderRegistry;
 use App\Services\AI\TokenGuard;
@@ -16,6 +18,19 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EmbedController extends Controller
 {
+    private function corsHeaders(Request $request): array
+    {
+        $origin = $request->headers->get('Origin');
+
+        return [
+            'Access-Control-Allow-Origin' => $origin ?: '*',
+            'Access-Control-Allow-Methods' => 'POST, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type',
+            'Access-Control-Max-Age' => '86400',
+            'Vary' => 'Origin',
+        ];
+    }
+
     public function show(string $token): Response
     {
         $embed = ToolEmbed::where('token', $token)->where('is_active', true)->firstOrFail();
@@ -39,19 +54,29 @@ class EmbedController extends Controller
             if (! $allowed) abort(403, 'Origin not allowed.');
         }
 
-        $requiresPassword = ! empty($embed->password_hash) && ! session("embed_unlocked_{$token}");
+        $requiresPassword = ! blank($embed->password_hash) && ! session()->has("embed_unlocked_{$token}");
 
         Redis::incr("embed_usage:{$token}");
+
+        $languages = Language::where('is_active', true)->get(['code', 'name'])->toArray();
+        $models = AiModel::active()->ofType('chat')->orderBy('provider')->orderBy('name')->get(['slug', 'name', 'provider'])->toArray();
 
         return response()->view('embed.tool', [
             'embed' => $embed,
             'tool' => $tool,
             'requiresPassword' => $requiresPassword,
             'appName' => settings('app_name', 'MakeAI'),
+            'languages' => $languages,
+            'models' => $models,
         ])->header('X-Frame-Options', 'ALLOWALL');
     }
 
-    public function unlock(Request $request, string $token): Response
+    public function unlockOptions(Request $request, string $token): Response
+    {
+        return response('', 204)->withHeaders($this->corsHeaders($request));
+    }
+
+    public function unlock(Request $request, string $token): \Symfony\Component\HttpFoundation\Response
     {
         $embed = ToolEmbed::where('token', $token)->where('is_active', true)->firstOrFail();
 
@@ -63,7 +88,12 @@ class EmbedController extends Controller
 
         session(["embed_unlocked_{$token}" => true]);
 
-        return response()->json(['unlocked' => true]);
+        return response()->json(['unlocked' => true])->withHeaders($this->corsHeaders($request));
+    }
+
+    public function runOptions(Request $request, string $token): Response
+    {
+        return response('', 204)->withHeaders($this->corsHeaders($request));
     }
 
     public function run(Request $request, string $token): StreamedResponse
@@ -71,7 +101,9 @@ class EmbedController extends Controller
         $embed = ToolEmbed::where('token', $token)->where('is_active', true)->firstOrFail();
         $tool = AiTool::where('slug', $embed->tool_slug)->firstOrFail();
 
-        if (! $embed->is_active) abort(403);
+        if (!$tool->is_embeddable) {
+            abort(403, 'This tool is not embeddable.');
+        }
 
         $validated = $request->validate([
             'fields' => 'required|array',
@@ -123,7 +155,7 @@ class EmbedController extends Controller
             'Content-Type' => 'text/event-stream',
             'Cache-Control' => 'no-cache',
             'X-Accel-Buffering' => 'no',
-            'Access-Control-Allow-Origin' => '*',
+            ...$this->corsHeaders($request),
         ]);
     }
 }

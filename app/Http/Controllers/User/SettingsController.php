@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\DisableTwoFactorRequest;
 use App\Http\Requests\Auth\EnableTwoFactorRequest;
 use App\Http\Requests\Auth\RegenerateRecoveryCodesRequest;
+use App\Http\Requests\User\UpdateProfileRequest;
 use App\Models\User;
 use App\Models\UserApiKey;
 use App\Services\Security\TotpService;
@@ -13,10 +14,10 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Support\CountryCatalog;
 
 class SettingsController extends Controller
 {
@@ -30,7 +31,16 @@ class SettingsController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'avatar' => $user->avatar,
+                'country' => $user->country,
+                'profession' => $user->profession,
             ],
+            'countries' => collect(CountryCatalog::countries(app()->getLocale()))
+                ->map(fn (array $country) => [
+                    'value' => $country['code'],
+                    'label' => $country['name'],
+                ])
+                ->values()
+                ->all(),
         ]);
     }
 
@@ -70,15 +80,11 @@ class SettingsController extends Controller
 
     // ─── Profile ───────────────────────────────
 
-    public function updateProfile(Request $request): RedirectResponse
+    public function updateProfile(UpdateProfileRequest $request): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-        ]);
+        $validated = $request->validated();
 
         $emailChanged = $validated['email'] !== $user->email;
 
@@ -186,6 +192,7 @@ class SettingsController extends Controller
         $user->apiKeys()->create([
             'provider' => $validated['provider'],
             'api_key' => encrypt($validated['api_key']),
+            'created_at' => now(),
         ]);
 
         return back()->with('success', translate('API key added successfully.'));
@@ -201,6 +208,7 @@ class SettingsController extends Controller
         }
 
         $key->delete();
+        $request->session()->forget(['error', 'warning', 'info']);
 
         return back()->with('success', translate('API key removed.'));
     }

@@ -210,7 +210,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Mail Templates')" />
 
-    <div class="w-full space-y-6 px-4 py-8 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Templates') }}</h1>

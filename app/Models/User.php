@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 use Throwable;
+use Addons\AiChatbot\Models\Conversation;
+use Addons\AiChatbot\Models\ChatProject;
+use Addons\AiChatbot\Models\ConversationTag;
 
 /**
  * MakeAI User model — aligned with AI_SaaS_Master_Prompt Part 4.1.
@@ -27,6 +30,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $fillable = [
         'name', 'email', 'password', 'password_changed_at', 'ulid', 'avatar',
+        'country', 'profession',
         'credits', 'credits_used_today', 'credits_used_month',
         'daily_limit', 'monthly_limit',
         'plan_id', 'subscription_status', 'subscription_ends_at',

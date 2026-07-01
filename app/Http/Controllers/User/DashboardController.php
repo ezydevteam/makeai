@@ -4,11 +4,10 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiTool;
-use App\Models\Conversation;
+use Addons\AiChatbot\Models\Conversation;
 use App\Models\CreditTransaction;
 use App\Models\Document;
 use App\Models\LoginHistory;
-use App\Models\Plan;
 use App\Models\SupportTicket;
 use App\Models\UserCollection;
 use App\Models\User;

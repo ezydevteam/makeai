@@ -72,7 +72,7 @@ class ExportCenterController extends Controller
         ]);
     }
 
-    public function export(Request $request): JsonResponse|BinaryFileResponse|Response
+    public function export(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $this->authorizeExports();
         $request->validate([
@@ -316,7 +316,7 @@ class ExportCenterController extends Controller
         ];
     }
 
-    private function csvUsers(string $filename, string $dateFrom, string $dateTo, Request $request): Response
+    private function csvUsers(string $filename, string $dateFrom, string $dateTo, Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $query = User::query()
             ->when($request->status, fn ($q) => $q->where('is_active', $request->status === 'active'))
@@ -331,7 +331,7 @@ class ExportCenterController extends Controller
         );
     }
 
-    private function csvAiUsage(string $filename, string $dateFrom, string $dateTo, Request $request): Response
+    private function csvAiUsage(string $filename, string $dateFrom, string $dateTo, Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $query = AiUsageLog::query()
             ->with('user:id,name,email')
@@ -358,7 +358,7 @@ class ExportCenterController extends Controller
         );
     }
 
-    private function csvRevenue(string $filename, string $dateFrom, string $dateTo, Request $request): Response
+    private function csvRevenue(string $filename, string $dateFrom, string $dateTo, Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         $query = Payment::query()
             ->with('user:id,name,email')
@@ -382,7 +382,7 @@ class ExportCenterController extends Controller
         );
     }
 
-    private function csvAffiliates(string $filename): Response
+    private function csvAffiliates(string $filename): \Symfony\Component\HttpFoundation\StreamedResponse
     {
         return $this->exportService->streamCsv(
             $filename,

@@ -280,7 +280,7 @@ const providerColorClasses: Record<string, string> = {
         </Transition>
     </Teleport>
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
+    <div class="mx-auto max-w-7xl px-6 py-6">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Providers') }}</h1>

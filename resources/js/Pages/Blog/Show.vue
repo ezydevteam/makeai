@@ -83,7 +83,7 @@ const formatDate = (value: string | null) => {
     </Head>
 
     <article class="min-h-screen bg-emerald-50/50 dark:bg-surface-950">
-        <div class="max-w-4xl mx-auto px-6 py-10">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-10">
             <nav class="mb-6 flex items-center gap-2 text-sm text-gray-500">
                 <Link :href="route('home')" class="hover:text-primary-600">{{ t('Home') }}</Link>
                 <span>/</span>
