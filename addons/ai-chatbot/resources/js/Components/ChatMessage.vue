@@ -89,6 +89,9 @@ const props = defineProps<{
     conversationUlid?: string
 }>()
 
+const chat = inject<ReturnType<typeof import('../Composables/useChat').useChat>>('chat')
+
+
 const messageDate = computed(() => {
     if (!props.message.created_at) return ''
     return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(props.message.created_at))
@@ -142,7 +145,6 @@ function cancelEditing() {
 async function saveEdit() {
     if (!props.conversationUlid || !editContent.value.trim()) return
 
-    const chat = inject<ReturnType<typeof import('../Composables/useChat').useChat>>('chat')
     if (chat) {
         await chat.editMessage(props.conversationUlid, props.message.id, editContent.value.trim())
         isEditing.value = false
@@ -244,7 +246,6 @@ function repeatMessage() {
 
 function branchFromHere() {
     if (!props.conversationUlid) return
-    const chat = inject<ReturnType<typeof import('../Composables/useChat').useChat>>('chat')
     if (chat) {
         chat.branchConversation(props.conversationUlid, props.message.id)
     }

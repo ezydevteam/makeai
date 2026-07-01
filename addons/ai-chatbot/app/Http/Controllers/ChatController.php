@@ -417,10 +417,13 @@ class ChatController extends Controller
 
         $validated = $request->validate([
             'chat_custom_instructions' => 'nullable|string|max:2000',
+            'custom_instructions' => 'nullable|string|max:2000',
         ]);
 
+        $instructions = $request->input('chat_custom_instructions') ?? $request->input('custom_instructions');
+
         $user->update([
-            'chat_custom_instructions' => $validated['chat_custom_instructions'] ?? null,
+            'chat_custom_instructions' => $instructions,
         ]);
 
         return response()->json([
