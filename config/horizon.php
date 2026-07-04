@@ -199,7 +199,11 @@ return [
     'defaults' => [
         'supervisor-1' => [
             'connection' => 'redis',
-            'queue' => ['default', 'ai', 'emails', 'mail', 'low', 'webhooks', 'otp'],
+            // Must list EVERY queue jobs are dispatched to (core + addons), in
+            // rough priority order — a queue missing here is never processed.
+            // media/embeddings/social are used by the image-editor, voiceover,
+            // knowledge-base and social-scheduler addons.
+            'queue' => ['otp', 'emails', 'mail', 'default', 'webhooks', 'ai', 'media', 'embeddings', 'social', 'low'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'maxProcesses' => 1,

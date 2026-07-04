@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin\CMS;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TestimonialGenerateRequest;
-use App\Http\Requests\Admin\TestimonialImportRequest;
 use App\Http\Requests\Admin\TestimonialRequest;
 use App\Models\Testimonial;
 use App\Models\User;
@@ -92,34 +91,7 @@ class TestimonialController extends Controller
         return back();
     }
 
-    public function import(TestimonialImportRequest $request)
-    {
-        $file = $request->file('csv');
-        $rows = array_map('str_getcsv', file($file->getPathname()));
-        $header = array_map('strtolower', array_map('trim', array_shift($rows)));
-        $imported = 0;
 
-        foreach ($rows as $row) {
-            if (count($row) < count($header)) {
-                continue;
-            }
-            $data = array_combine($header, $row);
-            Testimonial::create([
-                'name' => $data['name'] ?? translate('Unknown'),
-                'role' => $data['role'] ?? null,
-                'company' => $data['company'] ?? null,
-                'content' => $data['content'] ?? $data['review'] ?? '',
-                'rating' => (int) ($data['rating'] ?? 5),
-                'is_active' => true,
-                'is_featured' => false,
-                'sort_order' => 0,
-                'source' => 'import',
-            ]);
-            $imported++;
-        }
-
-        return back()->with('success', translate('Imported :count testimonial(s) from CSV.', ['count' => $imported]));
-    }
 
     public function generate(TestimonialGenerateRequest $request, AiService $aiService): JsonResponse
     {

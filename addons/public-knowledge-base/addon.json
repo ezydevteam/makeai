@@ -8,6 +8,14 @@
     "envato_item_id": null,
     "admin_menu": [
         {
+            "label": "Analytics",
+            "route": "addon.kb.admin.analytics",
+            "route_params": {},
+            "route_pattern": "addon.kb.admin.analytics",
+            "icon": "ti ti-chart-bar",
+            "permission": "addon.kb.articles.manage"
+        },
+        {
             "label": "Articles",
             "route": "addon.kb.admin.articles.index",
             "route_params": {},
@@ -21,14 +29,6 @@
             "route_params": {},
             "route_pattern": "addon.kb.admin.categories.*",
             "icon": "ti ti-folders",
-            "permission": "addon.kb.articles.manage"
-        },
-        {
-            "label": "Analytics",
-            "route": "addon.kb.admin.analytics",
-            "route_params": {},
-            "route_pattern": "addon.kb.admin.analytics",
-            "icon": "ti ti-chart-bar",
             "permission": "addon.kb.articles.manage"
         },
         {

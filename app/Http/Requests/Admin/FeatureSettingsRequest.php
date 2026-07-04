@@ -14,7 +14,8 @@ class FeatureSettingsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'subscriptions_enabled' => ['required', 'boolean'],
+            // Only submitted on Extended License installs — the toggle is hidden otherwise.
+            'subscriptions_enabled' => ['sometimes', 'boolean'],
             'affiliate_enabled' => ['required', 'boolean'],
             'tickets_enabled' => ['required', 'boolean'],
             'contact_enabled' => ['required', 'boolean'],

@@ -33,6 +33,8 @@ const props = defineProps<{
         search_mode: string
         chunking_mode: string
         map_reduce_batch_size: number
+        ingest_credits_per_mb: number
+        ingest_credits_url: number
     }
     embeddingModels: EmbeddingModel[]
     fallbackEmbedding: FallbackEmbedding
@@ -54,6 +56,8 @@ const form = useForm({
     search_mode: props.settings.search_mode,
     chunking_mode: props.settings.chunking_mode,
     map_reduce_batch_size: props.settings.map_reduce_batch_size,
+    ingest_credits_per_mb: props.settings.ingest_credits_per_mb,
+    ingest_credits_url: props.settings.ingest_credits_url,
 })
 
 const chunkingModeOptions = [
@@ -79,7 +83,7 @@ const saveSettings = () => {
 <template>
     <Head :title="t('RAG Settings — Admin')" />
 
-    <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('RAG Settings') }}</h1>
@@ -204,6 +208,18 @@ const saveSettings = () => {
                         <input type="number" v-model="form.ephemeral_retention_days" min="1" max="90"
                             class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
                         <p class="text-xs text-gray-400 mt-1.5">{{ t('Auto-delete unsaved RAG sessions after this many days.') }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Ingestion Credits Per MB') }}</label>
+                        <input type="number" v-model="form.ingest_credits_per_mb" min="0" step="any"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('Credits charged per MB of uploaded documents. 0 = free ingestion.') }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Ingestion Credits Per URL / Video') }}</label>
+                        <input type="number" v-model="form.ingest_credits_url" min="0" step="any"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('Flat credits charged when ingesting a web page or YouTube video. 0 = free.') }}</p>
                     </div>
                 </div>
             </div>

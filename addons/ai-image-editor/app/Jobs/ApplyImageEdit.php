@@ -45,9 +45,9 @@ class ApplyImageEdit implements ShouldQueue
 
         try {
             $outputPath = $service->apply($edit);
-            $outputUrl = Storage::url($outputPath);
+            $outputUrl = Storage::disk('public')->url($outputPath);
 
-            $absPath = storage_path('app/' . $outputPath);
+            $absPath = Storage::disk('public')->path($outputPath);
             [$width, $height] = file_exists($absPath) ? getimagesize($absPath) : [null, null];
 
             $edit->update([

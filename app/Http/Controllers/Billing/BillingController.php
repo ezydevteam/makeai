@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Billing;
 
 use App\Http\Controllers\Controller;
+use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -33,6 +34,25 @@ class BillingController extends Controller
                 'created_at' => $payment->created_at->toISOString(),
             ]);
 
+        $activeSubscription = GatewaySubscription::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', [GatewaySubscription::STATUS_ACTIVE, GatewaySubscription::STATUS_TRIALING])
+            ->latest()
+            ->first();
+
+        $resumableSubscription = $activeSubscription ? null : GatewaySubscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', GatewaySubscription::STATUS_CANCELLED)
+            ->where(function ($query) {
+                $query->whereNull('current_period_end')->orWhere('current_period_end', '>', now());
+            })
+            ->latest('cancelled_at')
+            ->first();
+
+        $canResume = $resumableSubscription
+            && (! $resumableSubscription->gateway_subscription_id
+                || in_array($resumableSubscription->gateway, ['stripe', 'paypal'], true));
+
         return Inertia::render('User/Billing', [
             'payments' => $payments,
             'plan' => $this->planData($user),
@@ -40,6 +60,11 @@ class BillingController extends Controller
                 'status' => $user->subscription_status,
                 'ends_at' => $user->subscription_ends_at?->toISOString(),
                 'trial_ends_at' => $user->trial_ends_at?->toISOString(),
+                'gateway' => $activeSubscription?->gateway ?? $resumableSubscription?->gateway,
+                'billing_cycle' => $activeSubscription?->billing_cycle,
+                'can_cancel' => (bool) ($activeSubscription && $activeSubscription->billing_cycle !== 'lifetime'),
+                'can_resume' => (bool) $canResume,
+                'has_billing_portal' => $activeSubscription?->gateway === 'stripe' && (bool) config('cashier.secret'),
             ],
         ]);
     }

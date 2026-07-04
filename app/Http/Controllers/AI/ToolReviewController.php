@@ -80,6 +80,13 @@ class ToolReviewController extends Controller
 
         $user = Auth::user();
 
+        if ($user->is_banned) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Your account has been suspended.'),
+            ], 403);
+        }
+
         $hasUsedTool = AiUsageLog::where('user_id', $user->id)
             ->where('type', 'template')
             ->where('status', 'completed')
@@ -167,6 +174,13 @@ class ToolReviewController extends Controller
         ]);
 
         $user = Auth::user();
+
+        if ($user->is_banned) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('Your account has been suspended.'),
+            ], 403);
+        }
 
         // Prevent voting on own review
         if ($review->user_id === $user->id) {

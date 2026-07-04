@@ -27,12 +27,22 @@ type TopUserRow = {
     credits: number
 }
 
+interface ComparisonData {
+    label: string
+    type: 'up' | 'down' | 'neutral'
+}
+
+interface StatObject {
+    value: number
+    comparison: ComparisonData
+}
+
 const props = defineProps<{
-    total_renders: number
-    processing: number
-    completed_today: number
-    failed_today: number
-    total_storage_gb: number
+    total_renders: StatObject
+    processing: StatObject
+    completed_today: StatObject
+    failed_today: StatObject
+    total_storage_gb: StatObject
     by_type: RenderTypeRow[]
     by_provider: ProviderRow[]
     top_users: TopUserRow[]
@@ -66,7 +76,7 @@ const hasUsers = computed(() => props.top_users.length > 0)
 <template>
     <Head :title="t('Video Creator Overview')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -81,12 +91,71 @@ const hasUsers = computed(() => props.top_users.length > 0)
             </div>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <StatsCard :title="t('Total Renders')" :value="`${total_renders}`" />
-            <StatsCard :title="t('Processing')" :value="`${processing}`" :color="processing > 0 ? 'warning' : undefined" />
-            <StatsCard :title="t('Completed Today')" :value="`${completed_today}`" />
-            <StatsCard :title="t('Failed Today')" :value="`${failed_today}`" :color="failed_today > 0 ? 'danger' : undefined" />
-            <StatsCard :title="t('Storage')" :value="`${total_storage_gb} GB`" />
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <StatsCard
+                :title="t('Total Renders')"
+                :value="total_renders.value"
+                :comparison="total_renders.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="total_renders.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-video text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Processing')"
+                :value="processing.value"
+                :comparison="processing.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="processing.comparison.type"
+                :color="processing.value > 0 ? 'warning' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-loader text-lg animate-spin"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Completed Today')"
+                :value="completed_today.value"
+                :comparison="completed_today.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="completed_today.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-checkbox text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Failed Today')"
+                :value="failed_today.value"
+                :comparison="failed_today.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="failed_today.comparison.type"
+                :color="failed_today.value > 0 ? 'danger' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-alert-triangle text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Storage')"
+                :value="`${total_storage_gb.value} GB`"
+                :comparison="total_storage_gb.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="total_storage_gb.comparison.type"
+                color="accent"
+            >
+                <template #icon>
+                    <i class="ti ti-database text-lg"></i>
+                </template>
+            </StatsCard>
         </div>
 
         <div class="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">

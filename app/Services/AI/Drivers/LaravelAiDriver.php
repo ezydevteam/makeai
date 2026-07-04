@@ -134,6 +134,8 @@ class LaravelAiDriver implements AiDriverInterface
             instructions: $instructions,
             messages: $history,
             tools: [],
+            maxTokensOption: isset($options['max_tokens']) ? (int) $options['max_tokens'] : null,
+            temperatureOption: $this->temperatureFor($model, $options),
         );
 
         $response = $agent->prompt(
@@ -161,6 +163,8 @@ class LaravelAiDriver implements AiDriverInterface
             instructions: $instructions,
             messages: $history,
             tools: [],
+            maxTokensOption: isset($options['max_tokens']) ? (int) $options['max_tokens'] : null,
+            temperatureOption: $this->temperatureFor($model, $options),
         );
 
         $stream = $agent->stream(
@@ -247,6 +251,25 @@ class LaravelAiDriver implements AiDriverInterface
             'model' => $response->meta->model,
             'tokens_used' => $response->tokens,
         ])->all();
+    }
+
+    /**
+     * Resolve the temperature to send for a model, if any.
+     *
+     * OpenAI reasoning models (o1/o3/o4 family) reject non-default
+     * temperature values, so no temperature is sent for those.
+     */
+    private function temperatureFor(string $model, array $options): ?float
+    {
+        if (! isset($options['temperature'])) {
+            return null;
+        }
+
+        if (preg_match('/^o[134](-|$)/i', $model)) {
+            return null;
+        }
+
+        return max(0.0, min(2.0, (float) $options['temperature']));
     }
 
     // ─── Config Injection (for SDK resolution) ───────────────────

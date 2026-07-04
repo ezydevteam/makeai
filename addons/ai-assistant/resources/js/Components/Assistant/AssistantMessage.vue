@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import DOMPurify from 'dompurify'
 
 interface Message {
     role: 'user' | 'assistant'
@@ -38,11 +39,13 @@ const hasRatedDown = ref(false)
 const copied = ref(false)
 
 function renderMarkdown(text: string): string {
-    return text
+    const html = text
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
         .replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-xs">$1</code>')
         .replace(/\n/g, '<br>')
+    // Strip any raw HTML the text may contain before it reaches v-html.
+    return DOMPurify.sanitize(html, { FORBID_TAGS: ['style', 'form', 'input', 'button'], FORBID_ATTR: ['style'] })
 }
 
 function rate(rating: number) {

@@ -49,14 +49,14 @@ Route::prefix('v1')->group(function () {
     });
 
     // ─── Tool Review Mutations (auth required) ─────
-    Route::middleware('auth:sanctum')->prefix('tools')->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:public,30,60'])->prefix('tools')->group(function () {
         Route::post('{slug}/reviews', [ToolReviewController::class, 'store']);
         Route::post('reviews/{review}/vote', [ToolReviewController::class, 'vote']);
     });
 
     Route::middleware(['web', 'auth'])->post('documents', [DocumentController::class, 'store']);
 
-    Route::middleware(['web', 'auth'])->prefix('affiliate')->group(function () {
+    Route::middleware(['web', 'auth', 'affiliate'])->prefix('affiliate')->group(function () {
         Route::get('/', [AffiliateController::class, 'api']);
         Route::get('referrals', [AffiliateController::class, 'referralsApi']);
         Route::get('commissions', [AffiliateController::class, 'commissionsApi']);

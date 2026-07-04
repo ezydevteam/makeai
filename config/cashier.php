@@ -30,7 +30,8 @@ return [
     */
 
     'webhook' => [
-        'secret' => env('STRIPE_WEBHOOK_SECRET', function_exists('settings') ? settings('stripe_webhook_secret') : null),
+        // Admin-panel credentials are mapped in at boot by AppServiceProvider::configureStripeFromAdminPanel().
+        'secret' => env('STRIPE_WEBHOOK_SECRET'),
         'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
         'events' => WebhookCommand::DEFAULT_EVENTS,
     ],

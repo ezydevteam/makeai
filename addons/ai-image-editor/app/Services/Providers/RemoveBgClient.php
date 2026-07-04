@@ -15,7 +15,7 @@ class RemoveBgClient
     {
         $response = Http::timeout(60)
             ->withHeader('X-Api-Key', $this->apiKey())
-            ->attach('image_file', Storage::get($imagePath), basename($imagePath))
+            ->attach('image_file', Storage::disk('public')->get($imagePath), basename($imagePath))
             ->post("{$this->baseUrl}/removebg", [
                 'size' => 'auto',
                 'format' => 'png',
@@ -44,7 +44,7 @@ class RemoveBgClient
 
     private function saveToStorage(string $binaryContent, string $storagePath): string
     {
-        Storage::put($storagePath, $binaryContent);
+        Storage::disk('public')->put($storagePath, $binaryContent);
 
         return $storagePath;
     }

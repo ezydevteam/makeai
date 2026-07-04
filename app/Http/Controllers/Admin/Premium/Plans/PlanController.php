@@ -42,16 +42,6 @@ class PlanController extends Controller
     {
         $data = $request->validated();
 
-        logger()->info('admin.plans.update.payload', [
-            'plan_id' => $plan->id,
-            'price_monthly' => $data['price_monthly'] ?? null,
-            'original_price_monthly' => $data['original_price_monthly'] ?? null,
-            'price_yearly' => $data['price_yearly'] ?? null,
-            'original_price_yearly' => $data['original_price_yearly'] ?? null,
-            'price_lifetime' => $data['price_lifetime'] ?? null,
-            'original_price_lifetime' => $data['original_price_lifetime'] ?? null,
-        ]);
-
         if (($data['is_featured'] ?? false) === true) {
             Plan::whereKeyNot($plan->id)->update(['is_featured' => false]);
         }
@@ -74,6 +64,8 @@ class PlanController extends Controller
             'is_active' => $data['is_active'] ?? false,
             'trial_all_countries' => $data['trial_all_countries'] ?? false,
             'trial_days' => $data['trial_days'] ?? 0,
+            'stripe_price_monthly_id' => $data['stripe_price_monthly_id'] ?? null,
+            'stripe_price_yearly_id' => $data['stripe_price_yearly_id'] ?? null,
         ]);
 
         $seenCountries = [];
@@ -173,6 +165,8 @@ class PlanController extends Controller
             'features' => $plan->features,
             'trial_days' => $plan->trial_days,
             'trial_all_countries' => $plan->trial_all_countries,
+            'stripe_price_monthly_id' => $plan->stripe_price_monthly_id,
+            'stripe_price_yearly_id' => $plan->stripe_price_yearly_id,
             'is_featured' => $plan->is_featured,
             'is_active' => $plan->is_active,
             'country_prices' => $plan->countryPrices->map(fn (PlanCountryPrice $row) => [

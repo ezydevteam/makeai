@@ -10,9 +10,12 @@ class UpdateSettingsRequest extends FormRequest
 {
     public function rules(): array
     {
+        // Same access levels as the core AI tools (guest / login / premium / plan:*).
+        $accessRule = app(\App\Services\AccessLevelService::class)->getValidationRules();
+
         return [
             'enabled' => ['nullable', 'boolean'],
-            'show_to' => ['nullable', 'string', 'in:all,logged_in,pro'],
+            'show_to' => array_merge(['nullable', 'string'], $accessRule),
             'default_provider' => ['nullable', 'string', 'in:elevenlabs,openai,murf,playht'],
             'default_voice_id' => ['nullable', 'string', 'max:100'],
             'speed_default' => ['nullable', 'numeric', 'min:0.25', 'max:4.0'],

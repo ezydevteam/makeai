@@ -652,6 +652,9 @@ class ThemeAddonController extends Controller
         // Only show models from providers with at least one active, non-disabled API key.
         $configuredProviders = \App\Models\AiKey::available()->pluck('provider');
 
+        $friendlyModelNames = config('ai.model_names', []);
+        $friendlyProviderNames = config('ai.provider_names', []);
+
         $aiModels = \App\Models\AiModel::active()
             ->whereIn('type', ['chat'])
             ->whereIn('provider', $configuredProviders)
@@ -660,8 +663,8 @@ class ThemeAddonController extends Controller
             ->get(['slug', 'name', 'provider'])
             ->map(fn ($m) => [
                 'value' => $m->slug,
-                'label' => $m->name,
-                'provider' => $m->provider,
+                'label' => $friendlyModelNames[$m->slug] ?? $m->name,
+                'provider' => $friendlyProviderNames[$m->provider] ?? ucfirst($m->provider),
             ]);
 
         $rules = [];
@@ -669,8 +672,14 @@ class ThemeAddonController extends Controller
             $rules = \Addons\AiAssistant\Models\AiAssistantRule::orderBy('id', 'desc')->get();
         }
 
+        $modes = [];
+        if ($slug === 'ai-chatbot' && class_exists(\Addons\AiChatbot\Models\ChatbotMode::class) && \Illuminate\Support\Facades\Schema::hasTable('chatbot_modes')) {
+            $modes = \Addons\AiChatbot\Models\ChatbotMode::active()->orderBy('sort_order')->get(['slug', 'name']);
+        }
+
         $addonSpecificPage = resource_path('js/Pages/Addons/' . $slug . '/Admin/Settings.vue');
-        $page = file_exists($addonSpecificPage)
+        $addonOnDiskPage = base_path('addons/' . $slug . '/resources/js/Pages/Admin/Settings.vue');
+        $page = (file_exists($addonSpecificPage) || file_exists($addonOnDiskPage))
             ? 'Addons/' . $slug . '/Admin/Settings'
             : 'Admin/Appearance/AddonSettings';
 
@@ -679,6 +688,7 @@ class ThemeAddonController extends Controller
             'settings' => $settings,
             'aiModels' => $aiModels,
             'rules' => $rules,
+            'modes' => $modes,
         ]);
     }
 

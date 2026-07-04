@@ -102,8 +102,12 @@ class ProviderRegistry
      *
      * Increments error_count. If exceeded MAX_ERRORS, disables key for COOLDOWN_MINUTES.
      * Returns the next available driver, or null if all keys exhausted.
+     *
+     * @param  int[]  $excludeKeyIds  Keys already tried this request — never rotate
+     *                                back to one of these (prevents ping-ponging
+     *                                between two failing keys).
      */
-    public static function markFailedAndRotate(string $name, int $failedKeyId, ?int &$rotationKeyId = null): ?AiDriverInterface
+    public static function markFailedAndRotate(string $name, int $failedKeyId, ?int &$rotationKeyId = null, array $excludeKeyIds = []): ?AiDriverInterface
     {
         $driverName = self::normalizeName($name);
 
@@ -121,7 +125,7 @@ class ProviderRegistry
 
         $nextKey = AiKey::forProvider($driverName)
             ->available()
-            ->where('id', '!=', $failedKeyId)
+            ->whereNotIn('id', array_values(array_unique(array_merge($excludeKeyIds, [$failedKeyId]))))
             ->orderBy('last_used_at', 'asc')
             ->first();
 

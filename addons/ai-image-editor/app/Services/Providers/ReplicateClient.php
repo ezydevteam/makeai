@@ -114,7 +114,7 @@ class ReplicateClient
         }
 
         $storagePath = 'image-editor/tmp/' . $filename;
-        Storage::put($storagePath, file_get_contents($tempPath));
+        Storage::disk('public')->put($storagePath, file_get_contents($tempPath));
         @unlink($tempPath);
 
         return $storagePath;
@@ -134,7 +134,7 @@ class ReplicateClient
     private function imageToBase64(string $storagePath): string
     {
         $ext = strtolower(pathinfo($storagePath, PATHINFO_EXTENSION));
-        $bytes = Storage::get($storagePath);
+        $bytes = Storage::disk('public')->get($storagePath);
 
         return 'data:image/' . $ext . ';base64,' . base64_encode($bytes);
     }

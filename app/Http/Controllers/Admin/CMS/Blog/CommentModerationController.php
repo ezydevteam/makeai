@@ -18,16 +18,31 @@ class CommentModerationController extends Controller
         $this->authorizeComments();
 
         $status = $request->string('status')->toString();
+        $search = trim((string) $request->string('search')->value());
+
+        $comments = Comment::query()
+            ->with(['user:id,name,email,avatar', 'commentable'])
+            ->withCount('reports')
+            ->when(in_array($status, ['pending', 'approved', 'spam'], true), fn ($query) => $query->where('status', $status))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($query) use ($search) {
+                    $query->where('content', 'like', "%{$search}%")
+                        ->orWhereHas('user', function ($query) use ($search) {
+                            $query->where('name', 'like', "%{$search}%")
+                                  ->orWhere('email', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest()
+            ->paginate(25)
+            ->withQueryString();
 
         return Inertia::render('Admin/CMS/Blog/Comments/Index', [
-            'comments' => Comment::query()
-                ->with(['user:id,name,email,avatar', 'commentable'])
-                ->withCount('reports')
-                ->when(in_array($status, ['pending', 'approved', 'spam'], true), fn ($query) => $query->where('status', $status))
-                ->latest()
-                ->paginate(25)
-                ->withQueryString(),
-            'filters' => ['status' => $status],
+            'comments' => $comments,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
             'pendingCount' => Comment::where('status', 'pending')->count(),
             'settings' => [
                 'comments_enabled' => (bool) settings('comments_enabled', true),

@@ -102,7 +102,7 @@ onMounted(() => {
     <Head :title="$t('Two-Factor Authentication')" />
 
     <div class="auth-page admin-auth-page" :style="adminAuthStyle">
-        <div class="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div class="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
             <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
                 <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="border-b border-gray-100 px-6 py-5 dark:border-surface-800">

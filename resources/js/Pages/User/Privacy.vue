@@ -19,12 +19,13 @@ interface ExportItem {
 }
 
 interface SessionItem {
-    id: number
+    id: string
     ip: string
     country: string | null
     city: string | null
     user_agent: string
     last_seen: string
+    is_current?: boolean
 }
 
 const props = defineProps<{
@@ -41,7 +42,7 @@ const props = defineProps<{
 }>()
 
 const exportForm = useForm({})
-const deleteForm = useForm({ confirmation: '', otp: '' })
+const deleteForm = useForm({ confirmation: '', password: '' })
 const preferencesForm = useForm({
     email_marketing: props.user?.email_marketing ?? true,
     allow_data_improve: props.user?.allow_data_improve ?? true,
@@ -53,7 +54,7 @@ const preferencesForm = useForm({
 })
 
 const showDeleteModal = ref(false)
-const showRevokeConfirm = ref<number | null>(null)
+const showRevokeConfirm = ref<string | null>(null)
 
 const cookieConsent = ref({
     functional: props.user?.cookie_consent?.functional ?? true,
@@ -84,7 +85,7 @@ const cancelDeletion = () => {
     useForm({}).post(route('user.dashboard.privacy.cancel-deletion'))
 }
 
-const revokeSession = (id: number) => {
+const revokeSession = (id: string) => {
     useForm({ session_id: id }).post(route('user.dashboard.privacy.sessions.revoke'))
 }
 
@@ -241,7 +242,8 @@ const exportedCookieConsent = computed(() => {
                         <span class="break-words text-[11px] text-gray-400 sm:max-w-[300px]">{{ session.user_agent }}</span>
                         <span class="text-[11px] text-gray-400">{{ new Date(session.last_seen).toLocaleString() }}</span>
                     </div>
-                    <button v-if="showRevokeConfirm !== session.id" @click="showRevokeConfirm = session.id" class="self-start text-xs text-red-500 transition-colors hover:text-red-700 sm:self-auto">{{ t('Revoke') }}</button>
+                    <span v-if="session.is_current" class="self-start rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400 sm:self-auto">{{ t('This device') }}</span>
+                    <button v-else-if="showRevokeConfirm !== session.id" @click="showRevokeConfirm = session.id" class="self-start text-xs text-red-500 transition-colors hover:text-red-700 sm:self-auto">{{ t('Revoke') }}</button>
                     <div v-else class="flex flex-wrap items-center gap-2">
                         <span class="text-xs text-red-500">{{ t('Confirm?') }}</span>
                         <button @click="revokeSession(session.id); showRevokeConfirm = null" class="text-xs font-bold text-red-600">{{ t('Yes') }}</button>
@@ -255,9 +257,15 @@ const exportedCookieConsent = computed(() => {
     <!-- Delete Account Modal -->
     <ActionConfirmModal :open="showDeleteModal" :title="t('Delete Your Account')" :message="t('This action is permanent. All your data will be deleted after a 30-day grace period. You can cancel during this time by logging in.')" :confirm-label="t('Schedule Deletion')" :variant="'danger'" :processing="deleteForm.processing" @confirm="scheduleDeletion" @cancel="showDeleteModal = false">
         <div class="space-y-4 pt-3">
-            <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('Type DELETE to confirm and enter the OTP sent to your email.') }}</p>
-            <input v-model="deleteForm.confirmation" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('DELETE')" />
-            <input v-model="deleteForm.otp" type="text" maxlength="6" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-mono text-center tracking-[0.5em] dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('000000')" />
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ t('Type DELETE to confirm and enter your password.') }}</p>
+            <div>
+                <input v-model="deleteForm.confirmation" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('DELETE')" />
+                <p v-if="deleteForm.errors.confirmation" class="mt-1 text-xs text-red-500">{{ deleteForm.errors.confirmation }}</p>
+            </div>
+            <div>
+                <input v-model="deleteForm.password" type="password" autocomplete="current-password" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Your password')" />
+                <p v-if="deleteForm.errors.password" class="mt-1 text-xs text-red-500">{{ deleteForm.errors.password }}</p>
+            </div>
         </div>
     </ActionConfirmModal>
 </template>

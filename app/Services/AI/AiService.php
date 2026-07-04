@@ -55,6 +55,7 @@ class AiService
         }
 
         $lastException = null;
+        $triedKeyIds = $currentKeyId ? [$currentKeyId] : [];
 
         while ($adapter) {
             try {
@@ -69,7 +70,11 @@ class AiService
                     throw $e;
                 }
 
-                $adapter = ProviderRegistry::markFailedAndRotate($providerName, $currentKeyId, $currentKeyId);
+                $adapter = ProviderRegistry::markFailedAndRotate($providerName, $currentKeyId, $currentKeyId, $triedKeyIds);
+
+                if ($adapter && $currentKeyId) {
+                    $triedKeyIds[] = $currentKeyId;
+                }
             }
         }
 
@@ -89,24 +94,7 @@ class AiService
      */
     private function isRetryableError(Throwable $e): bool
     {
-        $message = $e->getMessage();
-        $code = (int) $e->getCode();
-
-        if ($code === 429 || $code === 403 || ($code >= 500 && $code < 600)) {
-            return true;
-        }
-
-        $retryable = ['rate limit', 'too many requests', 'quota exceeded', 'insufficient_quota',
-            'timeout', 'timed out', 'connection refused', 'connection reset',
-            'service unavailable', 'internal server error', 'bad gateway', 'gateway timeout'];
-
-        foreach ($retryable as $keyword) {
-            if (stripos($message, $keyword) !== false) {
-                return true;
-            }
-        }
-
-        return false;
+        return AiErrors::isRetryable($e);
     }
 
     // ─── Core: Text Completions ───────────────────────────────────
@@ -127,14 +115,13 @@ class AiService
         $modelName = $model ?? settings('default_ai_model', 'gpt-4o-mini');
 
         try {
+            // Pre-flight failures are credit/account problems — a different
+            // provider cannot fix them, so no fallback here.
             TokenGuard::before($user, null, $modelName);
         } catch (Throwable $e) {
-            $fallback = $this->resolveFallback($providerName);
-            if ($fallback) {
-                return $this->complete($user, $prompt, $systemPrompt, $fallback['provider'], $fallback['model'], $options);
-            }
             TokenGuard::recordFailure($user, $providerName, $modelName, 'chat', 0, 0, [
                 'preflight_error' => class_basename($e),
+                'tool_slug' => $toolSlug,
             ]);
             throw $e;
         }
@@ -181,9 +168,11 @@ class AiService
                 );
             }, $user, $providerName, $modelName, 'chat');
         } catch (Throwable $e) {
+            // Fall back to the secondary provider only for errors it can fix
+            // (provider not configured / rate limits / outages).
             $fallback = $this->resolveFallback($providerName);
-            if ($fallback && $e->getMessage() !== $providerName) {
-                return $this->complete($user, $prompt, $systemPrompt, $fallback['provider'], $fallback['model'], $options);
+            if ($fallback && ($e instanceof IntegrationNotConfiguredException || AiErrors::isRetryable($e))) {
+                return $this->complete($user, $prompt, $systemPrompt, $fallback['provider'], $fallback['model'], $options, $toolSlug);
             }
             throw $e;
         }
@@ -248,7 +237,8 @@ class AiService
                 $result['model'],
                 $providerName,
                 'template',
-                ['template_slug' => $template->slug]
+                ['template_slug' => $template->slug, 'personal_api_key' => (bool) $completion->apiKey],
+                ! $completion->apiKey
             );
 
             RecordGenerationHistoryJob::dispatch($user, [
@@ -394,7 +384,8 @@ class AiService
                     $usageStats['model'] ?? $finalModel,
                     $providerName,
                     'template',
-                    ['template_slug' => $template->slug]
+                    ['template_slug' => $template->slug, 'personal_api_key' => (bool) $completion->apiKey],
+                    ! $completion->apiKey
                 );
 
                 $template->incrementUsage();
@@ -591,12 +582,13 @@ class AiService
         ?string $model = null,
         ?string $size = null,
         ?string $quality = null,
+        ?User $user = null,
     ): array {
         $providerName = $provider ?? settings('ai_image_provider', config('ai.default_for_images', 'openai'));
         $provider = app(AiManager::class)->imageProvider($providerName);
 
         try {
-            TokenGuard::before(null, null, $model);
+            TokenGuard::before($user, null, $model);
 
             $response = $provider->image(
                 prompt: $prompt,
@@ -607,9 +599,9 @@ class AiService
 
             // Estimate tokens for image generation (rough estimate: 1000 tokens per image)
             $estimatedTokens = 1000 * count($response->images);
-            
+
             TokenGuard::after(
-                null,
+                $user,
                 $estimatedTokens,
                 0,
                 $response->meta->model,
@@ -626,7 +618,7 @@ class AiService
                 'model' => $response->meta->model,
             ];
         } catch (Throwable $e) {
-            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'image_generation', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $model ?? 'unknown', 'image_generation', 0, 0, [
                 'error' => $e->getMessage(),
                 'tool_slug' => 'image_generator',
             ]);
@@ -644,13 +636,14 @@ class AiService
         string $voice = 'default-female',
         ?string $provider = null,
         ?string $model = null,
+        ?User $user = null,
     ): array {
         $providerName = $provider ?? settings('ai_audio_provider', config('ai.default_for_audio', 'openai'));
 
         $provider = app(AiManager::class)->audioProvider($providerName);
 
         try {
-            TokenGuard::before(null, null, $model);
+            TokenGuard::before($user, null, $model);
 
             $response = $provider->audio(
                 text: $text,
@@ -660,9 +653,9 @@ class AiService
 
             // Estimate tokens for audio generation (rough estimate: 1 token per 4 chars)
             $estimatedTokens = (int) ceil(mb_strlen($text) / 4);
-            
+
             TokenGuard::after(
-                null,
+                $user,
                 $estimatedTokens,
                 0,
                 $response->meta->model,
@@ -677,7 +670,7 @@ class AiService
                 'model' => $response->meta->model,
             ];
         } catch (Throwable $e) {
-            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'audio_generation', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $model ?? 'unknown', 'audio_generation', 0, 0, [
                 'error' => $e->getMessage(),
                 'tool_slug' => 'audio_generator',
             ]);
@@ -694,13 +687,14 @@ class AiService
         bool $diarize = false,
         ?string $provider = null,
         ?string $model = null,
+        ?User $user = null,
     ): array {
         $providerName = $provider ?? settings('ai_transcription_provider', config('ai.default_for_transcription', 'openai'));
 
         $provider = app(AiManager::class)->transcriptionProvider($providerName);
 
         try {
-            TokenGuard::before(null, null, $model);
+            TokenGuard::before($user, null, $model);
 
             $response = $provider->transcribe(
                 audio: $audio,
@@ -711,9 +705,9 @@ class AiService
 
             // Estimate tokens for transcription (rough estimate: 1 token per 4 chars of output)
             $estimatedTokens = (int) ceil(mb_strlen($response->text) / 4);
-            
+
             TokenGuard::after(
-                null,
+                $user,
                 0,
                 $estimatedTokens,
                 $response->meta->model,
@@ -729,7 +723,7 @@ class AiService
                 'model' => $response->meta->model,
             ];
         } catch (Throwable $e) {
-            TokenGuard::recordFailure(null, $providerName, $model ?? 'unknown', 'transcription', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $model ?? 'unknown', 'transcription', 0, 0, [
                 'error' => $e->getMessage(),
                 'tool_slug' => 'transcriber',
             ]);

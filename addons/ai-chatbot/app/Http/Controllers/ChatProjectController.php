@@ -14,7 +14,15 @@ class ChatProjectController extends Controller
 {
     public function index(): JsonResponse
     {
-        $projects = Auth::user()->chatProjects()
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $projects = $user->chatProjects()
             ->withCount('conversations')
             ->latest('updated_at')
             ->get();
@@ -27,13 +35,21 @@ class ChatProjectController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sign in to create projects.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
             'color_hex' => 'nullable|string|max:7',
         ]);
 
-        $project = Auth::user()->chatProjects()->create($validated);
+        $project = $user->chatProjects()->create($validated);
 
         return response()->json([
             'success' => true,

@@ -93,6 +93,14 @@ class SocialAuthController extends Controller
 
             $user->save();
         } else {
+            // Honor the admin "registration enabled" toggle: social login may
+            // still authenticate existing users, but must not create new
+            // accounts when self-registration is disabled.
+            if (! (bool) settings('registration_enabled', true)) {
+                return redirect()->route('login')
+                    ->with('error', translate('New account registration is currently disabled.'));
+            }
+
             $user = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -114,9 +122,10 @@ class SocialAuthController extends Controller
 
         Auth::login($user, true);
 
-        if ($user->hasTotpEnabled()) {
+        if ($user->two_factor_enabled) {
             $request->session()->put('user_2fa_id', $user->id);
             $request->session()->put('user_2fa_remember', true);
+            $request->session()->put('user_2fa_method', $user->hasTotpEnabled() ? 'totp' : 'otp');
             Auth::logout();
 
             return redirect()->route('two-factor.show');

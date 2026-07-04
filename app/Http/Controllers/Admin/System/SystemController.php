@@ -480,6 +480,9 @@ class SystemController extends Controller
 
     private function authorizeSystem(): void
     {
+        if (! auth('admin')->user()?->hasPermission('settings.manage')) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 
     public function checkUpdates()
@@ -692,7 +695,10 @@ class SystemController extends Controller
                 'status' => $this->isQueueRunning() ? 'pass' : 'warn',
                 'label' => translate('Queue worker'),
                 'detail' => $this->isQueueRunning() ? translate('Active') : translate('May be offline'),
-                'suggestion' => $this->isQueueRunning() ? null : translate('Start queue worker: php artisan queue:work'),
+                // A bare `queue:work` only processes the "default" queue, so OTP,
+                // email and other jobs on named queues would never send. List every
+                // queue explicitly (or run Horizon when using Redis).
+                'suggestion' => $this->isQueueRunning() ? null : translate('Start queue worker: php artisan queue:work --queue=otp,emails,mail,default,webhooks,ai,media,embeddings,social,low'),
             ],
             [
                 'status' => $this->isSchedulerRunning() ? 'pass' : 'fail',

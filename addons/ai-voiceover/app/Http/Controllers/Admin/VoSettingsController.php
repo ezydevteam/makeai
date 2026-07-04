@@ -26,8 +26,16 @@ class VoSettingsController extends \App\Http\Controllers\Controller
             ];
         }
 
+        // Same access-level options the core AI tools expose (minus "inherit",
+        // which has no parent to inherit from here).
+        $accessLevels = collect(app(\App\Services\AccessLevelService::class)->getOptions())
+            ->reject(fn (array $o) => $o['value'] === 'inherit')
+            ->values()
+            ->all();
+
         return Inertia::render('Addons/ai-voiceover/Admin/Settings', [
             'voiceSyncStatus' => $voiceSyncStatus,
+            'accessLevels' => $accessLevels,
             'systemStatus' => [
                 'ffmpeg' => $this->checkBinary('ffmpeg'),
                 'ffprobe' => $this->checkBinary('ffprobe'),

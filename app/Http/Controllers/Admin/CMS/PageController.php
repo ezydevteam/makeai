@@ -24,11 +24,12 @@ class PageController extends Controller
             $query->onlyTrashed();
         } else {
             $query->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()));
-            $query->when($request->filled('search'), function ($query) use ($request) {
-                $search = trim($request->string('search')->toString());
-                $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
-            });
         }
+
+        $query->when($request->filled('search'), function ($query) use ($request) {
+            $search = trim($request->string('search')->toString());
+            $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('slug', 'like', "%{$search}%"));
+        });
 
         $pages = $query
             ->orderBy('is_system', 'desc')
@@ -80,6 +81,13 @@ class PageController extends Controller
     public function update(PageRequest $request, Page $page)
     {
         $validated = $this->normalizePageData($request->validated(), $page);
+
+        // System pages have fixed slugs referenced by hardcoded links (footer,
+        // GDPR cookie banner, menus, legal pages). Keep the slug immutable so a
+        // rename can't silently break those references — content stays editable.
+        if ($page->is_system) {
+            $validated['slug'] = $page->slug;
+        }
 
         if ($request->boolean('remove_featured_image')) {
             if ($page->featured_image) {

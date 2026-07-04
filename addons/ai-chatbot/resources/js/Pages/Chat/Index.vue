@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, provide, ref, onMounted, onUnmounted } from 'vue'
+import { computed, provide, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import { onClickOutside } from '@vueuse/core'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import { useChat } from '../../Composables/useChat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -83,6 +84,94 @@ provide('sidebarMobileOpen', sidebarMobileOpen)
 provide('isMobileSidebar', isMobile)
 
 onClickOutside(exploreRef, () => { exploreOpen.value = false })
+
+const getModeIconClass = (icon?: string | null) => {
+    const value = icon?.trim()
+    if (!value) return 'ti ti-grid-dots'
+
+    if (value === 'ti-world-search' || value === 'ti ti-world-search') {
+        return 'ti ti-world-www'
+    }
+
+    if (value.startsWith('ti ')) return value
+    if (value.startsWith('ti-')) return `ti ${value}`
+    return `ti ti-${value}`
+}
+
+const activeProject = computed(() => {
+    if (!chat.activeConversation.value?.project_id) return null
+    return chat.projects.value.find(p => p.id === chat.activeConversation.value?.project_id) || null
+})
+
+const otherProjects = computed(() => {
+    const currentProjId = chat.activeConversation.value?.project_id
+    return chat.projects.value.filter(p => p.id !== currentProjId)
+})
+
+const breadcrumbMenuRef = ref<HTMLElement | null>(null)
+const breadcrumbMenuOpen = ref(false)
+onClickOutside(breadcrumbMenuRef, () => {
+    breadcrumbMenuOpen.value = false
+})
+
+const renamingActiveConversation = ref(false)
+const activeConversationRenameValue = ref('')
+const renameInputRef = ref<HTMLInputElement | null>(null)
+
+const startActiveConversationRename = async () => {
+    if (!chat.activeConversation.value) return
+    activeConversationRenameValue.value = chat.activeConversation.value.title || ''
+    renamingActiveConversation.value = true
+    breadcrumbMenuOpen.value = false
+    await nextTick()
+    renameInputRef.value?.focus()
+}
+
+const saveActiveConversationRename = async () => {
+    if (!renamingActiveConversation.value || !chat.activeConversation.value) return
+    const title = activeConversationRenameValue.value.trim()
+    await chat.renameConversation(chat.activeConversation.value.ulid, title || null)
+    renamingActiveConversation.value = false
+}
+
+const cancelActiveConversationRename = () => {
+    renamingActiveConversation.value = false
+}
+
+const onMoveToProject = async (projectId: number | null) => {
+    if (!chat.activeConversation.value) return
+    const convUlid = chat.activeConversation.value.ulid
+    await chat.moveToProject(convUlid, projectId)
+    breadcrumbMenuOpen.value = false
+    if (chat.activeConversation.value?.ulid === convUlid) {
+        chat.activeConversation.value = { ...chat.activeConversation.value, project_id: projectId }
+    }
+}
+
+const togglePin = async () => {
+    if (!chat.activeConversation.value) return
+    await chat.togglePin(chat.activeConversation.value.ulid)
+    breadcrumbMenuOpen.value = false
+}
+
+const showDeleteConfirm = ref(false)
+const deleteProcessing = ref(false)
+
+const deleteActiveConversation = () => {
+    breadcrumbMenuOpen.value = false
+    showDeleteConfirm.value = true
+}
+
+const confirmDeleteActiveConversation = async () => {
+    if (!chat.activeConversation.value) return
+    deleteProcessing.value = true
+    try {
+        await chat.deleteConversation(chat.activeConversation.value.ulid)
+    } finally {
+        deleteProcessing.value = false
+        showDeleteConfirm.value = false
+    }
+}
 </script>
 
 <template>
@@ -151,6 +240,113 @@ onClickOutside(exploreRef, () => { exploreOpen.value = false })
         </Transition>
 
         <div class="chat-main">
+            <!-- Breadcrumbs -->
+            <div v-if="chat.activeConversation.value" class="absolute top-[18px] left-16 lg:left-6 z-20 flex items-center gap-1.5 text-xs text-[#6e6a65] dark:text-white/40 font-medium select-none">
+                <Link :href="route('chat.index')" class="!text-[#6e6a65] !dark:text-white/40 hover:!text-[#1a1a1a] dark:hover:!text-white transition-colors no-underline flex items-center gap-1">
+                    <span>{{ t('Home') }}</span>
+                </Link>
+                <span class="text-gray-300 dark:text-white/10">/</span>
+                <template v-if="activeProject">
+                    <button class="hover:text-[#1a1a1a] dark:hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0 text-xs font-medium" @click="chat.selectProject(activeProject)">
+                        {{ activeProject.name }}
+                    </button>
+                    <span class="text-gray-300 dark:text-white/10">/</span>
+                </template>
+
+                <!-- Chat title with inline rename and action menu -->
+                <div class="relative flex items-center gap-1 group">
+                    <template v-if="renamingActiveConversation">
+                        <input
+                            ref="renameInputRef"
+                            v-model="activeConversationRenameValue"
+                            class="px-1.5 py-0.5 rounded border border-black/10 dark:border-white/20 bg-white dark:bg-[#1a1a1a] text-xs text-[#1a1a1a] dark:text-white/80 outline-none max-w-[120px] sm:max-w-[200px]"
+                            @keyup.enter="saveActiveConversationRename"
+                            @keyup.escape="cancelActiveConversationRename"
+                            @blur="saveActiveConversationRename"
+                            @click.stop
+                        />
+                    </template>
+                    <template v-else>
+                        <span
+                            class="text-[#1a1a1a] dark:text-white/80 max-w-[120px] sm:max-w-[200px] truncate hover:underline cursor-text font-semibold flex items-center gap-1"
+                            :title="t('Double click to rename')"
+                            @dblclick.stop="startActiveConversationRename"
+                        >
+                            {{ chat.activeConversation.value.title || t('New conversation') }}
+                        </span>
+
+                        <div class="relative" ref="breadcrumbMenuRef">
+                            <button
+                                class="flex h-5 w-5 items-center justify-center rounded-full text-gray-400 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                :class="{ 'opacity-100 bg-black/5 dark:bg-white/5': breadcrumbMenuOpen }"
+                                @click.stop="breadcrumbMenuOpen = !breadcrumbMenuOpen"
+                            >
+                                <i class="ti ti-chevron-down text-[10px]"></i>
+                            </button>
+                            <div v-if="breadcrumbMenuOpen" class="absolute left-0 top-full mt-1.5 min-w-[160px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1 z-50">
+                                <div class="px-3 py-1.5 text-[11px] font-medium text-[#b0aca8] dark:text-white/30">{{ t('Move to Project') }}</div>
+                                <button v-for="proj in otherProjects" :key="proj.id" class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="onMoveToProject(proj.id)">
+                                    <span class="w-2 h-2 rounded-full shrink-0" :style="{ backgroundColor: proj.color_hex || '#6b7280' }"></span>
+                                    <span class="truncate">{{ proj.name }}</span>
+                                </button>
+                                <button v-if="chat.activeConversation.value.project_id" class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="onMoveToProject(null)">
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                    <span>{{ t('Remove from project') }}</span>
+                                </button>
+                                <div class="border-t border-black/5 dark:border-white/10 my-0.5"></div>
+
+                                <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="togglePin">
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" /></svg>
+                                    <span>{{ chat.activeConversation.value.is_pinned ? t('Unpin') : t('Pin') }}</span>
+                                </button>
+
+                                <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="startActiveConversationRename">
+                                    <i class="ti ti-pencil text-[12px]"></i>
+                                    <span>{{ t('Rename') }}</span>
+                                </button>
+
+                                <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-red-500 hover:bg-red-50 dark:hover:bg-red-500/5 transition-colors" @click.stop="deleteActiveConversation">
+                                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                    <span>{{ t('Delete') }}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Floating Mode Badge -->
+            <Transition
+                enter-active-class="transition duration-300 ease-out"
+                enter-from-class="-translate-y-4 opacity-0"
+                enter-to-class="translate-y-0 opacity-100"
+                leave-active-class="transition duration-200 ease-in"
+                leave-from-class="translate-y-0 opacity-100"
+                leave-to-class="-translate-y-4 opacity-0"
+            >
+                <div v-if="chat.selectedMode.value" class="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                    <div
+                        class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-black/10 bg-white/80 dark:bg-black/40 dark:border-white/10 shadow-lg backdrop-blur-md transition-all hover:bg-white/95 dark:hover:bg-black/60 group"
+                    >
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" :style="{ backgroundColor: chat.selectedMode.value.color_hex || '#6b7280' }"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2" :style="{ backgroundColor: chat.selectedMode.value.color_hex || '#6b7280' }"></span>
+                        </span>
+                        <i :class="getModeIconClass(chat.selectedMode.value.icon)" class="text-sm text-gray-700 dark:text-gray-300"></i>
+                        <span class="text-xs font-semibold text-gray-900 dark:text-white capitalize select-none">{{ chat.selectedMode.value.name }} {{ t('Mode') }}</span>
+
+                        <button
+                            type="button"
+                            class="ml-1 flex items-center justify-center w-4 h-4 rounded-full bg-black/5 dark:bg-white/10 hover:bg-red-500 hover:text-white dark:hover:bg-red-500 transition-colors text-gray-400"
+                            :title="t('Exit Mode')"
+                            @click.stop="chat.newChat()"
+                        >
+                            <i class="ti ti-x text-[9px]"></i>
+                        </button>
+                    </div>
+                </div>
+            </Transition>
+
             <button
                 type="button"
                 class="absolute left-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/90 text-[#1a1a1a] shadow-lg dark:bg-white/10 dark:text-white lg:hidden"
@@ -192,6 +388,19 @@ onClickOutside(exploreRef, () => { exploreOpen.value = false })
             </div>
         </div>
     </div>
+
+    <!-- Active Chat Delete Confirmation Modal -->
+    <ActionConfirmModal
+        :open="showDeleteConfirm"
+        :title="t('Delete conversation?')"
+        :message="t('This will permanently delete this conversation and its messages.')"
+        :confirm-label="t('Delete conversation')"
+        processing-label="Deleting..."
+        :processing="deleteProcessing"
+        variant="danger"
+        @cancel="showDeleteConfirm = false"
+        @confirm="confirmDeleteActiveConversation"
+    />
 </template>
 
 <style>

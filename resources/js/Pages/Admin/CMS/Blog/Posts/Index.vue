@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import StatsCard from '@/Components/UI/StatsCard.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useAdminCan } from '@/Composables/useAdminCan'
 
 defineOptions({ layout: AdminLayout })
 
@@ -68,9 +72,16 @@ const props = defineProps<{
     filters: { search?: string; status?: string; category?: string; author?: string }
     hasTrashedPosts: boolean
     trashMode?: boolean
+    stats?: {
+        total: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        published: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        comments: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        views: { value: string; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    }
 }>()
 
 const { t } = useTranslate()
+const { isSuperAdmin } = useAdminCan()
 
 const selected = ref<string[]>([])
 const search = ref(props.filters.search ?? '')
@@ -80,13 +91,6 @@ const author = ref(props.filters.author ?? '')
 const bulkAction = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchFocused = ref(false)
-const openActionMenuId = ref<string | null>(null)
-const actionMenuPosition = ref({ top: 0, left: 0, placement: 'bottom' as 'top' | 'bottom' })
-
-const ACTION_MENU_WIDTH = 208
-const ACTION_MENU_ESTIMATED_HEIGHT = 176
-const ACTION_MENU_GAP = 8
-const VIEWPORT_PADDING = 16
 
 const confirmModal = ref<ConfirmModalState>({
     open: false,
@@ -131,7 +135,8 @@ const bulkActionOptions = computed<SelectOption[]>(() => {
         return [
             { value: '', label: t('Bulk Actions') },
             { value: 'restore', label: t('Restore Selected') },
-            { value: 'force-delete', label: t('Delete Permanently') },
+            // Permanent deletion is irreversible — Super Admins only.
+            ...(isSuperAdmin.value ? [{ value: 'force-delete', label: t('Delete Permanently') }] : []),
         ]
     }
 
@@ -143,19 +148,12 @@ const bulkActionOptions = computed<SelectOption[]>(() => {
     ]
 })
 
-const filteredPosts = computed(() => {
-    const term = search.value.trim().toLowerCase()
-
-    if (!term) {
-        return props.posts.data
-    }
-
-    return props.posts.data.filter((post) => {
-        const title = post.title.toLowerCase()
-        const slug = post.slug.toLowerCase()
-
-        return title.includes(term) || slug.includes(term)
-    })
+let searchTimeout: any = null
+watch(search, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        applyFilters()
+    }, 350)
 })
 
 const applyFilters = () => {
@@ -173,7 +171,6 @@ const applyFilters = () => {
 
 const clearSearch = () => {
     search.value = ''
-    applyFilters()
 }
 
 const resetFilters = () => {
@@ -221,57 +218,7 @@ const runConfirmedAction = () => {
     confirmModal.value.action?.()
 }
 
-const toggleActionMenu = async (postUlid: string, event: MouseEvent) => {
-    if (openActionMenuId.value === postUlid) {
-        openActionMenuId.value = null
-        return
-    }
-
-    const trigger = event.currentTarget
-
-    if (!(trigger instanceof HTMLElement)) {
-        return
-    }
-
-    const rect = trigger.getBoundingClientRect()
-    const spaceBelow = window.innerHeight - rect.bottom
-    const spaceAbove = rect.top
-    const openUpward = spaceBelow < ACTION_MENU_ESTIMATED_HEIGHT && spaceAbove > spaceBelow
-    const top = openUpward
-        ? Math.max(VIEWPORT_PADDING, rect.top - ACTION_MENU_GAP)
-        : Math.min(window.innerHeight - VIEWPORT_PADDING, rect.bottom + ACTION_MENU_GAP)
-    const left = Math.min(window.innerWidth - VIEWPORT_PADDING, rect.right)
-
-    openActionMenuId.value = postUlid
-    actionMenuPosition.value = {
-        top,
-        left,
-        placement: openUpward ? 'top' : 'bottom',
-    }
-
-    await nextTick()
-}
-
-const closeActionMenu = () => {
-    openActionMenuId.value = null
-}
-
-const handleDocumentClick = (event: MouseEvent) => {
-    const target = event.target
-
-    if (!(target instanceof HTMLElement) || target.closest('[data-post-actions-menu]')) {
-        return
-    }
-
-    openActionMenuId.value = null
-}
-
-const handleViewportChange = () => {
-    openActionMenuId.value = null
-}
-
 const confirmTrashPost = (post: BlogPost) => {
-    closeActionMenu()
     openConfirmModal({
         title: t('Move post to trash?'),
         message: t('Move post :name to trash?', { name: post.title }),
@@ -288,7 +235,6 @@ const confirmTrashPost = (post: BlogPost) => {
 }
 
 const confirmForceDeletePost = (post: BlogPost) => {
-    closeActionMenu()
     openConfirmModal({
         title: t('Delete permanently?'),
         message: t('Delete post :name permanently? This action cannot be undone.', { name: post.title }),
@@ -305,7 +251,6 @@ const confirmForceDeletePost = (post: BlogPost) => {
 }
 
 const confirmRestorePost = (post: BlogPost) => {
-    closeActionMenu()
     openConfirmModal({
         title: t('Restore post?'),
         message: t('Restore post :name and return it to the blog posts list?', { name: post.title }),
@@ -322,13 +267,12 @@ const confirmRestorePost = (post: BlogPost) => {
 }
 
 const duplicatePost = (post: BlogPost) => {
-    closeActionMenu()
     router.post(route('admin.blog.posts.duplicate', post.ulid), {}, { preserveScroll: true })
 }
 
 const toggleSelectAll = (event: Event) => {
     const checked = (event.target as HTMLInputElement).checked
-    selected.value = checked ? filteredPosts.value.map((post) => post.ulid) : []
+    selected.value = checked ? props.posts.data.map((post: BlogPost) => post.ulid) : []
 }
 
 const runBulkAction = () => {
@@ -420,50 +364,37 @@ const handleKeydown = (event: KeyboardEvent) => {
         return
     }
 
-    if (event.key === 'Escape' && !confirmModal.value.open && openActionMenuId.value) {
-        closeActionMenu()
-        return
-    }
-
     if (event.key === 'Escape' && !confirmModal.value.open && hasActiveFilters.value) {
         resetFilters()
     }
 }
 
 onMounted(() => {
-    document.addEventListener('click', handleDocumentClick)
     window.addEventListener('keydown', handleKeydown)
-    window.addEventListener('resize', handleViewportChange)
-    window.addEventListener('scroll', handleViewportChange, true)
 })
 
 onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick)
     window.removeEventListener('keydown', handleKeydown)
-    window.removeEventListener('resize', handleViewportChange)
-    window.removeEventListener('scroll', handleViewportChange, true)
 })
 </script>
 
 <template>
-    <Head :title="isTrashed ? t('Blog Trash') : t('Blog Posts')" />
-
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="min-w-0">
+    <Head :title="isTrashed ? t('Blog Trash') : t('Blog Posts')" />    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ isTrashed ? t('Blog Trash') : t('Blog Posts') }}
                 </h1>
-                <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ isTrashed ? t('Restore deleted blog posts or permanently remove them from the blog.') : t('Create, review, schedule, and publish blog content from one editorial dashboard.') }}
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
                 <template v-if="isTrashed">
                     <Link
                         :href="route('admin.blog.posts.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 w-full sm:w-auto"
                     >
                         <i class="ti ti-arrow-left text-base"></i>
                         {{ t('Back to Posts') }}
@@ -473,274 +404,322 @@ onBeforeUnmount(() => {
                     <Link
                         v-if="hasTrashedPosts"
                         :href="route('admin.blog.posts.trash')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 w-full sm:w-auto"
                     >
                         <i class="ti ti-trash text-base"></i>
                         {{ t('Trash') }}
                     </Link>
                     <Link
                         :href="route('admin.blog.posts.create')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+                        class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition w-full sm:w-auto"
                     >
                         <i class="ti ti-plus text-base"></i>
                         {{ t('Create Post') }}
                     </Link>
                 </template>
             </div>
-        </section>
+        </div>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                <div class="relative min-w-[240px] flex-1">
-                    <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
-                    <input
-                        ref="searchInput"
-                        v-model="search"
-                        type="text"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        :placeholder="t('Search posts by title or slug...')"
-                        @keydown.enter="applyFilters"
-                        @focus="searchFocused = true"
-                        @blur="searchFocused = false"
-                    />
-                    <span
-                        v-if="!search && !searchFocused"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >
-                        /
-                    </span>
-                    <button
-                        v-if="search"
-                        type="button"
-                        class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
-                        :aria-label="t('Clear search')"
-                        @click="clearSearch"
-                    >
-                        <i class="ti ti-x text-sm"></i>
-                    </button>
-                </div>
+        <!-- Stats Grid (Hidden in Trash Mode to focus on restoration) -->
+        <div v-if="stats && !isTrashed" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatsCard
+                :title="t('Total Posts')"
+                :value="stats.total.value"
+                :comparison="stats.total.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-article text-lg"></i>
+                </template>
+            </StatsCard>
 
-                <AppSelect
-                    v-if="!isTrashed"
-                    v-model="status"
-                    :options="statusOptions"
-                    :placeholder="t('All Statuses')"
-                    class="w-full sm:w-52"
-                    @update:model-value="applyFilters"
-                />
+            <StatsCard
+                :title="t('Published')"
+                :value="stats.published.value"
+                :comparison="stats.published.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.published.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-checkbox text-lg"></i>
+                </template>
+            </StatsCard>
 
-                <AppSelect
-                    v-model="category"
-                    :options="categoryOptions"
-                    :placeholder="t('All Categories')"
-                    class="w-full sm:w-56"
-                    live-search
-                    @update:model-value="applyFilters"
-                />
+            <StatsCard
+                :title="t('Comments')"
+                :value="stats.comments.value"
+                :comparison="stats.comments.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.comments.comparison.type"
+                color="warning"
+            >
+                <template #icon>
+                    <i class="ti ti-messages text-lg"></i>
+                </template>
+            </StatsCard>
 
-                <AppSelect
-                    v-model="author"
-                    :options="authorOptions"
-                    :placeholder="t('All Authors')"
-                    class="w-full sm:w-56"
-                    live-search
-                    @update:model-value="applyFilters"
-                />
+            <StatsCard
+                :title="t('Total Views')"
+                :value="stats.views.value"
+                :comparison="stats.views.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.views.comparison.type"
+                color="accent"
+            >
+                <template #icon>
+                    <i class="ti ti-eye text-lg"></i>
+                </template>
+            </StatsCard>
+        </div>
 
-                <button
-                    v-if="hasActiveFilters"
-                    type="button"
-                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                    @click="resetFilters"
-                >
-                    {{ t('Clear filters') }}
-                </button>
+        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div class="flex-1 min-w-[240px]">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInput"
+                                v-model="search"
+                                type="text"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                :placeholder="t('Search posts by title or slug...')"
+                                @keydown.enter="applyFilters"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
+                            />
+                            <span
+                                v-if="!search && !searchFocused"
+                                class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                            >
+                                /
+                            </span>
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="clearSearch"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+                    </div>
 
-                <div v-if="selected.length" class="ml-auto flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-                    <span class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ t(':count selected', { count: selected.length }) }}
-                    </span>
-                    <AppSelect
-                        v-model="bulkAction"
-                        :options="bulkActionOptions"
-                        :placeholder="t('Bulk Actions')"
-                        class="w-full sm:w-56"
-                    />
-                    <button
-                        type="button"
-                        :disabled="!bulkAction || selected.length === 0"
-                        class="inline-flex items-center justify-center rounded-lg btn-primary px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                        @click="runBulkAction"
-                    >
-                        {{ t('Apply') }}
-                    </button>
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div v-if="!isTrashed" class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="status"
+                                :options="statusOptions"
+                                :placeholder="t('All Statuses')"
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="category"
+                                :options="categoryOptions"
+                                :placeholder="t('All Categories')"
+                                live-search
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="author"
+                                :options="authorOptions"
+                                :placeholder="t('All Authors')"
+                                live-search
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 w-full sm:w-auto"
+                            @click="resetFilters"
+                        >
+                            {{ t('Clear filters') }}
+                        </button>
+
+                        <div v-if="selected.length" class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">
+                                {{ t(':count selected', { count: selected.length }) }}
+                            </span>
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                                <AppSelect
+                                    v-model="bulkAction"
+                                    :options="bulkActionOptions"
+                                    :placeholder="t('Bulk Actions')"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                :disabled="!bulkAction || selected.length === 0"
+                                class="btn-primary inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto"
+                                @click="runBulkAction"
+                            >
+                                {{ t('Apply') }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[980px] text-left text-sm text-gray-500 dark:text-gray-400">
-                    <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-surface-800 dark:bg-surface-800/50 dark:text-gray-400">
-                        <tr>
-                            <th scope="col" class="w-12 px-4 py-3.5">
-                                <input
-                                    type="checkbox"
-                                    class="rounded border-gray-300 text-primary-600"
-                                    :checked="filteredPosts.length > 0 && selected.length === filteredPosts.length"
-                                    @change="toggleSelectAll"
-                                >
-                            </th>
-                            <th scope="col" class="px-6 py-3.5">{{ t('Post') }}</th>
-                            <th scope="col" class="px-4 py-3.5">{{ t('Status') }}</th>
-                            <th scope="col" class="px-4 py-3.5">{{ t('Author') }}</th>
-                            <th scope="col" class="px-4 py-3.5">{{ t('Views') }}</th>
-                            <th scope="col" class="px-4 py-3.5">{{ t('Date') }}</th>
-                            <th scope="col" class="px-6 py-3.5 text-right">{{ t('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
-                        <tr
-                            v-for="post in filteredPosts"
-                            :key="post.ulid"
-                            class="bg-white transition-colors hover:bg-gray-50/50 dark:bg-surface-900 dark:hover:bg-surface-800/30"
-                        >
-                            <td class="px-4 py-4">
-                                <input v-model="selected" :value="post.ulid" type="checkbox" class="rounded border-gray-300 text-primary-600">
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="min-w-0">
-                                    <p class="truncate font-medium text-gray-900 dark:text-white">{{ post.title }}</p>
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">/blog/{{ post.slug }}</p>
-                                    <div class="mt-2 flex flex-wrap gap-1">
-                                        <span
-                                            v-for="item in post.categories"
-                                            :key="item.id"
-                                            class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
-                                        >
-                                            {{ item.name }}
-                                        </span>
+            <div class="overflow-hidden rounded-b-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="w-12 px-4 py-3">
+                                    <input
+                                        type="checkbox"
+                                        class="rounded border-gray-300 text-primary-600"
+                                        :checked="posts.data.length > 0 && selected.length === posts.data.length"
+                                        @change="toggleSelectAll"
+                                    >
+                                </th>
+                                <th scope="col" class="px-4 py-3">{{ t('Post') }}</th>
+                                <th scope="col" class="px-4 py-3">{{ t('Status') }}</th>
+                                <th scope="col" class="px-4 py-3">{{ t('Author') }}</th>
+                                <th scope="col" class="px-4 py-3">{{ t('Views') }}</th>
+                                <th scope="col" class="px-4 py-3">{{ t('Date') }}</th>
+                                <th scope="col" class="px-4 py-3 text-right">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr
+                                v-for="post in posts.data"
+                                :key="post.ulid"
+                                class="transition-colors hover:bg-primary-50/40 dark:hover:bg-gray-900/30"
+                            >
+                                <td class="px-4 py-4">
+                                    <input v-model="selected" :value="post.ulid" type="checkbox" class="rounded border-gray-300 text-primary-600">
+                                </td>
+                                <td class="px-4 py-4">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-semibold text-gray-900 dark:text-white">{{ post.title }}</p>
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">/blog/{{ post.slug }}</p>
+                                        <div class="mt-2 flex flex-wrap gap-1">
+                                            <span
+                                                v-for="item in post.categories"
+                                                :key="item.id"
+                                                class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700 dark:bg-primary-900/20 dark:text-primary-300"
+                                            >
+                                                {{ item.name }}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span :class="badgeClass(isTrashed ? 'trashed' : post.status)" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize">
-                                    {{ t(isTrashed ? 'trashed' : post.status) }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ post.author?.name ?? t('Unknown') }}</td>
-                            <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ new Intl.NumberFormat().format(post.views_count) }}</td>
-                            <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ isTrashed ? formatDate(post.deleted_at) : formatDate(post.published_at) }}</td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="relative inline-flex justify-end" data-post-actions-menu>
-                                    <button
-                                        type="button"
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
-                                        :aria-label="t('Open actions')"
-                                        @click.stop="toggleActionMenu(post.ulid, $event)"
-                                    >
-                                        <i class="ti ti-dots-vertical text-base"></i>
-                                    </button>
-                                </div>
-                                <Teleport to="body">
-                                    <div
-                                        v-if="openActionMenuId === post.ulid"
-                                        data-post-actions-menu
-                                        class="fixed z-[80] w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-700 dark:bg-surface-900"
-                                        :style="{
-                                            top: `${actionMenuPosition.top}px`,
-                                            left: `${actionMenuPosition.left}px`,
-                                            transform: actionMenuPosition.placement === 'top'
-                                                ? `translate(-${ACTION_MENU_WIDTH}px, -100%)`
-                                                : `translateX(-${ACTION_MENU_WIDTH}px)`,
-                                            transformOrigin: actionMenuPosition.placement === 'bottom' ? 'top right' : 'bottom right',
-                                        }"
-                                    >
-                                        <template v-if="!isTrashed">
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span :class="badgeClass(isTrashed ? 'trashed' : post.status)" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize">
+                                        {{ t(isTrashed ? 'trashed' : post.status) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ post.author?.name ?? t('Unknown') }}</td>
+                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ new Intl.NumberFormat().format(post.views_count) }}</td>
+                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ isTrashed ? formatDate(post.deleted_at) : formatDate(post.published_at) }}</td>
+                                <td class="px-4 py-4 text-end">
+                                    <TableActionMenu v-if="!isTrashed">
+                                        <template #default="{ close }">
                                             <a
                                                 :href="postViewHref(post)"
                                                 target="_blank"
-                                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800"
-                                                @click="closeActionMenu"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="close"
                                             >
-                                                <i :class="post.status === 'published' ? 'ti ti-external-link' : 'ti ti-eye'" class="text-base text-gray-500"></i>
-                                                <span>{{ postViewTooltip(post) }}</span>
+                                                <i :class="post.status === 'published' ? 'ti ti-external-link' : 'ti ti-eye'" class="text-base"></i>
+                                                {{ post.status === 'published' ? t('View Live') : t('Preview') }}
                                             </a>
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800"
-                                                @click="duplicatePost(post)"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="duplicatePost(post); close()"
                                             >
-                                                <i class="ti ti-copy text-base text-gray-500"></i>
-                                                <span>{{ t('Duplicate post') }}</span>
+                                                <i class="ti ti-copy text-base"></i>
+                                                {{ t('Duplicate') }}
                                             </button>
                                             <Link
                                                 :href="route('admin.blog.posts.edit', post.ulid)"
-                                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-gray-700 transition hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800"
-                                                @click="closeActionMenu"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="close"
                                             >
-                                                <i class="ti ti-edit text-base text-gray-500"></i>
-                                                <span>{{ t('Edit post') }}</span>
+                                                <i class="ti ti-edit text-base"></i>
+                                                {{ t('Edit Details') }}
                                             </Link>
+                                            <hr class="border-gray-200 dark:border-surface-700">
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
-                                                @click="confirmTrashPost(post)"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                @click="confirmTrashPost(post); close()"
                                             >
                                                 <i class="ti ti-trash text-base"></i>
-                                                <span>{{ t('Move to trash') }}</span>
+                                                {{ t('Move to Trash') }}
                                             </button>
                                         </template>
-                                        <template v-else>
+                                    </TableActionMenu>
+
+                                    <div v-else class="flex items-center justify-end gap-2">
+                                        <Tooltip :content="t('Restore')">
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-950/40"
+                                                class="flex h-8 w-8 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                                                 @click="confirmRestorePost(post)"
                                             >
                                                 <i class="ti ti-arrow-back-up text-base"></i>
-                                                <span>{{ t('Restore') }}</span>
                                             </button>
+                                        </Tooltip>
+
+                                        <Tooltip v-if="isSuperAdmin" :content="t('Delete Forever')">
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-950/40"
+                                                class="flex h-8 w-8 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                                                 @click="confirmForceDeletePost(post)"
                                             >
-                                                <i class="ti ti-trash-x text-base"></i>
-                                                <span>{{ t('Delete Forever') }}</span>
+                                                <i class="ti ti-trash text-base"></i>
                                             </button>
-                                        </template>
+                                        </Tooltip>
                                     </div>
-                                </Teleport>
-                            </td>
-                        </tr>
+                                </td>
+                            </tr>
+                            <tr v-if="!posts.data.length">
+                                <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <i class="ti ti-file-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
+                                    <p class="font-medium">{{ hasActiveFilters ? t('No blog posts match your filters') : t('No blog posts found') }}</p>
+                                    <button
+                                        v-if="hasActiveFilters"
+                                        type="button"
+                                        class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                        @click="resetFilters"
+                                    >
+                                        {{ t('Clear filters') }}
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-                        <tr v-if="!filteredPosts.length">
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                                <i class="ti ti-file-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
-                                <p class="font-medium">{{ hasActiveFilters ? t('No blog posts match your filters') : t('No blog posts found') }}</p>
-                                <button
-                                    v-if="hasActiveFilters"
-                                    type="button"
-                                    class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                    @click="resetFilters"
-                                >
-                                    {{ t('Clear filters') }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                <div v-if="posts.links.length > 3" class="border-t border-gray-100 p-4 dark:border-surface-800">
+                    <Pagination
+                        :links="posts.links"
+                        :from="posts.from"
+                        :to="posts.to"
+                        :total="posts.total"
+                        :current-page="posts.current_page"
+                        :last-page="posts.last_page"
+                    />
+                </div>
             </div>
-
-            <div v-if="posts.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                <Pagination
-                    :links="posts.links"
-                    :from="posts.from"
-                    :to="posts.to"
-                    :total="posts.total"
-                    :current-page="posts.current_page"
-                    :last-page="posts.last_page"
-                />
-            </div>
-        </section>
+        </div>
     </div>
 
     <ActionConfirmModal

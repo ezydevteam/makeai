@@ -52,12 +52,19 @@ if %errorlevel% neq 0 (
 )
 
 echo ==^> 4. Copying application source into makeai/ (excluding public/)
-robocopy "%SRC_DIR%" "%BUILD_DIR%\public_html\makeai" /E /XD "%SRC_DIR%\.git" "%SRC_DIR%\node_modules" "%SRC_DIR%\tests" "%SRC_DIR%\scripts" "%SRC_DIR%\caveman" "%SRC_DIR%\.commandcode" "%SRC_DIR%\.cursor" "%SRC_DIR%\.vscode" "%SRC_DIR%\.idea" "%SRC_DIR%\public" "%SRC_DIR%\dist" "%SRC_DIR%\storage" "%SRC_DIR%\bootstrap\cache" /XF "%SRC_DIR%\.env" "%SRC_DIR%\.env.testing" "%SRC_DIR%\database.sqlite" .gitignore .gitattributes .gitkeep
+robocopy "%SRC_DIR%" "%BUILD_DIR%\public_html\makeai" /E /XD "%SRC_DIR%\.git" "%SRC_DIR%\node_modules" "%SRC_DIR%\tests" "%SRC_DIR%\scripts" "%SRC_DIR%\caveman" "%SRC_DIR%\.commandcode" "%SRC_DIR%\.cursor" "%SRC_DIR%\.vscode" "%SRC_DIR%\.idea" "%SRC_DIR%\public" "%SRC_DIR%\dist" "%SRC_DIR%\distribution" "%SRC_DIR%\storage" "%SRC_DIR%\bootstrap\cache" "%SRC_DIR%\.agent" "%SRC_DIR%\.agent-mem" "%SRC_DIR%\.agents" "%SRC_DIR%\.brainsync" "%SRC_DIR%\.codex" "%SRC_DIR%\.claude" "%SRC_DIR%\.github" "%SRC_DIR%\.tmp" /XF "%SRC_DIR%\.env" "%SRC_DIR%\.env.testing" "%SRC_DIR%\database.sqlite" .gitignore .gitattributes .gitkeep
 if %errorlevel% gtr 7 (
     echo ERROR: Robocopy failed!
     pause
     exit /b 1
 )
+
+echo ==^> 4b. Pruning root-level dev/AI artifacts (non-recursive: app assets in subfolders are untouched)
+set "MK=%BUILD_DIR%\public_html\makeai"
+del /F /Q "%MK%\*.md" "%MK%\*.svg" "%MK%\*.html" "%MK%\*.xlsx" "%MK%\*.exe" "%MK%\*.jpg" "%MK%\*.jpeg" "%MK%\*.png" 2>nul
+del /F /Q "%MK%\_ide_helper.php" "%MK%\_ide_helper_models.php" "%MK%\.phpstorm.meta.php" "%MK%\.phpunit.result.cache" 2>nul
+del /F /Q "%MK%\debug_rag.php" "%MK%\_check_page.php" "%MK%\tsc_errors.txt" "%MK%\tsc_out.txt" 2>nul
+del /F /Q "%MK%\.mcp.json" "%MK%\.mcp.json.bak" "%MK%\.editorconfig" "%MK%\.npmrc" "%MK%\phpunit.xml" "%MK%\getMessage()" 2>nul
 
 echo ==^> 5. Moving public/ contents to zip root
 robocopy "%SRC_DIR%\public" "%BUILD_DIR%\public_html" /E /XD build
@@ -118,6 +125,13 @@ if not exist "%BUILD_DIR%\public_html\index.php" (
     echo FATAL: index.php missing
     pause
     exit /b 1
+)
+for %%F in ("%BUILD_DIR%\public_html\makeai\*.exe" "%BUILD_DIR%\public_html\makeai\*.md" "%BUILD_DIR%\public_html\makeai\_ide_helper*.php") do (
+    if exist "%%F" (
+        echo FATAL: internal artifact leaked into package: %%F
+        pause
+        exit /b 1
+    )
 )
 
 echo ==> 12. Zipping

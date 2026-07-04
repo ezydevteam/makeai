@@ -113,7 +113,7 @@ class CreditTopupController extends Controller
             'user_id' => $request->user()->id,
             'gateway' => $gateway->slug,
             'amount' => $total,
-            'currency' => 'USD',
+            'currency' => strtoupper((string) settings('currency_code', 'USD')),
             'status' => 'pending',
             'type' => 'credit_topup',
             'metadata' => [

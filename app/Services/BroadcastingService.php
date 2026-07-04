@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
@@ -51,12 +52,32 @@ class BroadcastingService
 
     public function isRedisAvailable(): bool
     {
-        try {
-            Redis::ping();
+        // This is reached on every page load (shared broadcasting + notification
+        // Inertia props) and BroadcastingService is resolved several times per
+        // request, so pinging Redis each time would make a misconfigured or
+        // unreachable Redis host stall every request. Memoize for the request and
+        // cache briefly across requests.
+        static $available = null;
 
-            return true;
+        if ($available !== null) {
+            return $available;
+        }
+
+        $check = static function (): bool {
+            try {
+                Redis::ping();
+
+                return true;
+            } catch (\Throwable) {
+                return false;
+            }
+        };
+
+        try {
+            return $available = (bool) Cache::remember('broadcasting:redis_available', 30, $check);
         } catch (\Throwable) {
-            return false;
+            // Cache store itself unavailable — fall back to a single direct check.
+            return $available = $check();
         }
     }
 

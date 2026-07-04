@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { sanitizeHtml } from '@/Composables/useSanitize'
 import { badgeClass } from '@/Composables/useBadge'
 import AppSelect from '@/Components/AppSelect.vue'
+import { useToastr } from '@/Composables/useToastr'
 
 const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
@@ -56,6 +57,9 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+const toast = useToastr()
+
+const aiLoading = ref(false)
 
 const form = useForm({
     message: '',
@@ -195,18 +199,36 @@ const insertCanned = (id: string | number | null | (string | number)[]) => {
 }
 
 const suggestReply = async () => {
-    const response = await fetch(route('admin.support.tickets.suggest-reply', props.ticket.ticket_number), {
-        method: 'POST',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
-        },
-    })
+    if (aiLoading.value) return
+    aiLoading.value = true
 
-    const data = await response.json()
+    try {
+        const response = await fetch(route('admin.support.tickets.suggest-reply', props.ticket.ticket_number), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '',
+            },
+        })
 
-    if (data.success) {
-        form.message = data.data.content
-        form.is_ai_draft = true
+        if (!response.ok) {
+            throw new Error()
+        }
+
+        const data = await response.json()
+
+        if (data.success) {
+            form.message = data.data.content
+            form.is_ai_draft = true
+            toast.success(t('AI reply draft generated successfully.'))
+        } else {
+            toast.error(data.message || t('Unable to generate AI reply. Please make sure your AI settings and API credentials are configured correctly.'))
+        }
+    } catch (error: any) {
+        console.error(error)
+        toast.error(t('Unable to generate AI reply. Please make sure your AI settings and API credentials are configured correctly.'))
+    } finally {
+        aiLoading.value = false
     }
 }
 </script>
@@ -214,7 +236,7 @@ const suggestReply = async () => {
 <template>
     <Head :title="ticket.subject" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ ticket.subject }}</h1>
@@ -326,11 +348,13 @@ const suggestReply = async () => {
                                 <button
                                     v-if="settings.ai_reply_suggestion"
                                     type="button"
-                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
+                                    :disabled="aiLoading"
+                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
                                     @click="suggestReply"
                                 >
-                                    <i class="ti ti-sparkles text-base"></i>
-                                    {{ t('AI Reply') }}
+                                    <i v-if="aiLoading" class="ti ti-loader animate-spin text-base"></i>
+                                    <i v-else class="ti ti-sparkles text-base"></i>
+                                    {{ aiLoading ? t('Generating...') : t('AI Reply') }}
                                 </button>
                             </div>
                         </div>
@@ -349,7 +373,7 @@ const suggestReply = async () => {
                                 <input
                                     type="file"
                                     multiple
-                                    class="rounded-lg border border-gray-200 bg-gray-50 p-1.5 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:file:bg-primary-900/30 dark:file:text-primary-200"
+                                    class="rounded-lg border border-gray-200 bg-gray-50 p-1.5 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary-100 file:px-2 file:py-1 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:file:bg-primary-900/30 dark:file:text-primary-200"
                                     @change="setFiles"
                                 >
                             </div>

@@ -94,7 +94,7 @@ const typeBadge = (type: string) => {
 <template>
     <Head :title="t(':provider — AI Management', { provider: provider.name })" />
 
-    <div class="max-w-7xl mx-auto px-6 py-6">
+    <div class="max-w-7xl mx-auto px-6">
         <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div>
@@ -148,7 +148,7 @@ const typeBadge = (type: string) => {
                     <tbody class="divide-y divide-gray-100 dark:divide-surface-700">
                         <tr v-for="key in keys" :key="key.id" class="transition-colors hover:bg-primary-50/40 dark:hover:bg-surface-800/60">
                             <td class="px-5 py-3.5 font-medium text-gray-900 dark:text-white">{{ key.label || t('Unnamed Key') }}</td>
-                            <td class="px-5 py-3.5 font-mono text-xs text-gray-400 dark:text-gray-500">••••{{ (key.api_key || '').slice(-4) }}</td>
+                            <td class="px-5 py-3.5 font-mono text-xs text-gray-400 dark:text-gray-500">{{ key.masked_key || '••••' }}</td>
                             <td class="px-5 py-3.5">
                                 <span
                                     v-if="key.is_active"

@@ -40,6 +40,12 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             MakeAiPreventRequestsDuringMaintenance::class,
         );
 
+        // Runs before session/CSRF so an "entire site" IP ban short-circuits
+        // early and cheaply (it exempts /admin/* internally).
+        $middleware->web(prepend: [
+            \App\Http\Middleware\BlockBannedIps::class,
+        ]);
+
         $middleware->web(append: [
             InstallationMiddleware::class,
             LicenseMiddleware::class,
@@ -48,6 +54,14 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             DetectPricingCountry::class,
             ToolSlugRedirect::class,
             HandleInertiaRequests::class,
+        ]);
+
+        // Gate the API group too. Feature/generation endpoints under routes/api.php
+        // (e.g. the auth:sanctum "ai" group) and addon ['api'] routes otherwise
+        // bypass license enforcement entirely — LicenseMiddleware returns a 403
+        // LICENSE_INVALID for these instead of letting generation run unlicensed.
+        $middleware->api(append: [
+            LicenseMiddleware::class,
         ]);
 
         $middleware->validateCsrfTokens(except: [
@@ -59,6 +73,7 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.auth' => AdminAuth::class,
             'admin.permission' => AdminPermission::class,
+            'admin.super' => \App\Http\Middleware\CheckSuperAdmin::class,
             'admin.audit' => \App\Http\Middleware\AdminAuditLog::class,
             'affiliate' => CheckAffiliateEnabled::class,
             'check.credits' => CheckCredits::class,
@@ -70,7 +85,9 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             'email.verify' => \App\Http\Middleware\CheckEmailVerificationEnabled::class,
             'not.banned' => NotBanned::class,
             'premium' => \App\Http\Middleware\CheckPremium::class,
+            'extended' => \App\Http\Middleware\CheckExtendedLicense::class,
             'throttle' => ThrottleAiRequests::class,
+            'addon.enabled' => \App\Http\Middleware\AddonEnabled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

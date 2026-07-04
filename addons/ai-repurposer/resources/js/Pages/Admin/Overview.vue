@@ -3,20 +3,31 @@ import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 
 defineOptions({ layout: AdminLayout })
 
+interface ComparisonData {
+    label: string
+    type: 'up' | 'down' | 'neutral'
+}
+
+interface StatObject {
+    value: number
+    comparison: ComparisonData
+}
+
 interface Stats {
-    total_jobs: number
-    queued_jobs: number
-    processing_jobs: number
-    completed_jobs: number
-    failed_jobs: number
-    completed_today: number
-    total_outputs: number
-    saved_outputs: number
-    total_credits: number
-    total_words: number
+    total_jobs: StatObject
+    queued_jobs: StatObject
+    processing_jobs: StatObject
+    completed_jobs: StatObject
+    failed_jobs: StatObject
+    completed_today: StatObject
+    total_outputs: StatObject
+    saved_outputs: StatObject
+    total_credits: StatObject
+    total_words: StatObject
     by_format: Record<string, number>
 }
 
@@ -42,28 +53,7 @@ const props = defineProps<{
     recentJobs: RecentJob[]
 }>()
 
-type BadgeTone = 'green' | 'blue' | 'amber' | 'red' | 'gray'
 
-interface StatCard {
-    label: string
-    value: string | number
-    icon: string
-    tone: BadgeTone
-    note: string
-}
-
-const statCards = computed<StatCard[]>(() => [
-    { label: t('Total Jobs'), value: props.stats.total_jobs, icon: 'ti ti-refresh', tone: 'blue', note: t('All repurpose jobs created so far.') },
-    { label: t('Queued'), value: props.stats.queued_jobs, icon: 'ti ti-clock', tone: 'amber', note: t('Waiting in the processing queue.') },
-    { label: t('Processing'), value: props.stats.processing_jobs, icon: 'ti ti-loader-2', tone: 'blue', note: t('Currently transcribing or generating.') },
-    { label: t('Completed'), value: props.stats.completed_jobs, icon: 'ti ti-circle-check', tone: 'green', note: t('Finished jobs ready for review.') },
-    { label: t('Failed'), value: props.stats.failed_jobs, icon: 'ti ti-alert-triangle', tone: 'red', note: t('Jobs that need attention.') },
-    { label: t('Completed Today'), value: props.stats.completed_today, icon: 'ti ti-calendar-check', tone: 'green', note: t('Work finished during the current day.') },
-    { label: t('Total Outputs'), value: props.stats.total_outputs, icon: 'ti ti-files', tone: 'blue', note: t('Generated content formats.') },
-    { label: t('Saved Outputs'), value: props.stats.saved_outputs, icon: 'ti ti-bookmark', tone: 'gray', note: t('Outputs sent to the core blog.') },
-    { label: t('Credits Used'), value: Number(props.stats.total_credits).toFixed(0), icon: 'ti ti-coins', tone: 'amber', note: t('Credits deducted across jobs.') },
-    { label: t('Words Processed'), value: Number(props.stats.total_words).toLocaleString(), icon: 'ti ti-align-left', tone: 'gray', note: t('Transcript and output word volume.') },
-])
 
 const formatCards = computed(() =>
     Object.entries(props.stats.by_format).map(([format, count]) => ({
@@ -74,6 +64,8 @@ const formatCards = computed(() =>
             .replace(/\b\w/g, (char) => char.toUpperCase()),
     })),
 )
+
+type BadgeTone = 'green' | 'blue' | 'amber' | 'red' | 'gray'
 
 const statusToneMap: Record<RecentJob['status'], BadgeTone> = {
     queued: 'amber',
@@ -102,7 +94,7 @@ function toneClasses(tone: BadgeTone): string {
 <template>
     <Head :title="t('Content Repurposer Overview')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -129,32 +121,137 @@ function toneClasses(tone: BadgeTone): string {
             </div>
         </div>
 
-        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <div
-                v-for="card in statCards"
-                :key="card.label"
-                class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-gray-900"
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <StatsCard
+                :title="t('Total Jobs')"
+                :value="stats.total_jobs.value"
+                :comparison="stats.total_jobs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total_jobs.comparison.type"
+                color="primary"
             >
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-lg" :class="toneClasses(card.tone)">
-                            <i :class="card.icon"></i>
-                        </span>
-                        <div>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                                {{ card.value }}
-                            </p>
-                            <p class="mt-1 text-xs uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
-                                {{ card.label }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                    {{ card.note }}
-                </p>
-            </div>
-        </section>
+                <template #icon>
+                    <i class="ti ti-refresh text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Queued')"
+                :value="stats.queued_jobs.value"
+                :comparison="stats.queued_jobs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.queued_jobs.comparison.type"
+                :color="stats.queued_jobs.value > 0 ? 'warning' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-clock text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Processing')"
+                :value="stats.processing_jobs.value"
+                :comparison="stats.processing_jobs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.processing_jobs.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-loader text-lg animate-spin"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Completed')"
+                :value="stats.completed_jobs.value"
+                :comparison="stats.completed_jobs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.completed_jobs.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-circle-check text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Failed')"
+                :value="stats.failed_jobs.value"
+                :comparison="stats.failed_jobs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.failed_jobs.comparison.type"
+                :color="stats.failed_jobs.value > 0 ? 'danger' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-alert-triangle text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Completed Today')"
+                :value="stats.completed_today.value"
+                :comparison="stats.completed_today.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.completed_today.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-calendar-check text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Total Outputs')"
+                :value="stats.total_outputs.value"
+                :comparison="stats.total_outputs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total_outputs.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-files text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Saved Outputs')"
+                :value="stats.saved_outputs.value"
+                :comparison="stats.saved_outputs.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.saved_outputs.comparison.type"
+                color="accent"
+            >
+                <template #icon>
+                    <i class="ti ti-bookmark text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Credits Used')"
+                :value="Number(stats.total_credits.value).toFixed(0)"
+                :comparison="stats.total_credits.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total_credits.comparison.type"
+                color="pink"
+            >
+                <template #icon>
+                    <i class="ti ti-coins text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Words Processed')"
+                :value="Number(stats.total_words.value).toLocaleString()"
+                :comparison="stats.total_words.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total_words.comparison.type"
+                color="accent"
+            >
+                <template #icon>
+                    <i class="ti ti-align-left text-lg"></i>
+                </template>
+            </StatsCard>
+        </div>
 
         <section class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)]">
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-gray-900">
@@ -258,15 +355,15 @@ function toneClasses(tone: BadgeTone): string {
                     <div class="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                         <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                             <p class="text-xs uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('Queued') }}</p>
-                            <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{{ props.stats.queued_jobs }}</p>
+                            <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{{ props.stats.queued_jobs.value }}</p>
                         </div>
                         <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                             <p class="text-xs uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('Outputs Saved') }}</p>
-                            <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{{ props.stats.saved_outputs }}</p>
+                            <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{{ props.stats.saved_outputs.value }}</p>
                         </div>
                         <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
                             <p class="text-xs uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">{{ t('Words Processed') }}</p>
-                            <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{{ Number(props.stats.total_words).toLocaleString() }}</p>
+                            <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">{{ Number(props.stats.total_words.value).toLocaleString() }}</p>
                         </div>
                     </div>
                 </div>

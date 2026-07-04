@@ -231,7 +231,51 @@ async function fetchReminders() {
     }
 }
 
-const allNotes = ref<{ id: number; subject: string; description: string | null; reminder_date: string | null; created_at: string }[]>([])
+async function snoozeReminder(noteId: number) {
+    const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.getAttribute('content') || ''
+    try {
+        const res = await fetch(route('admin.notes.snooze', noteId), {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': token,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+        })
+        if (res.ok) {
+            toast.success(t('Reminder postponed by 1 hour.'))
+            await fetchReminders()
+        } else {
+            toast.error(t('Snooze failed.'))
+        }
+    } catch {
+        toast.error(t('Snooze failed.'))
+    }
+}
+
+async function dismissReminder(noteId: number) {
+    const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.getAttribute('content') || ''
+    try {
+        const res = await fetch(route('admin.notes.dismiss', noteId), {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': token,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+            },
+        })
+        if (res.ok) {
+            toast.success(t('Reminder dismissed.'))
+            await fetchReminders()
+        } else {
+            toast.error(t('Dismiss failed.'))
+        }
+    } catch {
+        toast.error(t('Dismiss failed.'))
+    }
+}
+
+const allNotes = ref<{ id: number; subject: string; description: string | null; reminder_date: string | null; reminder_sent?: boolean; created_at: string }[]>([])
 
 async function handleDashboardNoteDeleted() {
     await fetchReminders()
@@ -1314,7 +1358,7 @@ const activityTypeLabels: Record<string, string> = {
                 </div>
                 <div ref="exportEl" class="relative">
                     <button @click.stop="showExportMenu = !showExportMenu" :disabled="exporting"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700">
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700">
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
@@ -1324,12 +1368,12 @@ const activityTypeLabels: Record<string, string> = {
                         class="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-surface-700 dark:bg-surface-900">
                         <button v-for="et in exportTypes" :key="et.value"
                             @click="doDashboardExport(et.value, 'xlsx')"
-                            class="w-full rounded-lg px-3 py-2 text-start text-sm text-gray-700 transition-colors hover:bg-primary-50 dark:text-gray-300 dark:hover:bg-surface-800">
+                            class="w-full rounded-xl px-3 py-2 text-start text-sm text-gray-700 transition-colors hover:bg-primary-50 dark:text-gray-300 dark:hover:bg-surface-800">
                             {{ et.label }}
                         </button>
                         <div class="my-1 border-t border-gray-100 dark:border-surface-800" />
                         <Link :href="route('admin.reports.export-center')"
-                            class="block rounded-lg px-3 py-2 text-sm text-primary-600 transition-colors hover:bg-primary-50 dark:hover:bg-surface-800">
+                            class="block rounded-xl px-3 py-2 text-sm text-primary-600 transition-colors hover:bg-primary-50 dark:hover:bg-surface-800">
                             {{ t('Export Center →') }}
                         </Link>
                     </div>
@@ -1338,7 +1382,7 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <!-- Demo Mode Indicator -->
-        <div v-if="isDemo" class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+        <div v-if="isDemo" class="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
             <div class="flex items-start gap-3">
                 <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
@@ -1351,16 +1395,26 @@ const activityTypeLabels: Record<string, string> = {
         </div>
 
         <!-- Notes Reminder Alert -->
-        <div v-if="notesReminders.length" class="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+        <div v-if="notesReminders.length" class="rounded-2xl border border-blue-200 bg-blue-50 p-4 dark:border-slate-800 dark:bg-blue-900/20">
             <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
+                <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
                 <div class="flex-1">
-                    <p class="text-sm font-semibold text-amber-800 dark:text-amber-300">{{ t('Note Reminders') }}</p>
-                    <div class="mt-1 space-y-0.5">
-                        <p v-for="n in notesReminders" :key="n.id" class="text-sm text-amber-700 dark:text-amber-400">{{ n.subject }}</p>
+                    <p class="text-sm font-semibold text-blue-800 dark:text-blue-300">{{ t('Note Reminders') }}</p>
+                    <div class="mt-2 space-y-2">
+                        <div v-for="n in notesReminders" :key="n.id" class="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-blue-100/30 dark:bg-blue-950/20 px-3 py-2">
+                            <span class="text-sm text-blue-700 dark:text-blue-400 font-medium">{{ n.subject }}</span>
+                            <div class="flex items-center gap-3">
+                                <button @click="snoozeReminder(n.id)" class="text-xs font-bold text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100 transition">
+                                    {{ t('Remind later (1h)') }}
+                                </button>
+                                <button @click="dismissReminder(n.id)" class="text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 transition">
+                                    {{ t('Dismiss') }}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <button @click="showNotesListModal = true" class="shrink-0 text-xs font-bold text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200">{{ t('View all') }}</button>
+                <button @click="showNotesListModal = true" class="shrink-0 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 mt-0.5">{{ t('View all') }}</button>
             </div>
         </div>
 
@@ -1398,31 +1452,33 @@ const activityTypeLabels: Record<string, string> = {
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('My Notes') }}</h3>
                     <div class="flex items-center gap-1.5">
                         <Tooltip :content="t('Create note')" placement="top">
-                            <button @click="editingNoteId = undefined; showNotesFormModal = true" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 hover:text-primary-500 dark:text-primary-400 dark:hover:bg-primary-900/20" :aria-label="t('Create note')">
+                            <button @click="editingNoteId = undefined; showNotesFormModal = true" class="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary-600 hover:bg-primary-50 hover:text-primary-500 dark:text-primary-400 dark:hover:bg-primary-900/20" :aria-label="t('Create note')">
                                 <i class="ti ti-plus text-base"></i>
                             </button>
                         </Tooltip>
                         <Tooltip :content="t('View all notes')" placement="top">
-                            <button @click="showNotesListModal = true" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-primary-600 hover:bg-primary-50 hover:text-primary-500 dark:text-primary-400 dark:hover:bg-primary-900/20" :aria-label="t('View all notes')">
+                            <button @click="showNotesListModal = true" class="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary-600 hover:bg-primary-50 hover:text-primary-500 dark:text-primary-400 dark:hover:bg-primary-900/20" :aria-label="t('View all notes')">
                                 <i class="ti ti-eye text-base"></i>
                             </button>
                         </Tooltip>
                     </div>
                 </div>
                 <div v-if="allNotes.length" class="space-y-2">
-                    <div v-for="note in allNotes.slice(0, 2)" :key="note.id" class="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-surface-800 dark:bg-surface-800/50 group">
+                    <div v-for="note in allNotes.slice(0, 2)" :key="note.id" class="rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-surface-800 dark:bg-surface-800/50 group">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ note.subject }}</p>
                                 <p v-if="note.description" class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{{ note.description }}</p>
-                                <span v-if="note.reminder_date" class="inline-block mt-1 text-[10px] text-amber-600 dark:text-amber-400">{{ new Date(note.reminder_date).toLocaleString() }}</span>
+                                <span v-if="note.reminder_date && !note.reminder_sent && new Date(note.reminder_date) > new Date()" class="inline-block mt-1 text-[10px] text-amber-600 dark:text-amber-400">
+                                    {{ t('Reminder') }}: {{ new Date(note.reminder_date).toLocaleString() }}
+                                </span>
                             </div>
                             <div class="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button @click="editingNoteId = note.id; showNotesFormModal = true" class="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-300">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" /></svg>
+                                <button @click="editingNoteId = note.id; showNotesFormModal = true" :title="t('Edit')" class="inline-flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-300">
+                                    <i class="ti ti-edit"></i>
                                 </button>
-                                <button @click="requestDeleteDashboardNote(note.id)" class="rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                <button @click="requestDeleteDashboardNote(note.id)" :title="t('Delete')" class="inline-flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400">
+                                    <i class="ti ti-trash"></i>
                                 </button>
                             </div>
                         </div>
@@ -1609,7 +1665,7 @@ const activityTypeLabels: Record<string, string> = {
                         v-for="post in popularBlogPosts.slice(0, 5)"
                         :key="post.ulid"
                         :href="route('admin.blog.posts.edit', post.ulid)"
-                        class="flex items-start justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2.5 transition-colors hover:border-primary-200 hover:bg-primary-50/60 dark:border-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-surface-800"
+                        class="flex items-start justify-between gap-3 rounded-2xl border border-gray-100 px-3 py-2.5 transition-colors hover:border-primary-200 hover:bg-primary-50/60 dark:border-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-surface-800"
                     >
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ post.title }}</p>
@@ -1648,7 +1704,7 @@ const activityTypeLabels: Record<string, string> = {
                         v-for="subscription in recentProSubscriptions.slice(0, 5)"
                         :key="subscription.id"
                         :href="subscription.user ? route('admin.users.show', subscription.user.ulid) : route('admin.users.index')"
-                        class="flex items-start justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2.5 transition-colors hover:border-primary-200 hover:bg-primary-50/60 dark:border-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-surface-800"
+                        class="flex items-start justify-between gap-3 rounded-2xl border border-gray-100 px-3 py-2.5 transition-colors hover:border-primary-200 hover:bg-primary-50/60 dark:border-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-surface-800"
                     >
                         <div class="min-w-0 flex-1">
                             <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ subscription.user?.name ?? t('Unknown user') }}</p>
@@ -1678,7 +1734,7 @@ const activityTypeLabels: Record<string, string> = {
                     </Link>
                 </div>
                 <div v-if="activity.length" class="space-y-1">
-                    <div v-for="(item, i) in activity.slice(0, 5)" :key="i" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-surface-800 transition-colors">
+                    <div v-for="(item, i) in activity.slice(0, 5)" :key="i" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-surface-800 transition-colors">
                         <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :class="{
                             'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400': item.icon === 'user',
                             'bg-success-100 dark:bg-success-900/30 text-success-600 dark:text-success-400': item.icon === 'dollar',

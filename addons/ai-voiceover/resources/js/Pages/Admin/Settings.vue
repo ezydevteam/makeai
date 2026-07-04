@@ -64,6 +64,7 @@ const props = defineProps<{
         ffmpeg: boolean
         ffprobe: boolean
     }
+    accessLevels: Array<{ value: string; label: string; description?: string | null }>
 }>()
 
 const form = useForm<VoiceoverSettings>({
@@ -88,7 +89,7 @@ const form = useForm<VoiceoverSettings>({
     murf_api_key: '',
     playht_api_key: '',
     playht_user_id: '',
-    show_to: 'logged_in',
+    show_to: 'login',
 })
 
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
@@ -130,18 +131,12 @@ const selectedProvider = computed<ProviderId>(() => {
 const selectedProviderMeta = computed(() => providerMeta[selectedProvider.value])
 const selectedProviderStatus = computed(() => props.voiceSyncStatus[selectedProvider.value] ?? null)
 
-const accessOptions = computed<SelectOption[]>(() => {
-    const options: SelectOption[] = [
-        { value: 'all', label: t('All users') },
-        { value: 'logged_in', label: t('Logged In users') },
-    ]
-
-    if (isProAvailable.value) {
-        options.push({ value: 'pro', label: t('Pro users') })
-    }
-
-    return options
-})
+// Same access levels as the core AI tools (server-provided: guest / login /
+// premium / plan:*). Premium/plan options are already filtered server-side when
+// pro isn't available.
+const accessOptions = computed<SelectOption[]>(() =>
+    (props.accessLevels ?? []).map((l) => ({ value: l.value, label: l.label }))
+)
 
 const providerOptions: SelectOption[] = [
     { value: 'elevenlabs', label: t('ElevenLabs') },
@@ -175,7 +170,7 @@ const syncVoices = () => {
 <template>
     <Head :title="t('Voiceover Settings')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">

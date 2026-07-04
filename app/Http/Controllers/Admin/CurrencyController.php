@@ -25,7 +25,7 @@ class CurrencyController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'code' => 'required|string|size:3|unique:currencies,code',
             'symbol' => 'required|string|max:10',
             'name' => 'required|string|max:100',
@@ -33,7 +33,7 @@ class CurrencyController extends Controller
             'decimal_places' => 'required|integer|min:0|max:5',
         ]);
 
-        Currency::create($request->all());
+        Currency::create([...$validated, 'is_active' => true]);
 
         return back()->with('success', translate('Currency added successfully.'));
     }

@@ -13,6 +13,10 @@ class VoiceoverToolSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! function_exists('is_addon_active') || ! is_addon_active('ai-voiceover')) {
+            return;
+        }
+
         $category = Category::updateOrCreate(
             ['slug' => 'audio-media', 'type' => 'ai_tool'],
             [

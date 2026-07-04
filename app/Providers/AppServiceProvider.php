@@ -50,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureInfrastructureFallbacks();
+        $this->configureStripeFromAdminPanel();
         $this->configureBroadcasting();
         $this->syncAddonsFromFilesystem();
         $this->registerAddons();
@@ -113,6 +114,41 @@ class AppServiceProvider extends ServiceProvider
         if ($sessionDriver === 'redis') {
             config(['session.driver' => 'file']);
             \Illuminate\Support\Facades\Log::warning('Infrastructure fallback: Session driver degraded from redis to file.');
+        }
+    }
+
+    /**
+     * Cashier reads Stripe keys from config/.env, but buyers configure gateways in
+     * the admin panel. Map the stored gateway credentials into the Cashier config
+     * at boot so checkout, the billing portal, webhooks, and cancellation all work
+     * without touching .env. Values set in .env keep priority.
+     */
+    private function configureStripeFromAdminPanel(): void
+    {
+        if (! filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        try {
+            $gateway = \App\Models\PaymentGateway::query()->where('slug', 'stripe')->first();
+
+            if (! $gateway) {
+                return;
+            }
+
+            if (! config('cashier.key') && ($key = $gateway->getCredential('publishable_key'))) {
+                config(['cashier.key' => $key]);
+            }
+
+            if (! config('cashier.secret') && ($secret = $gateway->getCredential('secret_key'))) {
+                config(['cashier.secret' => $secret]);
+            }
+
+            if (! config('cashier.webhook.secret') && ($webhookSecret = $gateway->getCredential('webhook_secret'))) {
+                config(['cashier.webhook.secret' => $webhookSecret]);
+            }
+        } catch (\Throwable) {
+            // Database not ready (installer, migrations pending) — keep env-based config.
         }
     }
 

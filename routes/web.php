@@ -41,11 +41,9 @@ use App\Http\Controllers\User\DashboardController;
 use App\Http\Controllers\User\OnboardingController;
 use App\Http\Controllers\User\PrivacyController;
 use App\Http\Controllers\User\SettingsController as UserSettingsController;
-use App\Http\Resources\SiteTemplateResource;
 use App\Http\Middleware\EmbedCorsMiddleware;
 use App\Models\AiTool;
 use App\Models\Page;
-use App\Models\SiteTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Hash;
@@ -70,6 +68,12 @@ Broadcast::routes(['middleware' => ['web']]);
 // ─── Admin Routes ───────────────────────────
 Route::middleware('web')->prefix('admin')->group(base_path('routes/admin.php'));
 
+// Support attachment download — serves the ticket owner OR an admin with the
+// support.tickets permission (access is enforced inside the controller, since a
+// single URL is shared between the user and admin ticket views).
+Route::get('/support/attachments/{attachment}/download', [SupportTicketController::class, 'downloadAttachment'])
+    ->name('support.attachments.download');
+
 // ─── Public ─────────────────────────────────
 Route::get('/', function () {
     $slug = settings('homepage_template', 'default');
@@ -80,105 +84,18 @@ Route::get('/', function () {
             'hide_footer' => (bool) addon_setting('ai-chatbot', 'hide_site_footer', false),
             'default_chat_model' => addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini'),
             'allow_model_select' => (bool) addon_setting('ai-chatbot', 'allow_model_select', true),
-            'show_friendly_model_names' => (bool) addon_setting('ai-chatbot', 'show_friendly_model_names', false),
+            'show_provider_models' => (bool) addon_setting('ai-chatbot', 'show_provider_models', true),
+            'show_custom_models' => (bool) addon_setting('ai-chatbot', 'show_custom_models', false),
+            'custom_models' => addon_setting('ai-chatbot', 'custom_models', []),
             'allow_guest_messages' => (bool) addon_setting('ai-chatbot', 'allow_guest_messages', false),
             'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
         ]);
     }
 
-    if ($slug === 'default') {
-        return app(HomepageController::class)->show();
-    }
-
-    $template = SiteTemplate::where('slug', $slug)
-        ->where('is_active', true)
-        ->firstOrFail();
-
-    if ($template->requires_pro && ! isProAvailable()) {
-        return app(HomepageController::class)->show();
-    }
-
-    $rawSlugs = $template->bundled_tool_slugs;
-
-    if (is_string($rawSlugs)) {
-        $rawSlugs = json_decode($rawSlugs, true);
-    }
-
-    $slugs = is_array($rawSlugs) ? $rawSlugs : [];
-
-    $tools = empty($slugs)
-        ? collect()
-        : AiTool::whereIn('slug', $slugs)
-            ->where('is_active', true)
-            ->orderByRaw('FIELD(slug, '.collect($slugs)->map(fn ($s) => "'{$s}'")->join(',').')')
-            ->get();
-
-    $resolvedTemplate = (new SiteTemplateResource($template))->resolve();
-
-    $props = [
-        'template' => $resolvedTemplate,
-        'tools' => $tools,
-    ];
-
-    if ($slug === 'social-media-manager') {
-        $props['platformSettings'] = settings('template_social_platforms', []);
-        $props['defaultPlatform'] = settings('template_social_default_platform', '');
-
-        if (auth()->check()) {
-            $today = now()->startOfDay();
-            $weekStart = now()->startOfWeek();
-
-            $props['userStats'] = [
-                'toolsUsedToday' => \App\Models\AiUsageLog::where('user_id', auth()->id())
-                    ->where('created_at', '>=', $today)
-                    ->distinct('tool_slug')
-                    ->count('tool_slug'),
-                'generationsThisWeek' => \App\Models\AiUsageLog::where('user_id', auth()->id())
-                    ->where('created_at', '>=', $weekStart)
-                    ->count(),
-            ];
-        }
-    }
-
-    if ($slug === 'marketing-suite') {
-        $props['stageSettings'] = settings('template_marketing_stages', []);
-        $props['defaultStage'] = settings('template_marketing_default_stage', 'awareness');
-    }
-
-    if ($slug === 'content-studio') {
-        $props['contentTypeSettings'] = settings('template_content_types', []);
-        $props['defaultType'] = settings('template_content_default_type', '');
-    }
-
-    if ($slug === 'ecommerce-toolkit') {
-        $props['ecomStageSettings'] = settings('template_ecom_stages', []);
-        $props['defaultStage'] = settings('template_ecom_default_stage', 'product-listing');
-        $props['showContextPanel'] = settings('template_ecom_show_context_panel', true);
-        $props['contextPanelLabel'] = settings('template_ecom_context_panel_label', '');
-    }
-
-    if ($slug === 'developer-assistant') {
-        $props['devCategorySettings'] = settings('template_dev_categories', []);
-        $props['defaultCategory'] = settings('template_dev_default_category', 'generate');
-        $props['devLanguageSettings'] = settings('template_dev_languages', []);
-    }
-
-    if ($slug === 'academic-writer') {
-        $props['academicStageSettings'] = settings('template_academic_stages', []);
-        $props['defaultStage'] = settings('template_academic_default_stage', 'research');
-        $props['showContextPanel'] = settings('template_academic_show_context_panel', true);
-        $props['contextPanelLabel'] = settings('template_academic_context_panel_label', '');
-        $props['contextSubjectPlaceholder'] = settings('template_academic_subject_placeholder', '');
-        $props['academicLevels'] = settings('template_academic_levels', []);
-        $props['defaultLevel'] = settings('template_academic_default_level', '');
-        $props['academicCitationStyles'] = settings('template_academic_citation_styles', []);
-        $props['defaultCitation'] = settings('template_academic_default_citation', '');
-    }
-
-    return Inertia::render("Templates/{$template->layout_component}", $props);
+    return app(HomepageController::class)->show();
 })->name('home');
-Route::get('/pricing', [PricingController::class, 'index'])->name('pricing');
-Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->name('affiliate.capture');
+Route::get('/pricing', [PricingController::class, 'index'])->middleware('premium')->name('pricing');
+Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->middleware('throttle:public,30,60')->name('affiliate.capture');
 Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch');
 Route::get('/live-search', LiveSearchController::class)->middleware('throttle:public,60,60')->name('live-search');
 Route::get('/css/theme-variables.css', \App\Http\Controllers\ThemeCssController::class)->name('theme-variables.css');
@@ -228,16 +145,26 @@ Route::middleware('auth')->group(function () {
     Route::middleware('verified')->group(function () {
         Route::get('/user/dashboard', [DashboardController::class, 'index'])->name('user.dashboard');
 
-        Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
-        Route::post('/checkout/coupon-preview', [CheckoutController::class, 'previewCoupon'])->name('checkout.coupon-preview');
-        Route::post('/checkout/session', [CheckoutController::class, 'createSession'])->name('checkout.session');
-        Route::get('/checkout/bank-transfer/{payment}', [CheckoutController::class, 'bankInstructions'])->name('checkout.bank.show');
-        Route::post('/checkout/bank-transfer/{payment}/proof', [CheckoutController::class, 'uploadBankProof'])->name('checkout.bank.proof');
-        Route::get('/checkout/paypal/return/{payment}', [CheckoutController::class, 'paypalReturn'])->name('checkout.paypal.return');
-        Route::get('/checkout/pending/{payment}', [CheckoutController::class, 'pending'])->name('checkout.pending');
-        Route::get('/checkout/stripe', [StripeController::class, 'checkout'])->name('checkout.stripe');
-        Route::get('/billing-portal', [StripeController::class, 'billingPortal'])->name('billing.portal');
-        Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
+        // New purchases: only when premium is fully available (extended license + toggle on).
+        Route::middleware('premium')->group(function () {
+            Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
+            Route::post('/checkout/coupon-preview', [CheckoutController::class, 'previewCoupon'])->middleware('throttle:public,20,60')->name('checkout.coupon-preview');
+            Route::post('/checkout/session', [CheckoutController::class, 'createSession'])->name('checkout.session');
+            Route::get('/checkout/stripe', [StripeController::class, 'checkout'])->name('checkout.stripe');
+        });
+
+        // Post-purchase lifecycle: must keep working on an extended license even if the
+        // admin switches the subscriptions toggle off, so existing subscribers can still
+        // complete initiated payments, cancel, or manage billing.
+        Route::middleware('extended')->group(function () {
+            Route::get('/checkout/bank-transfer/{payment}', [CheckoutController::class, 'bankInstructions'])->name('checkout.bank.show');
+            Route::post('/checkout/bank-transfer/{payment}/proof', [CheckoutController::class, 'uploadBankProof'])->name('checkout.bank.proof');
+            Route::get('/checkout/paypal/return/{payment}', [CheckoutController::class, 'paypalReturn'])->name('checkout.paypal.return');
+            Route::get('/checkout/pending/{payment}', [CheckoutController::class, 'pending'])->name('checkout.pending');
+            Route::get('/billing-portal', [StripeController::class, 'billingPortal'])->name('billing.portal');
+            Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
+            Route::post('/subscription/resume', [SubscriptionController::class, 'resume'])->name('subscription.resume');
+        });
 
         Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
         Route::patch('/documents/{document}', [DocumentController::class, 'update'])->name('documents.update');
@@ -416,7 +343,7 @@ Route::middleware(['auth', 'verified'])->prefix('tools/rag')->name('rag.')->grou
     Route::get('/sessions/{ulid}', [App\Http\Controllers\RagToolController::class, 'session'])->name('sessions.show');
     Route::get('/sessions/{ulid}/status', [App\Http\Controllers\RagToolController::class, 'status'])->name('sessions.status');
     Route::get('/sessions/{ulid}/file', [App\Http\Controllers\RagToolController::class, 'file'])->name('sessions.file');
-    Route::post('/sessions/{ulid}/chat', [App\Http\Controllers\RagToolController::class, 'chat'])->name('sessions.chat');
+    Route::post('/sessions/{ulid}/chat', [App\Http\Controllers\RagToolController::class, 'chat'])->middleware('throttle:text_gen')->name('sessions.chat');
     Route::post('/sessions/{ulid}/save-to-kb', [App\Http\Controllers\RagToolController::class, 'saveToKb'])->name('sessions.save');
     Route::get('/sessions/{ulid}/share', [App\Http\Controllers\RagToolController::class, 'getShareStatus'])->name('sessions.share_status');
     Route::post('/sessions/{ulid}/share', [App\Http\Controllers\RagToolController::class, 'share'])->name('sessions.share');
@@ -464,10 +391,12 @@ Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm
 Route::get('/newsletter/open/{campaign}/{email}', [NewsletterController::class, 'trackOpen'])->name('newsletter.open');
 
 // ─── Ads ────────────────────────────────────
+// Public tracking endpoints are rate-limited per IP to stop click/impression
+// fraud and queue-flooding (each hit dispatches a job).
 Route::get('/api/ads/{zone}', [AdController::class, 'getActive'])->name('ads.active');
-Route::post('/api/ads/{ad}/view', [AdController::class, 'trackView'])->name('ads.trackView');
-Route::post('/api/ads/{ad}/click', [AdController::class, 'trackClick'])->name('ads.trackClick');
-Route::get('/ads/click/{ad}', [AdController::class, 'click'])->name('ads.click');
+Route::post('/api/ads/{ad}/view', [AdController::class, 'trackView'])->middleware('throttle:public,120,60')->name('ads.trackView');
+Route::post('/api/ads/{ad}/click', [AdController::class, 'trackClick'])->middleware('throttle:public,60,60')->name('ads.trackClick');
+Route::get('/ads/click/{ad}', [AdController::class, 'click'])->middleware('throttle:public,60,60')->name('ads.click');
 
 // ─── Contact ────────────────────────────────
 Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:contact', 'contact'])->name('contact.store');
@@ -502,7 +431,7 @@ Route::post('/{slug}/password', function (Request $request, string $slug) {
     $request->session()->put("page_unlocked_{$page->id}", true);
 
     return redirect()->route('page.show', $page->slug);
-})->name('page.password');
+})->middleware('throttle:public,10,60')->name('page.password');
 
 // ─── Voiceover Studio (addon — must be before CMS catch-all) ──────────
 Route::middleware(['web', 'auth'])->prefix('voiceover-studio')->name('addon.vo.user.')->group(function () {

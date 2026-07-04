@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Head, Link, usePage } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { Head, Link, router, usePage } from '@inertiajs/vue3'
+import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -24,6 +25,11 @@ interface Subscription {
     status: string | null
     ends_at: string | null
     trial_ends_at: string | null
+    gateway: string | null
+    billing_cycle: string | null
+    can_cancel: boolean
+    can_resume: boolean
+    has_billing_portal: boolean
 }
 
 interface PlanData {
@@ -107,6 +113,39 @@ const statusClass = (status: string) => {
     }
     return map[status] ?? 'bg-gray-100 text-gray-700'
 }
+
+const cancelModalOpen = ref(false)
+const cancelProcessing = ref(false)
+const resumeProcessing = ref(false)
+
+const isCancelledWithGrace = computed(() => props.subscription.can_resume)
+
+const confirmCancel = () => {
+    if (cancelProcessing.value) return
+
+    cancelProcessing.value = true
+
+    router.post(route('subscription.cancel'), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            cancelProcessing.value = false
+            cancelModalOpen.value = false
+        },
+    })
+}
+
+const resumeSubscription = () => {
+    if (resumeProcessing.value) return
+
+    resumeProcessing.value = true
+
+    router.post(route('subscription.resume'), {}, {
+        preserveScroll: true,
+        onFinish: () => {
+            resumeProcessing.value = false
+        },
+    })
+}
 </script>
 
 <template>
@@ -175,12 +214,64 @@ const statusClass = (status: string) => {
                     </div>
                 </div>
 
-                <Link :href="route('pricing')" class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-700 dark:hover:text-primary-300">
-                    <i class="ti ti-arrow-up"></i>
-                    {{ t('Manage Plan') }}
-                </Link>
+                <div v-if="isCancelledWithGrace" class="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                    <p class="text-sm font-medium text-amber-800 dark:text-amber-300">
+                        {{ t('Your subscription is cancelled.') }}
+                        <template v-if="planEndsAt">{{ t('Access remains until :date.', { date: formatDate(planEndsAt) }) }}</template>
+                    </p>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <Link :href="route('pricing')" class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-700 dark:hover:text-primary-300" :class="{ 'sm:col-span-2': !subscription.can_cancel && !subscription.can_resume && !subscription.has_billing_portal }">
+                        <i class="ti ti-arrow-up"></i>
+                        {{ t('Manage Plan') }}
+                    </Link>
+
+                    <a
+                        v-if="subscription.has_billing_portal"
+                        :href="route('billing.portal')"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-700 dark:hover:text-primary-300"
+                    >
+                        <i class="ti ti-credit-card"></i>
+                        {{ t('Billing Portal') }}
+                    </a>
+
+                    <button
+                        v-if="subscription.can_cancel"
+                        type="button"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+                        @click="cancelModalOpen = true"
+                    >
+                        <i class="ti ti-circle-x"></i>
+                        {{ t('Cancel Subscription') }}
+                    </button>
+
+                    <button
+                        v-if="subscription.can_resume"
+                        type="button"
+                        :disabled="resumeProcessing"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/15"
+                        @click="resumeSubscription"
+                    >
+                        <i class="ti ti-refresh"></i>
+                        {{ resumeProcessing ? t('Resuming...') : t('Resume Subscription') }}
+                    </button>
+                </div>
             </div>
         </section>
+
+        <ActionConfirmModal
+            :open="cancelModalOpen"
+            :title="t('Cancel subscription')"
+            :message="t('Your subscription will not renew. You keep full access until the end of the current billing period.')"
+            :confirm-label="t('Cancel subscription')"
+            :cancel-label="t('Keep subscription')"
+            :processing-label="t('Cancelling...')"
+            :processing="cancelProcessing"
+            variant="danger"
+            @cancel="cancelModalOpen = false"
+            @confirm="confirmCancel"
+        />
 
         <!-- Payment History -->
         <div class="rounded-2xl border border-gray-200 bg-white shadow-[0_18px_40px_rgba(15,23,42,0.06)] dark:border-surface-800 dark:bg-gray-900">

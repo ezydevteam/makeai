@@ -6,6 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class GatewaySubscription extends Model
 {
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_TRIALING = 'trialing';
+
+    public const STATUS_PAST_DUE = 'past_due';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUS_EXPIRED = 'expired';
+
     protected $table = 'billing_subscriptions';
 
     protected $fillable = [

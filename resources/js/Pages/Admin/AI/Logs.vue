@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -62,6 +63,12 @@ const props = defineProps<{
         date_to?: string
     }
     providers: string[]
+    stats: {
+        total_requests: { value: string; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        credits_used: { value: string; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        estimated_cost: { value: string; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        failed_requests: { value: string; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    }
 }>()
 
 const searchInput = ref(props.filters.search || '')
@@ -117,7 +124,7 @@ const applyFilters = () => {
 const updateFilter = (key: string, value: any) => {
     const params: Record<string, string | undefined> = buildParams()
     params[key] = value ? String(value) : undefined
-    
+
     router.get(route('admin.ai.logs.index'), params, {
         preserveState: true,
         preserveScroll: true,
@@ -209,7 +216,7 @@ const formatResponseTime = (ms: number | null | undefined) => {
 
 const formatToolSlug = (slug: string | null | undefined) => {
     if (!slug) return t('Direct')
-    
+
     const toolNames: Record<string, string> = {
         'admin_blog_assist': t('Blog Editor'),
         'admin_faq_generate': t('FAQ Generator'),
@@ -225,7 +232,7 @@ const formatToolSlug = (slug: string | null | undefined) => {
         'embedding': t('Embedding'),
         'embedding_batch': t('Embedding Batch'),
     }
-    
+
     return toolNames[slug] || slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
@@ -242,7 +249,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('AI Usage Logs')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -261,7 +268,62 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
+        <!-- Stats Grid -->
+        <div v-if="stats" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatsCard
+                :title="t('AI Requests')"
+                :value="stats.total_requests.value"
+                :comparison="stats.total_requests.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total_requests.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-cpu text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Credits Spent')"
+                :value="stats.credits_used.value"
+                :comparison="stats.credits_used.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.credits_used.comparison.type"
+                color="accent"
+            >
+                <template #icon>
+                    <i class="ti ti-coins text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Estimated Cost')"
+                :value="stats.estimated_cost.value"
+                :comparison="stats.estimated_cost.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.estimated_cost.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-currency-dollar text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Failed Requests')"
+                :value="stats.failed_requests.value"
+                :comparison="stats.failed_requests.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.failed_requests.comparison.type"
+                color="danger"
+            >
+                <template #icon>
+                    <i class="ti ti-alert-triangle text-lg"></i>
+                </template>
+            </StatsCard>
+        </div>
+
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
             <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
                 <div class="relative min-w-[240px] flex-1">
                     <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>

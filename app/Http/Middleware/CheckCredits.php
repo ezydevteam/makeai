@@ -34,8 +34,6 @@ class CheckCredits
             $template = AiTool::where('slug', $slug)->where('is_active', true)->first();
         }
 
-        $accessLevel = $template ? $access->effectiveLevel($template) : 'login_required';
-
         if ($user && $user->is_banned) {
             return response()->json([
                 'success' => false,

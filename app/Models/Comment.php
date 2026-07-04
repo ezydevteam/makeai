@@ -65,6 +65,7 @@ class Comment extends Model
     public function canBeEditedBy(?User $user): bool
     {
         return $user !== null
+            && ! $user->is_banned
             && $this->user_id === $user->id
             && $this->created_at?->greaterThanOrEqualTo(now()->subMinutes(15));
     }

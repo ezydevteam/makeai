@@ -4,6 +4,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import { computed, ref } from 'vue'
+import { applyPurchaseCodeMask } from '@/lib/purchaseCode'
 
 defineOptions({ layout: AdminLayout })
 
@@ -67,22 +68,15 @@ function formatGraceTime(hours: number): string {
     return `${remainingHours}h ${t('remaining')}`
 }
 
-function applyMask(value: string) {
-    if (page.props.licenseTestMode) {
-        return value.replace(/[^a-z0-9-]/gi, '').slice(0, 50).toUpperCase()
-    }
-    return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
-}
-
 function onPurchaseCodeInput(e: Event) {
-    activateForm.purchase_code = applyMask((e.target as HTMLInputElement).value)
+    activateForm.purchase_code = applyPurchaseCodeMask((e.target as HTMLInputElement).value, true)
 }
 </script>
 
 <template>
     <Head :title="t('License Settings')" />
 
-    <div class="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-3xl space-y-6 px-4 sm:px-6 lg:px-8">
         <!-- Developer test mode warning banner -->
         <div
             v-if="page.props.licenseTestMode"

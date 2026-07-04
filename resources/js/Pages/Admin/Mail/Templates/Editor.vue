@@ -157,7 +157,7 @@ const runAiAssist = async (action: string) => {
 <template>
     <Head :title="pageTitle" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mx-auto max-w-7xl">
             <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -176,7 +176,7 @@ const runAiAssist = async (action: string) => {
                 <div class="flex flex-col gap-3 sm:flex-row">
                     <Link
                         :href="route('admin.mail.templates.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                     >
                         <i class="ti ti-arrow-left text-base"></i>
                         {{ t('Back') }}
@@ -188,7 +188,7 @@ const runAiAssist = async (action: string) => {
                         @click="submit"
                     >
                         <i class="ti ti-device-floppy text-base"></i>
-                        {{ submitLabel }}
+                        {{ form.processing ? t('Saving...') : submitLabel }}
                     </button>
                 </div>
             </div>
@@ -196,31 +196,37 @@ const runAiAssist = async (action: string) => {
             <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <form @submit.prevent="submit" class="space-y-6">
                     <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                        <div class="border-b border-gray-100 px-6 py-3 dark:border-gray-700">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Template Details') }}</h2>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Define the visible name, delivery state, and email metadata for this template.') }}</p>
                         </div>
 
                         <div class="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
                             <div class="md:col-span-1">
-                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Display Name') }}</label>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {{ t('Display Name') }}
+                                    <span class="text-red-500">*</span>
+                                </label>
                                 <input
                                     v-model="form.name"
                                     type="text"
                                     :placeholder="t('e.g. Monthly Product Update')"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
                                 >
                                 <p v-if="form.errors.name" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.name }}</p>
                             </div>
 
                             <div class="md:col-span-1">
-                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {{ t('Slug') }}
+                                    <span class="text-red-500">*</span>
+                                </label>
                                 <input
                                     v-model="form.slug"
                                     :readonly="!props.template.id"
                                     type="text"
                                     :placeholder="t('e.g. monthly_update')"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 font-mono text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 read-only:cursor-not-allowed read-only:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30 dark:read-only:bg-surface-800"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 font-mono text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 read-only:cursor-not-allowed read-only:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30 dark:read-only:bg-surface-800"
                                 >
                                 <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
                                     {{ props.template.id ? t('You can adjust the slug for existing templates if needed.') : t('The slug is generated automatically from the display name.') }}
@@ -230,12 +236,15 @@ const runAiAssist = async (action: string) => {
 
                             <div class="md:col-span-2 grid grid-cols-1 gap-6 xl:grid-cols-12">
                                 <div class="xl:col-span-8">
-                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Email Subject') }}</label>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    {{ t('Email Subject') }}
+                                    <span class="text-red-500">*</span>
+                                </label>
                                 <input
                                     v-model="form.subject"
                                     type="text"
                                     :placeholder="t('e.g. Welcome back, {user_name}')"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 transition placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
                                 >
                                 <p v-if="form.errors.subject" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ form.errors.subject }}</p>
                             </div>
@@ -249,8 +258,11 @@ const runAiAssist = async (action: string) => {
                     </div>
 
                     <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
-                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Email Content') }}</h2>
+                        <div class="border-b border-gray-100 px-6 py-3 dark:border-gray-700">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                {{ t('Email Content') }}
+                                <span class="text-red-500">*</span>
+                            </h2>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Design the body of the email using rich text and supported merge variables.') }}</p>
                         </div>
 
@@ -273,12 +285,12 @@ const runAiAssist = async (action: string) => {
 
                 <div class="space-y-6">
                     <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                        <div class="border-b border-gray-100 px-6 py-3 dark:border-gray-700">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Variable Guide') }}</h2>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use these placeholders to personalize outgoing emails.') }}</p>
                         </div>
 
-                        <div class="space-y-4 p-6">
+                        <div class="space-y-4 px-6 py-4">
                             <div
                                 v-for="(description, token) in variableGuide"
                                 :key="token"
@@ -291,11 +303,10 @@ const runAiAssist = async (action: string) => {
                     </div>
 
                     <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
+                        <div class="border-b border-gray-100 px-6 py-3 dark:border-gray-700">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Template Notes') }}</h2>
                         </div>
-
-                        <div class="space-y-3 p-6 text-sm text-gray-500 dark:text-gray-400">
+                        <div class="space-y-3 px-6 py-3 text-sm text-gray-500 dark:text-gray-400">
                             <p>{{ t('System templates support built-in platform flows such as authentication, billing, and account notices.') }}</p>
                             <p>{{ t('Custom templates are ideal for newsletters, announcements, or manual outreach campaigns.') }}</p>
                             <p>{{ t('Keep subject lines concise and make sure the message still reads well if a variable is empty.') }}</p>

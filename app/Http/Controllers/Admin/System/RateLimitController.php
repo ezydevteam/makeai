@@ -15,7 +15,7 @@ use Inertia\Response;
 class RateLimitController extends Controller
 {
     public const CATEGORIES = [
-        'text_gen' => 'AI Text Generation',
+        'text_gen' => 'AI Generation',
         'auth' => 'Login / Authentication',
         'otp' => 'OTP / 2FA Verification',
         'contact' => 'Contact Form',
@@ -24,6 +24,20 @@ class RateLimitController extends Controller
         'public' => 'Public / Guest Tools',
         'social_auth' => 'Social Login',
     ];
+
+    /**
+     * Scopes an IP ban may target, most severe first.
+     *  - 'site' blocks EVERY request (incl. page views) via BlockBannedIps.
+     *  - 'all'  blocks every throttled action (forms, login, AI, tools) but
+     *           still allows passive page browsing.
+     *  - the rest mirror the throttle categories, plus public_tool embeds
+     *    (which has no tier row but is still a throttled, bannable endpoint).
+     */
+    public const BAN_CATEGORIES = [
+        'site' => 'Entire Site (Block All Access)',
+        'all' => 'All Endpoints (Forms, Login, AI & Tools)',
+        'public_tool' => 'Public Tools / Embeds',
+    ] + self::CATEGORIES;
 
     private const TIERS = ['guest', 'free_user', 'pro_user'];
 
@@ -34,6 +48,7 @@ class RateLimitController extends Controller
         return Inertia::render('Admin/System/RateLimits', [
             'tiers' => $this->buildTierConfig(),
             'categories' => self::CATEGORIES,
+            'banCategories' => self::BAN_CATEGORIES,
             'bannedIps' => BannedIp::with('bannedBy')
                 ->latest('banned_at')
                 ->paginate(20),
@@ -73,9 +88,11 @@ class RateLimitController extends Controller
     public function banIp(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'ip_address' => ['required', 'string', 'max:45'],
+            // Must be a real IP — bans are matched by exact IP, so a malformed
+            // string would just be stored and never match anything.
+            'ip_address' => ['required', 'ip', 'max:45'],
             'reason' => ['required', 'string', 'max:255'],
-            'category' => ['required', 'string', Rule::in(array_keys(self::CATEGORIES))],
+            'category' => ['required', 'string', Rule::in(array_keys(self::BAN_CATEGORIES))],
             'expires_in_hours' => ['nullable', 'integer', 'min:1', 'max:8760'],
         ]);
 
@@ -96,7 +113,8 @@ class RateLimitController extends Controller
 
     public function unbanIp(BannedIp $bannedIp): RedirectResponse
     {
-        $this->rateLimiter->unbanIp($bannedIp->ip_address);
+        // Remove only this scope's ban — an IP may carry other category bans.
+        $bannedIp->delete();
 
         return back()->with('success', translate('IP ban removed.'));
     }

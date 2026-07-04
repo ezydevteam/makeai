@@ -15,8 +15,8 @@ class StabilityClient
     {
         $response = Http::timeout(60)
             ->withToken($this->apiKey())
-            ->attach('image', Storage::get($imagePath), basename($imagePath))
-            ->attach('mask', Storage::get($maskPath), 'mask.png')
+            ->attach('image', Storage::disk('public')->get($imagePath), basename($imagePath))
+            ->attach('mask', Storage::disk('public')->get($maskPath), 'mask.png')
             ->post("{$this->baseUrl}/stable-image/edit/inpaint", [
                 'prompt' => $prompt,
                 'output_format' => 'png',
@@ -45,7 +45,7 @@ class StabilityClient
 
         $response = Http::timeout(60)
             ->withToken($this->apiKey())
-            ->attach('image', Storage::get($imagePath), basename($imagePath))
+            ->attach('image', Storage::disk('public')->get($imagePath), basename($imagePath))
             ->post("{$this->baseUrl}/stable-image/edit/outpaint", $payload);
 
         if (! $response->successful()) {
@@ -61,8 +61,8 @@ class StabilityClient
     {
         $response = Http::timeout(60)
             ->withToken($this->apiKey())
-            ->attach('image', Storage::get($contentPath), basename($contentPath))
-            ->attach('style_image', Storage::get($stylePath), 'style.png')
+            ->attach('image', Storage::disk('public')->get($contentPath), basename($contentPath))
+            ->attach('style_image', Storage::disk('public')->get($stylePath), 'style.png')
             ->post("{$this->baseUrl}/stable-image/control/style", [
                 'fidelity' => $fidelity,
                 'output_format' => 'png',
@@ -95,7 +95,7 @@ class StabilityClient
 
     private function saveToStorage(string $binaryContent, string $storagePath): string
     {
-        Storage::put($storagePath, $binaryContent);
+        Storage::disk('public')->put($storagePath, $binaryContent);
 
         return $storagePath;
     }
@@ -103,7 +103,7 @@ class StabilityClient
     private function imageToBase64(string $storagePath): string
     {
         $ext = strtolower(pathinfo($storagePath, PATHINFO_EXTENSION));
-        $bytes = Storage::get($storagePath);
+        $bytes = Storage::disk('public')->get($storagePath);
 
         return 'data:image/' . $ext . ';base64,' . base64_encode($bytes);
     }

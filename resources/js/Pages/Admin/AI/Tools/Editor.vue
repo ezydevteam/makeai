@@ -333,7 +333,7 @@ const submit = () => {
 <template>
     <Head :title="pageTitle + ' - ' + t('Admin')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ pageTitle }}</h1>

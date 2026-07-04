@@ -19,6 +19,7 @@ class StoreCommentRequest extends FormRequest
     public function authorize(): bool
     {
         return (bool) settings('comments_enabled', true)
+            && ! ($this->user()?->is_banned)
             && ($this->user() || (bool) settings('comments_allow_guests', false));
     }
 

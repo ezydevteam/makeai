@@ -84,6 +84,11 @@ class TemplateController extends Controller
             return redirect()->route('addon.vo.user.studio');
         }
 
+        // Redirect image-editor tool to the addon page
+        if ($slug === 'image-editor' && is_addon_active('ai-image-editor')) {
+            return redirect()->route('addon.ie.user.editor');
+        }
+
         $toolData = $this->toolCatalog->toolBySlug($slug);
 
         $isAdminPreview = request()->query('preview') === '1' && auth('admin')->check();

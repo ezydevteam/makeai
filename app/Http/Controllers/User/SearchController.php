@@ -28,7 +28,7 @@ class SearchController extends Controller
         }
 
         $conversations = [];
-        if (is_addon_active('ai-chatbot')) {
+        if (is_addon_active('ai-chatbot') && \Illuminate\Support\Facades\Schema::hasTable('conversations')) {
             $conversations = \Addons\AiChatbot\Models\Conversation::where('user_id', $user->id)
                 ->where(function ($q) use ($query) {
                     $q->where('title', 'like', "%{$query}%")

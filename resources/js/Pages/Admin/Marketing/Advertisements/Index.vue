@@ -314,7 +314,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Ads')" />
 
-    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mx-auto max-w-7xl space-y-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>

@@ -55,7 +55,7 @@ function confirmRemove() {
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('My Collections') }}</h1>
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Organize your favorite tools into curated collections.') }}</p>
       </div>
-      <button @click="showCreate = !showCreate" :class="showCreate ? 'btn-danger' : 'btn-primary'" class="rounded-full px-4 py-2 text-sm font-semibold">
+      <button @click="showCreate = !showCreate" :class="showCreate ? 'bg-danger-600 hover:bg-danger-700 text-white transition-colors shadow-sm' : 'btn-primary'" class="rounded-full px-4 py-2 text-sm font-semibold">
         <i :class="showCreate ? 'ti ti-x text-base' : 'ti ti-plus text-base'" class="transition-all"></i>
         {{ showCreate ? t('Cancel') : t('New Collection') }}
       </button>

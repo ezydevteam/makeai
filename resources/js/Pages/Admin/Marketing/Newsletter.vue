@@ -2,12 +2,15 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AppColorPicker from '@/Components/AppColorPicker.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
+import { useToastr } from '@/Composables/useToastr'
 
 const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
@@ -52,9 +55,10 @@ interface PaginatedCollection<T> {
 }
 
 interface NewsletterStats {
-    total: number
-    active: number
-    unsubscribed: number
+    total: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    active: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    unsubscribed: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    campaigns: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
     users_all?: number
     users_active?: number
     users_inactive?: number
@@ -89,10 +93,16 @@ const props = defineProps<{
     stats: NewsletterStats
     settings: NewsletterSettings
     configuredSecrets: Record<string, boolean>
+    isMailConfigured: boolean
+    filters?: {
+        search?: string
+        status?: 'all' | 'subscribed' | 'unsubscribed'
+    }
 }>()
 
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
+const toast = useToastr()
 
 const activeTab = ref<NewsletterTab>('subscribers')
 const showCampaignModal = ref(false)
@@ -101,8 +111,14 @@ const sendTargetId = ref<number | null>(null)
 const deleteTargetId = ref<number | null>(null)
 const deleteSubscriberId = ref<number | null>(null)
 const subscriberSearchInput = ref<HTMLInputElement | null>(null)
-const subscriberSearch = ref('')
-const subscriberStatus = ref(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('status') ?? 'all' : 'all')
+const subscriberSearch = ref(props.filters?.search || '')
+const subscriberStatus = ref<'all' | 'subscribed' | 'unsubscribed'>(props.filters?.status || 'all')
+const searchFocused = ref(false)
+const filterDebounce = ref<number | null>(null)
+const testTargetId = ref<number | null>(null)
+const testCampaignForm = useForm({})
+const retryTargetId = ref<number | null>(null)
+const retryCampaignForm = useForm({})
 
 const tabOptions = [
     { value: 'subscribers', label: t('Subscribers') },
@@ -179,30 +195,19 @@ const primaryActionLabel = computed(() => {
 const canShowPrimaryAction = computed(() => activeTab.value !== 'subscribers')
 const usesExternalDriver = computed(() => settingsForm.newsletter_driver !== 'internal')
 const modalTitle = computed(() => editingCampaignId.value ? t('Edit Campaign') : t('Create Campaign'))
-const filteredSubscribers = computed(() => {
-    const query = subscriberSearch.value.trim().toLowerCase()
-
-    if (!query) {
-        return props.subscribers.data
-    }
-
-    return props.subscribers.data.filter((subscriber) => {
-        return [
-            subscriber.email,
-            subscriber.name ?? '',
-            subscriber.status,
-        ].some((value) => String(value).toLowerCase().includes(query))
-    })
-})
-
 const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || t('Newsletter subscribers')
 
 const formatNumber = (value: number | undefined) => new Intl.NumberFormat().format(value ?? 0)
 
+const hasActiveFilters = computed(() => subscriberSearch.value.trim().length > 0 || subscriberStatus.value !== 'all')
+
 const filterSubscribers = () => {
     const query: Record<string, string> = {}
 
-    if (subscriberStatus.value !== 'all') {
+    if (subscriberSearch.value.trim()) {
+        query.search = subscriberSearch.value.trim()
+    }
+    if (subscriberStatus.value && subscriberStatus.value !== 'all') {
         query.status = subscriberStatus.value
     }
 
@@ -213,12 +218,26 @@ const filterSubscribers = () => {
     })
 }
 
-const clearSubscriberSearch = () => {
-    if (!subscriberSearch.value) {
+watch([subscriberSearch, subscriberStatus], () => {
+    if (activeTab.value !== 'subscribers') {
         return
     }
 
+    if (filterDebounce.value) {
+        window.clearTimeout(filterDebounce.value)
+    }
+
+    filterDebounce.value = window.setTimeout(() => {
+        filterSubscribers()
+    }, 250) as unknown as number
+})
+
+const clearSubscriberSearch = () => {
+    if (filterDebounce.value) {
+        window.clearTimeout(filterDebounce.value)
+    }
     subscriberSearch.value = ''
+    filterSubscribers()
 }
 
 const openCreateCampaign = () => {
@@ -257,6 +276,10 @@ const updateCampaign = () => {
 }
 
 const queueCampaign = (id: number) => {
+    if (!props.isMailConfigured) {
+        toast.error(t('Mail is not configured. Please configure mail settings first.'))
+        return
+    }
     sendTargetId.value = id
 }
 
@@ -298,12 +321,31 @@ const confirmDeleteCampaign = () => {
     })
 }
 
-const testCampaign = (id: number) => {
-    useForm({}).post(route('admin.newsletter.campaign.test', id))
+const queueTestCampaign = (id: number) => {
+    if (!props.isMailConfigured) {
+        toast.error(t('Mail is not configured. Please configure mail settings first.'))
+        return
+    }
+    testTargetId.value = id
+}
+
+const confirmTestCampaign = () => {
+    if (testTargetId.value === null) return
+
+    testCampaignForm.post(route('admin.newsletter.campaign.test', testTargetId.value), {
+        onFinish: () => {
+            testTargetId.value = null
+        },
+    })
 }
 
 const retryCampaign = (id: number) => {
-    useForm({}).post(route('admin.newsletter.campaign.retry', id))
+    retryTargetId.value = id
+    retryCampaignForm.post(route('admin.newsletter.campaign.retry', id), {
+        onFinish: () => {
+            retryTargetId.value = null
+        },
+    })
 }
 
 const saveSettings = () => {
@@ -322,40 +364,39 @@ const handlePrimaryAction = () => {
 }
 
 const clearSubscriberFilters = () => {
-    const hadStatus = subscriberStatus.value !== 'all'
-
+    if (filterDebounce.value) {
+        window.clearTimeout(filterDebounce.value)
+    }
     subscriberSearch.value = ''
     subscriberStatus.value = 'all'
-
-    if (hadStatus) {
-        filterSubscribers()
-    }
+    filterSubscribers()
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null
     const isTypingTarget = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT' || target?.isContentEditable
 
-    if (event.key === '/' && activeTab.value === 'subscribers' && !showCampaignModal.value && !sendTargetId.value && !deleteTargetId.value && !deleteSubscriberId.value && !isTypingTarget) {
+    if (event.key === '/' && activeTab.value === 'subscribers' && !showCampaignModal.value && !sendTargetId.value && !testTargetId.value && !deleteTargetId.value && !deleteSubscriberId.value && !isTypingTarget) {
         event.preventDefault()
         subscriberSearchInput.value?.focus()
         subscriberSearchInput.value?.select()
         return
     }
 
-    if (event.key === 'Escape' && activeTab.value === 'subscribers' && !showCampaignModal.value && !sendTargetId.value && !deleteTargetId.value && !deleteSubscriberId.value && (subscriberSearch.value || subscriberStatus.value !== 'all')) {
-        event.preventDefault()
-        clearSubscriberFilters()
+    if (event.key === 'Escape' && activeTab.value === 'subscribers' && !showCampaignModal.value && !sendTargetId.value && !testTargetId.value && !deleteTargetId.value && !deleteSubscriberId.value) {
+        if (document.activeElement === subscriberSearchInput.value) {
+            event.preventDefault()
+            subscriberSearch.value = ''
+            subscriberSearchInput.value?.blur()
+            return
+        }
+
+        if (hasActiveFilters.value) {
+            event.preventDefault()
+            clearSubscriberFilters()
+        }
     }
 }
-
-watch(subscriberStatus, () => {
-    if (activeTab.value !== 'subscribers') {
-        return
-    }
-
-    filterSubscribers()
-})
 
 onMounted(() => {
     document.addEventListener('keydown', handleKeydown)
@@ -369,7 +410,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Newsletter')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Newsletter') }}</h1>
@@ -382,7 +423,7 @@ onBeforeUnmount(() => {
                 <button
                     v-if="canShowPrimaryAction"
                     type="button"
-                    class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                    class="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
                     :disabled="settingsForm.processing"
                     @click="handlePrimaryAction"
                 >
@@ -392,28 +433,68 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-3">
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
-                <p class="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{{ t('Total Subscribers') }}</p>
-                <p class="mt-3 text-3xl font-semibold text-gray-900 dark:text-white">{{ formatNumber(stats.total) }}</p>
-            </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
-                <p class="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{{ t('Active') }}</p>
-                <p class="mt-3 text-3xl font-semibold text-success-600">{{ formatNumber(stats.active) }}</p>
-            </div>
-            <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900">
-                <p class="text-xs font-medium uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400">{{ t('Unsubscribed') }}</p>
-                <p class="mt-3 text-3xl font-semibold text-danger-600">{{ formatNumber(stats.unsubscribed) }}</p>
-            </div>
+        <!-- Stats Grid -->
+        <div v-if="stats" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatsCard
+                :title="t('Total Subscribers')"
+                :value="stats.total.value"
+                :comparison="stats.total.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-users text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Active')"
+                :value="stats.active.value"
+                :comparison="stats.active.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.active.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-checkbox text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Unsubscribed')"
+                :value="stats.unsubscribed.value"
+                :comparison="stats.unsubscribed.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.unsubscribed.comparison.type"
+                color="danger"
+            >
+                <template #icon>
+                    <i class="ti ti-x text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Campaigns Sent')"
+                :value="stats.campaigns.value"
+                :comparison="stats.campaigns.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.campaigns.comparison.type"
+                color="warning"
+            >
+                <template #icon>
+                    <i class="ti ti-mail text-lg"></i>
+                </template>
+            </StatsCard>
         </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white p-2 shadow-card dark:border-surface-700 dark:bg-surface-900">
+        <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-2 shadow-card dark:border-surface-700 dark:bg-surface-900">
             <div class="flex flex-wrap gap-2">
                 <button
                     v-for="tab in tabOptions"
                     :key="tab.value"
                     type="button"
-                    class="rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                    class="rounded-xl px-4 py-2 text-sm font-medium transition-colors"
                     :class="activeTab === tab.value ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-800'"
                     @click="activeTab = tab.value"
                 >
@@ -422,10 +503,10 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <div v-if="activeTab === 'subscribers'" class="space-y-4">
-            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
-                <div class="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 dark:border-surface-700 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="w-full max-w-md">
+        <div v-if="activeTab === 'subscribers'" class="space-y-6">
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between border-b border-gray-200 px-6 py-4 dark:border-surface-700">
+                    <div class="flex-1 min-w-[240px]">
                         <label class="sr-only">{{ t('Search subscribers') }}</label>
                         <div class="relative">
                             <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
@@ -433,15 +514,15 @@ onBeforeUnmount(() => {
                                 ref="subscriberSearchInput"
                                 v-model="subscriberSearch"
                                 type="text"
-                                :placeholder="t('Search subscribers... (/)')"
-                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-16 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                :placeholder="t('Search subscribers...')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-16 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
                             >
                             <span
-                                v-if="!subscriberSearch"
-                                class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                            >
-                                /
-                            </span>
+                                v-if="!subscriberSearch && !searchFocused"
+                                class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                            >/</span>
                             <button
                                 v-if="subscriberSearch"
                                 type="button"
@@ -453,10 +534,19 @@ onBeforeUnmount(() => {
                             </button>
                         </div>
                     </div>
-                    <div class="w-full lg:w-52">
-                        <div class="min-w-[190px]">
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-52 lg:flex-none">
                             <AppSelect v-model="subscriberStatus" :options="subscriberStatusOptions" :placeholder="t('All status')" />
                         </div>
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 w-full sm:w-auto"
+                            @click="clearSubscriberFilters"
+                        >
+                            <i class="ti ti-rotate-clockwise text-base"></i>
+                            {{ t('Reset') }}
+                        </button>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -470,7 +560,7 @@ onBeforeUnmount(() => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
-                            <tr v-for="subscriber in filteredSubscribers" :key="subscriber.id" class="transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-500/5">
+                            <tr v-for="subscriber in props.subscribers.data" :key="subscriber.id" class="transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-500/5">
                                 <td class="px-6 py-4">
                                     <div class="text-sm font-medium text-gray-900 dark:text-white">{{ subscriber.email }}</div>
                                     <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ subscriber.name || t('Anonymous') }}</div>
@@ -480,7 +570,7 @@ onBeforeUnmount(() => {
                                         class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
                                         :class="subscriber.status === 'subscribed'
                                             ? 'bg-success-100 text-success-700'
-                                            : 'bg-danger-100 text-danger-700'"
+                                            : 'bg-red-100 text-red-700'"
                                     >
                                         {{ t(subscriber.status) }}
                                     </span>
@@ -489,17 +579,18 @@ onBeforeUnmount(() => {
                                     {{ formatDate(subscriber.created_at) }}
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button
-                                        type="button"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-500/10"
-                                        :title="t('Remove subscriber')"
-                                        @click="deleteSubscriber(subscriber.id)"
-                                    >
-                                        <i class="ti ti-trash text-base"></i>
-                                    </button>
+                                    <Tooltip :content="t('Remove subscriber')" placement="top">
+                                        <button
+                                            type="button"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-100 bg-white text-gray-500 shadow-sm transition-all hover:bg-red-50 hover:text-red-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                                            @click="deleteSubscriber(subscriber.id)"
+                                        >
+                                            <i class="ti ti-trash text-base"></i>
+                                        </button>
+                                    </Tooltip>
                                 </td>
                             </tr>
-                            <tr v-if="filteredSubscribers.length === 0">
+                            <tr v-if="props.subscribers.data.length === 0">
                                 <td colspan="4" class="px-6 py-12 text-center text-sm text-gray-400">
                                     {{ subscriberSearch || subscriberStatus !== 'all' ? t('No subscribers match these filters.') : t('No subscribers found.') }}
                                 </td>
@@ -513,12 +604,12 @@ onBeforeUnmount(() => {
         </div>
         </div>
 
-        <div v-if="activeTab === 'campaigns'" class="space-y-4 w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div v-if="activeTab === 'campaigns'" class="space-y-6 w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
             <div class="grid gap-4 xl:grid-cols-2">
                 <article
                     v-for="campaign in campaigns.data"
                     :key="campaign.id"
-                    class="rounded-xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900"
+                    class="rounded-2xl border border-gray-200 bg-white p-5 shadow-card dark:border-surface-700 dark:bg-surface-900"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div class="min-w-0">
@@ -549,7 +640,7 @@ onBeforeUnmount(() => {
                             <button
                                 v-if="campaign.status === 'draft'"
                                 type="button"
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-white"
+                                class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-100 bg-white text-gray-500 shadow-sm transition-all hover:bg-gray-50 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-400 dark:hover:bg-surface-800 dark:hover:text-primary-400"
                                 :title="t('Edit campaign')"
                                 @click="editCampaign(campaign)"
                             >
@@ -558,39 +649,45 @@ onBeforeUnmount(() => {
                             <button
                                 v-if="campaign.status === 'draft'"
                                 type="button"
-                                class="inline-flex items-center gap-2 rounded-lg bg-primary-100 px-3 py-2 text-xs font-medium text-primary-700 transition hover:bg-primary-200"
+                                class="inline-flex items-center gap-2 rounded-xl bg-primary-100 px-3 py-2 text-xs font-medium text-primary-700 transition hover:bg-primary-200 disabled:opacity-60"
+                                :disabled="sendCampaignForm.processing"
                                 @click="queueCampaign(campaign.id)"
                             >
-                                <i class="ti ti-send text-sm"></i>
-                                <span>{{ t('Queue Send') }}</span>
+                                <i v-if="sendCampaignForm.processing && sendTargetId === campaign.id" class="ti ti-loader-2 animate-spin text-sm"></i>
+                                <i v-else class="ti ti-pointer-collaboration-2 text-sm"></i>
+                                <span>{{ sendCampaignForm.processing && sendTargetId === campaign.id ? t('Queueing...') : t('Queue Send') }}</span>
                             </button>
                             <button
                                 v-if="campaign.status === 'sent'"
                                 type="button"
-                                class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-200 dark:hover:bg-surface-800"
-                                @click="testCampaign(campaign.id)"
+                                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-200 dark:hover:bg-surface-800 disabled:opacity-60"
+                                :disabled="testCampaignForm.processing"
+                                @click="queueTestCampaign(campaign.id)"
                             >
-                                <i class="ti ti-send-2 text-sm"></i>
-                                <span>{{ t('Send Test') }}</span>
+                                <i v-if="testCampaignForm.processing && testTargetId === campaign.id" class="ti ti-loader-2 animate-spin text-sm"></i>
+                                <i v-else class="ti ti-send text-sm"></i>
+                                <span>{{ testCampaignForm.processing && testTargetId === campaign.id ? t('Sending...') : t('Send Test') }}</span>
                             </button>
                             <button
                                 v-if="campaign.status === 'sent' && (campaign.failed_count || 0) > 0"
                                 type="button"
-                                class="inline-flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700 transition hover:bg-amber-200"
+                                class="inline-flex items-center gap-2 rounded-xl bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700 transition hover:bg-amber-200 disabled:opacity-60"
+                                :disabled="retryCampaignForm.processing"
                                 @click="retryCampaign(campaign.id)"
                             >
-                                <i class="ti ti-rotate-clockwise-2 text-sm"></i>
-                                <span>{{ t('Retry Failed') }}</span>
+                                <i v-if="retryCampaignForm.processing && retryTargetId === campaign.id" class="ti ti-loader-2 animate-spin text-sm"></i>
+                                <i v-else class="ti ti-rotate-clockwise-2 text-sm"></i>
+                                <span>{{ retryCampaignForm.processing && retryTargetId === campaign.id ? t('Retrying...') : t('Retry Failed') }}</span>
                             </button>
-                            <button
-                                v-if="campaign.status !== 'sending'"
-                                type="button"
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition hover:bg-danger-50 hover:text-danger-600 dark:hover:bg-danger-500/10"
-                                :title="t('Delete campaign')"
-                                @click="deleteCampaign(campaign.id)"
-                            >
-                                <i class="ti ti-trash text-base"></i>
-                            </button>
+                            <Tooltip v-if="campaign.status !== 'sending'" :content="t('Delete campaign')" placement="top">
+                                <button
+                                    type="button"
+                                    class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-gray-100 bg-white text-gray-500 shadow-sm transition-all hover:bg-red-50 hover:text-red-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                                    @click="deleteCampaign(campaign.id)"
+                                >
+                                    <i class="ti ti-trash text-base"></i>
+                                </button>
+                            </Tooltip>
                         </div>
                     </div>
 
@@ -623,7 +720,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-if="activeTab === 'settings'" class="space-y-6 w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                 <div class="grid gap-6 md:grid-cols-2">
                     <div class="md:col-span-2">
                         <AppSelect v-model="settingsForm.newsletter_driver" :options="driverOptions" :label="t('Newsletter driver')" />
@@ -637,31 +734,31 @@ onBeforeUnmount(() => {
                             type="password"
                             autocomplete="new-password"
                             :placeholder="configuredSecrets.mailchimp_api_key ? t('Stored securely - leave blank to keep') : t('e.g. 1234567890abcdef-us21')"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                         >
                     </label>
 
                     <label v-if="usesExternalDriver" class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Server prefix') }}</span>
-                        <input v-model="settingsForm.mailchimp_server_prefix" type="text" :placeholder="t('e.g. us21')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.mailchimp_server_prefix" type="text" :placeholder="t('e.g. us21')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label v-if="usesExternalDriver" class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Audience / List ID') }}</span>
-                        <input v-model="settingsForm.mailchimp_list_id" type="text" :placeholder="t('e.g. 1a2b3c4d5e')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.mailchimp_list_id" type="text" :placeholder="t('e.g. 1a2b3c4d5e')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label v-if="usesExternalDriver" class="block md:col-span-2">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Default tags') }}</span>
-                        <input v-model="settingsForm.mailchimp_tags" type="text" :placeholder="t('website_signup, ai_user')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.mailchimp_tags" type="text" :placeholder="t('website_signup, ai_user')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Comma-separated tags to apply to new subscribers.') }}</p>
                     </label>
                 </div>
             </section>
 
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                 <div class="space-y-4">
-                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                    <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Double opt-in') }}</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Require email confirmation before adding subscribers.') }}</p>
@@ -671,7 +768,7 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <div v-if="usesExternalDriver" class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                    <div v-if="usesExternalDriver" class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Mailchimp double opt-in') }}</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Send a confirmation email to new subscribers.') }}</p>
@@ -685,8 +782,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div v-if="activeTab === 'popup'" class="space-y-6 w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
-                <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+            <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
                     <div>
                         <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Enable newsletter popup') }}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Show a popup to encourage visitors to subscribe.') }}</p>
@@ -697,7 +794,7 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
-            <section v-if="settingsForm.newsletter_enable_popup" class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <section v-if="settingsForm.newsletter_enable_popup" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                 <div class="grid gap-6 md:grid-cols-2">
                     <div>
                         <AppSelect v-model="settingsForm.newsletter_popup_trigger" :options="popupTriggerOptions" :label="t('Trigger type')" />
@@ -705,37 +802,37 @@ onBeforeUnmount(() => {
 
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Trigger value') }}</span>
-                        <input v-model="settingsForm.newsletter_popup_trigger_value" type="text" :placeholder="t('e.g. 5')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.newsletter_popup_trigger_value" type="text" :placeholder="t('e.g. 5')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</span>
-                        <input v-model="settingsForm.newsletter_popup_title" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.newsletter_popup_title" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Success message') }}</span>
-                        <input v-model="settingsForm.newsletter_popup_success_message" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.newsletter_popup_success_message" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label class="block md:col-span-2">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</span>
-                        <textarea v-model="settingsForm.newsletter_popup_description" rows="3" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
+                        <textarea v-model="settingsForm.newsletter_popup_description" rows="3" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"></textarea>
                     </label>
 
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Input placeholder') }}</span>
-                        <input v-model="settingsForm.newsletter_popup_placeholder" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.newsletter_popup_placeholder" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Submit button text') }}</span>
-                        <input v-model="settingsForm.newsletter_popup_submit_text" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.newsletter_popup_submit_text" type="text" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <label class="block">
                         <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cookie duration (days)') }}</span>
-                        <input v-model="settingsForm.newsletter_popup_cookie_duration" type="number" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                        <input v-model="settingsForm.newsletter_popup_cookie_duration" type="number" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                     </label>
 
                     <div class="block">
@@ -744,9 +841,9 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
-            <section v-if="settingsForm.newsletter_enable_popup" class="rounded-xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+            <section v-if="settingsForm.newsletter_enable_popup" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                 <div class="space-y-4">
-                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                    <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Show on mobile devices') }}</p>
                         </div>
@@ -755,7 +852,7 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
+                    <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800">
                         <div>
                             <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Hide for logged-in users') }}</p>
                         </div>
@@ -774,7 +871,7 @@ onBeforeUnmount(() => {
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ modalTitle }}</h3>
                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Prepare the subject, audience, and message body before sending.') }}</p>
                     </div>
-                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-white" @click="closeCampaignModal">
+                    <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-surface-800 dark:hover:text-white" @click="closeCampaignModal">
                         <i class="ti ti-x text-lg"></i>
                     </button>
                 </div>
@@ -783,7 +880,7 @@ onBeforeUnmount(() => {
                     <div class="grid gap-6 md:grid-cols-2">
                         <label class="block md:col-span-2">
                             <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Subject') }}</span>
-                            <input v-model="campaignForm.subject" type="text" :placeholder="t('Weekly AI Updates')" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" required>
+                            <input v-model="campaignForm.subject" type="text" :placeholder="t('Weekly AI Updates')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white" required>
                         </label>
 
                         <div>
@@ -803,10 +900,10 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div class="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-surface-700">
-                        <button type="button" class="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-200 dark:hover:bg-surface-800" @click="closeCampaignModal">
+                        <button type="button" class="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-200 dark:hover:bg-surface-800" @click="closeCampaignModal">
                             {{ t('Cancel') }}
                         </button>
-                        <button type="submit" :disabled="campaignForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60">
+                        <button type="submit" :disabled="campaignForm.processing" class="btn-primary rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60">
                             {{ editingCampaignId ? t('Update Campaign') : t('Save Draft') }}
                         </button>
                     </div>
@@ -824,6 +921,18 @@ onBeforeUnmount(() => {
             variant="primary"
             @cancel="sendTargetId = null"
             @confirm="confirmSendCampaign"
+        />
+
+        <ActionConfirmModal
+            :open="testTargetId !== null"
+            :title="t('Send test campaign?')"
+            :message="t('A test email will be sent to the administrator email address to verify the layout.')"
+            :confirm-label="t('Send Test')"
+            :processing-label="t('Sending...')"
+            :processing="testCampaignForm.processing"
+            variant="primary"
+            @cancel="testTargetId = null"
+            @confirm="confirmTestCampaign"
         />
 
         <ActionConfirmModal

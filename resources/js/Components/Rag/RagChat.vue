@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted, computed, watch } from 'vue'
-import { marked } from 'marked'
 import RagSourceChips from '@/Components/Rag/RagSourceChips.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 import { sanitizeErrorMessage } from '@/Composables/useErrorSanitizer'
+import { renderMarkdown } from '@/Composables/useMarkdown'
 
 interface Source { doc: string; chunk?: number; score?: number; snippet?: string; start?: number; doc_label?: string }
 interface Message {
@@ -210,10 +210,6 @@ function retryLastMessage() {
         messages.value = messages.value.filter(m => m.id !== lastUserMsg.id)
         sendMessage()
     }
-}
-
-function renderMarkdown(content: string): string {
-    return marked.parse(content || '') as string
 }
 
 function copyToClipboard(text: string, id: string) {

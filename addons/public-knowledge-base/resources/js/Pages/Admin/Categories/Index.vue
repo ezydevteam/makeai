@@ -192,7 +192,7 @@ const remove = () => {
 <template>
     <Head :title="t('AI Knowledge Base Categories')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-8">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Knowledge Base Categories') }}</h1>

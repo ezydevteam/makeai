@@ -9,7 +9,7 @@ use Addons\AiVoiceover\Http\Controllers\User\StudioController;
 use Illuminate\Support\Facades\Route;
 
 // User routes
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', \Addons\AiVoiceover\Http\Middleware\VoiceoverAccess::class])
     ->prefix('voiceover-studio')
     ->name('addon.vo.user.')
     ->group(function () {

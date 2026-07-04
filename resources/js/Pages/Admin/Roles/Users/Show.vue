@@ -6,15 +6,18 @@ import AppSelect from '@/Components/AppSelect.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { useDateFormat } from '@/Composables/useDateFormat';
 import { useTranslate } from '@/Composables/useTranslate';
+import { useAdminCan } from '@/Composables/useAdminCan';
 
 defineOptions({ layout: AdminLayout });
 const { formatDateTime } = useDateFormat();
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 const { t } = useTranslate();
+const { canAny } = useAdminCan();
 
 const props = defineProps<{
     user: any,
     plans: Array<{ id: number, name: string }>,
+    countries: Array<{ value: string, label: string }>,
     usageHistory: Array<{
         id: number
         tool_slug: string | null
@@ -34,6 +37,8 @@ const form = useForm({
     credits: props.user.credits,
     plan_id: props.user.plan_id ?? '',
     is_active: props.user.is_active,
+    country: props.user.country ?? '',
+    profession: props.user.profession ?? '',
     password: '',
     password_confirmation: '',
 });
@@ -53,6 +58,39 @@ const showPassword = ref(false);
 const showPasswordConfirmation = ref(false);
 const notificationModalOpen = ref(false);
 const deleteModalOpen = ref(false);
+const isDeleting = ref(false);
+
+const deleteUser = () => {
+    router.delete(route('admin.users.delete', props.user.ulid), {
+        onBefore: () => {
+            isDeleting.value = true;
+        },
+        onFinish: () => {
+            isDeleting.value = false;
+            deleteModalOpen.value = false;
+        },
+    });
+};
+
+const isTogglingStatus = ref(false);
+const statusModalOpen = ref(false);
+
+const toggleUserStatus = () => {
+    router.post(route('admin.users.toggle-status', props.user.ulid), {}, {
+        onBefore: () => {
+            isTogglingStatus.value = true;
+        },
+        onFinish: () => {
+            isTogglingStatus.value = false;
+            statusModalOpen.value = false;
+            form.is_active = props.user.is_active;
+        },
+    });
+};
+
+const handleStatusToggle = () => {
+    statusModalOpen.value = true;
+};
 
 const planOptions = computed(() => [
     { value: '', label: t('No Plan') },
@@ -118,7 +156,7 @@ const disableTwoFactor = () => {
 
 <template>
     <Head :title="`${user.name} - ${t('User Details')}`" />
-    <div class="mx-auto w-full sm:max-w-5xl px-6 py-6">
+    <div class="mx-auto w-full sm:max-w-5xl px-6">
         <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">{{ t('Edit User') }}: {{ user.name }}</h1>
@@ -127,7 +165,7 @@ const disableTwoFactor = () => {
 
             <Link
                 :href="route('admin.users.index')"
-                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
                 <i class="ti ti-arrow-left text-base"></i>
                 {{ t('Back') }}
@@ -137,46 +175,53 @@ const disableTwoFactor = () => {
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Left: Profile Info -->
             <div class="lg:col-span-2 space-y-6">
-                <form @submit.prevent="submit" class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                        <h3 class="font-bold text-gray-900">{{ t('Account Details') }}</h3>
+                <form @submit.prevent="submit" class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden dark:bg-surface-900 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-surface-800/50">
+                        <h3 class="font-bold text-gray-900 dark:text-white">{{ t('Account Details') }}</h3>
                     </div>
                     <div class="p-6 space-y-6">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('Full Name') }}</label>
-                                <input v-model="form.name" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" required />
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('Full Name') }}</label>
+                                <input v-model="form.name" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:border-gray-700 dark:text-white" required />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('Email Address') }}</label>
-                                <input v-model="form.email" type="email" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" required />
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('Email Address') }}</label>
+                                <input v-model="form.email" type="email" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:border-gray-700 dark:text-white" required />
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('Credits Balance') }}</label>
-                                <input v-model="form.credits" type="number" step="0.01" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" required />
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('Credits Balance') }}</label>
+                                <input v-model="form.credits" type="number" step="0.01" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:border-gray-700 dark:text-white" required />
                             </div>
                             <div>
                                 <AppSelect v-model="form.plan_id" :options="planOptions" :label="t('Active Plan')" :placeholder="t('No Plan (Free)')" live-search />
                             </div>
+                            <div>
+                                <AppSelect v-model="form.country" :options="countries" :label="t('Country')" :placeholder="t('Select Country')" live-search />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('Profession') }}</label>
+                                <input v-model="form.profession" type="text" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:border-gray-700 dark:text-white" :placeholder="t('e.g. Developer, Designer')" />
+                            </div>
                         </div>
 
-                        <div class="pt-4 border-t border-gray-100">
-                            <h4 class="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider">{{ t('Change Password') }}</h4>
+                        <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <h4 class="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">{{ t('Change Password') }}</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('New Password') }}</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('New Password') }}</label>
                                     <div class="relative">
-                                        <input v-model="form.password" :type="showPassword ? 'text' : 'password'" :placeholder="t('Leave blank to keep current')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" />
-                                        <button type="button" class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600" :aria-label="showPassword ? t('Hide password') : t('Show password')" @click="showPassword = !showPassword">
+                                        <input v-model="form.password" :type="showPassword ? 'text' : 'password'" :placeholder="t('Leave blank to keep current')" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:border-gray-700 dark:text-white" />
+                                        <button type="button" class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" :aria-label="showPassword ? t('Hide password') : t('Show password')" @click="showPassword = !showPassword">
                                             <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
                                         </button>
                                     </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">{{ t('Confirm New Password') }}</label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('Confirm New Password') }}</label>
                                     <div class="relative">
-                                        <input v-model="form.password_confirmation" :type="showPasswordConfirmation ? 'text' : 'password'" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" />
-                                        <button type="button" class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600" :aria-label="showPasswordConfirmation ? t('Hide password confirmation') : t('Show password confirmation')" @click="showPasswordConfirmation = !showPasswordConfirmation">
+                                        <input v-model="form.password_confirmation" :type="showPasswordConfirmation ? 'text' : 'password'" class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:border-gray-700 dark:text-white" />
+                                        <button type="button" class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" :aria-label="showPasswordConfirmation ? t('Hide password confirmation') : t('Show password confirmation')" @click="showPasswordConfirmation = !showPasswordConfirmation">
                                             <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
                                         </button>
                                     </div>
@@ -184,16 +229,11 @@ const disableTwoFactor = () => {
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-3 pt-4">
-                            <button type="button" @click="form.is_active = !form.is_active" :class="form.is_active ? 'bg-success-500' : 'bg-gray-300'" class="relative w-12 h-6 rounded-full transition-colors">
-                                <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-sm" :class="form.is_active ? 'translate-x-6' : 'translate-x-0'"></span>
-                            </button>
-                            <span class="text-sm font-medium text-gray-700">{{ form.is_active ? t('User account is active') : t('User account is disabled') }}</span>
-                        </div>
+
                     </div>
-                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
-                        <Link :href="route('admin.users.index')" class="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">{{ t('Cancel') }}</Link>
-                        <button type="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
+                    <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 dark:bg-surface-800/40 dark:border-gray-800">
+                        <Link :href="route('admin.users.index')" class="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">{{ t('Cancel') }}</Link>
+                        <button v-if="canAny(['users.edit', 'users.manage'])" type="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
                             {{ form.processing ? t('Saving...') : t('Update User') }}
                         </button>
                     </div>
@@ -202,32 +242,41 @@ const disableTwoFactor = () => {
 
             <!-- Right: Activity & Sidebar -->
             <div class="space-y-6">
-                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-                    <h3 class="font-bold text-gray-900 mb-4">Quick Actions</h3>
+                <div v-if="canAny(['users.edit', 'users.delete', 'users.impersonate', 'users.manage'])" class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 dark:bg-surface-900 dark:border-gray-800">
+                    <h3 class="font-bold text-gray-900 dark:text-white mb-4">{{ t('Quick Actions') }}</h3>
                     <div class="space-y-3">
-                        <form :action="route('admin.users.impersonate', user.ulid)" method="POST" target="_blank">
+                        <form v-if="canAny(['users.impersonate', 'users.manage'])" :action="route('admin.users.impersonate', user.ulid)" method="POST" target="_blank">
                             <input type="hidden" name="_token" :value="csrfToken" />
-                            <button type="submit" class="w-full flex items-center justify-center gap-2 py-3 bg-accent-600 text-white font-bold text-sm rounded-xl hover:bg-accent-500 transition-colors shadow-lg shadow-accent-500/20">
+                            <button type="submit" class="w-full flex items-center justify-center gap-2 py-3 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl font-bold text-sm hover:bg-primary-100 dark:bg-primary-950/20 dark:border-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/30 transition-colors">
                                 <i class="ti ti-login-2 text-base"></i>
                                 {{ $t('Login as User') }}
                             </button>
                         </form>
-                        <button type="button" @click="notificationModalOpen = true" class="w-full py-3 bg-gray-50 border border-gray-200 text-gray-700 font-bold text-sm rounded-xl hover:bg-gray-100 transition-colors">
+                        <button v-if="canAny(['users.edit', 'users.manage'])" type="button" @click="notificationModalOpen = true" class="w-full py-3 bg-purple-50 border border-purple-200 text-purple-600 font-bold text-sm rounded-xl hover:bg-purple-100 dark:bg-purple-950/20 dark:border-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors">
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i class="ti ti-bell text-base"></i>
                                 {{ $t('Send Notification') }}
                             </span>
                         </button>
-                        <button class="w-full py-3 bg-gray-50 border border-gray-200 text-gray-700 font-bold text-sm rounded-xl hover:bg-gray-100 transition-colors">
+                        <button
+                            v-if="canAny(['users.edit', 'users.manage'])"
+                            type="button"
+                            :disabled="isTogglingStatus"
+                            @click="handleStatusToggle"
+                            :class="user.is_active
+                                ? 'w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50'
+                                : 'w-full py-3 bg-green-50 border border-green-200 text-green-700 font-bold text-sm rounded-xl hover:bg-green-100 dark:bg-green-950/20 dark:border-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30 transition-colors disabled:opacity-50'"
+                        >
                             <span class="inline-flex items-center justify-center gap-2">
-                                <i class="ti ti-mail text-base"></i>
-                                {{ $t('Send Reset Email') }}
+                                <i :class="user.is_active ? 'ti ti-user-off text-base' : 'ti ti-user-check text-base'"></i>
+                                {{ isTogglingStatus ? $t('Processing...') : (user.is_active ? $t('Deactivate Account') : $t('Activate Account')) }}
                             </span>
                         </button>
                         <button
+                            v-if="canAny(['users.delete', 'users.manage'])"
                             type="button"
                             @click="deleteModalOpen = true"
-                            class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors"
+                            class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
                         >
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i class="ti ti-trash text-base"></i>
@@ -235,11 +284,11 @@ const disableTwoFactor = () => {
                             </span>
                         </button>
                         <button
-                            v-if="user.two_factor_enabled"
+                            v-if="user.two_factor_enabled && canAny(['users.edit', 'users.manage'])"
                             type="button"
                             :disabled="twoFactorForm.processing"
                             @click="disableTwoFactor"
-                            class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 transition-colors disabled:opacity-50"
+                            class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors disabled:opacity-50"
                         >
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i class="ti ti-shield-x text-base"></i>
@@ -248,17 +297,17 @@ const disableTwoFactor = () => {
                         </button>
                     </div>
                 </div>
-                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-                        <h3 class="font-bold text-gray-900">{{ t('Recent Logins') }}</h3>
+                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden dark:bg-surface-900 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-surface-800/50">
+                        <h3 class="font-bold text-gray-900 dark:text-white">{{ t('Recent Logins') }}</h3>
                     </div>
-                    <div class="divide-y divide-gray-100">
+                    <div class="divide-y divide-gray-100 dark:divide-gray-800">
                         <div v-for="log in user.login_history" :key="log.id" class="px-6 py-4">
-                            <p class="text-sm font-medium text-gray-900">{{ log.ip }}</p>
-                            <p class="text-[10px] text-gray-500 truncate mb-1">{{ log.user_agent }}</p>
-                            <p class="text-[10px] text-gray-400">{{ formatDateTime(log.created_at) }}</p>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ log.ip }}</p>
+                            <p class="text-[10px] text-gray-500 truncate mb-1 dark:text-gray-400">{{ log.user_agent }}</p>
+                            <p class="text-[10px] text-gray-400 dark:text-gray-500">{{ formatDateTime(log.created_at) }}</p>
                         </div>
-                        <div v-if="!user.login_history?.length" class="px-6 py-6 text-center text-xs text-gray-500 italic">
+                        <div v-if="!user.login_history?.length" class="px-6 py-6 text-center text-xs text-gray-500 italic dark:text-gray-400">
                             No login history available.
                         </div>
                     </div>
@@ -267,73 +316,73 @@ const disableTwoFactor = () => {
         </div>
 
         <!-- Usage Stats -->
-        <div class="mt-8 bg-white border border-gray-200 rounded-2xl shadow-sm p-6 grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div class="mt-8 bg-white border border-gray-200 rounded-2xl shadow-sm p-6 grid grid-cols-2 md:grid-cols-4 gap-6 dark:bg-surface-900 dark:border-gray-800">
             <div>
-                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Today Usage</p>
-                <p class="text-xl font-bold text-gray-900">{{ parseFloat(user.credits_used_today).toFixed(2) }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 dark:text-gray-500">Today Usage</p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ parseFloat(user.credits_used_today).toFixed(2) }}</p>
             </div>
             <div>
-                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Month Usage</p>
-                <p class="text-xl font-bold text-gray-900">{{ parseFloat(user.credits_used_month).toFixed(2) }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 dark:text-gray-500">Month Usage</p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ parseFloat(user.credits_used_month).toFixed(2) }}</p>
             </div>
             <div>
-                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Total Referrals</p>
-                <p class="text-xl font-bold text-gray-900">{{ user.referral_count }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 dark:text-gray-500">Total Referrals</p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ user.referral_count }}</p>
             </div>
             <div>
-                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Referral Earned</p>
-                <p class="text-xl font-bold text-gray-900">${{ parseFloat(user.referral_earnings).toFixed(2) }}</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 dark:text-gray-500">Referral Earned</p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">${{ parseFloat(user.referral_earnings).toFixed(2) }}</p>
             </div>
         </div>
 
-        <div class="mt-8 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-            <div class="border-b border-gray-100 bg-gray-50/80 px-6 py-3">
-                <h3 class="text-lg font-semibold text-gray-900">{{ t('Usage History') }}</h3>
-                <p class="text-sm text-gray-500">{{ t('Recent AI usage activity for this user.') }}</p>
+        <div class="mt-8 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:bg-surface-900 dark:border-gray-800">
+            <div class="border-b border-gray-100 bg-gray-50/80 px-6 py-3 dark:border-gray-800 dark:bg-surface-800/80">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Usage History') }}</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Recent AI usage activity for this user.') }}</p>
             </div>
 
-            <div v-if="usageHistory.length === 0" class="px-6 py-12 text-center text-sm text-gray-500">
+            <div v-if="usageHistory.length === 0" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                 {{ t('No usage history found.') }}
             </div>
 
             <div v-else>
                 <div class="hidden lg:block overflow-x-auto">
                     <table class="w-full text-left text-sm">
-                        <thead class="bg-gray-50 border-b border-gray-100">
+                        <thead class="bg-gray-50 border-b border-gray-100 dark:bg-surface-850 dark:border-gray-800">
                             <tr>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Tool') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Model') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Provider') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Tokens') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Credits') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Status') }}</th>
-                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{{ t('Date') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Model') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Provider') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Tokens') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Credits') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Date') }}</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <tr v-for="item in usageHistory" :key="item.id" class="hover:bg-gray-50/60 transition-colors">
-                                <td class="px-6 py-4 font-medium text-gray-900">{{ item.tool_slug || t('Direct') }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ item.model || '—' }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ item.provider }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ totalTokens(item).toLocaleString() }}</td>
-                                <td class="px-6 py-4 text-gray-600">{{ formatCredits(item.credits_used) }}</td>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tr v-for="item in usageHistory" :key="item.id" class="hover:bg-gray-50/60 dark:hover:bg-gray-800/40 transition-colors">
+                                <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ item.tool_slug || t('Direct') }}</td>
+                                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ item.model || '—' }}</td>
+                                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ item.provider }}</td>
+                                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ totalTokens(item).toLocaleString() }}</td>
+                                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ formatCredits(item.credits_used) }}</td>
                                 <td class="px-6 py-4">
                                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize" :class="statusBadgeClass(item.status)">
                                         {{ item.status }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-gray-500">{{ formatDateTime(item.created_at) }}</td>
+                                <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ formatDateTime(item.created_at) }}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="space-y-3 p-4 lg:hidden">
-                    <div v-for="item in usageHistory" :key="item.id" class="rounded-xl border border-gray-200 p-4">
+                    <div v-for="item in usageHistory" :key="item.id" class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                                <p class="text-sm font-semibold text-gray-900">{{ item.tool_slug || t('Direct') }}</p>
-                                <p class="mt-1 text-xs text-gray-500">{{ item.model || '—' }} · {{ item.provider }}</p>
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.tool_slug || t('Direct') }}</p>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ item.model || '—' }} · {{ item.provider }}</p>
                             </div>
                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize" :class="statusBadgeClass(item.status)">
                                 {{ item.status }}
@@ -341,16 +390,16 @@ const disableTwoFactor = () => {
                         </div>
                         <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
                             <div>
-                                <p class="text-gray-400">{{ t('Tokens') }}</p>
-                                <p class="mt-1 font-medium text-gray-700">{{ totalTokens(item).toLocaleString() }}</p>
+                                <p class="text-gray-400 dark:text-gray-500">{{ t('Tokens') }}</p>
+                                <p class="mt-1 font-medium text-gray-700 dark:text-gray-200">{{ totalTokens(item).toLocaleString() }}</p>
                             </div>
                             <div>
-                                <p class="text-gray-400">{{ t('Credits') }}</p>
-                                <p class="mt-1 font-medium text-gray-700">{{ formatCredits(item.credits_used) }}</p>
+                                <p class="text-gray-400 dark:text-gray-500">{{ t('Credits') }}</p>
+                                <p class="mt-1 font-medium text-gray-700 dark:text-gray-200">{{ formatCredits(item.credits_used) }}</p>
                             </div>
                             <div class="col-span-2">
-                                <p class="text-gray-400">{{ t('Date') }}</p>
-                                <p class="mt-1 font-medium text-gray-700">{{ formatDateTime(item.created_at) }}</p>
+                                <p class="text-gray-400 dark:text-gray-500">{{ t('Date') }}</p>
+                                <p class="mt-1 font-medium text-gray-700 dark:text-gray-200">{{ formatDateTime(item.created_at) }}</p>
                             </div>
                         </div>
                     </div>
@@ -364,9 +413,24 @@ const disableTwoFactor = () => {
             :message="t('This will soft delete :name and remove access until restored from the database.', { name: user.name })"
             :confirm-label="t('Delete User')"
             :processing-label="t('Deleting...')"
+            :processing="isDeleting"
             variant="danger"
             @cancel="deleteModalOpen = false"
-            @confirm="router.delete(route('admin.users.delete', user.ulid))"
+            @confirm="deleteUser"
+        />
+
+        <ActionConfirmModal
+            :open="statusModalOpen"
+            :title="user.is_active ? t('Deactivate Account?') : t('Activate Account?')"
+            :message="user.is_active
+                ? t('Are you sure you want to deactivate the account of :name? This will suspend their access to the application immediately.', { name: user.name })
+                : t('Are you sure you want to activate the account of :name? This will restore their access to the application immediately.', { name: user.name })"
+            :confirm-label="user.is_active ? t('Deactivate') : t('Activate')"
+            :processing-label="user.is_active ? t('Deactivating...') : t('Activating...')"
+            :processing="isTogglingStatus"
+            :variant="user.is_active ? 'danger' : 'primary'"
+            @cancel="statusModalOpen = false"
+            @confirm="toggleUserStatus"
         />
 
         <Teleport to="body">
@@ -383,21 +447,29 @@ const disableTwoFactor = () => {
                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
                     @click.self="notificationModalOpen = false"
                 >
-                    <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
-                        <div class="border-b border-gray-100 px-6 py-4">
-                            <h3 class="text-lg font-bold text-gray-900">{{ t('Send Notification') }}</h3>
+                    <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-surface-900">
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Send Notification') }}</h3>
+                            <button
+                                type="button"
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
+                                :aria-label="t('Close')"
+                                @click="notificationModalOpen = false"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
                         </div>
 
                         <div class="max-h-[70vh] overflow-y-auto p-6">
                             <div class="space-y-4 text-left">
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('Title') }}</span>
-                                    <input v-model="notificationForm.title" type="text" maxlength="120" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</span>
+                                    <input v-model="notificationForm.title" type="text" maxlength="120" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('e.g. System maintenance update')">
                                     <p v-if="notificationForm.errors.title" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.title }}</p>
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('Message') }}</span>
-                                    <textarea v-model="notificationForm.message" rows="4" maxlength="1000" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none"></textarea>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Message') }}</span>
+                                    <textarea v-model="notificationForm.message" rows="4" maxlength="1000" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('Enter the details of the notification here...')"></textarea>
                                     <p v-if="notificationForm.errors.message" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.message }}</p>
                                 </label>
                                 <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -414,19 +486,19 @@ const disableTwoFactor = () => {
                                     ]" />
                                 </div>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('Schedule') }}</span>
-                                    <input v-model="notificationForm.scheduled_at" type="datetime-local" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none">
-                                    <p class="mt-1 text-xs text-gray-400">{{ t('Leave blank to send now.') }}</p>
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Schedule') }}</span>
+                                    <input v-model="notificationForm.scheduled_at" type="datetime-local" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ t('Leave blank to send now.') }}</p>
                                 </label>
                                 <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700">{{ t('Action URL') }}</span>
-                                    <input v-model="notificationForm.action_url" type="text" maxlength="500" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none" :placeholder="t('Optional')">
+                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Action URL') }}</span>
+                                    <input v-model="notificationForm.action_url" type="text" maxlength="500" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('e.g. https://example.com/billing (Optional)')">
                                 </label>
                             </div>
                         </div>
 
-                        <div class="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
-                            <button type="button" class="px-4 py-2 text-sm font-semibold text-gray-600 transition hover:text-gray-900" :disabled="notificationForm.processing" @click="notificationModalOpen = false">
+                        <div class="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-surface-800/40">
+                            <button type="button" class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors" :disabled="notificationForm.processing" @click="notificationModalOpen = false">
                                 {{ t('Cancel') }}
                             </button>
                             <button type="button" class="btn-primary rounded-xl px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="notificationForm.processing" @click="sendNotification">

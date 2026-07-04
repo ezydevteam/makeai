@@ -106,12 +106,31 @@ class EmbedController extends Controller
         }
 
         $validated = $request->validate([
-            'fields' => 'required|array',
+            'fields' => 'required|array|max:50',
         ]);
+
+        $fields = $validated['fields'];
+
+        // Visitors may only pick models the admin has activated — anything
+        // else would be billed to the embed owner at an unknown rate.
+        if (isset($fields['model'])) {
+            $modelValid = is_string($fields['model'])
+                && AiModel::where('slug', $fields['model'])->active()->exists();
+
+            if (! $modelValid) {
+                unset($fields['model']);
+            }
+        }
+
+        // Cap total input size before it inflates token costs
+        $maxChars = max(1000, (int) settings('ai_max_input_chars', 30000));
+        if (strlen((string) json_encode($fields)) > $maxChars) {
+            abort(422, translate('Your input is too long. Please shorten it and try again.'));
+        }
 
         $owner = $embed->user;
         $promptBuilder = app(PromptBuilder::class);
-        $completion = $promptBuilder->build($tool, $validated['fields'], $owner);
+        $completion = $promptBuilder->build($tool, $fields, $owner);
 
         $provider = ProviderRegistry::resolve($completion->provider ?? 'openai');
         TokenGuard::before($owner, $tool, $completion->model);

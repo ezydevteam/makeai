@@ -29,13 +29,22 @@ class AdminController extends Controller
             $query->where('role_id', $request->role);
         }
 
+        // Search Filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
         $admins = $query->paginate(20)->withQueryString();
         $roles = AdminRole::all();
 
         return Inertia::render('Admin/Roles/Admins/Index', [
             'admins' => $admins,
             'roles' => $roles,
-            'filters' => $request->only(['status', 'role']),
+            'filters' => $request->only(['status', 'role', 'search']),
             'hasTrashedAdmins' => Admin::onlyTrashed()->exists(),
         ]);
     }
@@ -57,12 +66,21 @@ class AdminController extends Controller
             $query->where('role_id', $request->role);
         }
 
+        // Search Filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
         $admins = $query->latest('deleted_at')->paginate(20)->withQueryString();
 
         return Inertia::render('Admin/Roles/Admins/Trash', [
             'admins' => $admins,
             'roles' => AdminRole::all(),
-            'filters' => $request->only(['status', 'role']),
+            'filters' => $request->only(['status', 'role', 'search']),
         ]);
     }
 
@@ -231,6 +249,11 @@ class AdminController extends Controller
             'ids' => 'required|array',
             'action' => 'required|string|in:restore,force_delete',
         ]);
+
+        // Permanent deletion is irreversible — Super Admins only.
+        if ($validated['action'] === 'force_delete' && ! auth('admin')->user()->isSuperAdmin()) {
+            abort(403, translate('This action is restricted to Super Admins.'));
+        }
 
         $query = Admin::onlyTrashed()
             ->whereIn('id', $validated['ids'])

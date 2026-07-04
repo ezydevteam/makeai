@@ -6,6 +6,7 @@ import AppSelect from '@/Components/AppSelect.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import Pagination from '@/Components/Pagination.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -236,6 +237,7 @@ const formatDate = (dateStr: string) => {
 
 const handleKeydown = (event: KeyboardEvent) => {
     if (replyModalOpen.value || deleteModalOpen.value) return
+
     if (event.key === '/') {
         if (event.metaKey || event.ctrlKey || event.altKey || ['input', 'textarea'].includes((event.target as HTMLElement).tagName.toLowerCase())) {
             return
@@ -243,6 +245,20 @@ const handleKeydown = (event: KeyboardEvent) => {
         event.preventDefault()
         searchInput.value?.focus()
         searchInput.value?.select()
+        return
+    }
+
+    if (event.key === 'Escape' && document.activeElement === searchInput.value) {
+        event.preventDefault()
+        search.value = ''
+        applyFilters()
+        searchInput.value?.blur()
+        return
+    }
+
+    if (event.key === 'Escape' && hasActiveFilters.value) {
+        event.preventDefault()
+        resetFilters()
     }
 }
 
@@ -259,7 +275,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Tool Reviews — Admin')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-8 xl:px-10">
         <!-- Title section -->
         <div class="flex items-center justify-between">
             <div>
@@ -269,191 +285,210 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Main section -->
-        <section class="rounded-xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
+        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
             <!-- Filter Bar -->
-            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                <div class="relative min-w-[240px] flex-1">
-                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
-                    <input
-                        ref="searchInput"
-                        v-model="search"
-                        type="text"
-                        :placeholder="t('Search comments, users or tools...')"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        @input="handleSearchInput"
-                        @focus="searchFocused = true"
-                        @blur="searchFocused = false"
-                    />
-                    <span
-                        v-if="!search && !searchFocused"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >
-                        /
-                    </span>
-                    <button
-                        v-if="search"
-                        type="button"
-                        class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
-                        @click="clearSearch"
-                    >
-                        <i class="ti ti-x text-sm"></i>
-                    </button>
+            <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div class="flex-1 min-w-[240px]">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInput"
+                                v-model="search"
+                                type="text"
+                                :placeholder="t('Search comments, users or tools...')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                @input="handleSearchInput"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
+                            />
+                            <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                                <span v-if="!search && !searchFocused" class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500">/</span>
+                            </div>
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="clearSearch"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="selectedStatus"
+                                :options="statusOptions"
+                                :placeholder="t('All Status')"
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="selectedRating"
+                                :options="ratingOptions"
+                                :placeholder="t('All Ratings')"
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                            @click="resetFilters"
+                        >
+                            <i class="ti ti-rotate-clockwise text-base"></i>
+                            {{ t('Reset') }}
+                        </button>
+                    </div>
                 </div>
-                <AppSelect
-                    v-model="selectedStatus"
-                    :options="statusOptions"
-                    :placeholder="t('All Status')"
-                    class="w-full sm:w-44"
-                    @update:model-value="applyFilters"
-                />
-                <AppSelect
-                    v-model="selectedRating"
-                    :options="ratingOptions"
-                    :placeholder="t('All Ratings')"
-                    class="w-full sm:w-44"
-                    @update:model-value="applyFilters"
-                />
-                <button
-                    v-if="hasActiveFilters"
-                    type="button"
-                    class="rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                    @click="resetFilters"
-                >
-                    {{ t('Reset') }}
-                </button>
             </div>
 
             <!-- Table or Empty state -->
-            <div class="overflow-x-auto">
-                <table v-if="reviews.data.length" class="min-w-[950px] w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('User') }}</th>
-                            <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
-                            <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Rating') }}</th>
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Comment & Reply') }}</th>
-                            <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
-                        <tr v-for="review in reviews.data" :key="review.id" class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30">
-                            <!-- User column -->
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-100 font-bold text-gray-600 dark:bg-surface-800 dark:text-gray-300">
-                                        <img v-if="review.user?.avatar" :src="'/storage/' + review.user.avatar" class="h-full w-full object-cover" />
-                                        <span v-else>{{ review.user?.name?.charAt(0) || 'U' }}</span>
-                                    </div>
-                                    <div>
-                                        <p class="font-semibold text-gray-900 dark:text-white">{{ review.user?.name || t('Anonymous') }}</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ review.user?.email || '—' }}</p>
-                                    </div>
-                                </div>
-                            </td>
+            <div v-if="reviews.data.length === 0" class="px-6 py-16 text-center">
+                <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl dark:bg-emerald-900/20">
+                    <i class="ti ti-star text-2xl text-emerald-600 dark:text-emerald-300"></i>
+                </div>
+                <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">
+                    {{ hasActiveFilters ? t('No reviews match these filters') : t('No reviews yet') }}
+                </h3>
+                <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+                    {{ hasActiveFilters
+                        ? t('Try clearing the current search or filters to see more reviews.')
+                        : t('Users have not left any reviews for the AI tools yet.') }}
+                </p>
+                <button
+                    v-if="hasActiveFilters"
+                    type="button"
+                    class="btn-primary mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                    @click="resetFilters"
+                >
+                    {{ t('Clear Filters') }}
+                </button>
+            </div>
 
-                            <!-- Tool column -->
-                            <td class="px-4 py-4">
-                                <div v-if="review.tool" class="flex items-center gap-2">
-                                    <div :style="{ background: review.tool.color || '#6366f1' }" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] text-white">
-                                        <i v-if="review.tool.icon" :class="review.tool.icon"></i>
-                                        <span v-else>{{ review.tool.name.charAt(0) }}</span>
+            <div v-else class="overflow-hidden rounded-b-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('User') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Rating') }}</th>
+                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Comment & Reply') }}</th>
+                                <th class="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr v-for="review in reviews.data" :key="review.id" class="transition hover:bg-primary-50/60 dark:hover:bg-primary-900/10">
+                                <!-- User column -->
+                                <td class="px-6 py-5 align-top">
+                                    <div class="flex items-start gap-3">
+                                        <div v-if="review.user?.avatar" class="h-11 w-11 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-800">
+                                            <img :src="review.user.avatar.startsWith('http') ? review.user.avatar : '/storage/' + review.user.avatar" class="h-full w-full object-cover" />
+                                        </div>
+                                        <div
+                                            v-else
+                                            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                        >
+                                            <span>{{ review.user?.name?.charAt(0) || 'U' }}</span>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="font-medium text-gray-900 dark:text-white">{{ review.user?.name || t('Anonymous') }}</div>
+                                            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ review.user?.email || '—' }}</div>
+                                        </div>
                                     </div>
-                                    <span class="font-medium text-gray-700 dark:text-gray-300">{{ review.tool.name }}</span>
-                                </div>
-                                <span v-else class="text-xs text-gray-400 italic">{{ review.tool_slug }}</span>
-                            </td>
+                                </td>
 
-                            <!-- Rating column -->
-                            <td class="px-4 py-4 whitespace-nowrap">
-                                <div class="flex items-center gap-0.5 text-warning-400">
-                                    <i v-for="star in 5" :key="star" class="ti text-sm" :class="star <= review.rating ? 'ti-star-filled' : 'ti-star text-gray-200 dark:text-surface-700'"></i>
-                                </div>
-                                <p class="text-[10px] text-gray-400 mt-0.5">{{ formatDate(review.created_at) }}</p>
-                            </td>
+                                <!-- Tool column -->
+                                <td class="px-6 py-5 align-top">
+                                    <div v-if="review.tool" class="flex items-center gap-2">
+                                        <div :style="{ background: review.tool.color || '#6366f1' }" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] text-white">
+                                            <i v-if="review.tool.icon" :class="review.tool.icon"></i>
+                                            <span v-else>{{ review.tool.name.charAt(0) }}</span>
+                                        </div>
+                                        <span class="font-medium text-gray-700 dark:text-gray-300">{{ review.tool.name }}</span>
+                                    </div>
+                                    <span v-else class="text-xs text-gray-400 italic">{{ review.tool_slug }}</span>
+                                </td>
 
-                            <!-- Comment & Reply column -->
-                            <td class="px-6 py-4 max-w-sm">
-                                <p class="text-gray-700 dark:text-gray-300 break-words leading-relaxed">
-                                    {{ review.comment || t('No comment left.') }}
-                                </p>
-                                <div v-if="review.admin_reply" class="mt-1">
-                                    <div class="flex items-center gap-1.5 text-[11px] font-bold text-primary-600 dark:text-primary-400">
-                                        {{ t('Replied:') }}
+                                <!-- Rating column -->
+                                <td class="px-6 py-5 align-top whitespace-nowrap">
+                                    <div class="flex items-center gap-0.5 text-warning-400">
+                                        <i v-for="star in 5" :key="star" class="ti text-sm" :class="star <= review.rating ? 'ti-star-filled' : 'ti-star text-gray-200 dark:text-surface-700'"></i>
+                                    </div>
+                                    <p class="text-[10px] text-gray-400 mt-1">{{ formatDate(review.created_at) }}</p>
+                                </td>
+
+                                <!-- Comment & Reply column -->
+                                <td class="px-6 py-5 align-top max-w-sm">
+                                    <p class="text-gray-600 dark:text-gray-300 break-words leading-relaxed text-sm">
+                                        {{ review.comment || t('No comment left.') }}
+                                    </p>
+                                    <div v-if="review.admin_reply" class="mt-2 rounded-lg bg-gray-50 p-2.5 dark:bg-surface-800">
+                                        <div class="text-[11px] font-bold text-primary-600 dark:text-primary-400 mb-0.5">
+                                            {{ t('Replied:') }}
+                                        </div>
                                         <p class="text-xs text-gray-600 dark:text-gray-400 break-words">{{ review.admin_reply }}</p>
                                     </div>
-                                </div>
-                            </td>
+                                </td>
 
-                            <!-- Status column -->
-                            <td class="px-4 py-4 text-center">
-                                <button
-                                    type="button"
-                                    class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition"
-                                    :class="review.is_approved
-                                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400'
-                                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400'"
-                                    @click="toggleApprove(review)"
-                                >
-                                    <span class="h-1.5 w-1.5 rounded-full" :class="review.is_approved ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-                                    {{ review.is_approved ? t('Approved') : t('Pending') }}
-                                </button>
-                            </td>
+                                <!-- Status column -->
+                                <td class="px-6 py-5 align-top text-center whitespace-nowrap">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold transition"
+                                        :class="review.is_approved
+                                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400'
+                                            : 'bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400'"
+                                        @click="toggleApprove(review)"
+                                    >
+                                        <span class="h-1.5 w-1.5 rounded-full" :class="review.is_approved ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                                        {{ review.is_approved ? t('Approved') : t('Pending') }}
+                                    </button>
+                                </td>
 
-                            <!-- Actions column -->
-                            <td class="px-6 py-4 text-right">
-                                <div class="flex items-center justify-end gap-1.5">
-                                    <Tooltip :content="review.is_approved ? t('Disapprove') : t('Approve')" placement="top">
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg transition"
-                                            :class="review.is_approved
-                                                ? 'text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/30'
-                                                : 'text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/30'"
-                                            @click="toggleApprove(review)"
-                                        >
-                                            <i :class="review.is_approved ? 'ti ti-circle-x text-base' : 'ti ti-circle-check text-base'"></i>
-                                        </button>
-                                    </Tooltip>
-                                    <Tooltip :content="t('Reply')" placement="top">
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-surface-800"
-                                            @click="openReplyModal(review)"
-                                        >
-                                            <i class="ti ti-arrow-back-up text-base"></i>
-                                        </button>
-                                    </Tooltip>
-                                    <Tooltip :content="t('Delete')" placement="top">
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-                                            @click="confirmDelete(review)"
-                                        >
-                                            <i class="ti ti-trash text-base"></i>
-                                        </button>
-                                    </Tooltip>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <!-- Empty State -->
-                <div v-else class="flex flex-col items-center justify-center py-12 px-4 text-center">
-                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-50 text-gray-400 dark:bg-surface-800 dark:text-surface-600 mb-3">
-                        <i class="ti ti-star text-2xl"></i>
-                    </div>
-                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('No reviews yet') }}</h3>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('No user reviews matching the selected filters were found.') }}</p>
-                    <button
-                        v-if="hasActiveFilters"
-                        type="button"
-                        class="btn-primary mt-4 px-4 py-2 text-xs rounded-lg"
-                        @click="resetFilters"
-                    >
-                        {{ t('Reset Filters') }}
-                    </button>
+                                <!-- Actions column -->
+                                <td class="overflow-visible px-6 py-5 align-top text-end">
+                                    <TableActionMenu>
+                                        <template #default="{ close }">
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="toggleApprove(review); close()"
+                                            >
+                                                <i class="ti text-base" :class="review.is_approved ? 'ti-circle-x' : 'ti-circle-check'"></i>
+                                                {{ review.is_approved ? t('Disapprove') : t('Approve') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="openReplyModal(review); close()"
+                                            >
+                                                <i class="ti ti-arrow-back-up text-base"></i>
+                                                {{ t('Reply') }}
+                                            </button>
+                                            <hr class="border-gray-100 dark:border-surface-700">
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                @click="confirmDelete(review); close()"
+                                            >
+                                                <i class="ti ti-trash text-base"></i>
+                                                {{ t('Delete') }}
+                                            </button>
+                                        </template>
+                                    </TableActionMenu>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -461,7 +496,7 @@ onBeforeUnmount(() => {
             <div v-if="reviews.data.length && reviews.total && reviews.total > reviews.data.length" class="border-t border-gray-100 p-4 dark:border-surface-800">
                 <Pagination :links="reviews.links" />
             </div>
-        </section>
+        </div>
     </div>
 
     <!-- Reply Modal -->

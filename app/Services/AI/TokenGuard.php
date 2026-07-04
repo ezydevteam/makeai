@@ -12,7 +12,6 @@ use App\Models\AiUsageLog;
 use App\Models\User;
 use App\Services\NotificationEventService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
@@ -49,8 +48,10 @@ class TokenGuard
         // 1. Estimate cost
         $estimatedCost = self::estimateCreditCost($template, $model);
 
-        // User-specific limits and balances
-        if ($user) {
+        // User-specific limits and balances. The internal "system" user (admin
+        // AI-assist) is not a paying account — it skips per-user credit/limit
+        // enforcement but still counts against the global budget checked below.
+        if ($user && ! $user->isInternalAi()) {
             // 2. Check user daily limit
             $dailyLimit = $user->daily_limit ?? (float) settings('user_daily_credit_limit', 0);
             if ($dailyLimit > 0 && ($user->credits_used_today + $estimatedCost) > $dailyLimit) {
@@ -78,8 +79,9 @@ class TokenGuard
             }
         }
 
-        // Soft warnings for user
-        if ($user) {
+        // Soft warnings for user (skipped for the internal system user, which has
+        // no per-user limits and whose $dailyLimit/$monthlyLimit are never set).
+        if ($user && ! $user->isInternalAi()) {
             // 6. Soft warning at 80% of daily limit
             if ($dailyLimit > 0 && ($user->credits_used_today / $dailyLimit) >= 0.8) {
                 request()?->attributes?->set('credit_warning', 'daily_80');
@@ -96,7 +98,9 @@ class TokenGuard
      * POST-COMPLETION — run AFTER receiving AI response.
      * Deducts credits, updates counters, logs usage.
      *
-     * @param  bool  $success  true = full credit deduction, false = partial tokens logged as 'cancelled', no deduction
+     * @param  bool  $deductCredits  false = log only, never charge (guest/personal API key)
+     * @param  bool  $success  false = logged as 'cancelled' (aborted stream); tokens that were
+     *                         generated are still billed when $deductCredits is true
      * @return float Credits actually used
      */
     public static function after(
@@ -112,15 +116,20 @@ class TokenGuard
         ?int $responseTimeMs = null
     ): float {
         // Fetch model config from DB for pricing
-        $dbModel = AiModel::where('slug', $model)->first();
+        $dbModel = self::resolveModelForPricing($model);
 
         $costUsd = self::calculateCostUsd($dbModel, $inputTokens, $outputTokens);
         $credits = self::calculateCredits($dbModel, $inputTokens, $outputTokens);
 
         $deducted = false;
 
-        // Only deduct credits on successful completions
-        if ($user && $deductCredits && $success) {
+        // The internal system user (admin AI-assist) is never charged per-user
+        // credits; its usage is still logged and counted toward global spend.
+        $billable = $user && $deductCredits && ! $user->isInternalAi();
+
+        // Charge for tokens the provider actually generated — including
+        // streams the client aborted part-way ($success = false).
+        if ($billable) {
             $deducted = $user->deductCredits($credits, "AI generation: {$model}", [
                 'provider' => $provider,
                 'model' => $model,
@@ -141,14 +150,12 @@ class TokenGuard
             }
         }
 
-        // Update global spend tracker — only for completed requests
-        if ($success) {
-            self::incrementGlobalSpend($costUsd);
-            self::notifyHighAiCostIfNeeded();
-        }
+        // Update global spend tracker — tokens were consumed either way
+        self::incrementGlobalSpend($costUsd);
+        self::notifyHighAiCostIfNeeded();
 
         $status = $success ? 'completed' : 'cancelled';
-        $billingFailed = $deductCredits && ! $deducted && $success;
+        $billingFailed = $billable && ! $deducted;
 
         if ($user) {
             AiUsageLog::create([
@@ -160,7 +167,7 @@ class TokenGuard
                 'input_tokens' => $inputTokens,
                 'output_tokens' => $outputTokens,
                 'cost_usd' => $costUsd,
-                'credits_used' => ($success && $deductCredits && $deducted) ? $credits : 0,
+                'credits_used' => ($billable && $deducted) ? $credits : 0,
                 'response_time_ms' => $responseTimeMs,
                 'status' => $billingFailed ? 'failed' : $status,
                 'metadata' => $billingFailed
@@ -176,7 +183,7 @@ class TokenGuard
             Cache::forget("usage_stats_{$user->id}");
         }
 
-        return ($success && $deductCredits && $deducted) ? $credits : 0.0;
+        return ($deductCredits && $deducted) ? $credits : 0.0;
     }
 
     /**
@@ -193,14 +200,14 @@ class TokenGuard
     ): void {
         // Still calculate partial cost if any tokens were consumed
         if ($inputTokens > 0 || $outputTokens > 0) {
-            $dbModel = AiModel::where('slug', $model)->first();
+            $dbModel = self::resolveModelForPricing($model);
             $costUsd = self::calculateCostUsd($dbModel, $inputTokens, $outputTokens);
             $credits = self::calculateCredits($dbModel, $inputTokens, $outputTokens);
 
             self::incrementGlobalSpend($costUsd);
             self::notifyHighAiCostIfNeeded();
 
-            if ($credits > 0 && $user) {
+            if ($credits > 0 && $user && ! $user->isInternalAi()) {
                 $deducted = $user->deductCredits($credits, "AI generation (partial/failed): {$model}", [
                     'provider' => $provider,
                     'model' => $model,
@@ -230,7 +237,7 @@ class TokenGuard
                 'cost_usd' => $costUsd,
                 'credits_used' => $deducted ? $credits : 0,
                 'status' => 'failed',
-                'metadata' => $credits > 0 && ! $deducted
+                'metadata' => $credits > 0 && ! $deducted && ! $user->isInternalAi()
                     ? array_merge($metadata, [
                         'billing_error' => 'INSUFFICIENT_CREDITS_AFTER_FAILURE',
                         'credits_due' => $credits,
@@ -245,17 +252,26 @@ class TokenGuard
      */
     public static function resetDailyCounters(): int
     {
-        return User::query()
-            ->where(function ($query): void {
-                $query->where('credits_used_today', '>', 0)
-                    ->orWhere('credits_used_month', '>', 0);
-            })
-            ->update([
-                'credits_used_today' => 0,
-                'credits_used_month' => DB::raw(
-                    now()->day === 1 ? '0' : 'credits_used_month'
-                ),
-            ]);
+        $affected = User::query()
+            ->where('credits_used_today', '>', 0)
+            ->update(['credits_used_today' => 0]);
+
+        // Monthly reset via a persisted marker: if the scheduler misses the
+        // 1st, the reset is caught up on the next run instead of skipping
+        // the whole month.
+        $currentMonth = now()->format('Y-m');
+        $lastReset = (string) settings('credits_month_last_reset', '');
+
+        if ($lastReset === '') {
+            settings_set('credits_month_last_reset', $currentMonth, 'string', 'ai');
+        } elseif ($lastReset !== $currentMonth) {
+            User::query()
+                ->where('credits_used_month', '>', 0)
+                ->update(['credits_used_month' => 0]);
+            settings_set('credits_month_last_reset', $currentMonth, 'string', 'ai');
+        }
+
+        return $affected;
     }
 
     // ─── Legacy method for backward compatibility ────────────────
@@ -288,6 +304,27 @@ class TokenGuard
     // ─── Private Calculation Methods ─────────────────────────────
 
     /**
+     * Resolve the AiModel row used for pricing.
+     *
+     * Providers return fully-qualified model names (e.g. "gpt-4o-mini-2024-07-18")
+     * that don't match the stored slug ("gpt-4o-mini"). Fall back to the
+     * longest slug that prefixes the returned name so billing never silently
+     * drops to the generic per-token fallback for known models.
+     */
+    private static function resolveModelForPricing(string $model): ?AiModel
+    {
+        $dbModel = AiModel::where('slug', $model)->first();
+        if ($dbModel) {
+            return $dbModel;
+        }
+
+        return AiModel::all()
+            ->filter(fn (AiModel $candidate) => str_starts_with($model, $candidate->slug))
+            ->sortByDesc(fn (AiModel $candidate) => strlen($candidate->slug))
+            ->first();
+    }
+
+    /**
      * Estimate credit cost for pre-flight check.
      */
     private static function estimateCreditCost(?AiTool $template, ?string $model): float
@@ -295,7 +332,7 @@ class TokenGuard
         $estimatedTokens = $template?->avg_output_tokens ?? 500;
         $modelSlug = $model ?? settings('default_ai_model', 'gpt-4o-mini');
 
-        $dbModel = AiModel::where('slug', $modelSlug)->first();
+        $dbModel = self::resolveModelForPricing($modelSlug);
 
         if (! $dbModel) {
             return round($estimatedTokens / 1000, 2);
@@ -368,7 +405,12 @@ class TokenGuard
         $percentage = ($spentToday / $globalBudget) * 100;
 
         if ($percentage >= (float) settings('ai_budget_alert_threshold_percent', 80)) {
-            app(NotificationEventService::class)->highAiCostAlert($percentage);
+            // Alert once per day, not on every request past the threshold
+            $alertKey = 'ai_budget_alert_sent:'.now()->toDateString();
+            if (! Cache::has($alertKey)) {
+                Cache::put($alertKey, true, now()->addDay());
+                app(NotificationEventService::class)->highAiCostAlert($percentage);
+            }
         }
     }
 

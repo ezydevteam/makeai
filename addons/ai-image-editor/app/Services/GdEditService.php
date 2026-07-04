@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Addons\AiImageEditor\Services;
 
 use Addons\AiImageEditor\Services\Providers\ImageEditException;
+use Illuminate\Support\Facades\Storage;
 
 class GdEditService
 {
@@ -14,7 +15,7 @@ class GdEditService
             throw new ImageEditException('PHP GD extension is not available. Color correction requires GD.');
         }
 
-        $abs = storage_path('app/' . $inputPath);
+        $abs = Storage::disk('public')->path($inputPath);
 
         if (! file_exists($abs)) {
             throw new ImageEditException("Input file not found: {$inputPath}");
@@ -62,7 +63,7 @@ class GdEditService
             imageconvolution($img, $sharpen, 1, 0);
         }
 
-        $absOutput = storage_path('app/' . $outputPath);
+        $absOutput = Storage::disk('public')->path($outputPath);
         $outputDir = dirname($absOutput);
 
         if (! is_dir($outputDir)) {
@@ -81,7 +82,7 @@ class GdEditService
             throw new ImageEditException('PHP GD extension is not available. Text overlay requires GD.');
         }
 
-        $abs = storage_path('app/' . $inputPath);
+        $abs = Storage::disk('public')->path($inputPath);
 
         if (! file_exists($abs)) {
             throw new ImageEditException("Input file not found: {$inputPath}");
@@ -134,7 +135,7 @@ class GdEditService
             imagestring($img, 5, $x, $y, $text, $textColor);
         }
 
-        $absOutput = storage_path('app/' . $outputPath);
+        $absOutput = Storage::disk('public')->path($outputPath);
         $outputDir = dirname($absOutput);
 
         if (! is_dir($outputDir)) {

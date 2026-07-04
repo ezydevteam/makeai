@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
@@ -8,6 +8,7 @@ import type { SelectOption } from '@/Components/AppSelect.vue'
 import AppColorPicker from '@/Components/AppColorPicker.vue'
 import IconClassSelect from '@/Components/IconClassSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -193,19 +194,28 @@ const statusFilterOptions: SelectOption[] = [
     { value: 'inactive', label: t('Inactive') },
 ]
 
-const filteredCategories = computed(() => {
-    const search = searchQuery.value.trim().toLowerCase()
+const applyFilters = () => {
+    const params: Record<string, string> = {}
+    if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+    if (statusFilter.value) params.status = statusFilter.value
 
-    return props.categories.data.filter((category) => {
-        const matchesSearch = !search
-            || category.name.toLowerCase().includes(search)
-            || category.slug.toLowerCase().includes(search)
-        const matchesStatus = !statusFilter.value
-            || (statusFilter.value === 'active' && category.is_active)
-            || (statusFilter.value === 'inactive' && !category.is_active)
-
-        return matchesSearch && matchesStatus
+    router.get(route('admin.ai.categories.index'), params, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
     })
+}
+
+let searchTimeout: any = null
+watch(searchQuery, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        applyFilters()
+    }, 350)
+})
+
+watch(statusFilter, () => {
+    applyFilters()
 })
 
 const hasActiveFilters = computed(() => Boolean(searchQuery.value || statusFilter.value))
@@ -216,6 +226,7 @@ const clearSearchQuery = () => {
     }
 
     searchQuery.value = ''
+    applyFilters()
 }
 
 const closeAllMenus = () => {
@@ -225,6 +236,7 @@ const closeAllMenus = () => {
 const clearTableFilters = () => {
     searchQuery.value = ''
     statusFilter.value = ''
+    applyFilters()
 }
 
 const isTypingTarget = (target: EventTarget | null) => {
@@ -477,207 +489,211 @@ onBeforeUnmount(() => {
     />
 
     <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10" @click="closeAllMenus">
-        <div class="mb-6 flex items-center justify-between">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-6">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tool Categories') }}</h1>
                 <p class="mt-1 w-full sm:max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Manage the dynamic groups used by public tool pages and admin templates. Categories control tool visibility and access requirements.') }}
                 </p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
                 <Link
                     :href="route('admin.ai.tools.index')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:border-primary-300 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
                 >
-                    <i class="ti ti-apps"></i>{{ t('All Tools') }}
+                    <i class="ti ti-apps text-base"></i>
+                    {{ t('All Tools') }}
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm"
+                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm text-white w-full sm:w-auto"
                     @click="openCreateModal"
                 >
-                    <i class="ti ti-plus"></i>{{ t('Create Category') }}
+                    <i class="ti ti-plus text-base"></i>
+                    {{ t('Create Category') }}
                 </button>
             </div>
         </div>
 
         <div class="min-w-0">
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                    <div class="relative min-w-[240px] flex-1">
-                        <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
-                        <input
-                            ref="searchInput"
-                            v-model="searchQuery"
-                            :placeholder="t('Search tool category...')"
-                            type="text"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                            @focus="searchFocused = true"
-                            @blur="searchFocused = false"
-                        />
-                        <span
-                            v-if="!searchQuery && !searchFocused"
-                            class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                        >
-                            /
-                        </span>
-                        <button
-                            v-if="searchQuery"
-                            type="button"
-                            class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
-                            :aria-label="t('Clear filter')"
-                            @click="clearSearchQuery"
-                        >
-                            <i class="ti ti-x text-sm"></i>
-                        </button>
-                    </div>
-                    <AppSelect
-                        v-model="statusFilter"
-                        :options="statusFilterOptions"
-                        :placeholder="t('All status')"
-                        class="w-full sm:w-40"
-                    />
-                </div>
-
-                <div class="overflow-x-auto">
-                    <!-- Empty State -->
-                    <div
-                        v-if="filteredCategories.length === 0"
-                        class="flex flex-col items-center justify-center px-6 py-16 text-center"
-                    >
-                        <div class="mb-4 text-5xl">
-                            {{ hasActiveFilters ? '🔍' : '📂' }}
+            <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[240px]">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-search text-base"></i>
+                                </span>
+                                <input
+                                    ref="searchInput"
+                                    v-model="searchQuery"
+                                    :placeholder="t('Search tool category...')"
+                                    type="text"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    @focus="searchFocused = true"
+                                    @blur="searchFocused = false"
+                                />
+                                <span
+                                    v-if="!searchQuery && !searchFocused"
+                                    class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                                >
+                                    /
+                                </span>
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear filter')"
+                                    @click="clearSearchQuery"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                            </div>
                         </div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                            {{ hasActiveFilters ? t('No matching categories') : t('No categories yet') }}
-                        </h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            {{ hasActiveFilters
-                                ? t('Try adjusting your search or filters.')
-                                : t('Create your first category to organize AI tools.') }}
-                        </p>
-                        <button
-                            v-if="hasActiveFilters"
-                            type="button"
-                            class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                            @click="clearTableFilters"
+
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                                <AppSelect
+                                    v-model="statusFilter"
+                                    :options="statusFilterOptions"
+                                    :placeholder="t('All status')"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden rounded-b-2xl">
+                    <div class="overflow-x-auto">
+                        <!-- Empty State -->
+                        <div
+                            v-if="categories.data.length === 0"
+                            class="flex flex-col items-center justify-center px-6 py-16 text-center"
                         >
-                            {{ t('Clear filters') }}
-                        </button>
+                            <div class="mb-4 text-5xl">
+                                {{ hasActiveFilters ? '🔍' : '📂' }}
+                            </div>
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                                {{ hasActiveFilters ? t('No matching categories') : t('No categories yet') }}
+                            </h3>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                {{ hasActiveFilters
+                                    ? t('Try adjusting your search or filters.')
+                                    : t('Create your first category to organize AI tools.') }}
+                            </p>
+                            <button
+                                v-if="hasActiveFilters"
+                                type="button"
+                                class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                @click="clearTableFilters"
+                            >
+                                {{ t('Clear filters') }}
+                            </button>
+                        </div>
+
+                        <!-- Table -->
+                        <table v-else class="min-w-[760px] w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
+                                    <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
+                                    <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Parent') }}</th>
+                                    <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tools') }}</th>
+                                    <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Active') }}</th>
+                                    <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Created') }}</th>
+                                    <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
+                                <tr
+                                    v-for="category in categories.data"
+                                    :key="category.id"
+                                    class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30"
+                                >
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2.5">
+                                            <span
+                                                v-if="category.color"
+                                                class="h-3 w-3 shrink-0 rounded-full"
+                                                :style="{ backgroundColor: category.color }"
+                                            />
+                                            <div>
+                                                <div class="font-semibold text-gray-900 dark:text-white">{{ category.name }}</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ category.slug }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                                        {{ category.parent?.name ?? t('—') }}
+                                    </td>
+                                    <td class="px-4 py-4 text-center">
+                                        <Link
+                                            v-if="category.tools_count > 0"
+                                            :href="route('admin.ai.tools.index') + '?category=' + category.id"
+                                            class="text-sm font-semibold text-primary-600 hover:text-primary-500"
+                                        >
+                                            {{ category.tools_count }}
+                                        </Link>
+                                        <span v-else class="text-sm text-gray-400">{{ t('0') }}</span>
+                                    </td>
+                                    <td class="px-4 py-4 text-center">
+                                        <button
+                                            type="button"
+                                            @click="toggleActive(category)"
+                                            class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
+                                            :class="[category.is_active ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700']"
+                                        >
+                                            <span
+                                                :class="category.is_active ? 'translate-x-4' : 'translate-x-0'"
+                                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+                                            />
+                                        </button>
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-4 text-xs text-gray-500 dark:text-gray-400">
+                                        {{ formatDate(category.created_at) }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <Tooltip :content="t('Edit')">
+                                                <button
+                                                    type="button"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                                                    @click="editCategory(category)"
+                                                >
+                                                    <i class="ti ti-edit text-base"></i>
+                                                </button>
+                                            </Tooltip>
+
+                                            <Tooltip :content="t('Delete')">
+                                                <button
+                                                    type="button"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                                    @click="confirmDelete(category)"
+                                                >
+                                                    <i class="ti ti-trash text-base"></i>
+                                                </button>
+                                            </Tooltip>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
-                    <!-- Table -->
-                    <table v-else class="min-w-[760px] w-full text-left">
-                        <thead class="bg-gray-50 dark:bg-surface-800">
-                            <tr>
-                                <th class="px-4 py-3 text-xs font-semibold uppercase text-gray-500">{{ t('Category') }}</th>
-                                <th class="px-4 py-3 text-xs font-semibold uppercase text-gray-500">{{ t('Parent') }}</th>
-                                <th class="px-4 py-3 text-xs font-semibold uppercase text-gray-500">{{ t('Tools') }}</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase text-gray-500">{{ t('Active') }}</th>
-                                <th class="px-4 py-3 text-xs font-semibold uppercase text-gray-500">{{ t('Created') }}</th>
-                                <th class="w-10 px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">{{ t('Actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr
-                                v-for="category in filteredCategories"
-                                :key="category.id"
-                                class="border-t border-gray-100 transition-colors hover:bg-gray-50/50 dark:border-surface-800 dark:hover:bg-surface-800/50"
-                            >
-                                <td class="px-4 py-4">
-                                    <div class="flex items-center gap-2.5">
-                                        <span
-                                            v-if="category.color"
-                                            class="h-3 w-3 shrink-0 rounded-full"
-                                            :style="{ backgroundColor: category.color }"
-                                        />
-                                        <div>
-                                            <div class="font-medium text-gray-900 dark:text-white">{{ category.name }}</div>
-                                            <div class="text-xs text-gray-500">{{ category.slug }}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ category.parent?.name ?? t('—') }}
-                                </td>
-                                <td class="px-4 py-4">
-                                    <Link
-                                        v-if="category.tools_count > 0"
-                                        :href="route('admin.ai.tools.index') + '?category=' + category.id"
-                                        class="text-sm font-semibold text-primary-600 hover:text-primary-500"
-                                    >
-                                        {{ category.tools_count }}
-                                    </Link>
-                                    <span v-else class="text-sm text-gray-400">{{ t('0') }}</span>
-                                </td>
-                                <td class="px-4 py-4 text-center">
-                                    <button
-                                        type="button"
-                                        :class="category.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                        class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                        @click="toggleActive(category)"
-                                    >
-                                        <span
-                                            :class="category.is_active ? 'translate-x-4' : 'translate-x-0'"
-                                            class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                                        />
-                                    </button>
-                                </td>
-                                <td class="whitespace-nowrap px-4 py-4 text-xs text-gray-500">
-                                    {{ formatDate(category.created_at) }}
-                                </td>
-                                <td class="relative px-4 py-4 text-right">
-                                    <button
-                                        type="button"
-                                        class="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-gray-300 hover:text-gray-600 dark:border-surface-700 dark:hover:border-surface-600 dark:hover:text-gray-300"
-                                        @click.stop="actionMenuOpen = actionMenuOpen === category.id ? null : category.id"
-                                    >
-                                        <i class="ti ti-dots-vertical"></i>
-                                    </button>
-
-                                    <div
-                                        v-if="actionMenuOpen === category.id"
-                                        class="absolute right-4 top-12 z-20 w-36 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-surface-700 dark:bg-surface-900"
-                                        @click.stop
-                                    >
-                                        <button
-                                            type="button"
-                                            class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                                            @click="editCategory(category)"
-                                        >
-                                            <i class="ti ti-edit"></i>
-                                            {{ t('Edit') }}
-                                        </button>
-                                        <hr class="border-gray-200 dark:border-surface-700">
-                                        <button
-                                            type="button"
-                                            class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-danger-600 hover:bg-gray-50 dark:text-danger-400 dark:hover:bg-gray-900/20"
-                                            @click="confirmDelete(category)"
-                                        >
-                                            <i class="ti ti-trash"></i>
-                                            {{ t('Delete') }}
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div
+                        v-if="categories.links && categories.links.length > 3"
+                        class="border-t border-gray-100 px-4 py-4 dark:border-gray-800"
+                    >
+                        <Pagination
+                            :links="categories.links"
+                            :from="categories.from"
+                            :to="categories.to"
+                            :total="categories.total"
+                            :current-page="categories.current_page"
+                            :last-page="categories.last_page"
+                        />
+                    </div>
                 </div>
-
-                <div
-                    v-if="!hasActiveFilters && categories.links && categories.links.length > 3"
-                    class="border-t border-gray-100 px-4 py-4 dark:border-surface-800"
-                >
-                    <Pagination
-                        :links="categories.links"
-                        :from="categories.from"
-                        :to="categories.to"
-                        :total="categories.total"
-                        :current-page="categories.current_page"
-                        :last-page="categories.last_page"
-                    />
-                </div>
-            </section>
+            </div>
         </div>
     </div>
 </template>

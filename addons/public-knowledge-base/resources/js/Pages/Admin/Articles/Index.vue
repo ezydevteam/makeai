@@ -60,21 +60,10 @@ interface Filters {
     embed_status?: string
 }
 
-interface ArticleStats {
-    total: number
-    published: number
-    draft: number
-    embedded_done: number
-    embed_failed: number
-}
-
-const { t } = useTranslate()
-
 const props = defineProps<{
     articles: ArticlePagination
     categories: ArticleCategory[]
     filters: Filters
-    stats: ArticleStats
 }>()
 
 const search = ref(props.filters.search ?? '')
@@ -88,14 +77,7 @@ const reEmbeddingId = ref<number | null>(null)
 const openActionMenuId = ref<number | null>(null)
 const actionMenuPosition = ref({ top: 0, left: 0, placement: 'bottom' as 'top' | 'bottom' })
 
-const articleStats = computed(() => {
-    return [
-        { label: t('Total Articles'), value: props.stats.total },
-        { label: t('Published'), value: props.stats.published },
-        { label: t('Drafts'), value: props.stats.draft },
-        { label: t('Embedded'), value: props.stats.embedded_done },
-    ]
-})
+const { t } = useTranslate()
 
 const embedStatusLabel: Record<EmbedStatus, string> = {
     pending: t('Pending'),
@@ -283,7 +265,7 @@ onMounted(() => {
 <template>
     <Head :title="t('KB Articles')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -307,16 +289,7 @@ onMounted(() => {
             </button>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div
-                v-for="stat in articleStats"
-                :key="stat.label"
-                class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-gray-900"
-            >
-                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">{{ stat.label }}</p>
-                <div class="mt-3 text-3xl font-bold text-gray-900 dark:text-white">{{ stat.value }}</div>
-            </div>
-        </div>
+
 
         <div class="mt-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-gray-900">
             <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">

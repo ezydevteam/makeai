@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
+import Pagination from '@/Components/Pagination.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -16,6 +20,7 @@ interface Coupon {
     value: string | number
     max_discount: string | number | null
     max_uses: number | null
+    per_user_limit: number | null
     used_count: number
     is_recurring: boolean
     is_active: boolean
@@ -27,9 +32,30 @@ interface Coupon {
     expires_at: string | null
 }
 
+interface PaginationLink {
+    url: string | null
+    label: string
+    active: boolean
+}
+
 const props = defineProps<{
-    coupons: { data: Coupon[] }
+    coupons: {
+        data: Coupon[]
+        links: PaginationLink[]
+        from?: number | null
+        to?: number | null
+        total?: number | null
+        current_page?: number | null
+        last_page?: number | null
+    }
     plans: PlanOption[]
+    filters: { search?: string; status?: string }
+    stats: {
+        total: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        active: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        published: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        recurring: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    }
 }>()
 
 const { t } = useTranslate()
@@ -41,6 +67,7 @@ const form = useForm({
     value: '10',
     max_discount: '',
     max_uses: '',
+    per_user_limit: '1',
     is_recurring: false,
     is_active: true,
     plan_id: '',
@@ -53,11 +80,9 @@ const editingId = ref<number | null>(null)
 const formModalOpen = ref(false)
 const deletingCoupon = ref<Coupon | null>(null)
 const deleteProcessing = ref(false)
-const actionMenuOpen = ref<number | null>(null)
-const actionMenuStyle = ref<Record<string, string>>({})
-const searchQuery = ref('')
+const searchQuery = ref(props.filters?.search || '')
 const searchInputRef = ref<HTMLInputElement | null>(null)
-const statusFilter = ref('')
+const statusFilter = ref(props.filters?.status || '')
 
 const userLimitOptions: { value: CouponUserLimit; label: string; description: string }[] = [
     { value: 'all', label: t('All users'), description: t('Anyone can use this coupon.') },
@@ -83,31 +108,28 @@ const userLimitSelectOptions = computed(() => userLimitOptions.map((option) => (
     value: option.value,
 })))
 
-const totalCoupons = computed(() => props.coupons.data.length)
-const activeCoupons = computed(() => props.coupons.data.filter((coupon) => coupon.is_active).length)
-const headerCoupons = computed(() => props.coupons.data.filter((coupon) => coupon.show_in_header).length)
-const recurringCoupons = computed(() => props.coupons.data.filter((coupon) => coupon.is_recurring).length)
-const filteredCoupons = computed(() => {
-    const query = searchQuery.value.trim().toLowerCase()
+const applyFilters = () => {
+    const params: Record<string, string> = {}
+    if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+    if (statusFilter.value) params.status = statusFilter.value
 
-    return props.coupons.data.filter((coupon) => {
-        const matchesQuery = !query || [
-            coupon.code,
-            coupon.plan?.name ?? '',
-            coupon.type,
-            coupon.user_limit,
-            coupon.is_active ? 'active' : 'inactive',
-        ].some((value) => value.toLowerCase().includes(query))
-
-        const matchesStatus =
-            statusFilter.value === ''
-            || (statusFilter.value === 'active' && coupon.is_active)
-            || (statusFilter.value === 'inactive' && !coupon.is_active)
-            || (statusFilter.value === 'published' && coupon.show_in_header)
-            || (statusFilter.value === 'unpublished' && !coupon.show_in_header)
-
-        return matchesQuery && matchesStatus
+    router.get(route('admin.coupons.index'), params, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
     })
+}
+
+let searchTimeout: any = null
+watch(searchQuery, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        applyFilters()
+    }, 350)
+})
+
+watch(statusFilter, () => {
+    applyFilters()
 })
 
 const statusFilterOptions = computed(() => [
@@ -143,6 +165,7 @@ const edit = (coupon: Coupon) => {
     form.value = String(coupon.value)
     form.max_discount = coupon.max_discount === null ? '' : String(coupon.max_discount)
     form.max_uses = coupon.max_uses === null ? '' : String(coupon.max_uses)
+    form.per_user_limit = coupon.per_user_limit === null ? '' : String(coupon.per_user_limit)
     form.is_recurring = coupon.is_recurring
     form.is_active = coupon.is_active
     form.plan_id = coupon.plan_id === null ? '' : String(coupon.plan_id)
@@ -169,6 +192,7 @@ const submit = () => {
         ...data,
         max_discount: data.max_discount || null,
         max_uses: data.max_uses || null,
+        per_user_limit: data.per_user_limit || null,
         plan_id: data.plan_id || null,
         user_limit: data.user_limit || 'all',
         starts_at: data.starts_at || null,
@@ -187,34 +211,6 @@ const confirmDelete = () => {
             deletingCoupon.value = null
         },
     })
-}
-
-const toggleActionMenu = (couponId: number) => {
-    actionMenuOpen.value = actionMenuOpen.value === couponId ? null : couponId
-}
-
-const closeActionMenu = () => {
-    actionMenuOpen.value = null
-}
-
-const openActionMenu = (couponId: number, event: MouseEvent) => {
-    if (actionMenuOpen.value === couponId) {
-        closeActionMenu()
-        return
-    }
-
-    const trigger = event.currentTarget as HTMLElement | null
-
-    if (!trigger) return
-
-    const rect = trigger.getBoundingClientRect()
-    actionMenuStyle.value = {
-        position: 'fixed',
-        top: `${rect.bottom + 8}px`,
-        left: `${Math.max(16, rect.right - 144)}px`,
-        zIndex: '60',
-    }
-    actionMenuOpen.value = couponId
 }
 
 const focusSearchOnSlash = (event: KeyboardEvent) => {
@@ -376,6 +372,18 @@ onBeforeUnmount(() => {
                                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                                             />
                                         </label>
+
+                                        <label class="block">
+                                            <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Uses per user') }}</span>
+                                            <input
+                                                v-model="form.per_user_limit"
+                                                type="number"
+                                                min="1"
+                                                :placeholder="t('Leave blank for unlimited')"
+                                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                            />
+                                            <span v-if="form.errors.per_user_limit" class="mt-2 block text-xs text-red-600 dark:text-red-300">{{ form.errors.per_user_limit }}</span>
+                                        </label>
                                     </div>
 
                                     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
@@ -479,203 +487,239 @@ onBeforeUnmount(() => {
             </Transition>
         </Teleport>
 
-        <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10" @click="closeActionMenu">
-            <div class="space-y-6">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ t('Coupons') }}</h1>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Create flexible checkout discounts and manage where they appear.') }}</p>
-                    </div>
+        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Coupons') }}</h1>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Create flexible checkout discounts and manage where they appear.') }}</p>
+                </div>
+                <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+                        class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition w-full sm:w-auto"
                         @click="openCreateModal"
                     >
                         <i class="ti ti-plus text-base"></i>
                         {{ t('Create Coupon') }}
                     </button>
                 </div>
+            </div>
 
-                <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div class="border border-gray-100 bg-white px-5 py-4 shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Total coupons') }}</p>
-                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ totalCoupons }}</p>
-                    </div>
-                    <div class="border border-gray-100 bg-white px-5 py-4 shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Active') }}</p>
-                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ activeCoupons }}</p>
-                    </div>
-                    <div class="border border-gray-100 bg-white px-5 py-4 shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Published') }}</p>
-                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ headerCoupons }}</p>
-                    </div>
-                    <div class="border border-gray-100 bg-white px-5 py-4 shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Recurring') }}</p>
-                        <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ recurringCoupons }}</p>
-                    </div>
-                </section>
+            <!-- Stats Grid -->
+            <div v-if="stats" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatsCard
+                    :title="t('Total Coupons')"
+                    :value="stats.total.value"
+                    :comparison="stats.total.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="stats.total.comparison.type"
+                    color="primary"
+                >
+                    <template #icon>
+                        <i class="ti ti-ticket text-lg"></i>
+                    </template>
+                </StatsCard>
 
-                <div>
-                    <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                        <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                <div class="w-full xl:max-w-md">
-                                    <div class="relative">
-                                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                            <i class="ti ti-search text-base"></i>
-                                        </span>
-                                        <input
-                                            ref="searchInputRef"
-                                            v-model="searchQuery"
-                                            type="text"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                            :placeholder="t('Filter this table by coupon code, plan, or status...')"
-                                        />
-                                        <span
-                                            v-if="!searchQuery"
-                                            class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
-                                        >
-                                            /
-                                        </span>
-                                        <button
-                                            v-if="searchQuery"
-                                            type="button"
-                                            class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                            :aria-label="t('Clear search')"
-                                            :title="t('Clear search')"
-                                            @click="searchQuery = ''"
-                                        >
-                                            <i class="ti ti-x text-base"></i>
-                                        </button>
-                                    </div>
-                                </div>
+                <StatsCard
+                    :title="t('Active')"
+                    :value="stats.active.value"
+                    :comparison="stats.active.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="stats.active.comparison.type"
+                    color="success"
+                >
+                    <template #icon>
+                        <i class="ti ti-checkbox text-lg"></i>
+                    </template>
+                </StatsCard>
 
-                                <div class="w-full md:w-56 xl:w-64">
-                                    <AppSelect
-                                        v-model="statusFilter"
-                                        :options="statusFilterOptions"
-                                        :placeholder="t('All Status')"
-                                    />
-                                </div>
+                <StatsCard
+                    :title="t('Published')"
+                    :value="stats.published.value"
+                    :comparison="stats.published.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="stats.published.comparison.type"
+                    color="accent"
+                >
+                    <template #icon>
+                        <i class="ti ti-eye text-lg"></i>
+                    </template>
+                </StatsCard>
+
+                <StatsCard
+                    :title="t('Recurring')"
+                    :value="stats.recurring.value"
+                    :comparison="stats.recurring.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="stats.recurring.comparison.type"
+                    color="warning"
+                >
+                    <template #icon>
+                        <i class="ti ti-refresh text-lg"></i>
+                    </template>
+                </StatsCard>
+            </div>
+
+            <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[240px]">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-search text-base"></i>
+                                </span>
+                                <input
+                                    ref="searchInputRef"
+                                    v-model="searchQuery"
+                                    type="text"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    :placeholder="t('Filter this table by coupon code, plan, or status...')"
+                                />
+                                <span
+                                    v-if="!searchQuery"
+                                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                                >
+                                    /
+                                </span>
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear search')"
+                                    :title="t('Clear search')"
+                                    @click="searchQuery = ''"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
                             </div>
                         </div>
-                        <div class="overflow-visible">
-                            <div class="overflow-x-auto">
-                            <table class="w-full text-left text-sm">
-                                <thead class="bg-gray-50 text-xs uppercase tracking-wider text-gray-500 dark:bg-gray-900/60 dark:text-gray-400">
-                                    <tr>
-                                        <th class="px-4 py-3">{{ t('Coupon') }}</th>
-                                        <th class="px-4 py-3">{{ t('Discount') }}</th>
-                                        <th class="px-4 py-3">{{ t('Eligibility') }}</th>
-                                        <th class="px-4 py-3">{{ t('Usage') }}</th>
-                                        <th class="px-4 py-3">{{ t('Status') }}</th>
-                                        <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-if="filteredCoupons.length === 0">
-                                        <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
-                                            {{ t('No coupons found.') }}
-                                        </td>
-                                    </tr>
 
-                                    <tr
-                                        v-for="coupon in filteredCoupons"
-                                        :key="coupon.id"
-                                        class="border-t border-gray-100 transition-colors hover:bg-primary-50/40 dark:border-gray-800 dark:hover:bg-gray-900/30"
-                                    >
-                                        <td class="px-4 py-4">
-                                            <div>
-                                                <p class="font-semibold uppercase tracking-wide text-gray-900 dark:text-white">{{ coupon.code }}</p>
-                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ couponDateRangeLabel(coupon) }}</p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4">
-                                            <div>
-                                                <p class="font-medium text-gray-900 dark:text-white">{{ discountLabel(coupon) }}</p>
-                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                    {{ coupon.type === 'percent' ? t('Percentage discount') : t('Fixed amount discount') }}
-                                                </p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4">
-                                            <div class="space-y-1">
-                                                <p class="text-gray-900 dark:text-white">{{ coupon.plan?.name || t('All plans') }}</p>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ userLimitLabel(coupon.user_limit) }}</p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4">
-                                            <div class="space-y-1">
-                                                <p class="text-gray-900 dark:text-white">{{ coupon.used_count }} / {{ coupon.max_uses || t('Unlimited') }}</p>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ coupon.is_recurring ? t('Recurring') : t('One-time coupon') }}</p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4">
-                                            <div class="space-y-1">
-                                                <span
-                                                    class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
-                                                    :class="coupon.is_active
-                                                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                                                        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
-                                                >
-                                                    {{ coupon.is_active ? t('Active') : t('Inactive') }}
-                                                </span>
-                                                <p
-                                                    class="text-xs"
-                                                    :class="coupon.show_in_header ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                                                >
-                                                    {{ coupon.show_in_header ? t('Published') : t('Unpublished') }}
-                                                </p>
-                                            </div>
-                                        </td>
-                                        <td class="px-4 py-4 text-right">
-                                            <div class="relative inline-flex justify-end" @click.stop>
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-56 lg:flex-none">
+                                <AppSelect
+                                    v-model="statusFilter"
+                                    :options="statusFilterOptions"
+                                    :placeholder="t('All Status')"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-hidden rounded-b-2xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
+                                <tr>
+                                    <th class="px-4 py-3">{{ t('Coupon') }}</th>
+                                    <th class="px-4 py-3">{{ t('Discount') }}</th>
+                                    <th class="px-4 py-3">{{ t('Eligibility') }}</th>
+                                    <th class="px-4 py-3">{{ t('Usage') }}</th>
+                                    <th class="px-4 py-3">{{ t('Status') }}</th>
+                                    <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                                <tr v-if="coupons.data.length === 0">
+                                    <td colspan="6" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        {{ t('No coupons found.') }}
+                                    </td>
+                                </tr>
+
+                                <tr
+                                    v-for="coupon in coupons.data"
+                                    :key="coupon.id"
+                                    class="transition-colors hover:bg-primary-50/40 dark:hover:bg-gray-900/30"
+                                >
+                                    <td class="px-4 py-4">
+                                        <div>
+                                            <p class="font-semibold uppercase tracking-wide text-gray-900 dark:text-white">{{ coupon.code }}</p>
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ couponDateRangeLabel(coupon) }}</p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div>
+                                            <p class="font-medium text-gray-900 dark:text-white">{{ discountLabel(coupon) }}</p>
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                {{ coupon.type === 'percent' ? t('Percentage discount') : t('Fixed amount discount') }}
+                                            </p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="space-y-1">
+                                            <p class="text-gray-900 dark:text-white">{{ coupon.plan?.name || t('All plans') }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ userLimitLabel(coupon.user_limit) }}</p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="space-y-1">
+                                            <p class="text-gray-900 dark:text-white">{{ coupon.used_count }} / {{ coupon.max_uses || t('Unlimited') }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ coupon.is_recurring ? t('Recurring') : t('One-time coupon') }}</p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <div class="space-y-1">
+                                            <span
+                                                class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold"
+                                                :class="coupon.is_active
+                                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
+                                            >
+                                                {{ coupon.is_active ? t('Active') : t('Inactive') }}
+                                            </span>
+                                            <p
+                                                class="text-xs"
+                                                :class="coupon.show_in_header ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
+                                            >
+                                                {{ coupon.show_in_header ? t('Published') : t('Unpublished') }}
+                                            </p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4 text-end">
+                                        <TableActionMenu>
+                                            <template #default="{ close }">
                                                 <button
                                                     type="button"
-                                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                                                    @click="openActionMenu(coupon.id, $event)"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                    @click="toggleHeader(coupon); close()"
                                                 >
-                                                    <i class="ti ti-dots-vertical text-base"></i>
+                                                    <i class="ti ti-layout-navbar text-base"></i>
+                                                    {{ coupon.show_in_header ? t('Unpublish') : t('Publish') }}
                                                 </button>
-
-                                                <div
-                                                    v-if="actionMenuOpen === coupon.id"
-                                                    class="w-36 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-gray-700 dark:bg-gray-800"
-                                                    :style="actionMenuStyle"
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                    @click="edit(coupon); close()"
                                                 >
-                                                    <button
-                                                        type="button"
-                                                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                        @click="edit(coupon); actionMenuOpen = null"
-                                                    >
-                                                        <i class="ti ti-edit text-sm"></i>
-                                                        {{ t('Edit') }}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-700"
-                                                        @click="toggleHeader(coupon); actionMenuOpen = null"
-                                                    >
-                                                        <i class="ti ti-layout-navbar text-sm"></i>
-                                                        {{ coupon.show_in_header ? t('Unpublish') : t('Publish') }}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                        @click="deletingCoupon = coupon; actionMenuOpen = null"
-                                                    >
-                                                        <i class="ti ti-trash text-sm"></i>
-                                                        {{ t('Delete') }}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            </div>
-                        </div>
-                    </section>
+                                                    <i class="ti ti-edit text-base"></i>
+                                                    {{ t('Edit Details') }}
+                                                </button>
+                                                <hr class="border-gray-200 dark:border-surface-700">
+                                                <button
+                                                    type="button"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                    @click="deletingCoupon = coupon; close()"
+                                                >
+                                                    <i class="ti ti-trash text-base"></i>
+                                                    {{ t('Delete') }}
+                                                </button>
+                                            </template>
+                                        </TableActionMenu>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-if="coupons.links && coupons.links.length > 3" class="border-t border-gray-100 p-4 dark:border-surface-800">
+                        <Pagination
+                            :links="coupons.links"
+                            :from="coupons.from"
+                            :to="coupons.to"
+                            :total="coupons.total"
+                            :current-page="coupons.current_page"
+                            :last-page="coupons.last_page"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

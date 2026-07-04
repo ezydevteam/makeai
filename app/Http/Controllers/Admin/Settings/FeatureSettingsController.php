@@ -16,7 +16,7 @@ class FeatureSettingsController extends Controller
         return Inertia::render('Admin/Settings/Features', [
             'features' => [
                 'favorites_enabled' => (bool) settings('favorites_enabled', true),
-                'subscriptions_enabled' => (bool) settings('subscriptions_enabled', false),
+                'subscriptions_enabled' => is_extended_license() && (bool) settings('subscriptions_enabled', false),
                 'affiliate_enabled' => (bool) settings('affiliate_enabled', false),
                 'tickets_enabled' => (bool) settings('tickets_enabled', true),
                 'contact_enabled' => (bool) settings('contact_enabled', true),
@@ -34,7 +34,6 @@ class FeatureSettingsController extends Controller
         $this->authorizeSettings();
 
         $features = [
-            'subscriptions_enabled',
             'affiliate_enabled',
             'tickets_enabled',
             'contact_enabled',
@@ -48,6 +47,11 @@ class FeatureSettingsController extends Controller
         foreach ($features as $feature) {
             settings_set($feature, (bool) $request->validated($feature), 'boolean', 'features');
         }
+
+        // Premium subscriptions require an Extended License. Enforced server-side —
+        // hiding the toggle in the UI alone would not stop a direct POST.
+        $subscriptionsEnabled = is_extended_license() && (bool) $request->validated('subscriptions_enabled', false);
+        settings_set('subscriptions_enabled', $subscriptionsEnabled, 'boolean', 'features');
 
         return back()->with('success', translate('Feature settings updated.'));
     }

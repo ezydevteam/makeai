@@ -48,7 +48,6 @@ use App\Http\Controllers\Admin\Settings\NotificationSettingsController;
 use App\Http\Controllers\Admin\Settings\OAuthSettingsController;
 use App\Http\Controllers\Admin\Settings\SocialCountersController;
 use App\Http\Controllers\Admin\Appearance\SidebarController;
-use App\Http\Controllers\Admin\AI\SiteTemplateController;
 use App\Http\Controllers\Admin\Support\CannedResponseController as SupportCannedResponseController;
 use App\Http\Controllers\Admin\Support\DepartmentController as SupportDepartmentController;
 use App\Http\Controllers\Admin\Support\SettingsController as SupportSettingsController;
@@ -110,6 +109,8 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     Route::get('notes', [AdminNoteController::class, 'index'])->name('admin.notes.index');
     Route::post('notes', [AdminNoteController::class, 'store'])->name('admin.notes.store');
     Route::post('notes/{note}', [AdminNoteController::class, 'update'])->name('admin.notes.update');
+    Route::post('notes/{note}/snooze', [AdminNoteController::class, 'snooze'])->name('admin.notes.snooze');
+    Route::post('notes/{note}/dismiss', [AdminNoteController::class, 'dismiss'])->name('admin.notes.dismiss');
     Route::delete('notes/{note}', [AdminNoteController::class, 'destroy'])->name('admin.notes.delete');
 
     // Themes
@@ -138,25 +139,27 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('appearance/addons/bulk-deactivate', [ThemeAddonController::class, 'bulkDeactivate'])->name('admin.addons.bulk-deactivate');
     });
 
-    // Users Management
-    Route::middleware('admin.permission:users.view')->group(function () {
-        Route::get('roles/users', [UserManagementController::class, 'index'])->name('admin.users.index');
-        Route::get('roles/users/trash', [UserManagementController::class, 'trash'])->name('admin.users.trash');
-        Route::get('roles/users/create', [UserManagementController::class, 'create'])->name('admin.users.create');
-        Route::post('roles/users', [UserManagementController::class, 'store'])->name('admin.users.store');
-        Route::get('roles/users/export', [UserManagementController::class, 'export'])->name('admin.users.export');
-        Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->name('admin.users.bulk');
-        Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->name('admin.users.trash.bulk');
-        Route::post('roles/users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
-        Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->name('admin.users.restore');
-        Route::delete('roles/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->name('admin.users.force-delete');
-        Route::get('roles/users/{user}', [UserManagementController::class, 'show'])->name('admin.users.show');
-        Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->name('admin.users.update');
-        Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->name('admin.users.delete');
-        Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->name('admin.users.notification');
-        Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->name('admin.users.2fa.disable');
-        Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->name('admin.users.impersonate');
-    });
+    // Users Management — granular RBAC. Each action accepts its specific
+    // permission OR the broad "users.manage"; super-admins bypass all checks.
+    // Order preserved: static segments must stay ahead of the {user} wildcard.
+    Route::get('roles/users', [UserManagementController::class, 'index'])->middleware('admin.permission:users.view,users.manage')->name('admin.users.index');
+    Route::get('roles/users/trash', [UserManagementController::class, 'trash'])->middleware('admin.permission:users.view,users.manage')->name('admin.users.trash');
+    Route::get('roles/users/create', [UserManagementController::class, 'create'])->middleware('admin.permission:users.create,users.manage')->name('admin.users.create');
+    Route::post('roles/users', [UserManagementController::class, 'store'])->middleware('admin.permission:users.create,users.manage')->name('admin.users.store');
+    Route::get('roles/users/export', [UserManagementController::class, 'export'])->middleware('admin.permission:users.manage')->name('admin.users.export');
+    Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->middleware('admin.permission:users.manage')->name('admin.users.bulk');
+    Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->middleware('admin.permission:users.delete,users.manage')->name('admin.users.trash.bulk');
+    // No extra permission: an admin must always be able to end an impersonation session and return to their own account.
+    Route::post('roles/users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
+    Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->middleware('admin.permission:users.delete,users.manage')->name('admin.users.restore');
+    Route::delete('roles/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->middleware('admin.super')->name('admin.users.force-delete');
+    Route::get('roles/users/{user}', [UserManagementController::class, 'show'])->middleware('admin.permission:users.view,users.manage')->name('admin.users.show');
+    Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.update');
+    Route::post('roles/users/{user}/toggle-status', [UserManagementController::class, 'toggleStatus'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.toggle-status');
+    Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->middleware('admin.permission:users.delete,users.manage')->name('admin.users.delete');
+    Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.notification');
+    Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.2fa.disable');
+    Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->middleware('admin.permission:users.impersonate,users.manage')->name('admin.users.impersonate');
 
     // Administrators & Roles
     Route::get('roles/admins', [AdminController::class, 'index'])->name('admin.admins.index');
@@ -166,7 +169,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     Route::post('roles/admins/{admin}', [AdminController::class, 'update'])->name('admin.admins.update');
     Route::post('roles/admins/{admin}/restore', [AdminController::class, 'restore'])->withTrashed()->name('admin.admins.restore');
     Route::delete('roles/admins/{admin}', [AdminController::class, 'destroy'])->name('admin.admins.delete');
-    Route::delete('roles/admins/{admin}/force-delete', [AdminController::class, 'forceDelete'])->withTrashed()->name('admin.admins.force-delete');
+    Route::delete('roles/admins/{admin}/force-delete', [AdminController::class, 'forceDelete'])->withTrashed()->middleware('admin.super')->name('admin.admins.force-delete');
 
     Route::get('security/two-factor', [AdminTwoFactorController::class, 'show'])->name('admin.security.2fa.show');
     Route::post('security/two-factor', [AdminTwoFactorController::class, 'enable'])->middleware('throttle:otp')->name('admin.security.2fa.enable');
@@ -212,33 +215,53 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     Route::middleware(['premium', 'admin.permission:plans.view'])->group(function () {
         Route::get('premium/plans', [PlanController::class, 'index'])->name('admin.plans.index');
         Route::get('premium/plans/pricing', [PlanController::class, 'pricing'])->name('admin.plans.pricing');
-        Route::post('premium/plans/settings', [PlanController::class, 'updateSettings'])->name('admin.plans.settings');
-        Route::put('premium/plans/{plan}', [PlanController::class, 'update'])->name('admin.plans.update');
+        Route::post('premium/plans/settings', [PlanController::class, 'updateSettings'])->middleware('admin.permission:plans.edit')->name('admin.plans.settings');
+        Route::put('premium/plans/{plan}', [PlanController::class, 'update'])->middleware('admin.permission:plans.edit')->name('admin.plans.update');
     });
 
+    // Payments, gateways, subscriptions, coupons, credit settings.
+    // These controllers hold NO internal permission checks, so the routes must
+    // enforce them. Permissions are aligned with the sidebar links so an admin
+    // never sees a link they cannot use (or vice-versa): read pages use the
+    // "view" permission the sidebar checks; money-mutations require the
+    // payments.gateways ("manage") permission. Super-admins bypass all checks.
     Route::middleware('premium')->group(function () {
-        Route::get('premium/gateways', [PaymentGatewayController::class, 'index'])->name('admin.payment-gateways.index');
-        Route::post('premium/gateways/sort', [PaymentGatewayController::class, 'sort'])->name('admin.payment-gateways.sort');
-        Route::post('premium/gateways/{gateway}', [PaymentGatewayController::class, 'update'])->name('admin.payment-gateways.update');
-        Route::get('premium/subscriptions', [SubscriptionManagementController::class, 'index'])->name('admin.subscriptions.index');
-        Route::post('premium/subscriptions/{user}/deactivate', [SubscriptionManagementController::class, 'deactivate'])->name('admin.subscriptions.deactivate');
-        Route::get('premium/coupons', [CouponController::class, 'index'])->name('admin.coupons.index');
-        Route::post('premium/coupons', [CouponController::class, 'store'])->name('admin.coupons.store');
-        Route::post('premium/coupons/{coupon}', [CouponController::class, 'update'])->name('admin.coupons.update');
-        Route::post('premium/coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->name('admin.coupons.header');
-        Route::delete('premium/coupons/{coupon}', [CouponController::class, 'destroy'])->name('admin.coupons.delete');
+        Route::get('premium/gateways', [PaymentGatewayController::class, 'index'])->middleware('admin.permission:payments.view,payments.gateways')->name('admin.payment-gateways.index');
+        Route::post('premium/gateways/sort', [PaymentGatewayController::class, 'sort'])->middleware('admin.permission:payments.gateways')->name('admin.payment-gateways.sort');
+        Route::post('premium/gateways/{gateway}', [PaymentGatewayController::class, 'update'])->middleware('admin.permission:payments.gateways')->name('admin.payment-gateways.update');
+        Route::get('premium/subscriptions', [SubscriptionManagementController::class, 'index'])->middleware('admin.permission:payments.view,payments.gateways')->name('admin.subscriptions.index');
+        Route::post('premium/subscriptions/{user}/deactivate', [SubscriptionManagementController::class, 'deactivate'])->middleware('admin.permission:payments.gateways')->name('admin.subscriptions.deactivate');
+        Route::post('premium/subscriptions/grant', [SubscriptionManagementController::class, 'grant'])->middleware('admin.permission:payments.gateways')->name('admin.subscriptions.grant');
 
-        // Credit Settings
-        Route::get('premium/credit-settings', [CreditSettingsController::class, 'index'])->name('admin.credit-settings.index');
-        Route::put('premium/credit-settings', [CreditSettingsController::class, 'update'])->name('admin.credit-settings.update');
+        // Transactions (payment review & bank transfer approval)
+        Route::get('premium/transactions', [\App\Http\Controllers\Admin\Premium\Payments\TransactionController::class, 'index'])->middleware('admin.permission:payments.view,payments.gateways')->name('admin.transactions.index');
+        Route::get('premium/transactions/{payment}/proof', [\App\Http\Controllers\Admin\Premium\Payments\TransactionController::class, 'proof'])->middleware('admin.permission:payments.view,payments.gateways')->name('admin.transactions.proof');
+        Route::post('premium/transactions/{payment}/approve', [\App\Http\Controllers\Admin\Premium\Payments\TransactionController::class, 'approve'])->middleware('admin.permission:payments.gateways')->name('admin.transactions.approve');
+        Route::post('premium/transactions/{payment}/reject', [\App\Http\Controllers\Admin\Premium\Payments\TransactionController::class, 'reject'])->middleware('admin.permission:payments.gateways')->name('admin.transactions.reject');
+        Route::get('premium/coupons', [CouponController::class, 'index'])->middleware('admin.permission:payments.gateways')->name('admin.coupons.index');
+        Route::post('premium/coupons', [CouponController::class, 'store'])->middleware('admin.permission:payments.gateways')->name('admin.coupons.store');
+        Route::post('premium/coupons/{coupon}', [CouponController::class, 'update'])->middleware('admin.permission:payments.gateways')->name('admin.coupons.update');
+        Route::post('premium/coupons/{coupon}/header', [CouponController::class, 'toggleHeader'])->middleware('admin.permission:payments.gateways')->name('admin.coupons.header');
+        Route::delete('premium/coupons/{coupon}', [CouponController::class, 'destroy'])->middleware('admin.permission:payments.gateways')->name('admin.coupons.delete');
+
+        // Credit Settings — shown in the sidebar under settings.manage.
+        Route::get('premium/credit-settings', [CreditSettingsController::class, 'index'])->middleware('admin.permission:settings.manage,payments.gateways')->name('admin.credit-settings.index');
+        Route::put('premium/credit-settings', [CreditSettingsController::class, 'update'])->middleware('admin.permission:settings.manage,payments.gateways')->name('admin.credit-settings.update');
     });
 
     // Affiliate (independent of premium)
-    Route::middleware('affiliate')->group(function () {
+    Route::middleware(['affiliate', 'admin.permission:payments.gateways'])->group(function () {
         Route::get('marketing/affiliate', [AffiliateController::class, 'index'])->name('admin.affiliate.index');
+        Route::get('marketing/affiliate/commissions', [AffiliateController::class, 'commissionsIndex'])->name('admin.affiliate.commissions.index');
+        Route::get('marketing/affiliate/payouts', [AffiliateController::class, 'payoutsIndex'])->name('admin.affiliate.payouts.index');
+        Route::get('marketing/affiliate/affiliates', [AffiliateController::class, 'affiliatesIndex'])->name('admin.affiliate.affiliates.index');
+        Route::get('marketing/affiliate/affiliates/{user}', [AffiliateController::class, 'show'])->name('admin.affiliate.affiliates.show');
+        Route::get('marketing/affiliate/settings', [AffiliateController::class, 'settingsEdit'])->name('admin.affiliate.settings.edit');
         Route::post('marketing/affiliate/settings', [AffiliateController::class, 'updateSettings'])->name('admin.affiliate.settings');
+        Route::post('marketing/affiliate/commissions/bulk-approve', [AffiliateController::class, 'bulkApproveCommissions'])->name('admin.affiliate.commissions.bulk-approve');
         Route::post('marketing/affiliate/commissions/{commission}/approve', [AffiliateController::class, 'approveCommission'])->name('admin.affiliate.commissions.approve');
         Route::post('marketing/affiliate/commissions/{commission}/reject', [AffiliateController::class, 'rejectCommission'])->name('admin.affiliate.commissions.reject');
+        Route::post('marketing/affiliate/affiliates/{user}/ban', [AffiliateController::class, 'toggleAffiliateBan'])->name('admin.affiliate.affiliates.ban');
         Route::post('marketing/affiliate/payouts/{payout}', [AffiliateController::class, 'processPayout'])->name('admin.affiliate.payouts.process');
     });
 
@@ -274,7 +297,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('content/pages/{page}', [PageController::class, 'update'])->name('admin.pages.update');
         Route::get('content/pages/{page}/preview', [PageController::class, 'preview'])->name('admin.pages.preview');
         Route::post('content/pages/{page}/restore', [PageController::class, 'restore'])->withTrashed()->name('admin.pages.restore');
-        Route::delete('content/pages/{page}/force-delete', [PageController::class, 'forceDelete'])->withTrashed()->name('admin.pages.force-delete');
+        Route::delete('content/pages/{page}/force-delete', [PageController::class, 'forceDelete'])->withTrashed()->middleware('admin.super')->name('admin.pages.force-delete');
         Route::delete('content/pages/{page}', [PageController::class, 'destroy'])->name('admin.pages.delete');
     });
 
@@ -337,18 +360,6 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         // Appearance: Sidebar Builder
         Route::get('appearance/sidebar', [SidebarController::class, 'index'])->name('admin.sidebar.index');
         Route::post('appearance/sidebar', [SidebarController::class, 'update'])->name('admin.sidebar.update');
-
-        // AI: Templates
-        Route::prefix('ai/templates')->name('admin.ai.templates.')->group(function () {
-            Route::get('/', [SiteTemplateController::class, 'index'])->name('index');
-            Route::get('{template}/edit', [SiteTemplateController::class, 'edit'])->name('edit');
-            Route::post('{template}', [SiteTemplateController::class, 'update'])->name('update');
-            Route::post('{template}/toggle', [SiteTemplateController::class, 'toggle'])->name('toggle');
-            Route::post('{template}/reset', [SiteTemplateController::class, 'resetToDefaults'])->name('reset');
-            Route::post('{template}/chatbot-settings', [SiteTemplateController::class, 'saveChatbotSettings'])->name('chatbot-settings');
-            Route::post('{template}/platform-settings', [SiteTemplateController::class, 'savePlatformSettings'])->name('platform-settings');
-            Route::post('{template}/stage-settings', [SiteTemplateController::class, 'saveStageSettings'])->name('stage-settings');
-        });
     });
 
     // Ads System
@@ -448,7 +459,6 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::get('content/testimonials', [TestimonialController::class, 'index'])->name('admin.testimonials.index');
         Route::post('content/testimonials', [TestimonialController::class, 'store'])->name('admin.testimonials.store');
         Route::post('content/testimonials/sort', [TestimonialController::class, 'bulkSort'])->name('admin.testimonials.sort');
-        Route::post('content/testimonials/import', [TestimonialController::class, 'import'])->name('admin.testimonials.import');
         Route::post('content/testimonials/generate', [TestimonialController::class, 'generate'])->name('admin.testimonials.generate');
         Route::post('content/testimonials/{testimonial}', [TestimonialController::class, 'update'])->name('admin.testimonials.update');
         Route::post('content/testimonials/{testimonial}/featured', [TestimonialController::class, 'toggleFeatured'])->name('admin.testimonials.featured');
@@ -461,7 +471,6 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::get('content/faqs', [FaqController::class, 'index'])->name('admin.faqs.index');
         Route::post('content/faqs', [FaqController::class, 'store'])->name('admin.faqs.store');
         Route::post('content/faqs/sort', [FaqController::class, 'bulkSort'])->name('admin.faqs.sort');
-        Route::post('content/faqs/import', [FaqController::class, 'import'])->name('admin.faqs.import');
         Route::post('content/faqs/generate', [FaqController::class, 'generate'])->name('admin.faqs.generate');
         Route::post('content/faqs/{faq}', [FaqController::class, 'update'])->name('admin.faqs.update');
         Route::post('content/faqs/{faq}/active', [FaqController::class, 'toggleActive'])->name('admin.faqs.active');
@@ -500,7 +509,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('posts/{post}/duplicate', [BlogPostController::class, 'duplicate'])->name('posts.duplicate');
         Route::get('posts/trash', [BlogPostController::class, 'trash'])->name('posts.trash');
         Route::post('posts/{post}/restore', [BlogPostController::class, 'restore'])->withTrashed()->name('posts.restore');
-        Route::delete('posts/{post}/force-delete', [BlogPostController::class, 'forceDelete'])->withTrashed()->name('posts.force-delete');
+        Route::delete('posts/{post}/force-delete', [BlogPostController::class, 'forceDelete'])->withTrashed()->middleware('admin.super')->name('posts.force-delete');
         Route::get('posts/{post}/preview', [BlogPostController::class, 'preview'])->name('posts.preview');
         Route::resource('posts', BlogPostController::class)->except(['show']);
 
@@ -542,7 +551,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::get('/tools/trash', [AiToolController::class, 'trash'])->name('tools.trash');
         Route::post('/tools/trash/bulk', [AiToolController::class, 'bulkTrash'])->name('tools.trash.bulk');
         Route::post('/tools/{tool}/restore', [AiToolController::class, 'restore'])->withTrashed()->name('tools.restore');
-        Route::delete('/tools/{tool}/force-delete', [AiToolController::class, 'forceDelete'])->withTrashed()->name('tools.force-delete');
+        Route::delete('/tools/{tool}/force-delete', [AiToolController::class, 'forceDelete'])->withTrashed()->middleware('admin.super')->name('tools.force-delete');
         Route::post('/tools/reviews/{review}/action', [AiToolController::class, 'reviewAction'])->name('tools.reviews.action');
 
         // Tool Reviews Management

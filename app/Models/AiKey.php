@@ -27,6 +27,13 @@ class AiKey extends Model
     ];
 
     /**
+     * Never expose the (decrypting) api_key accessor when the model is
+     * serialized to JSON/array. Controllers surface a masked value explicitly;
+     * this prevents any accidental leak of the raw key to the frontend or logs.
+     */
+    protected $hidden = ['api_key'];
+
+    /**
      * Encrypt the API key when setting it.
      */
     public function setApiKeyAttribute($value)

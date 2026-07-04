@@ -364,215 +364,214 @@ onBeforeUnmount(() => {
     <Head :title="t('Announcements - Admin')" />
 
     <AdminLayout>
-        <div class="py-6">
-            <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-                <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Announcements') }}</h1>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage sitewide banners, popup campaigns, and in-app notifications.') }}</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary"
-                        @click="openCreate"
-                    >
-                        <i class="ti ti-plus text-base"></i>
-                        {{ t('Add Announcement') }}
-                    </button>
+                <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Announcements') }}</h1>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage sitewide banners, popup campaigns, and in-app notifications.') }}</p>
                 </div>
 
-                <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                    <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                            <div class="w-full xl:max-w-md">
-                                <div class="relative">
-                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                        <i class="ti ti-search text-base"></i>
-                                    </span>
-                                    <input
-                                        ref="searchInputRef"
-                                        v-model="searchQuery"
-                                        type="text"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        :placeholder="t('Search announcements by title, content, type, or audience...')"
-                                    >
-                                    <span
-                                        v-if="!searchQuery"
-                                        class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
-                                    >
-                                        /
-                                    </span>
-                                    <button
-                                        v-if="searchQuery"
-                                        type="button"
-                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                        :aria-label="t('Clear search')"
-                                        :title="t('Clear search')"
-                                        @click="searchQuery = ''"
-                                    >
-                                        <i class="ti ti-x text-base"></i>
-                                    </button>
-                                </div>
-                            </div>
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary"
+                    @click="openCreate"
+                >
+                    <i class="ti ti-plus text-base"></i>
+                    {{ t('Add Announcement') }}
+                </button>
+            </div>
 
-                            <div class="flex flex-col gap-3 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
-                                <div class="w-full md:w-56">
-                                    <AppSelect v-model="audienceFilter" :options="audienceFilterOptions" />
-                                </div>
-
-                                <div class="w-full md:w-48">
-                                    <AppSelect v-model="statusFilter" :options="statusFilterOptions" />
-                                </div>
-
-                                <button
-                                    v-if="hasNonSearchFilters"
-                                    type="button"
-                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-                                    @click="clearSearchAndFilters"
+            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div class="w-full xl:max-w-md">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-search text-base"></i>
+                                </span>
+                                <input
+                                    ref="searchInputRef"
+                                    v-model="searchQuery"
+                                    type="text"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    :placeholder="t('Search announcements by title, content, type, or audience...')"
                                 >
-                                    <i class="ti ti-filter-x text-base"></i>
-                                    {{ t('Clear Filters') }}
+                                <span
+                                    v-if="!searchQuery"
+                                    class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                                >
+                                    /
+                                </span>
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear search')"
+                                    :title="t('Clear search')"
+                                    @click="searchQuery = ''"
+                                >
+                                    <i class="ti ti-x text-base"></i>
                                 </button>
                             </div>
                         </div>
-                    </div>
 
-                    <div v-if="filteredAnnouncements.length === 0" class="px-6 py-14 text-center">
-                        <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
-                            <i class="ti ti-speakerphone text-2xl"></i>
-                        </div>
-                        <h3 class="mt-4 text-lg font-bold text-gray-900 dark:text-white">
-                            {{ props.totalCount === 0 ? t('No announcements yet') : t('No matching announcements found') }}
-                        </h3>
-                        <p class="mx-auto mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-                            {{
-                                props.totalCount === 0
-                                    ? t('Create promotional banners, popup campaigns, or notices for your users.')
-                                    : t('Try another search term or clear the active audience and status filters.')
-                            }}
-                        </p>
-                        <div class="mt-6 flex justify-center gap-3">
+                        <div class="flex flex-col gap-3 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
+                            <div class="w-full md:w-56">
+                                <AppSelect v-model="audienceFilter" :options="audienceFilterOptions" />
+                            </div>
+
+                            <div class="w-full md:w-48">
+                                <AppSelect v-model="statusFilter" :options="statusFilterOptions" />
+                            </div>
+
                             <button
-                                v-if="props.totalCount === 0"
+                                v-if="hasNonSearchFilters"
                                 type="button"
-                                class="rounded-lg px-5 py-2.5 text-sm font-medium text-white btn-primary"
-                                @click="openCreate"
-                            >
-                                {{ t('Add First Announcement') }}
-                            </button>
-                            <button
-                                v-else
-                                type="button"
-                                class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
                                 @click="clearSearchAndFilters"
                             >
+                                <i class="ti ti-filter-x text-base"></i>
                                 {{ t('Clear Filters') }}
                             </button>
                         </div>
                     </div>
+                </div>
 
-                    <div v-else class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
-                                <tr>
-                                    <th scope="col" class="px-6 py-3">{{ t('Announcement') }}</th>
-                                    <th scope="col" class="px-6 py-3">{{ t('Type') }}</th>
-                                    <th scope="col" class="px-6 py-3">{{ t('Audience') }}</th>
-                                    <th scope="col" class="px-6 py-3">{{ t('Schedule') }}</th>
-                                    <th scope="col" class="px-6 py-3">{{ t('Status') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-right">{{ t('Action') }}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr
-                                    v-for="announcement in filteredAnnouncements"
-                                    :key="announcement.id"
-                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-primary-50/40 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
-                                >
-                                    <td class="px-6 py-4">
-                                        <div class="min-w-[260px]">
-                                            <div class="font-medium text-gray-900 dark:text-white">
-                                                {{ announcement.title || t('Untitled') }}
-                                            </div>
-                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                                {{ excerptContent(announcement.content) || t('No content added yet.') }}
-                                            </p>
+                <div v-if="filteredAnnouncements.length === 0" class="px-6 py-14 text-center">
+                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
+                        <i class="ti ti-speakerphone text-2xl"></i>
+                    </div>
+                    <h3 class="mt-4 text-lg font-bold text-gray-900 dark:text-white">
+                        {{ props.totalCount === 0 ? t('No announcements yet') : t('No matching announcements found') }}
+                    </h3>
+                    <p class="mx-auto mt-2 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+                        {{
+                            props.totalCount === 0
+                                ? t('Create promotional banners, popup campaigns, or notices for your users.')
+                                : t('Try another search term or clear the active audience and status filters.')
+                        }}
+                    </p>
+                    <div class="mt-6 flex justify-center gap-3">
+                        <button
+                            v-if="props.totalCount === 0"
+                            type="button"
+                            class="rounded-lg px-5 py-2.5 text-sm font-medium text-white btn-primary"
+                            @click="openCreate"
+                        >
+                            {{ t('Add First Announcement') }}
+                        </button>
+                        <button
+                            v-else
+                            type="button"
+                            class="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                            @click="clearSearchAndFilters"
+                        >
+                            {{ t('Clear Filters') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">{{ t('Announcement') }}</th>
+                                <th scope="col" class="px-6 py-3">{{ t('Type') }}</th>
+                                <th scope="col" class="px-6 py-3">{{ t('Audience') }}</th>
+                                <th scope="col" class="px-6 py-3">{{ t('Schedule') }}</th>
+                                <th scope="col" class="px-6 py-3">{{ t('Status') }}</th>
+                                <th scope="col" class="px-6 py-3 text-right">{{ t('Action') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="announcement in filteredAnnouncements"
+                                :key="announcement.id"
+                                class="border-b border-gray-100 bg-white transition-colors hover:bg-primary-50/40 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                            >
+                                <td class="px-6 py-4">
+                                    <div class="min-w-[260px]">
+                                        <div class="font-medium text-gray-900 dark:text-white">
+                                            {{ announcement.title || t('Untitled') }}
                                         </div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span :class="typeColor[announcement.type]" class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]">
-                                            {{ typeLabel[announcement.type] }}
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            {{ excerptContent(announcement.content) || t('No content added yet.') }}
+                                        </p>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span :class="typeColor[announcement.type]" class="inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]">
+                                        {{ typeLabel[announcement.type] }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                        {{ audienceLabel[announcement.target_audience] }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
+                                    <div>{{ frequencyLabel[announcement.show_frequency] }}</div>
+                                    <div v-if="announcement.starts_at" class="mt-1">{{ t('Starts') }}: {{ formatDate(announcement.starts_at) }}</div>
+                                    <div v-if="announcement.ends_at">{{ t('Ends') }}: {{ formatDate(announcement.ends_at) }}</div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <span
+                                            class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
+                                            :class="announcement.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
+                                        >
+                                            {{ announcement.is_active ? t('Active') : t('Inactive') }}
                                         </span>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                                            {{ audienceLabel[announcement.target_audience] }}
-                                        </span>
-                                    </td>
-                                    <td class="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
-                                        <div>{{ frequencyLabel[announcement.show_frequency] }}</div>
-                                        <div v-if="announcement.starts_at" class="mt-1">{{ t('Starts') }}: {{ formatDate(announcement.starts_at) }}</div>
-                                        <div v-if="announcement.ends_at">{{ t('Ends') }}: {{ formatDate(announcement.ends_at) }}</div>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-3">
+                                        <button
+                                            type="button"
+                                            :aria-label="announcement.is_active ? t('Disable announcement') : t('Enable announcement')"
+                                            class="relative inline-flex h-5 w-9 rounded-full transition-colors"
+                                            :class="announcement.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'"
+                                            @click="toggleActive(announcement.id)"
+                                        >
                                             <span
-                                                class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium"
-                                                :class="announcement.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'"
-                                            >
-                                                {{ announcement.is_active ? t('Active') : t('Inactive') }}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                :aria-label="announcement.is_active ? t('Disable announcement') : t('Enable announcement')"
-                                                class="relative inline-flex h-5 w-9 rounded-full transition-colors"
-                                                :class="announcement.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-700'"
-                                                @click="toggleActive(announcement.id)"
-                                            >
-                                                <span
-                                                    class="pointer-events-none mt-0.5 ml-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
-                                                    :class="announcement.is_active ? 'translate-x-4' : 'translate-x-0'"
-                                                ></span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <div class="inline-flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                                                :aria-label="t('Edit announcement')"
-                                                @click="openEdit(announcement)"
-                                            >
-                                                <i class="ti ti-edit text-base"></i>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-danger-600 transition-colors hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-900/20"
-                                                :aria-label="t('Delete announcement')"
-                                                @click="remove(announcement.id)"
-                                            >
-                                                <i class="ti ti-trash text-base"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                                                class="pointer-events-none mt-0.5 ml-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
+                                                :class="announcement.is_active ? 'translate-x-4' : 'translate-x-0'"
+                                            ></span>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="inline-flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                                            :aria-label="t('Edit announcement')"
+                                            @click="openEdit(announcement)"
+                                        >
+                                            <i class="ti ti-edit text-base"></i>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-danger-600 transition-colors hover:bg-danger-50 dark:text-danger-400 dark:hover:bg-danger-900/20"
+                                            :aria-label="t('Delete announcement')"
+                                            @click="remove(announcement.id)"
+                                        >
+                                            <i class="ti ti-trash text-base"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-                    <div v-if="announcements.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                        <Pagination
-                            :links="announcements.links"
-                            :from="announcements.from"
-                            :to="announcements.to"
-                            :total="announcements.total"
-                        />
-                    </div>
+                <div v-if="announcements.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                    <Pagination
+                        :links="announcements.links"
+                        :from="announcements.from"
+                        :to="announcements.to"
+                        :total="announcements.total"
+                    />
                 </div>
             </div>
         </div>
+    
 
         <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm" @click.self="closeForm">
             <div class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">

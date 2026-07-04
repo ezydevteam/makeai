@@ -14,6 +14,7 @@ class ReplyTicketRequest extends FormRequest
         $ticket = $this->route('ticket');
 
         return $this->user() !== null
+            && ! $this->user()->is_banned
             && $ticket
             && $ticket->user_id === $this->user()->id
             && ! in_array($ticket->status, ['closed'], true);

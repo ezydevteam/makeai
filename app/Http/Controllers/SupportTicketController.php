@@ -8,10 +8,13 @@ use App\Http\Requests\Support\StoreTicketRequest;
 use App\Models\Admin;
 use App\Models\SupportDepartment;
 use App\Models\SupportTicket;
+use App\Models\SupportTicketAttachment;
 use App\Models\User;
 use App\Services\InAppNotificationService;
 use App\Services\SupportTicketService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Inertia\Inertia;
 
 class SupportTicketController extends Controller
@@ -122,6 +125,34 @@ class SupportTicketController extends Controller
         );
 
         return back()->with('success', translate('Thanks for rating this support ticket.'));
+    }
+
+    /**
+     * Stream a support attachment from the private disk. Accessible to the
+     * ticket owner or to an admin holding the support.tickets permission — the
+     * files themselves are never publicly reachable.
+     */
+    public function downloadAttachment(SupportTicketAttachment $attachment): StreamedResponse
+    {
+        $ticket = $attachment->ticket;
+        abort_unless($ticket !== null, 404);
+
+        $admin = auth('admin')->user();
+        $user = auth('web')->user();
+
+        $allowed = ($admin && $admin->hasAnyPermission(['support.tickets']))
+            || ($user && $ticket->user_id === $user->id);
+
+        abort_unless($allowed, 403);
+
+        // Prefer the private disk; fall back to public for any pre-existing files.
+        foreach (['local', 'public'] as $disk) {
+            if ($attachment->file_path && Storage::disk($disk)->exists($attachment->file_path)) {
+                return Storage::disk($disk)->download($attachment->file_path, $attachment->file_name);
+            }
+        }
+
+        abort(404);
     }
 
     private function ticketPayload(SupportTicket $ticket, bool $includeInternal): array

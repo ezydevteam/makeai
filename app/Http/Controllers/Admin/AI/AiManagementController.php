@@ -58,6 +58,13 @@ class AiManagementController extends Controller
                 'fallback_model' => settings('fallback_ai_model', ''),
                 'max_tokens' => settings('max_tokens_per_request', config('ai.limits.max_tokens_per_request')),
                 'show_tool_credit_costs' => (bool) settings('show_tool_credit_costs', true),
+                // Spend controls (0 = disabled)
+                'user_daily_credit_limit' => (float) settings('user_daily_credit_limit', 0),
+                'user_monthly_credit_limit' => (float) settings('user_monthly_credit_limit', 0),
+                'global_daily_ai_budget_usd' => (float) settings('global_daily_ai_budget_usd', 0),
+                'credit_alert_threshold' => (int) settings('credit_alert_threshold', 100),
+                'public_tool_max_output_chars' => (int) settings('public_tool_max_output_chars', 1200),
+                'ai_max_input_chars' => (int) settings('ai_max_input_chars', 30000),
             ],
         ]);
     }
@@ -74,6 +81,12 @@ class AiManagementController extends Controller
             'fallback_model' => 'nullable|string|max:100',
             'max_tokens' => 'required|integer|min:1|max:128000',
             'show_tool_credit_costs' => 'required|boolean',
+            'user_daily_credit_limit' => 'nullable|numeric|min:0|max:100000000',
+            'user_monthly_credit_limit' => 'nullable|numeric|min:0|max:100000000',
+            'global_daily_ai_budget_usd' => 'nullable|numeric|min:0|max:1000000',
+            'credit_alert_threshold' => 'nullable|integer|min:0|max:100000000',
+            'public_tool_max_output_chars' => 'nullable|integer|min:0|max:100000',
+            'ai_max_input_chars' => 'nullable|integer|min:1000|max:500000',
         ]);
 
         // Validate that the selected model belongs to the selected provider
@@ -109,6 +122,14 @@ class AiManagementController extends Controller
         Setting::setValue('max_tokens_per_request', $data['max_tokens'], 'integer', 'ai');
         Setting::setValue('default_max_tokens', $data['max_tokens'], 'integer', 'ai');
         Setting::setValue('show_tool_credit_costs', $data['show_tool_credit_costs'], 'boolean', 'ai');
+
+        // Spend controls (0 = disabled)
+        Setting::setValue('user_daily_credit_limit', (string) ($data['user_daily_credit_limit'] ?? 0), 'string', 'ai');
+        Setting::setValue('user_monthly_credit_limit', (string) ($data['user_monthly_credit_limit'] ?? 0), 'string', 'ai');
+        Setting::setValue('global_daily_ai_budget_usd', (string) ($data['global_daily_ai_budget_usd'] ?? 0), 'string', 'ai');
+        Setting::setValue('credit_alert_threshold', (int) ($data['credit_alert_threshold'] ?? 100), 'integer', 'ai');
+        Setting::setValue('public_tool_max_output_chars', (int) ($data['public_tool_max_output_chars'] ?? 1200), 'integer', 'ai');
+        Setting::setValue('ai_max_input_chars', (int) ($data['ai_max_input_chars'] ?? 30000), 'integer', 'ai');
 
         return back()->with('success', translate('AI settings updated successfully.'));
     }
@@ -560,6 +581,8 @@ class AiManagementController extends Controller
                 'search_mode' => settings('rag_search_mode', 'vector'),
                 'chunking_mode' => settings('rag_chunking_mode', 'fixed'),
                 'map_reduce_batch_size' => (int) settings('rag_map_reduce_batch_size', 10),
+                'ingest_credits_per_mb' => (float) settings('rag_ingest_credits_per_mb', 0),
+                'ingest_credits_url' => (float) settings('rag_ingest_credits_url', 0),
             ],
             'embeddingModels' => $embeddingModels,
             'fallbackEmbedding' => [
@@ -589,6 +612,8 @@ class AiManagementController extends Controller
             'search_mode' => 'required|string|in:vector,hybrid',
             'chunking_mode' => 'required|string|in:fixed,semantic',
             'map_reduce_batch_size' => 'required|integer|min:1|max:50',
+            'ingest_credits_per_mb' => 'nullable|numeric|min:0|max:100000',
+            'ingest_credits_url' => 'nullable|numeric|min:0|max:100000',
         ]);
 
         // Validate system_prompt contains {context} placeholder
@@ -613,6 +638,8 @@ class AiManagementController extends Controller
         Setting::setValue('rag_search_mode', $data['search_mode'], 'string', 'rag');
         Setting::setValue('rag_chunking_mode', $data['chunking_mode'], 'string', 'rag');
         Setting::setValue('rag_map_reduce_batch_size', $data['map_reduce_batch_size'], 'integer', 'rag');
+        Setting::setValue('rag_ingest_credits_per_mb', (string) ($data['ingest_credits_per_mb'] ?? 0), 'string', 'rag');
+        Setting::setValue('rag_ingest_credits_url', (string) ($data['ingest_credits_url'] ?? 0), 'string', 'rag');
 
         return back()->with('success', translate('RAG settings updated successfully.'));
     }

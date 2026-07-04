@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Services\Pricing\PlanPriceResolver;
+use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -26,6 +27,43 @@ class StripeController extends Controller
         $pricing = $resolver->resolve($plan, $countryCode);
         $cycle = $pricing[$validated['billing']];
         $billing = $validated['billing'];
+
+        // Free trials are handled locally (no card required) — same as every other gateway.
+        if (! empty($cycle['is_trial']) && (float) $cycle['amount'] <= 0) {
+            if ($user->has_trialed) {
+                return redirect()->route('pricing')
+                    ->with('error', translate('You have already used your free trial. Please choose a paid plan.'));
+            }
+
+            $subscription = app(SubscriptionLifecycleService::class)->startTrial(
+                $user,
+                $plan,
+                $billing,
+                'stripe',
+                (int) (($cycle['trial_days'] ?? 0) ?: 30),
+                $pricing['currency_code'],
+            );
+
+            Payment::create([
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'subscription_id' => $subscription->id,
+                'gateway' => 'stripe',
+                'gateway_payment_id' => 'trial-'.$subscription->id,
+                'amount' => 0,
+                'currency' => $pricing['currency_code'],
+                'status' => 'completed',
+                'type' => 'subscription',
+                'metadata' => [
+                    'billing_cycle' => $billing,
+                    'pricing_country' => $pricing['country_code'],
+                    'pricing_source' => $pricing['source'],
+                    'is_trial' => true,
+                ],
+            ]);
+
+            return redirect()->route('user.dashboard')->with('success', translate('Trial activated successfully.'));
+        }
 
         // Create pending payment record for unified lifecycle tracking (bridges Cashier and custom GatewaySubscription)
         $payment = Payment::create([

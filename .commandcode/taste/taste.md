@@ -11,6 +11,9 @@
 # admin-ui
 - Use AppSelect and AppColorPicker components instead of native &lt;select&gt; and color text inputs in admin panel interfaces. Confidence: 0.75
 - Admin panel color variables are completely separate from frontend theme color variables — admin uses its own admin-specific primary color and color scheme. Do not reference frontend theme colors (e.g., `--color-primary-500` from the frontend palette) in admin panel styling. Confidence: 0.80
+- All admin primary buttons should use a gradient: `bg-gradient-to-r from-primary-500 to-primary-600` with hover `from-primary-600 to-primary-500`, with `rounded-lg` border radius, and use a uniform class name (e.g., `btn-primary-admin`). Confidence: 0.80
+- All admin panel pages must have uniform vertical padding/spacing for consistency, critical for Envato marketplace quality standards. Confidence: 0.75
+- In admin addon settings pages, keep the design minimal — remove unnecessary elements like Configuration Overview, enable/disable status badges, settings counts, top addon badges, and bottom save button cards. Confidence: 0.75
 
 # vue
 - When a section visibility toggle disables a section, auto-collapse its settings panel; when enabling, auto-expand it — bidirectional toggle-visibility-to-collapse linkage. Confidence: 0.70
@@ -53,6 +56,9 @@ See [code-style/taste.md](code-style/taste.md)
 
 # admin-rbac
 - Admin permissions use a pivot table (`admin_role_permissions` with `role_id` + `permission_id`) rather than a JSON column on `admin_roles`. Use `DB::table('admin_role_permissions')->updateOrInsert(...)` to grant permissions, not `json_encode` on a `permissions` column. Confidence: 0.70
+
+# laravel-controllers
+- Organize billing/payment controllers into a dedicated `billing/` subfolder within the controller directory rather than keeping them in the root `User/` or root controller namespace. Confidence: 0.70
 
 # laravel-eloquent
 - Aggregate methods like `max('updated_at')` return raw database values (strings), not Carbon instances — Eloquent date casting does not apply. Use `->latest('updated_at')->value('updated_at')` or `->latest('updated_at')->first()?->updated_at` if you need a Carbon object with methods like `->timestamp`. Confidence: 0.70

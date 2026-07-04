@@ -128,15 +128,16 @@ class RateLimiterService
         return $this->fixedWindowStatus($category, $key, $maxAttempts, $windowSeconds);
     }
 
-    public function banIp(string $ip, string $reason, string $category, ?int $adminId = null, ?int $expiresInSeconds = null): void
+    public function banIp(string $ip, string $reason, string $category = 'all', ?int $adminId = null, ?int $expiresInSeconds = null): void
     {
         $expiresAt = $expiresInSeconds ? now()->addSeconds($expiresInSeconds) : null;
 
+        // Keyed on (ip_address, category) so an IP can hold independent bans per
+        // scope; re-banning the same scope refreshes the existing row.
         BannedIp::updateOrCreate(
-            ['ip_address' => $ip],
+            ['ip_address' => $ip, 'category' => $category],
             [
                 'reason' => $reason,
-                'category' => $category,
                 'banned_at' => now(),
                 'expires_at' => $expiresAt,
                 'banned_by' => $adminId,
@@ -144,14 +145,37 @@ class RateLimiterService
         );
     }
 
-    public function unbanIp(string $ip): void
+    public function unbanIp(string $ip, ?string $category = null): void
     {
-        BannedIp::where('ip_address', $ip)->delete();
+        BannedIp::where('ip_address', $ip)
+            ->when($category !== null, fn ($q) => $q->where('category', $category))
+            ->delete();
     }
 
-    public function isIpBanned(string $ip): bool
+    /**
+     * Whether the IP is banned for the given endpoint category. A global ('all')
+     * ban blocks everything; a scoped ban blocks only its own category. When no
+     * category is supplied, only global bans count.
+     */
+    public function isIpBanned(string $ip, ?string $category = null): bool
     {
-        return BannedIp::where('ip_address', $ip)->active()->exists();
+        return BannedIp::where('ip_address', $ip)
+            ->active()
+            ->forEndpoint($category)
+            ->exists();
+    }
+
+    /**
+     * Whether the IP carries an active "entire site" ban — enforced globally on
+     * every request (not just throttled endpoints) by the BlockBannedIps
+     * middleware.
+     */
+    public function isIpBlockedSiteWide(string $ip): bool
+    {
+        return BannedIp::where('ip_address', $ip)
+            ->active()
+            ->where('category', 'site')
+            ->exists();
     }
 
     public function checkAiAbuse(string $ip, string $category): bool
@@ -159,9 +183,17 @@ class RateLimiterService
         $threshold = (int) settings('rl_ai_abuse_threshold', 100);
         $windowMinutes = (int) settings('rl_ai_abuse_window', 60);
         $banDuration = (int) settings('rl_ai_abuse_ban_duration', 86400);
+        $windowSeconds = $windowMinutes * 60;
+
+        if ($threshold <= 0 || $windowSeconds <= 0) {
+            return false;
+        }
+
+        if (! $this->isRedisAvailable()) {
+            return $this->checkAiAbuseDb($ip, $category, $threshold, $windowSeconds, $windowMinutes, $banDuration);
+        }
 
         $abuseKey = self::PREFIX."abuse:{$category}:ip:{$ip}";
-        $windowSeconds = $windowMinutes * 60;
         $now = microtime(true);
 
         Redis::zremrangebyscore($abuseKey, '-inf', $now - $windowSeconds);
@@ -175,6 +207,34 @@ class RateLimiterService
         if ($count >= $threshold) {
             $this->banIp($ip, "AI abuse: {$count} rate limit hits in {$windowMinutes} min", $category, null, $banDuration);
             Redis::del($abuseKey);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * DB-backed abuse tracking for installs without Redis (fixed window).
+     */
+    private function checkAiAbuseDb(string $ip, string $category, int $threshold, int $windowSeconds, int $windowMinutes, int $banDuration): bool
+    {
+        $abuseCategory = "abuse_{$category}";
+        $key = "ip:{$ip}";
+
+        $this->fixedWindowHit($abuseCategory, $key, $windowSeconds);
+
+        $dbKey = self::PREFIX."{$abuseCategory}:{$key}";
+        $windowStart = (int) (time() / $windowSeconds) * $windowSeconds;
+
+        $hits = (int) (DB::table('rate_limit_hits')
+            ->where('key', $dbKey)
+            ->where('window_start', $windowStart)
+            ->value('hits') ?? 0);
+
+        if ($hits >= $threshold) {
+            $this->banIp($ip, "AI abuse: {$hits} rate limit hits in {$windowMinutes} min", $category, null, $banDuration);
+            DB::table('rate_limit_hits')->where('key', $dbKey)->delete();
 
             return true;
         }

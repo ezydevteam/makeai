@@ -68,13 +68,16 @@ class LicenseSettingsController extends Controller
             403
         );
 
-        $success = $this->licenseService->reverify();
+        // Force a real server round-trip. Without force, reverify() short-circuits
+        // to true when still inside the recheck window, making this button a no-op
+        // that reports success without actually contacting the license server.
+        $success = $this->licenseService->reverify(force: true);
 
         return back()->with(
             $success ? 'success' : 'error',
             $success
                 ? translate('License re-verified successfully.')
-                : translate('Re-verification failed. Grace period started.')
+                : translate('Re-verification did not succeed. Please check your server\'s internet connection and try again.')
         );
     }
 }

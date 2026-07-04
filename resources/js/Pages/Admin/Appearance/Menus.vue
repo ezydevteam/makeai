@@ -512,7 +512,7 @@ const importMenu = () => {
                         v-for="menu in menus"
                         :key="menu.id"
                         type="button"
-                        class="flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition dark:border-surface-700 rtl:text-right"
+                        class="flex w-full items-center justify-between rounded-xl border px-4 py-2 text-left text-sm transition dark:border-surface-700 rtl:text-right"
                         :class="selectedMenu?.id === menu.id ? 'border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-primary-200 hover:bg-white dark:bg-surface-800/70 dark:text-gray-300 dark:hover:border-primary-900/40 dark:hover:bg-surface-800'"
                         @click="selectedMenuId = menu.id"
                     >
@@ -532,7 +532,6 @@ const importMenu = () => {
 
                 <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
                     <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Quick Add Shortcuts') }}</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Create ready-made links from your active blog and AI categories.') }}</p>
 
                     <div class="mt-5 space-y-5">
                         <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
@@ -583,20 +582,20 @@ const importMenu = () => {
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ selectedMenu.name }}</h2>
-                            <p class="mt-1 font-mono text-xs uppercase tracking-wide text-gray-400">{{ t('Slug') }}: {{ selectedMenu.slug }}</p>
+                            <p class="font-mono text-xs uppercase tracking-wide text-gray-400">{{ t('Slug') }}: {{ selectedMenu.slug }}</p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <Tooltip :content="t('Edit Menu')" placement="top">
-                                <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 transition hover:bg-gray-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800" :aria-label="t('Edit Menu')" @click="openEditMenu(selectedMenu)">
+                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800" :aria-label="t('Edit Menu')" @click="openEditMenu(selectedMenu)">
                                     <i class="ti ti-edit text-base"></i>
                                 </button>
                             </Tooltip>
                             <Tooltip :content="t('Delete')" placement="top">
-                                <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-danger-600 transition hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300" :aria-label="t('Delete')" @click="requestDeleteMenu(selectedMenu)">
+                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300" :aria-label="t('Delete')" @click="requestDeleteMenu(selectedMenu)">
                                     <i class="ti ti-trash text-base"></i>
                                 </button>
                             </Tooltip>
-                            <button type="button" class="inline-flex h-10 px-4 items-center gap-2 rounded-lg bg-gray-600 text-sm font-semibold text-white transition hover:bg-gray-700 dark:bg-gray-800" @click="openCreateItem">
+                            <button type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-100 px-4 text-sm font-semibold text-primary-700 transition hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40" @click="openCreateItem">
                                 <i class="ti ti-plus text-sm"></i>
                                 {{ t('Add Link') }}
                             </button>

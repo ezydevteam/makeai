@@ -32,7 +32,7 @@ Route::middleware(['web', 'admin.auth'])
         });
     });
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'addon.enabled:social-scheduler'])
     ->prefix('social')
     ->name('addon.social.user.')
     ->group(function () {

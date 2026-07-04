@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin\CMS;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\FaqCategoryRequest;
 use App\Http\Requests\Admin\FaqGenerateRequest;
-use App\Http\Requests\Admin\FaqImportRequest;
 use App\Http\Requests\Admin\FaqRequest;
 use App\Models\Faq;
 use App\Models\FaqCategory;
@@ -128,30 +127,7 @@ class FaqController extends Controller
         return back();
     }
 
-    public function import(FaqImportRequest $request)
-    {
-        $file = $request->file('csv');
-        $rows = array_map('str_getcsv', file($file->getPathname()));
-        $header = array_map('strtolower', array_map('trim', array_shift($rows)));
-        $imported = 0;
 
-        foreach ($rows as $row) {
-            if (count($row) < count($header)) {
-                continue;
-            }
-            $data = array_combine($header, $row);
-            Faq::create([
-                'question' => $data['question'] ?? $data['q'] ?? 'Untitled',
-                'answer' => $this->sanitizeAnswer($data['answer'] ?? $data['a'] ?? ''),
-                'category_id' => $request->category_id,
-                'is_active' => true,
-                'sort_order' => 0,
-            ]);
-            $imported++;
-        }
-
-        return back()->with('success', translate('Imported :count FAQ(s) from CSV.', ['count' => $imported]));
-    }
 
     public function generate(FaqGenerateRequest $request, AiService $aiService): JsonResponse
     {

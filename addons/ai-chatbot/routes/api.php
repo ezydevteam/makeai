@@ -6,14 +6,14 @@ use Illuminate\Support\Facades\Route;
 use Addons\AiChatbot\Http\Controllers\ChatController;
 use Addons\AiChatbot\Http\Controllers\ChatAttachmentController;
 use Addons\AiChatbot\Http\Controllers\ChatFeedbackController;
-use Addons\AiChatbot\Http\Controllers\ChatProductController;
+use Addons\AiChatbot\Http\Controllers\ChatModeController;
 use Addons\AiChatbot\Http\Controllers\ChatProjectController;
 use Addons\AiChatbot\Http\Controllers\ConversationTagController;
 
 Route::middleware(['api'])->prefix('api/v1')->group(function () {
-    Route::get('/chat/products', [ChatProductController::class, 'index']);
+    Route::get('/chat/modes', [ChatModeController::class, 'index']);
 
-    Route::middleware(['web', 'auth'])->prefix('chat')->group(function () {
+    Route::middleware(['web', \Addons\AiChatbot\Http\Middleware\ChatGuestAccess::class])->prefix('chat')->group(function () {
         Route::post('/attachments', [ChatAttachmentController::class, 'store']);
         Route::get('/attachments/{id}/preview', [ChatAttachmentController::class, 'preview']);
         Route::post('/feedback', [ChatFeedbackController::class, 'store']);

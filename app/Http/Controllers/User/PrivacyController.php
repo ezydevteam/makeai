@@ -8,12 +8,15 @@ use App\Jobs\PermanentlyDeleteUserJob;
 use App\Models\DataExportRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class PrivacyController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
 
@@ -29,18 +32,24 @@ class PrivacyController extends Controller
                 'is_expired' => $r->isExpired(),
             ]);
 
-        $sessions = $user->loginHistory()
-            ->where('success', true)
-            ->latest()
-            ->take(20)
+        // Drive the list from the real session store (database session driver)
+        // so that "revoke" actually terminates a live session rather than just
+        // hiding a login-history row.
+        $currentSessionId = $request->session()->getId();
+
+        $sessions = DB::table('sessions')
+            ->where('user_id', $user->id)
+            ->orderByDesc('last_activity')
+            ->limit(20)
             ->get()
             ->map(fn ($s) => [
                 'id' => $s->id,
-                'ip' => $s->ip,
-                'country' => $s->country,
-                'city' => $s->city,
+                'ip' => $s->ip_address,
+                'country' => null,
+                'city' => null,
                 'user_agent' => $s->user_agent,
-                'last_seen' => $s->created_at->toIso8601String(),
+                'last_seen' => Carbon::createFromTimestamp((int) $s->last_activity)->toIso8601String(),
+                'is_current' => $s->id === $currentSessionId,
             ]);
 
         $pendingExport = DataExportRequest::forUser($user->id)
@@ -113,16 +122,18 @@ class PrivacyController extends Controller
 
         $request->validate([
             'confirmation' => ['required', 'string', 'in:DELETE'],
-            'otp' => ['required', 'string', 'size:6'],
+            'password' => ['required', 'string'],
         ]);
 
-        if (! $user->verifyOtp($request->input('otp'))) {
-            return back()->with('error', __('Invalid verification code.'));
+        if (! Hash::check($request->input('password'), $user->password)) {
+            return back()->with('error', __('The provided password is incorrect.'));
         }
 
+        // Do NOT deactivate the account here: the grace-period UX requires the
+        // user to be able to log back in to cancel, and login is blocked for
+        // inactive accounts.
         $user->update([
             'scheduled_deletion_at' => now()->addDays(30),
-            'is_active' => false,
         ]);
 
         Auth::logout();
@@ -137,9 +148,10 @@ class PrivacyController extends Controller
     {
         $user = Auth::user();
 
+        // Only clear the deletion schedule — never force is_active back on, or a
+        // user could self-reactivate an account an admin had deactivated.
         $user->update([
             'scheduled_deletion_at' => null,
-            'is_active' => true,
         ]);
 
         return back()->with('success', __('Account deletion has been cancelled.'));
@@ -163,32 +175,32 @@ class PrivacyController extends Controller
     public function revokeSession(Request $request): RedirectResponse
     {
         $user = Auth::user();
-        $sessionId = $request->input('session_id');
+        $sessionId = (string) $request->input('session_id');
 
-        // Delete from actual sessions table to terminate the session
-        \DB::table('sessions')
+        if ($sessionId === $request->session()->getId()) {
+            return back()->with('error', __('You cannot revoke your current session. Use "Sign Out All Devices" instead.'));
+        }
+
+        // Terminate the live session by its real id (scoped to this user).
+        DB::table('sessions')
             ->where('id', $sessionId)
             ->where('user_id', $user->id)
-            ->delete();
-
-        // Also remove from login history (audit log)
-        $user->loginHistory()
-            ->where('id', $sessionId)
             ->delete();
 
         return back()->with('success', __('Session revoked.'));
     }
 
-    public function signOutAllDevices(): RedirectResponse
+    public function signOutAllDevices(Request $request): RedirectResponse
     {
         $user = Auth::user();
 
-        $user->tokens()->delete();
+        // Terminate every stored session for this user (database session driver).
+        DB::table('sessions')->where('user_id', $user->id)->delete();
 
         Auth::logout();
 
-        request()->session()->invalidate();
-        request()->session()->regenerateToken();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return redirect()->route('login')->with('info', __('You have been signed out of all devices.'));
     }

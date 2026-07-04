@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -7,6 +7,8 @@ import AppSelect from '@/Components/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import Pagination from '@/Components/Pagination.vue'
+
+const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -42,7 +44,15 @@ interface ContactSettingsForm {
 }
 
 const props = defineProps<{
-    messages: { data: ContactMessage[]; links: PaginationLink[] }
+    messages: {
+        data: ContactMessage[]
+        links: PaginationLink[]
+        from?: number | null
+        to?: number | null
+        total?: number | null
+        current_page?: number | null
+        last_page?: number | null
+    }
     filters: { search?: string; status?: string }
     stats: { total: number; unread: number; replied: number }
     settings: ContactSettingsForm
@@ -54,12 +64,15 @@ const { t } = useTranslate()
 
 const selected = ref<ContactMessage | null>(props.messages.data[0] ?? null)
 const search = ref(props.filters.search ?? '')
+const searchFocused = ref(false)
 const status = ref(props.filters.status ?? '')
 const deleteTarget = ref<ContactMessage | null>(null)
 const isDeleting = ref(false)
 const searchInput = ref<HTMLInputElement | null>(null)
 const showSettingsModal = ref(props.openSettings)
 const filterDebounce = ref<number | null>(null)
+
+const hasActiveFilters = computed(() => Boolean(search.value || status.value))
 
 const replyForm = useForm({
     subject: '',
@@ -245,7 +258,15 @@ const handleKeydown = (event: KeyboardEvent) => {
         return
     }
 
-    if (event.key === 'Escape' && !showSettingsModal.value && !deleteTarget.value && (search.value || status.value)) {
+    if (event.key === 'Escape' && document.activeElement === searchInput.value) {
+        event.preventDefault()
+        search.value = ''
+        applyFilters()
+        searchInput.value?.blur()
+        return
+    }
+
+    if (event.key === 'Escape' && !showSettingsModal.value && !deleteTarget.value && hasActiveFilters.value) {
         event.preventDefault()
         clearFilters()
     }
@@ -301,7 +322,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Contact Messages')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Contact Messages') }}</h1>
@@ -311,22 +332,22 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
+                <a
+                    :href="route('admin.contact.messages.export')"
+                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                >
+                    <i class="ti ti-file-export text-base"></i>
+                    {{ t('Export CSV') }}
+                </a>
                 <button
                     v-if="canManageSettings"
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                    class="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
                     @click="openSettingsModal"
                 >
                     <i class="ti ti-settings text-base"></i>
                     {{ t('Settings') }}
                 </button>
-                <a
-                    :href="route('admin.contact.messages.export')"
-                    class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
-                >
-                    <i class="ti ti-file-export text-base"></i>
-                    {{ t('Export CSV') }}
-                </a>
             </div>
         </section>
 
@@ -339,11 +360,13 @@ onBeforeUnmount(() => {
                             ref="searchInput"
                             v-model="search"
                             :placeholder="t('Search by name, email, or subject')"
-                            type="search"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-700 transition focus:border-primary-300 focus:outline-none focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            type="text"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-700 transition focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            @focus="searchFocused = true"
+                            @blur="searchFocused = false"
                         >
                         <span
-                            v-if="!search"
+                            v-if="!search && !searchFocused"
                             class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
                         >/</span>
                         <button
@@ -356,23 +379,32 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <div class="flex w-full items-center justify-between gap-3 lg:w-auto lg:justify-end">
-                        <div class="w-full lg:w-44">
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
                             <AppSelect
                                 v-model="status"
                                 :options="statusOptions"
                                 :placeholder="t('All statuses')"
                             />
                         </div>
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                            @click="clearFilters"
+                        >
+                            <i class="ti ti-rotate-clockwise text-base"></i>
+                            {{ t('Reset') }}
+                        </button>
                     </div>
                 </div>
 
-                <div class="divide-y divide-gray-100 dark:divide-surface-800">
+                <div class="">
                     <button
                         v-for="message in filteredMessages"
                         :key="message.id"
                         type="button"
-                        class="block w-full px-5 py-4 text-left transition hover:bg-primary-50/60 dark:hover:bg-surface-800/70"
+                        class="block w-full px-5 py-4 text-left transition hover:bg-primary-50/60 dark:hover:bg-surface-800/70 border-b border-gray-100 last:border-b-0 last:mb-0 dark:border-surface-800"
                         :class="{ 'bg-primary-50/80 dark:bg-surface-800/80': selected?.id === message.id }"
                         @click="openMessage(message)"
                     >
@@ -396,7 +428,7 @@ onBeforeUnmount(() => {
                                 <Tooltip :content="t('Delete message')" placement="top">
                                     <button
                                         type="button"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-danger-600 transition hover:bg-danger-50 dark:hover:bg-danger-900/10"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-danger-600 transition hover:bg-danger-50 dark:hover:bg-danger-900/10"
                                         @click.stop="confirmDelete(message)"
                                     >
                                         <i class="ti ti-trash text-base"></i>
@@ -415,8 +447,13 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <div v-if="messages.links?.length" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                    <Pagination :links="messages.links" />
+                <div v-if="messages.data.length && messages.total && messages.total > messages.data.length" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
+                    <Pagination
+                        :links="messages.links"
+                        :from="messages.from"
+                        :to="messages.to"
+                        :total="messages.total"
+                    />
                 </div>
             </div>
 
@@ -428,7 +465,7 @@ onBeforeUnmount(() => {
                                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ selected.subject || t('No subject') }}</h2>
                                 <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ selected.name }} · {{ selected.email }}</p>
                             </div>
-                            <span class="inline-flex rounded-full bg-secondary-50 px-2.5 py-1 text-xs font-medium text-secondary-700 dark:bg-secondary-900/20 dark:text-secondary-300">
+                            <span class="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500 dark:bg-surface-900/20 dark:text-gray-500">
                                 {{ new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(selected.created_at)) }}
                             </span>
                         </div>
@@ -451,12 +488,7 @@ onBeforeUnmount(() => {
 
                         <div>
                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Reply message') }}</label>
-                            <textarea
-                                v-model="replyForm.message"
-                                rows="7"
-                                :placeholder="t('Write a clear reply to the sender')"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                            ></textarea>
+                            <RichEditor v-model="replyForm.message" variant="comment" />
                             <p v-if="replyForm.errors.message" class="mt-2 text-sm text-danger-600">{{ replyForm.errors.message }}</p>
                         </div>
 
@@ -638,7 +670,9 @@ onBeforeUnmount(() => {
             :message="t('This message will be removed permanently from the contact inbox.')"
             :confirm-label="t('Delete')"
             :cancel-label="t('Cancel')"
+            :processing="isDeleting"
             @confirm="remove"
+            @cancel="closeDeleteModal"
             @update:open="(value: boolean) => { if (!value) closeDeleteModal() }"
         />
     </div>

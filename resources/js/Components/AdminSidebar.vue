@@ -46,6 +46,23 @@ const contactEnabled = computed(() => Boolean(page.props.contactEnabled))
 const blogEnabled = computed(() => Boolean(page.props.blogEnabled))
 const addonMenuItems = computed(() => (page.props.addonMenuItems as any[]) ?? [])
 
+const sidebarCounts = computed(() => (page.props.admin as any)?.sidebarCounts ?? {})
+
+// Submenu counts
+const premiumSubscriptionsCount = computed(() => Number(sidebarCounts.value.premium?.subscriptions ?? 0))
+const premiumTransactionsCount = computed(() => Number(sidebarCounts.value.premium?.transactions ?? 0))
+const blogCommentsCount = computed(() => Number(sidebarCounts.value.blog?.comments ?? 0))
+const toolReviewsCount = computed(() => Number(sidebarCounts.value.tool_reviews ?? 0))
+const contactMessagesCount = computed(() => Number(sidebarCounts.value.messages ?? 0))
+const supportTicketsCount = computed(() => Number(sidebarCounts.value.tickets ?? 0))
+const affiliatePayoutsCount = computed(() => Number(sidebarCounts.value.affiliates?.payouts ?? 0))
+const affiliateCommissionsCount = computed(() => Number(sidebarCounts.value.affiliates?.commissions ?? 0))
+
+// Group counts
+const premiumGroupCount = computed(() => premiumSubscriptionsCount.value + premiumTransactionsCount.value)
+const blogGroupCount = computed(() => blogCommentsCount.value)
+const affiliateGroupCount = computed(() => affiliatePayoutsCount.value + affiliateCommissionsCount.value)
+
 // Group addon menu items by slug, flatten single-item addons
 const addonGroups = computed(() => {
   const groups: Record<string, any> = {}
@@ -86,7 +103,6 @@ const isAiManagementActive = () =>
         'admin.ai.provider',
         'admin.ai.categories.*',
         'admin.ai.tools.*',
-        'admin.ai.templates.*',
         'admin.ai.access.*',
         'admin.ai.logs.*',
         'admin.ai.rag.*',
@@ -137,8 +153,9 @@ function autoExpandOnRoute(group: string, patterns: string[]) {
 }
 
 autoExpandOnRoute('users', ['admin.users.*', 'admin.admins.*', 'admin.roles.*'])
-autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.templates.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
+autoExpandOnRoute('ai', ['admin.ai.index', 'admin.ai.provider', 'admin.ai.categories.*', 'admin.ai.tools.*', 'admin.ai.access.*', 'admin.ai.logs.*', 'admin.ai.rag.*'])
 autoExpandOnRoute('premium', ['admin.plans.*', 'admin.payment-gateways.*', 'admin.subscriptions.*', 'admin.coupons.*', 'admin.credit-settings.*'])
+autoExpandOnRoute('affiliate', ['admin.affiliate.index', 'admin.affiliate.commissions.*', 'admin.affiliate.payouts.*', 'admin.affiliate.affiliates.*', 'admin.affiliate.settings.*'])
 autoExpandOnRoute('blog', ['admin.blog.posts.*', 'admin.blog.categories.*', 'admin.blog.tags.*', 'admin.blog.settings.*', 'admin.comments.*'])
 autoExpandOnRoute('appearance', ['admin.themes*', 'admin.addons*', 'admin.menus.*', 'admin.sidebar.*'])
 autoExpandOnRoute('system', ['admin.system.*', 'admin.activity.*', 'admin.appearance.*', 'admin.license.*'])
@@ -229,7 +246,6 @@ for (const item of addonMenuItems.value) {
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('ai') }">
           <Link :href="route('admin.ai.tools.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.tools.*') }">{{ t('Tools') }}</Link>
-          <Link :href="route('admin.ai.templates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.templates.*') }">{{ t('Templates') }}</Link>
           <Link :href="route('admin.ai.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.categories.*') }">{{ t('Categories') }}</Link>
           <Link :href="route('admin.ai.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.index') || isActive('admin.ai.provider') }">{{ t('Providers') }}</Link>
           <Link :href="route('admin.ai.access.index')" class="sidebar-subitem" :class="{ active: isActive('admin.ai.access.*') }">{{ t('Access Control') }}</Link>
@@ -241,75 +257,93 @@ for (const item of addonMenuItems.value) {
       <!-- Premium (Pro only) -->
       <div v-if="isProAvailable && canAny(['plans.view', 'payments.view', 'payments.gateways'])">
         <Tooltip :content="t('Premium')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('premium')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('premium') || isActive('admin.plans.*') || isActive('admin.payment-gateways.*') || isActive('admin.subscriptions.*') || isActive('admin.coupons.*'), 'open': isGroupOpen('premium') }">
+          <button @click="toggleGroup('premium')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('premium') || isActive('admin.plans.*') || isActive('admin.payment-gateways.*') || isActive('admin.subscriptions.*') || isActive('admin.transactions.*') || isActive('admin.coupons.*'), 'open': isGroupOpen('premium') }">
             <i class="ti ti-diamond text-base text-amber-500"></i>
-            <span v-show="!collapsed" class="flex-1 text-left">{{ t('Premium') }}</span>
+            <span v-show="!collapsed" class="flex-1 text-left flex items-center justify-between">
+              <span>{{ t('Premium') }}</span>
+              <span v-if="premiumGroupCount > 0" class="mr-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ premiumGroupCount }}</span>
+            </span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
           </button>
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('premium') }">
-          <Link v-if="can('payments.view')" :href="route('admin.subscriptions.index')" class="sidebar-subitem" :class="{ active: isActive('admin.subscriptions.*') }">{{ t('Subscriptions') }}</Link>
+          <Link v-if="can('payments.view')" :href="route('admin.subscriptions.index')" class="sidebar-subitem" :class="{ active: isActive('admin.subscriptions.*') }">
+            <span class="flex-grow">{{ t('Subscriptions') }}</span>
+            <span v-if="premiumSubscriptionsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ premiumSubscriptionsCount }}</span>
+          </Link>
           <Link v-if="can('plans.view')" :href="route('admin.plans.index')" class="sidebar-subitem" :class="{ active: isActive('admin.plans.*') }">{{ t('Plans') }}</Link>
           <Link v-if="can('settings.manage')" :href="route('admin.credit-settings.index')" class="sidebar-subitem" :class="{ active: isActive('admin.credit-settings.*') }">{{ t('Credits') }}</Link>
           <Link v-if="can('payments.gateways')" :href="route('admin.coupons.index')" class="sidebar-subitem" :class="{ active: isActive('admin.coupons.*') }">{{ t('Coupons') }}</Link>
           <Link v-if="can('payments.view')" :href="route('admin.payment-gateways.index')" class="sidebar-subitem" :class="{ active: isActive('admin.payment-gateways.*') }">{{ t('Gateways') }}</Link>
+          <Link v-if="can('payments.view')" :href="route('admin.transactions.index')" class="sidebar-subitem" :class="{ active: isActive('admin.transactions.*') }">
+            <span class="flex-grow">{{ t('Transactions') }}</span>
+            <span v-if="premiumTransactionsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ premiumTransactionsCount }}</span>
+          </Link>
         </div>
       </div>
 
       <!-- === Content === -->
       <div v-show="!collapsed" class="sidebar-group-label">{{ t('Content') }}</div>
       <Tooltip v-if="can('content.pages')" :content="t('Pages')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.pages.index')" class="sidebar-item" :class="{ active: isActive('admin.pages.*') }">
+        <Link :href="route('admin.pages.index')" class="sidebar-item" :class="{ active: isCurrentPath('/admin/content/pages') }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
         <span v-show="!collapsed">{{ t('Pages') }}</span>
         </Link>
       </Tooltip>
       <div v-if="blogEnabled && canAny(['content.blog', 'content.comments'])">
         <Tooltip :content="t('Blog')" placement="right" :full-width="true" :disabled="!collapsed">
-          <button @click="toggleGroup('blog')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('blog') || isActive('admin.blog.*') || isActive('admin.comments.*'), 'open': isGroupOpen('blog') }">
+          <button @click="toggleGroup('blog')" class="sidebar-item w-full" :class="{ 'active !font-medium': isGroupOpen('blog') || isActive('admin.blog.*') || isActive('admin.comments.*') || isCurrentPath('/admin/content/blog') || isCurrentPath('/admin/content/comments'), 'open': isGroupOpen('blog') }">
             <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.25c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" /></svg>
-            <span v-show="!collapsed" class="flex-1 text-left">{{ t('Blog') }}</span>
-            <span v-if="!collapsed && pendingCommentsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">{{ pendingCommentsCount }}</span>
+            <span v-show="!collapsed" class="flex-1 text-left flex items-center justify-between">
+              <span>{{ t('Blog') }}</span>
+              <span v-if="blogGroupCount > 0" class="mr-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ blogGroupCount }}</span>
+            </span>
             <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
           </button>
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('blog') }">
-          <Link v-if="can('content.blog')" :href="route('admin.blog.posts.index')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.posts.*') }">{{ t('Posts') }}</Link>
-          <Link v-if="can('content.blog')" :href="route('admin.blog.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.categories.*') }">{{ t('Categories') }}</Link>
-          <Link v-if="can('content.blog')" :href="route('admin.blog.tags.index')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.tags.*') }">{{ t('Tags') }}</Link>
-          <Link v-if="can('content.blog')" :href="route('admin.blog.settings.edit')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.settings.*') }">{{ t('Settings') }}</Link>
-          <Link v-if="canAny(['content.comments', 'content.blog', 'content.pages'])" :href="route('admin.comments.index')" class="sidebar-subitem" :class="{ active: isActive('admin.comments.*') }">{{ t('Comments') }}</Link>
+          <Link v-if="can('content.blog')" :href="route('admin.blog.posts.index')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.posts.*') || isCurrentPath('/admin/content/blog/posts') }">{{ t('Posts') }}</Link>
+          <Link v-if="can('content.blog')" :href="route('admin.blog.categories.index')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.categories.*') || isCurrentPath('/admin/content/blog/categories') }">{{ t('Categories') }}</Link>
+          <Link v-if="can('content.blog')" :href="route('admin.blog.tags.index')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.tags.*') || isCurrentPath('/admin/content/blog/tags') }">{{ t('Tags') }}</Link>
+          <Link v-if="can('content.blog')" :href="route('admin.blog.settings.edit')" class="sidebar-subitem" :class="{ active: isActive('admin.blog.settings.*') || isCurrentPath('/admin/content/blog/settings') }">{{ t('Settings') }}</Link>
+          <Link v-if="canAny(['content.comments', 'content.blog', 'content.pages'])" :href="route('admin.comments.index')" class="sidebar-subitem" :class="{ active: isActive('admin.comments.*') || isCurrentPath('/admin/content/comments') }">
+            <span class="flex-grow">{{ t('Comments') }}</span>
+            <span v-if="blogCommentsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ blogCommentsCount }}</span>
+          </Link>
         </div>
       </div>
       <Tooltip v-if="can('content.testimonials')" :content="t('Testimonials')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.testimonials.index')" class="sidebar-item" :class="{ active: isActive('admin.testimonials.*') }">
+        <Link :href="route('admin.testimonials.index')" class="sidebar-item" :class="{ active: isCurrentPath('/admin/content/testimonials') }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
         <span v-show="!collapsed">{{ t('Testimonials') }}</span>
         </Link>
       </Tooltip>
       <Tooltip v-if="can('content.faq')" :content="t('FAQs')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.faqs.index')" class="sidebar-item" :class="{ active: isActive('admin.faqs.*') }">
+        <Link :href="route('admin.faqs.index')" class="sidebar-item" :class="{ active: isCurrentPath('/admin/content/faqs') }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         <span v-show="!collapsed">{{ t('FAQs') }}</span>
         </Link>
       </Tooltip>
       <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Communications') }}</div>
       <Tooltip v-if="can('ai.tools')" :content="t('Tool Reviews')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.ai.reviews.index')" class="sidebar-item" :class="{ active: isActive('admin.ai.reviews.index') }">
+        <Link :href="route('admin.ai.reviews.index')" class="sidebar-item" :class="{ active: isCurrentPath('/admin/ai/reviews') }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" /></svg>
-        <span v-show="!collapsed">{{ t('Tool Reviews') }}</span>
+        <span v-show="!collapsed" class="flex-1 text-left">{{ t('Tool Reviews') }}</span>
+        <span v-if="!collapsed && toolReviewsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ toolReviewsCount }}</span>
         </Link>
       </Tooltip>
       <Tooltip v-if="can('content.pages') && contactEnabled" :content="t('Messages')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.contact.messages.index')" class="sidebar-item" :class="{ active: isContactMessagesActive() }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0l-7.5-4.615A2.25 2.25 0 012.25 6.993V6.75" /></svg>
-        <span v-show="!collapsed">{{ t('Messages') }}</span>
+        <span v-show="!collapsed" class="flex-1 text-left">{{ t('Messages') }}</span>
+        <span v-if="!collapsed && contactMessagesCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ contactMessagesCount }}</span>
         </Link>
       </Tooltip>
       <Tooltip v-if="can('support.tickets') && ticketsEnabled" :content="t('Support')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.support.tickets.index')" class="sidebar-item" :class="{ active: isSupportTicketsActive() }">
         <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>
-        <span v-show="!collapsed">{{ t('Support') }}</span>
+        <span v-show="!collapsed" class="flex-1 text-left">{{ t('Support') }}</span>
+        <span v-if="!collapsed && supportTicketsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ supportTicketsCount }}</span>
         </Link>
       </Tooltip>
 
@@ -358,16 +392,16 @@ for (const item of addonMenuItems.value) {
         </Tooltip>
         <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('system') }">
           <Link :href="route('admin.system.health')" class="sidebar-subitem" :class="{ active: isSystemHealthActive() }">{{ t('Health Check') }}</Link>
-          <Link :href="route('admin.system.updates')" class="sidebar-subitem" :class="{ active: isSystemUpdatesActive() }">
-            {{ t('Update') }}
-            <span v-if="page.props.updateAvailable" class="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">1</span>
-          </Link>
           <Link :href="route('admin.system.cron-jobs')" class="sidebar-subitem" :class="{ active: isSystemCronActive() }">{{ t('Cron Jobs') }}</Link>
           <Link :href="route('admin.system.maintenance')" class="sidebar-subitem" :class="{ active: isSystemMaintenanceActive() }">{{ t('Maintenance') }}</Link>
           <Link :href="route('admin.system.rate-limits.index')" class="sidebar-subitem" :class="{ active: isRateLimitsActive() }">{{ t('Rate Limits') }}</Link>
           <Link :href="route('admin.appearance.index')" class="sidebar-subitem" :class="{ active: isCustomStyleActive() }">{{ t('Custom Style') }}</Link>
+          <Link :href="route('admin.system.updates')" class="sidebar-subitem" :class="{ active: isSystemUpdatesActive() }">
+            {{ t('Update Version') }}
+            <span v-if="page.props.updateAvailable" class="ml-1.5 inline-flex items-center rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">1</span>
+          </Link>
           <Link v-if="isSuperAdmin" :href="route('admin.activity.admin-logs.index')" class="sidebar-subitem" :class="{ active: isActive('admin.activity.admin-logs.*') || isActive('admin.activity.user-logs.*') }">{{ t('Activity Logs') }}</Link>
-          <a v-if="broadcasting.redis_available" href="/horizon" class="sidebar-subitem" target="_blank" rel="noopener">
+          <a v-if="broadcasting.redis_available && isSuperAdmin" href="/horizon" class="sidebar-subitem" target="_blank" rel="noopener">
             {{ t('Horizon') }}
             <svg class="ml-1 inline-block h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
           </a>
@@ -403,12 +437,32 @@ for (const item of addonMenuItems.value) {
 
       <!-- === Marketing === -->
       <div v-show="!collapsed" class="sidebar-group-label !pt-5">{{ t('Marketing') }}</div>
-      <Tooltip v-if="can('payments.gateways') && affiliateEnabled" :content="t('Affiliate')" placement="right" :full-width="true" :disabled="!collapsed">
-        <Link :href="route('admin.affiliate.index')" class="sidebar-item" :class="{ active: isActive('admin.affiliate.*') }">
-          <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
-          <span v-show="!collapsed">{{ t('Affiliate') }}</span>
-        </Link>
-      </Tooltip>
+      <div v-if="can('payments.gateways') && affiliateEnabled">
+        <Tooltip :content="t('Affiliate')" placement="right" :full-width="true" :disabled="!collapsed">
+          <button @click="toggleGroup('affiliate')" class="sidebar-item w-full"
+            :class="{ 'active !font-medium': isGroupOpen('affiliate') || isActive('admin.affiliate.*'), 'open': isGroupOpen('affiliate') }">
+            <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+            <span v-show="!collapsed" class="flex-1 text-left flex items-center justify-between">
+              <span>{{ t('Affiliate') }}</span>
+              <span v-if="affiliateGroupCount > 0" class="mr-1 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ affiliateGroupCount }}</span>
+            </span>
+            <svg v-show="!collapsed" class="sidebar-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+          </button>
+        </Tooltip>
+        <div v-show="!collapsed" class="sidebar-submenu" :class="{ open: isGroupOpen('affiliate') }">
+          <Link :href="route('admin.affiliate.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.index') }">{{ t('Overview') }}</Link>
+          <Link :href="route('admin.affiliate.commissions.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.commissions.*') }">
+            <span class="flex-grow">{{ t('Commissions') }}</span>
+            <span v-if="affiliateCommissionsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ affiliateCommissionsCount }}</span>
+          </Link>
+          <Link :href="route('admin.affiliate.payouts.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.payouts.*') }">
+            <span class="flex-grow">{{ t('Payouts') }}</span>
+            <span v-if="affiliatePayoutsCount > 0" class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">{{ affiliatePayoutsCount }}</span>
+          </Link>
+          <Link :href="route('admin.affiliate.affiliates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.affiliates.index') || isActive('admin.affiliate.affiliates.show') }">{{ t('Affiliates') }}</Link>
+          <Link :href="route('admin.affiliate.settings.edit')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.settings.*') }">{{ t('Settings') }}</Link>
+        </div>
+      </div>
       <Tooltip v-if="can('users.manage')" :content="t('Newsletter')" placement="right" :full-width="true" :disabled="!collapsed">
         <Link :href="route('admin.newsletter.index')" class="sidebar-item" :class="{ active: isNewsletterActive() }">
           <svg class="sidebar-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
@@ -485,7 +539,7 @@ for (const item of addonMenuItems.value) {
   --sidebar-hover-bg: color-mix(in srgb, var(--sidebar-text) 5%, transparent);
   --sidebar-hover-text: color-mix(in srgb, var(--sidebar-text) 96%, rgb(26, 24, 24) 4%);
   --sidebar-active: var(--admin-accent, #a855f7);
-  --sidebar-active-bg: color-mix(in srgb, var(--sidebar-active) 16%, transparent);
+  --sidebar-active-bg: var(--admin-accent-soft, color-mix(in srgb, var(--sidebar-active) 16%, transparent));
   width: 260px;
   height: 100vh;
   background: var(--sidebar-bg);
@@ -655,15 +709,8 @@ html.dark .sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 25
 .sidebar-subitem:hover {
   color: var(--sidebar-hover-text);
 }
+
 .sidebar-subitem.active {
   color: var(--sidebar-active);
-}
-.sidebar-subitem::before {
-  content: '';
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
 }
 </style>

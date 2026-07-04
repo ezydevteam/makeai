@@ -126,7 +126,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload, false);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);
@@ -146,7 +146,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);
@@ -166,7 +166,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);
@@ -186,7 +186,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);
@@ -214,7 +214,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);
@@ -247,7 +247,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);
@@ -281,7 +281,7 @@ class AddonLicenseTest extends TestCase
 
         // Fake the HTTP request so it returns quickly and doesn't hit a real server
         Http::fake([
-            'https://license.yourdomain.com/*' => Http::response(['error' => 'invalid_code'], 422),
+            'https://license.ezydev.net/*' => Http::response(['error' => 'invalid_code'], 422),
         ]);
 
         // Create a role first to satisfy foreign key constraints
@@ -343,7 +343,7 @@ class AddonLicenseTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(AddonLicenseService::class);

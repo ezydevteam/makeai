@@ -151,11 +151,22 @@ class AccessLevelService
             if ($this->isPlanLevel($level)) {
                 $requiredPlanSlug = $this->getPlanSlugFromLevel($level);
 
-                if ($requiredPlanSlug && $user->plan) {
-                    return $user->plan->slug === $requiredPlanSlug;
+                if (! $requiredPlanSlug || ! $user->plan) {
+                    return false;
                 }
 
-                return false;
+                if ($user->plan->slug === $requiredPlanSlug) {
+                    return true;
+                }
+
+                // Plan hierarchy: a strictly higher-tier plan (by sort_order)
+                // also unlocks tools gated to lower-tier plans.
+                $requiredPlan = Plan::where('slug', $requiredPlanSlug)
+                    ->where('is_active', true)
+                    ->first();
+
+                return $requiredPlan !== null
+                    && (int) $user->plan->sort_order > (int) $requiredPlan->sort_order;
             }
         }
 

@@ -13,10 +13,15 @@ use App\Models\User;
 use App\Models\ToolReview;
 use App\Support\CountryCatalog;
 use Illuminate\Support\Facades\Cache;
+use App\Services\MailService;
+use App\Jobs\SendAdminNotificationEmail;
 
 class NotificationEventService
 {
-    public function __construct(private readonly InAppNotificationService $notifications) {}
+    public function __construct(
+        private readonly InAppNotificationService $notifications,
+        private readonly MailService $mail,
+    ) {}
 
     public function creditsAdded(User $user, float $amount, string $reason = ''): void
     {
@@ -35,21 +40,33 @@ class NotificationEventService
             'action_label' => translate('View dashboard'),
             'meta' => ['amount' => $amount, 'reason' => $reason],
         ]);
+
+        $this->mail->send('credits_added', $user->email, [
+            'user_name' => $user->name,
+            'credits' => $this->formatNumber($amount),
+            'site_name' => settings('app_name', 'MakeAI'),
+            'site_url' => url('/'),
+        ]);
     }
 
     public function creditBalanceChanged(User $user, float $balance): void
     {
         $threshold = (float) settings('credits_low_threshold', 10);
 
+        // The pricing/top-up page only exists when premium is available.
+        $actionUrl = isProAvailable() ? route('pricing') : null;
+
         if ($balance <= 0) {
-            $this->sendOnce("credits-exhausted:{$user->id}:".now()->toDateString(), function () use ($user) {
+            $this->sendOnce("credits-exhausted:{$user->id}:".now()->toDateString(), function () use ($user, $actionUrl) {
                 $this->notifications->send($user, [
                     'title' => translate('Credits exhausted'),
-                    'message' => translate("You've run out of credits. Top up to continue."),
+                    'message' => $actionUrl
+                        ? translate("You've run out of credits. Top up to continue.")
+                        : translate("You've run out of credits."),
                     'level' => 'error',
                     'category' => 'credits',
-                    'action_url' => route('pricing'),
-                    'action_label' => translate('Top up'),
+                    'action_url' => $actionUrl,
+                    'action_label' => $actionUrl ? translate('Top up') : null,
                 ]);
             });
 
@@ -57,7 +74,7 @@ class NotificationEventService
         }
 
         if ($threshold > 0 && $balance <= $threshold) {
-            $this->sendOnce("credits-low:{$user->id}:".now()->toDateString(), function () use ($user, $balance) {
+            $this->sendOnce("credits-low:{$user->id}:".now()->toDateString(), function () use ($user, $balance, $actionUrl) {
                 $this->notifications->send($user, [
                     'title' => translate('Credits running low'),
                     'message' => translate('Your credits are running low (:balance remaining).', [
@@ -65,8 +82,8 @@ class NotificationEventService
                     ]),
                     'level' => 'warning',
                     'category' => 'credits',
-                    'action_url' => route('pricing'),
-                    'action_label' => translate('Add credits'),
+                    'action_url' => $actionUrl,
+                    'action_label' => $actionUrl ? translate('Add credits') : null,
                 ]);
             });
         }
@@ -190,6 +207,24 @@ class NotificationEventService
             'action_label' => translate('View user'),
             'meta' => ['payment_ulid' => $payment->ulid],
         ]);
+
+        if ($payment->type === 'subscription') {
+            $this->mail->send('invoice_paid', $payment->user->email, [
+                'user_name' => $payment->user->name,
+                'plan_name' => $payment->plan?->name ?? translate('your plan'),
+                'amount' => $amount,
+                'id' => $payment->ulid,
+                'site_name' => settings('app_name', 'MakeAI'),
+                'site_url' => url('/'),
+            ]);
+
+            $this->mail->send('subscription_started', $payment->user->email, [
+                'user_name' => $payment->user->name,
+                'plan_name' => $payment->plan?->name ?? translate('your plan'),
+                'site_name' => settings('app_name', 'MakeAI'),
+                'site_url' => url('/'),
+            ]);
+        }
     }
 
     public function paymentFailed(Payment $payment, ?string $reason = null): void
@@ -218,6 +253,49 @@ class NotificationEventService
             'action_url' => route('admin.users.show', $payment->user),
             'action_label' => translate('View user'),
             'meta' => ['payment_ulid' => $payment->ulid, 'reason' => $reason],
+        ]);
+    }
+
+    /**
+     * A pending payment was manually rejected by an administrator
+     * (e.g. bank transfer proof could not be verified).
+     */
+    public function paymentRejected(Payment $payment, ?string $reason = null): void
+    {
+        $payment->loadMissing(['user', 'plan']);
+
+        if (! $payment->user) {
+            return;
+        }
+
+        $amount = format_currency((float) $payment->amount, $payment->currency);
+
+        $message = $reason
+            ? translate('Your payment of :amount (#:id) was rejected: :reason', [
+                'amount' => $amount,
+                'id' => $payment->ulid,
+                'reason' => $reason,
+            ])
+            : translate('Your payment of :amount (#:id) was rejected. Please contact support if you believe this is a mistake.', [
+                'amount' => $amount,
+                'id' => $payment->ulid,
+            ]);
+
+        $this->notifications->send($payment->user, [
+            'title' => translate('Payment rejected'),
+            'message' => $message,
+            'level' => 'error',
+            'category' => 'payment',
+            'action_url' => route('checkout.pending', $payment),
+            'action_label' => translate('View payment'),
+            'meta' => ['payment_ulid' => $payment->ulid, 'reason' => $reason],
+        ]);
+
+        SendAdminNotificationEmail::dispatch($payment->user_id, [
+            'title' => translate('Payment rejected'),
+            'message' => $message,
+            'action_url' => route('checkout.pending', $payment),
+            'action_label' => translate('View payment'),
         ]);
     }
 
@@ -258,16 +336,51 @@ class NotificationEventService
             return;
         }
 
+        $amount = format_currency((float) $commission->amount);
+
         $this->notifications->send($commission->referrer, [
             'title' => translate('Referral reward earned'),
-            'message' => translate('You earned :amount from a referral!', [
-                'amount' => format_currency((float) $commission->amount),
-            ]),
+            'message' => translate('You earned :amount from a referral!', ['amount' => $amount]),
             'level' => 'success',
             'category' => 'affiliate',
-            'action_url' => route('affiliate.dashboard'),
+            'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['commission_id' => $commission->id],
+        ]);
+
+        $this->mail->send('affiliate_commission_earned', $commission->referrer->email, [
+            'user_name' => $commission->referrer->name,
+            'amount' => $amount,
+            'site_name' => settings('app_name', 'MakeAI'),
+            'site_url' => url('/'),
+        ]);
+    }
+
+    public function commissionRejected(AffiliateCommission $commission): void
+    {
+        $commission->loadMissing('referrer');
+
+        if (! $commission->referrer) {
+            return;
+        }
+
+        $amount = format_currency((float) $commission->amount);
+
+        $this->notifications->send($commission->referrer, [
+            'title' => translate('Commission rejected'),
+            'message' => translate('A commission of :amount was rejected by the admin.', ['amount' => $amount]),
+            'level' => 'warning',
+            'category' => 'affiliate',
+            'action_url' => route('user.dashboard.affiliate'),
+            'action_label' => translate('View affiliate dashboard'),
+            'meta' => ['commission_id' => $commission->id],
+        ]);
+
+        $this->mail->send('affiliate_commission_rejected', $commission->referrer->email, [
+            'user_name' => $commission->referrer->name,
+            'amount' => $amount,
+            'site_name' => settings('app_name', 'MakeAI'),
+            'site_url' => url('/'),
         ]);
     }
 
@@ -279,11 +392,11 @@ class NotificationEventService
             return;
         }
 
-        $this->notifications->notifyAdmins([
+        $amount = format_currency((float) $payout->amount);
+
+        $this->notifications->notifyAdminsWithPermission('payments.gateways', [
             'title' => translate('Payout request'),
-            'message' => translate('💰 You have a new payout request: :amount', [
-                'amount' => format_currency((float) $payout->amount),
-            ]),
+            'message' => translate('You have a new payout request: :amount', ['amount' => $amount]),
             'level' => 'info',
             'category' => 'affiliate',
             'action_url' => route('admin.affiliate.index'),
@@ -293,7 +406,28 @@ class NotificationEventService
                 'user_ulid' => $payout->user->ulid,
                 'method' => $payout->method,
             ],
-        ], 'super-admin');
+        ]);
+    }
+
+    public function payoutProcessing(AffiliatePayout $payout): void
+    {
+        $payout->loadMissing('user');
+
+        if (! $payout->user) {
+            return;
+        }
+
+        $amount = format_currency((float) $payout->amount);
+
+        $this->notifications->send($payout->user, [
+            'title' => translate('Payout in progress'),
+            'message' => translate('Your payout request of :amount is being processed.', ['amount' => $amount]),
+            'level' => 'info',
+            'category' => 'affiliate',
+            'action_url' => route('user.dashboard.affiliate'),
+            'action_label' => translate('View affiliate dashboard'),
+            'meta' => ['payout_id' => $payout->id],
+        ]);
     }
 
     public function payoutApproved(AffiliatePayout $payout): void
@@ -304,14 +438,24 @@ class NotificationEventService
             return;
         }
 
+        $amount = format_currency((float) $payout->amount);
+
         $this->notifications->send($payout->user, [
-            'title' => translate('Payout approved'),
-            'message' => translate('Your payout request has been approved'),
+            'title' => translate('Payout paid'),
+            'message' => translate('Your payout request of :amount has been paid.', ['amount' => $amount]),
             'level' => 'success',
             'category' => 'affiliate',
-            'action_url' => route('affiliate.dashboard'),
+            'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['payout_id' => $payout->id],
+        ]);
+
+        $this->mail->send('affiliate_payout_paid', $payout->user->email, [
+            'user_name' => $payout->user->name,
+            'amount' => $amount,
+            'method' => $payout->method,
+            'site_name' => settings('app_name', 'MakeAI'),
+            'site_url' => url('/'),
         ]);
     }
 
@@ -323,14 +467,23 @@ class NotificationEventService
             return;
         }
 
+        $amount = format_currency((float) $payout->amount);
+
         $this->notifications->send($payout->user, [
-            'title' => translate('Payout request cancelled'),
-            'message' => translate('❌ Your payout request has been cancelled'),
+            'title' => translate('Payout rejected'),
+            'message' => translate('Your payout request of :amount was rejected.', ['amount' => $amount]),
             'level' => 'warning',
             'category' => 'affiliate',
-            'action_url' => route('affiliate.dashboard'),
+            'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['payout_id' => $payout->id],
+        ]);
+
+        $this->mail->send('affiliate_payout_rejected', $payout->user->email, [
+            'user_name' => $payout->user->name,
+            'amount' => $amount,
+            'site_name' => settings('app_name', 'MakeAI'),
+            'site_url' => url('/'),
         ]);
     }
 

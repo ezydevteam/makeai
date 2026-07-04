@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { badgeClass } from '@/Composables/useBadge'
 import AppSelect from '@/Components/AppSelect.vue'
@@ -57,7 +58,12 @@ const props = defineProps<{
     departments: Option[]
     admins: Option[]
     filters: { search?: string; status?: string; priority?: string; department?: string; assigned_to?: string }
-    stats: { total: number; open: number; in_progress: number; waiting_user: number; resolved: number }
+    stats: {
+        total: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        open: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        in_progress: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+        resolved: { value: number; comparison: { label: string; type: 'up' | 'down' | 'neutral' } }
+    }
     sla: { first_response_hours: number; resolution_hours: number }
     settings: SupportSettingsForm
     openSettings: boolean
@@ -76,6 +82,7 @@ const bulkStatus = ref('open')
 const bulkPriority = ref('medium')
 const bulkAssignedTo = ref<number | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
+const searchFocused = ref(false)
 const showSettingsModal = ref(props.openSettings)
 const filterDebounce = ref<number | null>(null)
 
@@ -150,8 +157,8 @@ const labels: Record<string, string> = {
     max_attachments_per_reply: 'Max attachments per reply',
     max_attachment_size_mb: 'Max attachment size (MB)',
     auto_close_resolved_days: 'Auto-close resolved tickets after days',
-    sla_first_response_hours: 'First response SLA (hours)',
-    sla_resolution_hours: 'Resolution SLA (hours)',
+    sla_first_response_hours: 'First response Service Level Agreement (SLA) (hours)',
+    sla_resolution_hours: 'Resolution Service Level Agreement (SLA) (hours)',
     allowed_attachment_types: 'Allowed attachment types',
 }
 
@@ -327,6 +334,14 @@ const handleKeydown = (event: KeyboardEvent) => {
         return
     }
 
+    if (event.key === 'Escape' && document.activeElement === searchInput.value) {
+        event.preventDefault()
+        search.value = ''
+        applyFilters()
+        searchInput.value?.blur()
+        return
+    }
+
     if (event.key === 'Escape' && !showSettingsModal.value && hasActiveFilters.value) {
         event.preventDefault()
         clearFilters()
@@ -374,7 +389,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Support Tickets')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Support Tickets') }}</h1>
@@ -384,6 +399,13 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
+                <a
+                    :href="route('admin.support.tickets.export')"
+                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                >
+                    <i class="ti ti-file-export text-base"></i>
+                    {{ t('Export') }}
+                </a>
                 <Link
                     :href="route('admin.support.departments.index')"
                     class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
@@ -398,13 +420,6 @@ onBeforeUnmount(() => {
                     <i class="ti ti-message-2-code text-base"></i>
                     {{ t('Canned Responses') }}
                 </Link>
-                <a
-                    :href="route('admin.support.tickets.export')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                >
-                    <i class="ti ti-file-export text-base"></i>
-                    {{ t('Export CSV') }}
-                </a>
                 <button
                     type="button"
                     class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
@@ -416,43 +431,115 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between dark:border-surface-800">
-                <div class="relative w-full max-w-xl">
-                    <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
-                    <input
-                        ref="searchInput"
-                        v-model="search"
-                        :placeholder="t('Search tickets by subject, number, or user')"
-                        type="search"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-700 transition focus:border-primary-300 focus:outline-none focus:ring-4 focus:ring-primary-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                    >
-                    <span
-                        v-if="!search"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >/</span>
-                    <button
-                        v-if="search"
-                        type="button"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                        @click="search = ''"
-                    >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
+        <!-- Stats Grid -->
+        <div v-if="stats" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatsCard
+                :title="t('Total Tickets')"
+                :value="stats.total.value"
+                :comparison="stats.total.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-ticket text-lg"></i>
+                </template>
+            </StatsCard>
 
-                <div class="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[44rem] lg:flex-row lg:justify-end">
-                    <div class="w-full lg:w-44">
-                        <AppSelect v-model="status" :options="statusOptions" :placeholder="t('All statuses')" />
+            <StatsCard
+                :title="t('Open')"
+                :value="stats.open.value"
+                :comparison="stats.open.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.open.comparison.type"
+                color="danger"
+            >
+                <template #icon>
+                    <i class="ti ti-clock text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('In Progress')"
+                :value="stats.in_progress.value"
+                :comparison="stats.in_progress.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.in_progress.comparison.type"
+                color="warning"
+            >
+                <template #icon>
+                    <i class="ti ti-hourglass-low text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Resolved')"
+                :value="stats.resolved.value"
+                :comparison="stats.resolved.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.resolved.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-circle-check text-lg"></i>
+                </template>
+            </StatsCard>
+        </div>
+
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="border-b border-gray-100 p-4 dark:border-surface-800 sm:px-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+                    <div class="flex-1 min-w-[240px]">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInput"
+                                v-model="search"
+                                type="text"
+                                :placeholder="t('Search tickets by subject, number, or user')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
+                            />
+                            <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                                <span v-if="!search && !searchFocused" class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500">/</span>
+                            </div>
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="search = ''"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="w-full lg:w-44">
-                        <AppSelect v-model="priority" :options="priorityOptions" :placeholder="t('All priorities')" />
-                    </div>
-                    <div class="w-full lg:w-52">
-                        <AppSelect v-model="department" :options="departmentOptions" :placeholder="t('All departments')" />
-                    </div>
-                    <div class="w-full lg:w-44">
-                        <AppSelect v-model="assignedTo" :options="adminOptions" :placeholder="t('All agents')" />
+
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect v-model="status" :options="statusOptions" :placeholder="t('All statuses')" />
+                        </div>
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect v-model="priority" :options="priorityOptions" :placeholder="t('All priorities')" />
+                        </div>
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-52 lg:flex-none">
+                            <AppSelect v-model="department" :options="departmentOptions" :placeholder="t('All departments')" />
+                        </div>
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect v-model="assignedTo" :options="adminOptions" :placeholder="t('All agents')" />
+                        </div>
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                            @click="clearFilters"
+                        >
+                            <i class="ti ti-rotate-clockwise text-base"></i>
+                            {{ t('Reset') }}
+                        </button>
                     </div>
                 </div>
             </div>

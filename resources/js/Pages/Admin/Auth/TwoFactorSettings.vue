@@ -200,7 +200,7 @@ const regenerateRecoveryCodes = () => {
                     <input v-model="disableForm.code" type="text" required :class="codeInputClass" :placeholder="$t('Authenticator or recovery code')" />
                     <p v-if="disableForm.errors.code" class="text-sm text-danger-500">{{ disableForm.errors.code }}</p>
 
-                    <button type="submit" :disabled="disableForm.processing" class="rounded-lg btn-danger shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60">
+                    <button type="submit" :disabled="disableForm.processing" class="rounded-xl bg-danger-600 hover:bg-danger-700 text-white px-4 py-2 text-sm font-semibold shadow-sm transition-all hover:-translate-y-px active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60">
                         {{ disableForm.processing ? $t('Disabling...') : $t('Disable Two-Factor') }}
                     </button>
                 </form>

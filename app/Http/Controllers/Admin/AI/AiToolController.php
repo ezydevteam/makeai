@@ -80,11 +80,20 @@ class AiToolController extends Controller
         return Inertia::render('Admin/AI/Tools/Editor', [
             'tool' => null,
             'categories' => Category::orderBy('sort_order')->get(['id', 'name', 'slug']),
-            'aiModels' => AiModel::active()
-                ->whereIn('provider', $configuredProviders)
-                ->orderBy('provider')
-                ->orderBy('name')
-                ->get(['slug', 'name', 'provider']),
+            'aiModels' => (function() use ($configuredProviders) {
+                $friendlyModelNames = config('ai.model_names', []);
+                $friendlyProviderNames = config('ai.provider_names', []);
+                return AiModel::active()
+                    ->whereIn('provider', $configuredProviders)
+                    ->orderBy('provider')
+                    ->orderBy('name')
+                    ->get(['slug', 'name', 'provider'])
+                    ->map(fn ($m) => [
+                        'slug' => $m->slug,
+                        'name' => $friendlyModelNames[$m->slug] ?? $m->name,
+                        'provider' => $friendlyProviderNames[$m->provider] ?? ucfirst($m->provider),
+                    ]);
+            })(),
             'accessLevels' => app(\App\Services\AccessLevelService::class)->getOptions(),
         ]);
     }
@@ -123,11 +132,20 @@ class AiToolController extends Controller
         return Inertia::render('Admin/AI/Tools/Editor', [
             'tool' => $tool,
             'categories' => Category::orderBy('sort_order')->get(['id', 'name', 'slug']),
-            'aiModels' => AiModel::active()
-                ->whereIn('provider', $configuredProviders)
-                ->orderBy('provider')
-                ->orderBy('name')
-                ->get(['slug', 'name', 'provider']),
+            'aiModels' => (function() use ($configuredProviders) {
+                $friendlyModelNames = config('ai.model_names', []);
+                $friendlyProviderNames = config('ai.provider_names', []);
+                return AiModel::active()
+                    ->whereIn('provider', $configuredProviders)
+                    ->orderBy('provider')
+                    ->orderBy('name')
+                    ->get(['slug', 'name', 'provider'])
+                    ->map(fn ($m) => [
+                        'slug' => $m->slug,
+                        'name' => $friendlyModelNames[$m->slug] ?? $m->name,
+                        'provider' => $friendlyProviderNames[$m->provider] ?? ucfirst($m->provider),
+                    ]);
+            })(),
             'reviews' => ToolReview::where('tool_slug', $tool->slug)
                 ->with('user:id,name,email')
                 ->latest()
@@ -213,6 +231,11 @@ class AiToolController extends Controller
             'ids.*' => ['required', 'integer'],
             'action' => ['required', 'string', 'in:restore,force_delete'],
         ]);
+
+        // Permanent deletion is irreversible — Super Admins only.
+        if ($validated['action'] === 'force_delete' && ! auth('admin')->user()->isSuperAdmin()) {
+            abort(403, translate('This action is restricted to Super Admins.'));
+        }
 
         $query = AiTool::onlyTrashed()->whereIn('id', $validated['ids']);
 

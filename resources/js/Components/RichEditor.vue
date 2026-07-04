@@ -997,7 +997,7 @@ onBeforeUnmount(() => {
             <div class="flex flex-wrap items-center gap-3">
                 <span>{{ textStats.words }} {{ t('words') }}</span>
                 <span>{{ textStats.characters }} {{ t('characters') }}</span>
-                <span>{{ textStats.readingMinutes }} {{ t('min read') }}</span>
+                <span v-if="variant !== 'minimal' && variant !== 'comment'">{{ textStats.readingMinutes }} {{ t('min read') }}</span>
             </div>
             <div v-if="variant === 'full'" class="flex flex-wrap items-center gap-2">
                 <span>{{ t('Versions') }}: {{ versionHistory.length }}/20</span>

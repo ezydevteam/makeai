@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 interface Category {
@@ -42,6 +43,7 @@ interface ToolsResponse {
 interface Filters {
     category?: string | number | null
     access_level?: string | null
+    search?: string | null
 }
 
 interface ConfirmModalState {
@@ -71,7 +73,7 @@ const form = useForm({
     access_level: props.filters.access_level ? String(props.filters.access_level) : '',
 })
 
-const searchQuery = ref('')
+const searchQuery = ref(props.filters.search ? String(props.filters.search) : '')
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchFocused = ref(false)
 const selectedIds = ref<number[]>([])
@@ -109,7 +111,7 @@ const confirmModal = ref<ConfirmModalState>({
 })
 
 const isAllSelected = computed(() => {
-    return filteredTools.value.length > 0 && filteredTools.value.every((tool) => selectedIds.value.includes(tool.id))
+    return props.tools.data.length > 0 && props.tools.data.every((tool) => selectedIds.value.includes(tool.id))
 })
 
 const hasActiveFilters = computed(() => searchQuery.value.trim().length > 0 || Boolean(form.category) || Boolean(form.access_level))
@@ -117,10 +119,10 @@ const hasActiveFilters = computed(() => searchQuery.value.trim().length > 0 || B
 const toggleAll = (e: Event) => {
     const target = e.target as HTMLInputElement
     if (target.checked) {
-        const visibleIds = filteredTools.value.map((tool) => tool.id)
+        const visibleIds = props.tools.data.map((tool) => tool.id)
         selectedIds.value = Array.from(new Set([...selectedIds.value, ...visibleIds]))
     } else {
-        const visibleIds = new Set(filteredTools.value.map((tool) => tool.id))
+        const visibleIds = new Set(props.tools.data.map((tool) => tool.id))
         selectedIds.value = selectedIds.value.filter((id) => !visibleIds.has(id))
     }
 }
@@ -153,6 +155,10 @@ const buildFilterPayload = () => {
         payload.access_level = form.access_level
     }
 
+    if (searchQuery.value.trim()) {
+        payload.search = searchQuery.value.trim()
+    }
+
     return payload
 }
 
@@ -166,6 +172,7 @@ const applyFilters = () => {
 
 const clearSearch = () => {
     searchQuery.value = ''
+    applyFilters()
 }
 
 const resetFilters = () => {
@@ -173,22 +180,15 @@ const resetFilters = () => {
     form.category = ''
     form.access_level = ''
     selectedIds.value = []
-    router.get(route('admin.ai.access.index'), {}, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    })
+    applyFilters()
 }
 
-const filteredTools = computed(() => {
-    const query = searchQuery.value.trim().toLowerCase()
-    return props.tools.data.filter((tool) => {
-        const categoryName = tool.category?.name?.toLowerCase() ?? ''
-        const matchesQuery = !query || tool.name.toLowerCase().includes(query) || categoryName.includes(query)
-        const matchesAccessLevel = !form.access_level || tool.access_level === form.access_level
-
-        return matchesQuery && matchesAccessLevel
-    })
+let searchTimeout: any = null
+watch(searchQuery, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        applyFilters()
+    }, 350)
 })
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -290,8 +290,8 @@ onBeforeUnmount(() => {
     <Head :title="t('AI Access Settings')" />
 
     <AdminLayout>
-        <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div class="min-w-0">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         {{ t('AI Access Settings') }}
@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 sm:w-auto">
                     <span class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-surface-700 dark:bg-surface-900">
                         <i class="ti ti-shield-check text-sm text-primary-600 dark:text-primary-400"></i>
                         {{ t(':count tools', { count: props.tools.total ?? props.tools.data.length }) }}
@@ -311,173 +311,190 @@ onBeforeUnmount(() => {
                         {{ t('Default: :level', { level: getAccessLevelLabel(props.globalDefault) }) }}
                     </span>
                 </div>
-            </section>
+            </div>
 
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
-                <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                    <div class="relative min-w-[240px] flex-1">
-                        <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
-                        <input
-                            ref="searchInput"
-                            v-model="searchQuery"
-                            type="text"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                            :placeholder="t('Search tools...')"
-                            @focus="searchFocused = true"
-                            @blur="searchFocused = false"
-                        />
-                        <span
-                            v-if="!searchQuery && !searchFocused"
-                            class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                        >
-                            /
-                        </span>
-                        <button
-                            v-if="searchQuery"
-                            type="button"
-                            class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
-                            :aria-label="t('Clear search')"
-                            @click="clearSearch"
-                        >
-                            <i class="ti ti-x text-sm"></i>
-                        </button>
-                    </div>
+            <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+                <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[240px]">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-search text-base"></i>
+                                </span>
+                                <input
+                                    ref="searchInput"
+                                    v-model="searchQuery"
+                                    type="text"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    :placeholder="t('Search tools...')"
+                                    @focus="searchFocused = true"
+                                    @blur="searchFocused = false"
+                                />
+                                <span
+                                    v-if="!searchQuery && !searchFocused"
+                                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                                >
+                                    /
+                                </span>
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                                    :aria-label="t('Clear search')"
+                                    @click="clearSearch"
+                                >
+                                    <i class="ti ti-x text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
 
-                    <AppSelect
-                        v-model="form.category"
-                        :options="categoryOptions"
-                        :placeholder="t('All Categories')"
-                        class="w-full sm:w-56"
-                        live-search
-                        @update:model-value="applyFilters"
-                    />
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[200px] lg:w-56 lg:flex-none">
+                                <AppSelect
+                                    v-model="form.category"
+                                    :options="categoryOptions"
+                                    :placeholder="t('All Categories')"
+                                    live-search
+                                    @update:model-value="applyFilters"
+                                />
+                            </div>
 
-                    <AppSelect
-                        v-model="form.access_level"
-                        :options="accessFilterOptions"
-                        :placeholder="t('All Access Levels')"
-                        class="w-full sm:w-56"
-                        @update:model-value="applyFilters"
-                    />
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-56 lg:flex-none">
+                                <AppSelect
+                                    v-model="form.access_level"
+                                    :options="accessFilterOptions"
+                                    :placeholder="t('All Access Levels')"
+                                    @update:model-value="applyFilters"
+                                />
+                            </div>
 
-                    <button
-                        v-if="hasActiveFilters"
-                        type="button"
-                        class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                        @click="resetFilters"
-                    >
-                        {{ t('Clear filters') }}
-                    </button>
-
-                    <div v-if="selectedIds.length" class="ml-auto flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-                        <span class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ t(':count selected', { count: selectedIds.length }) }}
-                        </span>
-                        <AppSelect
-                            v-model="bulkAction"
-                            :options="accessLevels"
-                            :placeholder="t('Access Level')"
-                            class="w-full sm:w-52"
-                        />
-                        <button
-                            type="button"
-                            :disabled="!bulkAction || selectedIds.length === 0"
-                            class="inline-flex items-center justify-center rounded-lg btn-primary px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                            :title="selectedIds.length === 0 ? t('Select at least 1 tool to apply') : ''"
-                            @click="applyBulkUpdate"
-                        >
-                            {{ t('Apply') }}
-                        </button>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="min-w-[760px] w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
-                                <th scope="col" class="w-4 px-4 py-3.5 text-left">
-                                    <input
-                                        type="checkbox"
-                                        class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-                                        :checked="isAllSelected"
-                                        @change="toggleAll"
-                                    />
-                                </th>
-                                <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
-                                <th scope="col" class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
-                                <th scope="col" class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Current Access') }}</th>
-                                <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
-                            <tr
-                                v-for="tool in filteredTools"
-                                :key="tool.id"
-                                class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30"
+                            <button
+                                v-if="hasActiveFilters"
+                                type="button"
+                                class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
+                                @click="resetFilters"
                             >
-                                <td class="w-4 px-4 py-4">
-                                    <input
-                                        v-model="selectedIds"
-                                        type="checkbox"
-                                        :value="tool.id"
-                                        class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                {{ t('Clear filters') }}
+                            </button>
+
+                            <template v-if="selectedIds.length">
+                                <span class="text-sm text-gray-500 dark:text-gray-400 sm:whitespace-nowrap">
+                                    {{ t(':count selected', { count: selectedIds.length }) }}
+                                </span>
+
+                                <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-52 lg:flex-none">
+                                    <AppSelect
+                                        v-model="bulkAction"
+                                        :options="accessLevels"
+                                        :placeholder="t('Access Level')"
                                     />
-                                </td>
-                                <td class="px-6 py-4">
-                                    <div class="min-w-0">
-                                        <p class="font-semibold text-gray-900 dark:text-white">{{ tool.name }}</p>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-4">
-                                    <span class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-400">
-                                        {{ tool.category?.name || t('Uncategorized') }}
-                                    </span>
-                                </td>
-                                <td class="px-4 py-4">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getAccessLevelBadgeClass(tool.access_level)">
-                                        {{ getAccessLevelLabel(tool.access_level) }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <Link
-                                        :href="route('admin.ai.tools.edit', tool.id)"
-                                        :title="t('Edit tool')"
-                                        :aria-label="t('Edit tool')"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-surface-800"
-                                    >
-                                        <i class="ti ti-edit text-base"></i>
-                                    </Link>
-                                </td>
-                            </tr>
-                            <tr v-if="filteredTools.length === 0">
-                                <td colspan="5" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
-                                    <i class="ti ti-search-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
-                                    <p class="font-medium">{{ hasActiveFilters ? t('No tools match your filters') : t('No tools found') }}</p>
-                                    <button
-                                        v-if="hasActiveFilters"
-                                        type="button"
-                                        class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                        @click="resetFilters"
-                                    >
-                                        {{ t('Clear filters') }}
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    :disabled="!bulkAction || selectedIds.length === 0"
+                                    class="inline-flex w-full sm:w-auto items-center justify-center btn-primary-admin px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 rounded-xl"
+                                    :title="selectedIds.length === 0 ? t('Select at least 1 tool to apply') : ''"
+                                    @click="applyBulkUpdate"
+                                >
+                                    {{ t('Apply') }}
+                                </button>
+                            </template>
+                        </div>
+                    </div>
                 </div>
 
-                <div v-if="tools.links && tools.links.length > 3 && !searchQuery" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                    <Pagination
-                        :links="tools.links"
-                        :from="tools.from"
-                        :to="tools.to"
-                        :total="tools.total"
-                        :current-page="tools.current_page"
-                        :last-page="tools.last_page"
-                    />
+                <div class="overflow-hidden rounded-b-2xl">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-[760px] w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
+                                    <th scope="col" class="w-4 px-4 py-3.5 text-left">
+                                        <input
+                                            type="checkbox"
+                                            class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                            :checked="isAllSelected"
+                                            @change="toggleAll"
+                                        />
+                                    </th>
+                                    <th scope="col" class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
+                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
+                                    <th scope="col" class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Current Access') }}</th>
+                                    <th scope="col" class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
+                                <tr
+                                    v-for="tool in tools.data"
+                                    :key="tool.id"
+                                    class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30"
+                                >
+                                    <td class="w-4 px-4 py-4">
+                                        <input
+                                            v-model="selectedIds"
+                                            type="checkbox"
+                                            :value="tool.id"
+                                            class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                        />
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="min-w-0">
+                                            <p class="font-semibold text-gray-900 dark:text-white">{{ tool.name }}</p>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4 text-center">
+                                        <span class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-400">
+                                            {{ tool.category?.name || t('Uncategorized') }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-4 text-center">
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" :class="getAccessLevelBadgeClass(tool.access_level)">
+                                            {{ getAccessLevelLabel(tool.access_level) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center justify-end">
+                                            <Tooltip :content="t('Edit Tool')">
+                                                <Link
+                                                    :href="route('admin.ai.tools.edit', tool.id)"
+                                                    class="flex h-8 w-8 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                                                >
+                                                    <i class="ti ti-edit text-base"></i>
+                                                </Link>
+                                            </Tooltip>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="tools.data.length === 0">
+                                    <td colspan="5" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
+                                        <i class="ti ti-search-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
+                                        <p class="font-medium">{{ hasActiveFilters ? t('No tools match your filters') : t('No tools found') }}</p>
+                                        <button
+                                            v-if="hasActiveFilters"
+                                            type="button"
+                                            class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                            @click="resetFilters"
+                                        >
+                                            {{ t('Clear filters') }}
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+ 
+                    <div v-if="tools.links && tools.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800">
+                        <Pagination
+                            :links="tools.links"
+                            :from="tools.from"
+                            :to="tools.to"
+                            :total="tools.total"
+                            :current-page="tools.current_page"
+                            :last-page="tools.last_page"
+                        />
+                    </div>
                 </div>
-            </section>
+            </div>
         </div>
 
         <ActionConfirmModal

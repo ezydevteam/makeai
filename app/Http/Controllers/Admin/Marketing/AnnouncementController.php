@@ -43,7 +43,7 @@ class AnnouncementController extends Controller
             'bg_color' => 'nullable|string|max:20',
             'text_color' => 'nullable|string|max:20',
             'cta_text' => 'nullable|string|max:100',
-            'cta_url' => 'nullable|string|max:500',
+            'cta_url' => ['nullable', 'string', 'max:500', 'not_regex:/^\s*(?:javascript|data|vbscript):/i'],
             'image' => 'nullable|string|max:500',
             'target_audience' => 'required|in:all,guests,auth,free,pro',
             'trigger_type' => 'nullable|string|max:50',
@@ -77,7 +77,7 @@ class AnnouncementController extends Controller
             'bg_color' => 'nullable|string|max:20',
             'text_color' => 'nullable|string|max:20',
             'cta_text' => 'nullable|string|max:100',
-            'cta_url' => 'nullable|string|max:500',
+            'cta_url' => ['nullable', 'string', 'max:500', 'not_regex:/^\s*(?:javascript|data|vbscript):/i'],
             'image' => 'nullable|string|max:500',
             'target_audience' => 'required|in:all,guests,auth,free,pro',
             'trigger_type' => 'nullable|string|max:50',
@@ -137,5 +137,8 @@ class AnnouncementController extends Controller
 
     private function authorizeAnnouncements(): void
     {
+        if (! auth('admin')->user()?->hasPermission('content.pages')) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

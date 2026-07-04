@@ -88,7 +88,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload, false);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -108,7 +108,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -128,7 +128,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -148,7 +148,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -173,7 +173,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -211,7 +211,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -237,7 +237,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -280,7 +280,7 @@ class LicenseServiceTest extends TestCase
         settings_set('license_verified_at', now()->subDays(10)->toDateTimeString(), 'string', 'license');
 
         Http::fake([
-            'https://license.yourdomain.com/*' => Http::response(null, 500),
+            'https://license.ezydev.net/*' => Http::response(null, 500),
         ]);
 
         $service = app(LicenseService::class);
@@ -305,7 +305,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -343,7 +343,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $service = app(LicenseService::class);
@@ -394,7 +394,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $sessionData = [
@@ -462,7 +462,7 @@ class LicenseServiceTest extends TestCase
         $mockResponseBody = $this->generateSignedResponse($payload);
 
         Http::fake([
-            'https://license.yourdomain.com/api/v1/verify' => Http::response($mockResponseBody),
+            'https://license.ezydev.net/api/v1/verify' => Http::response($mockResponseBody),
         ]);
 
         $response = $this->actingAs($admin, 'admin')

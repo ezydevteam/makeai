@@ -203,10 +203,7 @@ class TranslationController extends Controller
         $prompt = "Translate the following text into {$targetLang}. Provide ONLY the translated text, no explanation or quotes. IMPORTANT: Words starting with a colon (like :app, :count, :message) are placeholders and MUST be kept exactly as-is.\n\nText: {$text}";
 
         try {
-            $user = User::first(); // System proxy user for admin tasks
-            if (! $user) {
-                throw new \Exception(translate('No user found to process AI request.'));
-            }
+            $user = User::internalAi(); // Non-billable system user for admin AI tasks
 
             $aiService = app(AiService::class);
             $result = $aiService->complete($user, $prompt);
@@ -250,10 +247,7 @@ class TranslationController extends Controller
         $prompt = "Translate this JSON array of strings into {$targetLang}. Return ONLY a JSON array of translations in the same order. IMPORTANT: Words starting with a colon (like :app, :count, :message) are placeholders and MUST be kept exactly as-is.\n\nInput: {$jsonTexts}";
 
         try {
-            $user = User::first();
-            if (! $user) {
-                throw new \Exception(translate('No user found.'));
-            }
+            $user = User::internalAi(); // Non-billable system user for admin AI tasks
 
             $aiService = app(AiService::class);
             $result = $aiService->complete($user, $prompt);

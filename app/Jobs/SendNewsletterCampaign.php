@@ -32,7 +32,9 @@ class SendNewsletterCampaign implements ShouldQueue
     {
         $campaign = NewsletterCampaign::find($this->campaignId);
 
-        if (! $campaign || $campaign->status === 'sent') {
+        // A retry runs specifically on an already-'sent' campaign (to re-send its
+        // failed recipients), so only bail on 'sent' for a normal (non-retry) send.
+        if (! $campaign || ($campaign->status === 'sent' && ! $this->retryOnly)) {
             return;
         }
 
@@ -118,20 +120,37 @@ class SendNewsletterCampaign implements ShouldQueue
 
     private function handleRetry(NewsletterCampaign $campaign): void
     {
-        NewsletterCampaignRecipient::with('subscriber')
-            ->where('campaign_id', $campaign->id)
+        // Claim each failed recipient atomically before sending: flip 'failed' →
+        // 'sending' only if it is still 'failed'. A concurrent retry job that has
+        // already claimed a recipient gets 0 affected rows and is skipped, so no
+        // recipient is ever emailed twice by overlapping retries. (IDs are collected
+        // up front so we don't chunk over the same status column we're mutating.)
+        NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
             ->where('status', 'failed')
             ->orderBy('id')
-            ->chunkById(100, function ($recipients) use ($campaign) {
-                foreach ($recipients as $recipient) {
-                    $this->sendToRecipient($campaign, [
-                        'email' => $recipient->email,
-                        'name' => $recipient->name,
-                        'subscriber_id' => $recipient->subscriber_id,
-                        'user_id' => $recipient->user_id,
-                        'unsubscribe_url' => route('newsletter.unsubscribe', $recipient->subscriber?->token ?? ''),
-                    ]);
+            ->pluck('id')
+            ->each(function ($id) use ($campaign) {
+                $claimed = NewsletterCampaignRecipient::whereKey($id)
+                    ->where('status', 'failed')
+                    ->update(['status' => 'sending']);
+
+                if (! $claimed) {
+                    return; // another retry job already took this recipient
                 }
+
+                $recipient = NewsletterCampaignRecipient::with('subscriber')->find($id);
+
+                if (! $recipient) {
+                    return;
+                }
+
+                $this->sendToRecipient($campaign, [
+                    'email' => $recipient->email,
+                    'name' => $recipient->name,
+                    'subscriber_id' => $recipient->subscriber_id,
+                    'user_id' => $recipient->user_id,
+                    'unsubscribe_url' => route('newsletter.unsubscribe', $recipient->subscriber?->token ?? ''),
+                ]);
             });
     }
 

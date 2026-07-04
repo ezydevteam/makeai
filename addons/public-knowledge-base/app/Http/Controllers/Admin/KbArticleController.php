@@ -27,21 +27,12 @@ class KbArticleController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $statsQuery = (clone $baseQuery)->getQuery();
-
         $categories = KbCategory::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('Addons/public-knowledge-base/Admin/Articles/Index', [
             'articles' => $articles,
             'categories' => $categories,
             'filters' => $filters,
-            'stats' => [
-                'total' => (clone $statsQuery)->count(),
-                'published' => (clone $statsQuery)->where('status', 'published')->count(),
-                'draft' => (clone $statsQuery)->where('status', 'draft')->count(),
-                'embedded_done' => (clone $statsQuery)->where('embed_status', 'done')->count(),
-                'embed_failed' => (clone $statsQuery)->where('embed_status', 'failed')->count(),
-            ],
         ]);
     }
 

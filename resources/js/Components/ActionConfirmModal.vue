@@ -129,7 +129,7 @@ onUnmounted(() => {
                     leave-from-class="translate-y-0 scale-100 opacity-100"
                     leave-to-class="translate-y-2 scale-95 opacity-0"
                 >
-                    <div ref="modalRef" class="w-full max-w-md overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900">
+                    <div ref="modalRef" class="w-full max-w-md overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900">
                         <div class="p-5">
                             <h3 id="action-confirm-title" class="text-lg font-bold text-gray-900 dark:text-white">{{ t(title) }}</h3>
                             <p v-if="message" id="action-confirm-message" class="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
@@ -141,7 +141,7 @@ onUnmounted(() => {
                                 ref="cancelButtonRef"
                                 type="button"
                                 :disabled="processing"
-                                class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-surface-800"
+                                class="rounded-xl px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-surface-800"
                                 @click="close"
                             >
                                 {{ t(cancelLabel) }}
@@ -149,7 +149,7 @@ onUnmounted(() => {
                             <button
                                 type="button"
                                 :disabled="processing"
-                                class="rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
+                                class="rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
                                 :class="variant === 'danger' ? 'bg-red-600 hover:bg-red-500' : 'btn-primary'"
                                 @click="emit('confirm')"
                             >

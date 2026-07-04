@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class Conversation extends Model
 {
     protected $fillable = [
-        'ulid', 'user_id', 'project_id', 'product_slug',
+        'ulid', 'user_id', 'project_id', 'mode_slug',
         'title', 'model', 'total_tokens', 'total_credits',
         'message_count', 'last_message_at', 'is_pinned', 'share_token',
         'parent_conversation_id', 'branch_point_message_id',

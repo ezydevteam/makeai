@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Pagination from '@/Components/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useAdminCan } from '@/Composables/useAdminCan'
 
 defineOptions({ layout: AdminLayout })
 
@@ -58,6 +60,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+const { isSuperAdmin } = useAdminCan()
 
 const searchInput = ref(props.filters?.search ?? '')
 const searchField = ref<HTMLInputElement | null>(null)
@@ -99,9 +102,16 @@ const applyFilters = () => {
     })
 }
 
+let searchTimeout: any = null
+watch(searchInput, () => {
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+        applyFilters()
+    }, 350)
+})
+
 const clearSearch = () => {
     searchInput.value = ''
-    applyFilters()
 }
 
 const resetFilters = () => {
@@ -129,6 +139,14 @@ const handleKeydown = (event: KeyboardEvent) => {
         resetFilters()
     }
 }
+
+onMounted(() => {
+    window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+    window.removeEventListener('keydown', handleKeydown)
+})
 
 const getStatusClass = (pageStatus: string) => {
     switch (pageStatus) {
@@ -236,217 +254,231 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Pages')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="min-w-0">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t('Pages') }}
                 </h1>
-                <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Manage landing pages, legal pages, and custom content for the public site.') }}
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
                 <Link
                     :href="route('admin.pages.create')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium text-white"
+                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition w-full sm:w-auto"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('Create Page') }}
                 </Link>
             </div>
-        </section>
+        </div>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                <div class="relative min-w-[240px] flex-1">
-                    <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
-                    <input
-                        ref="searchField"
-                        v-model="searchInput"
-                        type="text"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        :placeholder="t('Search page title, slug, or template...')"
-                        @keydown.enter="applyFilters"
-                        @focus="searchFocused = true"
-                        @blur="searchFocused = false"
-                    />
-                    <span
-                        v-if="!searchInput && !searchFocused"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >
-                        /
-                    </span>
-                    <button
-                        v-if="searchInput"
-                        type="button"
-                        class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
-                        :aria-label="t('Clear search')"
-                        @click="clearSearch"
-                    >
-                        <i class="ti ti-x text-sm"></i>
-                    </button>
+        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div class="flex-1 min-w-[240px]">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchField"
+                                v-model="searchInput"
+                                type="text"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                :placeholder="t('Search page title, slug, or template...')"
+                                @keydown.enter="applyFilters"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
+                            />
+                            <span
+                                v-if="!searchInput && !searchFocused"
+                                class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                            >
+                                /
+                            </span>
+                            <button
+                                v-if="searchInput"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="clearSearch"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="status"
+                                :options="statusOptions"
+                                :placeholder="t('All Statuses')"
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 w-full sm:w-auto"
+                            @click="resetFilters"
+                        >
+                            {{ t('Clear filters') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="overflow-hidden rounded-b-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" class="px-4 py-3">{{ t('Page') }}</th>
+                                <th scope="col" class="px-4 py-3">{{ t('Template') }}</th>
+                                <th scope="col" class="px-4 py-3">{{ t('Status') }}</th>
+                                <th scope="col" class="px-4 py-3 text-right">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr
+                                v-for="page in pages.data"
+                                :key="page.id"
+                                class="transition-colors hover:bg-primary-50/40 dark:hover:bg-gray-900/30"
+                            >
+                                <td class="px-4 py-4">
+                                    <div class="flex items-start gap-3">
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
+                                            <i :class="page.is_system ? 'ti ti-lock' : 'ti ti-file-text'" class="text-lg"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <p class="truncate font-semibold text-gray-900 dark:text-white">{{ page.title }}</p>
+                                                <span
+                                                    v-if="page.is_system"
+                                                    class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300"
+                                                >
+                                                    {{ t('System') }}
+                                                </span>
+                                            </div>
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">/{{ page.slug }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                        {{ page.template }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <span
+                                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                        :class="getStatusClass(isTrashed ? 'trashed' : page.status)"
+                                    >
+                                        {{ formatStatusLabel(isTrashed ? 'trashed' : page.status) }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4 text-end">
+                                    <TableActionMenu v-if="!isTrashed">
+                                        <template #default="{ close }">
+                                            <a
+                                                :href="'/' + page.slug"
+                                                target="_blank"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="close"
+                                            >
+                                                <i class="ti ti-external-link text-base"></i>
+                                                {{ t('View Live') }}
+                                            </a>
+                                            <a
+                                                v-if="page.status === 'draft' || page.status === 'scheduled'"
+                                                :href="route('admin.pages.preview', page.id)"
+                                                target="_blank"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="close"
+                                            >
+                                                <i class="ti ti-eye text-base"></i>
+                                                {{ t('Preview') }}
+                                            </a>
+                                            <Link
+                                                :href="route('admin.pages.edit', page.id)"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                @click="close"
+                                            >
+                                                <i class="ti ti-edit text-base"></i>
+                                                {{ t('Edit Details') }}
+                                            </Link>
+                                            <hr v-if="!page.is_system" class="border-gray-200 dark:border-surface-700">
+                                            <button
+                                                v-if="!page.is_system"
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                @click="confirmDelete(page); close()"
+                                            >
+                                                <i class="ti ti-trash text-base"></i>
+                                                {{ t('Move to Trash') }}
+                                            </button>
+                                        </template>
+                                    </TableActionMenu>
+
+                                    <div v-else class="flex items-center justify-end gap-2">
+                                        <Tooltip v-if="!page.is_system" :content="t('Restore')">
+                                            <button
+                                                type="button"
+                                                class="flex h-8 w-8 items-center justify-center rounded-full text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                                @click="restorePage(page)"
+                                            >
+                                                <i class="ti ti-refresh text-base"></i>
+                                            </button>
+                                        </Tooltip>
+                                        <Tooltip v-if="!page.is_system && isSuperAdmin" :content="t('Delete Forever')">
+                                            <button
+                                                type="button"
+                                                class="flex h-8 w-8 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                                @click="confirmForceDelete(page)"
+                                            >
+                                                <i class="ti ti-trash text-base"></i>
+                                            </button>
+                                        </Tooltip>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <tr v-if="pages.data.length === 0">
+                                <td colspan="4" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <i class="ti ti-file-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
+                                    <p class="font-medium">{{ hasActiveFilters ? t('No pages match your filters') : t('No pages found') }}</p>
+                                    <button
+                                        v-if="hasActiveFilters"
+                                        type="button"
+                                        class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                        @click="resetFilters"
+                                    >
+                                        {{ t('Clear filters') }}
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <AppSelect
-                    v-model="status"
-                    :options="statusOptions"
-                    :placeholder="t('All Statuses')"
-                    class="w-full sm:w-56"
-                    @update:model-value="applyFilters"
-                />
-
-                <button
-                    v-if="hasActiveFilters"
-                    type="button"
-                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                    @click="resetFilters"
-                >
-                    {{ t('Clear filters') }}
-                </button>
+                <div v-if="pages.links && pages.links.length > 3" class="border-t border-gray-100 p-4 dark:border-surface-800">
+                    <Pagination
+                        :links="pages.links"
+                        :from="pages.from"
+                        :to="pages.to"
+                        :total="pages.total"
+                        :current-page="pages.current_page"
+                        :last-page="pages.last_page"
+                    />
+                </div>
             </div>
-
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[760px] text-left text-sm text-gray-500 dark:text-gray-400">
-                    <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-surface-800 dark:bg-surface-800/50 dark:text-gray-400">
-                        <tr>
-                            <th scope="col" class="px-6 py-3.5">{{ t('Page') }}</th>
-                            <th scope="col" class="px-6 py-3.5">{{ t('Template') }}</th>
-                            <th scope="col" class="px-6 py-3.5">{{ t('Status') }}</th>
-                            <th scope="col" class="px-6 py-3.5 text-right">{{ t('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
-                        <tr
-                            v-for="page in pages.data"
-                            :key="page.id"
-                            class="bg-white transition-colors hover:bg-gray-50/50 dark:bg-surface-900 dark:hover:bg-surface-800/30"
-                        >
-                            <td class="px-6 py-4">
-                                <div class="flex items-start gap-3">
-                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-300">
-                                        <i :class="page.is_system ? 'ti ti-lock' : 'ti ti-file-text'" class="text-lg"></i>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <p class="truncate font-medium text-gray-900 dark:text-white">{{ page.title }}</p>
-                                            <span
-                                                v-if="page.is_system"
-                                                class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-                                            >
-                                                {{ t('System') }}
-                                            </span>
-                                        </div>
-                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">/{{ page.slug }}</p>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                                    {{ page.template }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4">
-                                <span
-                                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                    :class="getStatusClass(isTrashed ? 'trashed' : page.status)"
-                                >
-                                    {{ formatStatusLabel(isTrashed ? 'trashed' : page.status) }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <div v-if="!isTrashed" class="inline-flex items-center gap-2">
-                                    <Tooltip :content="t('View live page')" placement="top">
-                                        <a
-                                            :href="'/' + page.slug"
-                                            target="_blank"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-primary-300"
-                                        >
-                                            <i class="ti ti-external-link"></i>
-                                        </a>
-                                    </Tooltip>
-
-                                    <Tooltip v-if="page.status === 'draft' || page.status === 'scheduled'" :content="t('Preview page')" placement="top">
-                                        <a
-                                            :href="route('admin.pages.preview', page.id)"
-                                            target="_blank"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-primary-300"
-                                        >
-                                            <i class="ti ti-eye text-base"></i>
-                                        </a>
-                                    </Tooltip>
-
-                                    <Tooltip :content="t('Edit page')" placement="top">
-                                        <Link
-                                            :href="route('admin.pages.edit', page.id)"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                                        >
-                                            <i class="ti ti-edit text-base"></i>
-                                        </Link>
-                                    </Tooltip>
-
-                                    <Tooltip v-if="!page.is_system" :content="t('Move to trash')" placement="top">
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                                            @click="confirmDelete(page)"
-                                        >
-                                            <i class="ti ti-trash text-base"></i>
-                                        </button>
-                                    </Tooltip>
-                                </div>
-
-                                <div v-else class="inline-flex items-center gap-2">
-                                    <button
-                                        v-if="!page.is_system"
-                                        type="button"
-                                        class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30"
-                                        @click="restorePage(page)"
-                                    >
-                                        {{ t('Restore') }}
-                                    </button>
-                                    <button
-                                        v-if="!page.is_system"
-                                        type="button"
-                                        class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 transition-colors hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
-                                        @click="confirmForceDelete(page)"
-                                    >
-                                        {{ t('Delete Forever') }}
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-
-                        <tr v-if="pages.data.length === 0">
-                            <td colspan="4" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                                <i class="ti ti-file-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
-                                <p class="font-medium">{{ hasActiveFilters ? t('No pages match your filters') : t('No pages found') }}</p>
-                                <button
-                                    v-if="hasActiveFilters"
-                                    type="button"
-                                    class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                    @click="resetFilters"
-                                >
-                                    {{ t('Clear filters') }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div v-if="pages.links && pages.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                <Pagination
-                    :links="pages.links"
-                    :from="pages.from"
-                    :to="pages.to"
-                    :total="pages.total"
-                    :current-page="pages.current_page"
-                    :last-page="pages.last_page"
-                />
-            </div>
-        </section>
+        </div>
     </div>
 
     <ActionConfirmModal

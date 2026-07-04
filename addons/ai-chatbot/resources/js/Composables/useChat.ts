@@ -2,14 +2,14 @@ import { ref, computed, watch } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { sanitizeErrorMessage } from '@/Composables/useErrorSanitizer'
 
-export interface ChatProduct {
+export interface ChatMode {
     id: number; slug: string; name: string; icon: string; color_hex: string
     system_prompt: string; preferred_models: string[]; default_model: string
     starter_prompts: string[]
 }
 
 export interface Conversation {
-    ulid: string; title: string | null; product_slug: string | null
+    ulid: string; title: string | null; mode_slug: string | null
     model: string | null; last_message_at: string; project_id: number | null
     is_pinned?: boolean; share_token?: string | null
     tags?: ConversationTag[]
@@ -93,7 +93,7 @@ function syncChatUrl(ulid: string | null) {
 }
 
 export function useChat() {
-    const products = ref<ChatProduct[]>([])
+    const modes = ref<ChatMode[]>([])
     const conversations = ref<Conversation[]>([])
     const groupedConversations = computed(() => {
         const groups: Record<string, Conversation[]> = { today: [], yesterday: [], last_7_days: [], older: [] }
@@ -113,17 +113,30 @@ export function useChat() {
     const tags = ref<ConversationTag[]>([])
     const selectedTag = ref<ConversationTag | null>(null)
 
-    const defaultChatModel = (usePage().props.default_chat_model as string) || 'gpt-4o-mini'
-    const allowModelSelect = (usePage().props.allow_model_select as boolean) ?? true
+    const defaultChatModel = computed(() => {
+        const chatbot = usePage().props.chatbot as any
+        return (usePage().props.default_chat_model as string) || chatbot?.defaultChatModel || 'gpt-4o-mini'
+    })
 
-    const selectedProduct = ref<ChatProduct | null>(null)
+    const allowModelSelect = computed(() => {
+        const chatbot = usePage().props.chatbot as any
+        if (usePage().props.allow_model_select !== undefined) {
+            return (usePage().props.allow_model_select as boolean)
+        }
+        if (chatbot?.allowModelSelect !== undefined) {
+            return (chatbot.allowModelSelect as boolean)
+        }
+        return true
+    })
+
+    const selectedMode = ref<ChatMode | null>(null)
     const activeConversation = ref<Conversation | null>(null)
     const selectedProject = ref<ChatProject | null>(null)
     const messages = ref<ChatMessage[]>([])
     const isStreaming = ref(false)
     const loading = ref(false)
     const error = ref('')
-    const selectedModel = ref<string | null>(allowModelSelect ? null : defaultChatModel)
+    const selectedModel = ref<string | null>(allowModelSelect.value ? null : defaultChatModel.value)
     const abortController = ref<AbortController | null>(null)
     const pendingConversationUlid = ref<string | null>(null)
     const hasMoreMessages = ref(false)
@@ -131,12 +144,14 @@ export function useChat() {
     const useKnowledgeBase = ref(false)
     const kbAvailable = (usePage().props.kb_available as boolean) ?? false
     const availableModels = computed(() => {
-        const models = usePage().props.available_chat_models as string[] | undefined
-        return models ?? [defaultChatModel]
+        const chatbot = usePage().props.chatbot as any
+        const models = (usePage().props.available_models || usePage().props.available_chat_models) as string[] | undefined
+        const sharedModels = chatbot?.availableModels as string[] | undefined
+        return models ?? sharedModels ?? [defaultChatModel.value]
     })
 
-    async function loadProducts() {
-        try { const data = await apiGet<{ success: boolean; data: ChatProduct[] }>('/api/v1/chat/products'); products.value = data.data } catch {}
+    async function loadModes() {
+        try { const data = await apiGet<{ success: boolean; data: ChatMode[] }>('/api/v1/chat/modes'); modes.value = data.data } catch {}
     }
     async function loadConversations(projectId?: number | null) {
         try {
@@ -214,12 +229,12 @@ export function useChat() {
         }
     }
 
-    function newChat(product?: ChatProduct) {
-        selectedProduct.value = product ?? null
+    function newChat(mode?: ChatMode) {
+        selectedMode.value = mode ?? null
         activeConversation.value = null
         messages.value = []
         error.value = ''
-        selectedModel.value = product?.default_model ?? null
+        selectedModel.value = mode?.default_model ?? null
         syncChatUrl(null)
     }
 
@@ -233,8 +248,8 @@ export function useChat() {
         messages.value = []
         error.value = ''
         selectedModel.value = conv.model
-        if (conv.product_slug) {
-            selectedProduct.value = products.value.find(p => p.slug === conv.product_slug) ?? null
+        if (conv.mode_slug) {
+            selectedMode.value = modes.value.find(m => m.slug === conv.mode_slug) ?? null
         }
         syncChatUrl(conv.ulid)
         await loadMessages(conv.ulid)
@@ -251,7 +266,7 @@ export function useChat() {
         const fallback: Conversation = {
             ulid,
             title: null,
-            product_slug: null,
+            mode_slug: null,
             model: null,
             last_message_at: new Date().toISOString(),
             project_id: null,
@@ -273,17 +288,17 @@ export function useChat() {
         pendingConversationUlid.value = null
         activeConversation.value = match
         selectedModel.value = match.model
-        if (match.product_slug) {
-            selectedProduct.value = products.value.find(p => p.slug === match.product_slug) ?? null
+        if (match.mode_slug) {
+            selectedMode.value = modes.value.find(m => m.slug === match.mode_slug) ?? null
         }
     })
 
-    async function sendMessage(content: string, product_slug?: string, attachments?: ChatAttachment[]) {
+    async function sendMessage(content: string, mode_slug?: string, attachments?: ChatAttachment[]) {
         if (!content.trim() || isStreaming.value) return
 
         const model = selectedModel.value
-            ?? selectedProduct.value?.default_model
-            ?? (usePage().props.default_chat_model as string)
+            ?? selectedMode.value?.default_model
+            ?? defaultChatModel.value
             ?? availableModels.value[0]
             ?? ''
 
@@ -307,7 +322,7 @@ export function useChat() {
         try {
             if (!activeConversation.value) {
                 const data = await apiPost<{ success: boolean; data: Conversation }>('/api/v1/chat', {
-                    product_slug: product_slug ?? selectedProduct.value?.slug ?? null,
+                    mode_slug: mode_slug ?? selectedMode.value?.slug ?? null,
                     model,
                     project_id: selectedProject.value?.id ?? null,
                 })
@@ -323,7 +338,7 @@ export function useChat() {
             await streamMessage(
                 activeConversation.value.ulid,
                 content,
-                product_slug ?? selectedProduct.value?.slug ?? undefined,
+                mode_slug ?? selectedMode.value?.slug ?? undefined,
                 model,
                 attachments,
                 useKnowledgeBase.value,
@@ -358,8 +373,8 @@ export function useChat() {
         }
     }
 
-    async function streamMessage(ulid: string, content: string, product_slug?: string, model?: string, attachments?: ChatAttachment[], use_kb?: boolean) {
-        const body: Record<string, unknown> = { content, product_slug: product_slug ?? undefined, model: model ?? undefined }
+    async function streamMessage(ulid: string, content: string, mode_slug?: string, model?: string, attachments?: ChatAttachment[], use_kb?: boolean) {
+        const body: Record<string, unknown> = { content, mode_slug: mode_slug ?? undefined, model: model ?? undefined }
         if (attachments?.length) body.attachments = attachments
         if (use_kb) body.use_knowledge_base = true
 
@@ -536,7 +551,7 @@ export function useChat() {
         // If should_regenerate is true, trigger a new AI response
         if (res.data.should_regenerate) {
             const editedMessage = res.data.message
-            await sendMessage(editedMessage.content, selectedProduct.value?.slug ?? undefined)
+            await sendMessage(editedMessage.content, selectedMode.value?.slug ?? undefined)
         }
 
         return res.data
@@ -562,20 +577,20 @@ export function useChat() {
     const allowGuest = (usePage().props.allow_guest_messages as boolean) ?? false
 
     if (!isGuest) {
-        loadProducts()
+        loadModes()
         loadConversations()
         loadProjects()
         loadTags()
     } else if (allowGuest) {
-        loadProducts()
+        loadModes()
         loadConversations()
         loadProjects()
         loadTags()
     }
 
     return {
-        products, conversations, groupedConversations, projects, tags, selectedTag,
-        selectedProduct, activeConversation, selectedProject, messages,
+        modes, conversations, groupedConversations, projects, tags, selectedTag,
+        selectedMode, activeConversation, selectedProject, messages,
         isStreaming, loading, error, selectedModel,
         useKnowledgeBase, kbAvailable,
         newChat, selectConversation, selectProject, sendMessage, stopStreaming,

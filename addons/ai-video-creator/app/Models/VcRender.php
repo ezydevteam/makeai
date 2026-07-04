@@ -66,7 +66,7 @@ class VcRender extends Model
             'completed' => 'Completed',
             'failed' => 'Failed',
             'cancelled' => 'Cancelled',
-        ][$this->status] ?? $this->status;
+        ][$this->status] ?? (string) $this->status;
     }
 
     public function getTypeLabelAttribute(): string
@@ -76,7 +76,7 @@ class VcRender extends Model
             'image_to_video' => 'Image to Video',
             'avatar_video' => 'AI Avatar',
             'slideshow' => 'Slideshow',
-        ][$this->type] ?? $this->type;
+        ][$this->type] ?? (string) $this->type;
     }
 
     public function getCanRetryAttribute(): bool

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\DTO\LicenseResult;
+use App\Support\PurchaseCode;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
@@ -18,17 +19,14 @@ class LicenseService
 
     // Public key shipped in core — pairs with the private key on the License Server.
     // Class constant, NOT settings/DB/.env — settings can be edited by a nuller.
+    //
+    // ⚠️ BEFORE PACKAGING FOR ENVATO: replace this with the REAL base64-encoded
+    // Ed25519 public key from your License Server. While it equals
+    // PLACEHOLDER_PUBLIC_KEY, all real (non-test-mode) activations are refused with
+    // a clear "not configured" message so buyers never see a cryptic signature error.
     private const LICENSE_SERVER_PUBLIC_KEY = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
+    private const PLACEHOLDER_PUBLIC_KEY    = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
     private const LICENSE_SERVER_URL        = 'https://license.ezydev.net/api/v1/verify';
-
-    /**
-     * SHA-256 hashes of fake purchase codes recognized only when LICENSE_TEST_MODE=true.
-     * These never reach the Envato API / License Server.
-     */
-    private const TEST_CODE_HASHES = [
-        'a826f24604f457de266d6db6d77ee0ef4ab0c0fd2b0a00b918022b57de79f5a2' => 1, // Regular: hash('sha256', 'TEST-LICENSE-0000-REGULAR')
-        '3faeb2cbd383b0c0eb4d7ebcc72312ba1c2b0d3448afba0b653b9249b392cc5d' => 2, // Extended: hash('sha256', 'TEST-LICENSE-0000-EXTENDED')
-    ];
 
     /**
      * Verify a purchase code via the Author License Server.
@@ -47,16 +45,22 @@ class LicenseService
         $purchaseCode = trim($purchaseCode);
         $purchaseCodeUpper = strtoupper($purchaseCode);
 
-        $hashedCode = hash('sha256', $purchaseCodeUpper);
-
-        if ($this->testModeActive() && array_key_exists($hashedCode, self::TEST_CODE_HASHES)) {
-            return $this->buildTestResult($purchaseCodeUpper, $hashedCode, $store);
+        if (($testType = PurchaseCode::matchTestCode($purchaseCode)) !== null) {
+            return $this->buildTestResult($purchaseCodeUpper, $testType, $store);
         }
 
-        if (! preg_match('/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i', $purchaseCode)) {
+        if (! PurchaseCode::isValidUuid($purchaseCode)) {
             return LicenseResult::failure(
                 translate('Invalid purchase code format. It should look like: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'),
                 'invalid_format'
+            );
+        }
+
+        if (! $this->publicKeyConfigured()) {
+            Log::critical('LicenseService: LICENSE_SERVER_PUBLIC_KEY is still the placeholder — the real key was not set before packaging.');
+            return LicenseResult::failure(
+                translate('License verification is not configured on this build. Please contact the author/support.'),
+                'public_key_missing'
             );
         }
 
@@ -142,6 +146,7 @@ class LicenseService
                     'wrong_item' => translate('This code belongs to a different product.'),
                     'refunded' => translate('This purchase was refunded.'),
                     'revoked' => translate('This license has been revoked — contact support.'),
+                    'envato_error' => translate('The marketplace is temporarily unavailable. Please try again in a few minutes.'),
                 ];
                 $errorMessage = $errorMap[$errorCode] ?? translate('License validation failed.');
                 return LicenseResult::failure($errorMessage, $errorCode);
@@ -164,6 +169,7 @@ class LicenseService
                 settings_set('license_domain', request()->getHost(), 'string', 'license');
                 settings_set('license_status', 'valid', 'string', 'license');
                 settings_set('license_grace_started_at', null, 'string', 'license');
+                $this->storeSignedProof($rawPayload, $data['signature']);
 
                 Cache::forget('license.status');
             }
@@ -245,14 +251,20 @@ class LicenseService
             return false;
         }
 
-        $purchaseCodeUpper = strtoupper($purchaseCode);
-        if ($this->testModeActive() && array_key_exists($purchaseCodeUpper, self::TEST_CODES)) {
+        if (PurchaseCode::matchTestCode($purchaseCode) !== null) {
             settings_set('license_verified_at', now()->toDateTimeString(), 'string', 'license');
             settings_set('license_status', 'valid', 'string', 'license');
             settings_set('license_grace_started_at', null, 'string', 'license');
             Cache::forget('license.status');
             Log::info('License re-verified via TEST MODE');
             return true;
+        }
+
+        if (! $this->publicKeyConfigured()) {
+            // Key not configured on this build — cannot verify signatures. Treat as a
+            // transient condition (never punish the buyer / start a grace period).
+            Log::critical('LicenseService: Re-verify skipped — license server public key not configured.');
+            return false;
         }
 
         if (! $force) {
@@ -280,6 +292,7 @@ class LicenseService
 
             if (! $response->successful()) {
                 Log::warning('LicenseService: Re-verify API error (transient)');
+                $this->checkOfflineDeadline();
                 return false;
             }
 
@@ -313,6 +326,19 @@ class LicenseService
             $payload = $data['payload'];
 
             if (empty($payload['valid'])) {
+                // Distinguish transient author/marketplace-side errors from a
+                // definitive negative verdict. An Envato API outage returns a
+                // signed valid:false with error=envato_error — that must NOT
+                // start a grace period, or a legitimate buyer gets invalidated
+                // whenever Envato is briefly down.
+                $transientErrors = ['envato_error', 'api_error', 'network', 'connection_error'];
+                if (in_array($payload['error'] ?? '', $transientErrors, true)) {
+                    Log::warning('LicenseService: Re-verify returned a transient server error — keeping current status', [
+                        'error' => $payload['error'] ?? null,
+                    ]);
+                    return false;
+                }
+
                 $this->startGracePeriod();
                 return false;
             }
@@ -321,16 +347,20 @@ class LicenseService
             settings_set('license_verified_at', now()->toDateTimeString(), 'string', 'license');
             settings_set('license_status', 'valid', 'string', 'license');
             settings_set('license_grace_started_at', null, 'string', 'license');
+            $this->storeSignedProof($rawPayload, $data['signature']);
 
             Cache::forget('license.status');
 
             Log::info('LicenseService: Re-verify successful');
             return true;
         } catch (\Throwable $e) {
-            // Network error — never punish for transient issues
+            // Network error — never punish for a transient issue, but DO enforce the
+            // offline deadline so blocking the license server can't keep a nulled
+            // copy alive forever.
             Log::warning('LicenseService: Re-verify connection error (transient)', [
                 'error' => $e->getMessage(),
             ]);
+            $this->checkOfflineDeadline();
             return false;
         }
     }
@@ -402,6 +432,8 @@ class LicenseService
             'license_domain',
             'license_status',
             'license_grace_started_at',
+            'license_signed_payload',
+            'license_signature',
         ];
 
         foreach ($keys as $key) {
@@ -463,6 +495,74 @@ class LicenseService
         return null;
     }
 
+    /**
+     * Persist the server's SIGNED payload + signature so the authentic
+     * `verified_at` can be re-checked offline later (tamper-evident anchor).
+     */
+    private function storeSignedProof(string $rawPayload, string $signatureB64): void
+    {
+        settings_set('license_signed_payload', $rawPayload, 'string', 'license');
+        settings_set('license_signature', $signatureB64, 'string', 'license');
+    }
+
+    /**
+     * Enforce the offline deadline. Reads the last genuinely server-confirmed
+     * `verified_at` from the stored SIGNED payload — re-verifying the signature
+     * offline so a DB-edited timestamp is rejected. If no signed confirmation has
+     * happened within license.max_offline_days, the grace period starts. This is
+     * what stops "block the license server → valid forever" nulling.
+     */
+    private function checkOfflineDeadline(): void
+    {
+        $maxDays = (int) config('license.max_offline_days', 14);
+        if ($maxDays <= 0) {
+            return; // deadline disabled
+        }
+
+        $payloadJson  = settings('license_signed_payload');
+        $signatureB64 = settings('license_signature');
+
+        // No stored signed proof (older activation) — fall back to the plain
+        // last-success timestamp so the deadline still applies.
+        if (blank($payloadJson) || blank($signatureB64)) {
+            $lastSuccess = settings('license_verified_at');
+            if (filled($lastSuccess)
+                && abs(now()->diffInDays(\Illuminate\Support\Carbon::parse($lastSuccess))) > $maxDays) {
+                Log::warning('LicenseService: Offline deadline exceeded (no signed proof) — starting grace');
+                $this->startGracePeriod();
+            }
+            return;
+        }
+
+        // Re-verify the stored signature offline. If it fails, the stored proof was
+        // tampered with (or the key changed) — do not trust the local timestamp.
+        if (! function_exists('sodium_crypto_sign_verify_detached')) {
+            return;
+        }
+
+        $sig = @base64_decode($signatureB64);
+        $pk  = @base64_decode($this->getPublicKey());
+
+        if (! $sig || ! $pk || ! @sodium_crypto_sign_verify_detached($sig, $payloadJson, $pk)) {
+            Log::warning('LicenseService: Stored license proof failed offline signature check — starting grace');
+            $this->startGracePeriod();
+            return;
+        }
+
+        $data = json_decode($payloadJson, true);
+        $verifiedAt = $data['verified_at'] ?? null;
+        if (blank($verifiedAt)) {
+            return;
+        }
+
+        if (abs(now()->diffInDays(\Illuminate\Support\Carbon::parse($verifiedAt))) > $maxDays) {
+            Log::warning('LicenseService: Offline deadline exceeded — no signed re-verification in :days days, starting grace', [
+                'days' => $maxDays,
+            ]);
+            $this->startGracePeriod();
+        }
+    }
+
     private function startGracePeriod(): void
     {
         $graceHours = config('license.grace_period', 72);
@@ -486,6 +586,55 @@ class LicenseService
         Log::warning('LicenseService: Grace period started', [
             'grace_hours' => $graceHours,
         ]);
+
+        // Warn admins now — they have $graceHours to re-activate before the app is
+        // blocked. Previously admins were only notified AFTER invalidation.
+        $this->notifyGraceStarted($graceHours);
+    }
+
+    /**
+     * Notify admins (in-app + email) that the license entered its grace period,
+     * giving them time to act before enforcement kicks in.
+     */
+    private function notifyGraceStarted(int $graceHours): void
+    {
+        try {
+            app(\App\Services\InAppNotificationService::class)->notifyAdmins([
+                'title' => translate('License needs re-verification'),
+                'message' => translate('Automatic license re-verification failed. Please re-activate your license within :hours hours to avoid interruption.', ['hours' => $graceHours]),
+                'level' => 'warning',
+                'category' => 'system',
+            ], 'super-admin');
+
+            $admins = \App\Models\Admin::where('is_active', true)->get();
+            foreach ($admins as $admin) {
+                $subject = translate('Action needed: license re-verification');
+                $message = translate('Automatic license re-verification failed. Please re-activate your license within :hours hours in the admin panel to avoid the app being blocked.', ['hours' => $graceHours]);
+                $html = <<<HTML
+                    <div style="font-family:Inter,Arial,sans-serif;color:#111827;line-height:1.6">
+                        <p>Hello {$admin->name},</p>
+                        <p>{$message}</p>
+                        <p style="margin-top:32px;color:#6b7280;font-size:13px">MakeAI Admin Notification</p>
+                    </div>
+                HTML;
+
+                \Illuminate\Support\Facades\Mail::html($html, function ($mail) use ($admin, $subject) {
+                    $mail->to($admin->email, $admin->name)->subject($subject);
+                });
+
+                \App\Models\MailLog::create([
+                    'template_slug' => 'license_grace_started',
+                    'recipient_email' => $admin->email,
+                    'subject' => $subject,
+                    'status' => 'sent',
+                    'sent_at' => now(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::error('LicenseService: Failed to notify admins of grace period start', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function markInvalid(): void
@@ -549,11 +698,19 @@ class LicenseService
     }
 
     /**
+     * Whether a real License Server public key has been baked in (i.e. the
+     * placeholder shipped in source was replaced before packaging).
+     */
+    private function publicKeyConfigured(): bool
+    {
+        return $this->getPublicKey() !== self::PLACEHOLDER_PUBLIC_KEY;
+    }
+
+    /**
      * Build mock test results for local development/testing.
      */
-    private function buildTestResult(string $purchaseCode, string $hashedCode, bool $store = true): LicenseResult
+    private function buildTestResult(string $purchaseCode, int $type, bool $store = true): LicenseResult
     {
-        $type = self::TEST_CODE_HASHES[$hashedCode];
         $supportedUntil = now()->addYears(10)->toDateTimeString();
 
         if ($store) {
@@ -582,10 +739,5 @@ class LicenseService
             'license' => $type === 2 ? 'Extended License' : 'Regular License',
             'supported_until' => $supportedUntil,
         ]);
-    }
-
-    private function testModeActive(): bool
-    {
-        return filter_var(config('app.license_test_mode', false), FILTER_VALIDATE_BOOLEAN);
     }
 }

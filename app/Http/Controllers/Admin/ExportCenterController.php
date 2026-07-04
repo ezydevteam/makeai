@@ -52,7 +52,7 @@ class ExportCenterController extends Controller
                 ['value' => 'ai-usage', 'label' => translate('AI Usage')],
                 ['value' => 'affiliates', 'label' => translate('Affiliate Commissions')],
             ],
-            'isProAvailable' => (bool) $this->isProAvailable(),
+            'isProAvailable' => isProAvailable(),
             'plans' => Plan::where('is_active', true)->select('id', 'name')->get()
                 ->map(fn ($p) => ['value' => (string) $p->id, 'label' => $p->name])->values()->all(),
             'gateways' => array_values(array_map(
@@ -97,7 +97,7 @@ class ExportCenterController extends Controller
         $gateway = $request->gateway;
         $toolSlug = $request->tool_slug;
 
-        if ($type === 'revenue' && ! $this->isProAvailable()) {
+        if ($type === 'revenue' && ! isProAvailable()) {
             return response()->json(['message' => translate('Revenue export is only available with Pro')], 422);
         }
 
@@ -433,11 +433,6 @@ class ExportCenterController extends Controller
         return response()->json(['count' => $count]);
     }
 
-    private function isProAvailable(): bool
-    {
-        return (bool) (settings('is_pro_available', true) ?? true);
-    }
-
     private function guessExportType(string $filename): string
     {
         foreach (['users', 'ai-usage', 'revenue', 'affiliates'] as $type) {
@@ -458,7 +453,12 @@ class ExportCenterController extends Controller
 
     private function authorizeExports(): void
     {
-        if (! auth('admin')->check()) {
+        // Check the actual permission, not just authentication — defense-in-depth
+        // in case an export route is ever added without the reports.export
+        // middleware. (Super admins bypass the permission check.)
+        $admin = auth('admin')->user();
+
+        if (! $admin || ! $admin->hasPermission('reports.export')) {
             abort(403, translate('Unauthorized.'));
         }
     }

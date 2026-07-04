@@ -10,7 +10,6 @@ use App\Models\SupportTicketReply;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SupportTicketService
@@ -247,9 +246,12 @@ class SupportTicketService
         return collect($attachments)
             ->filter(fn ($file) => $file instanceof UploadedFile)
             ->map(function (UploadedFile $file) use ($ticket, $reply, $authorType, $authorId) {
-                $path = $file->store("support/{$ticket->ticket_number}", 'public');
+                // Private disk: support attachments routinely contain personal data
+                // (screenshots, invoices, logs) and must not be reachable by URL.
+                // They are served through an authenticated, access-checked route.
+                $path = $file->store("support/{$ticket->ticket_number}", 'local');
 
-                SupportTicketAttachment::create([
+                $attachment = SupportTicketAttachment::create([
                     'ticket_id' => $ticket->id,
                     'reply_id' => $reply->id,
                     'file_name' => $file->getClientOriginalName(),
@@ -262,9 +264,9 @@ class SupportTicketService
                 ]);
 
                 return [
+                    'id' => $attachment->id,
                     'name' => $file->getClientOriginalName(),
-                    'url' => Storage::url($path),
-                    'path' => $path,
+                    'url' => route('support.attachments.download', $attachment),
                     'size' => $file->getSize() ?: 0,
                     'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
                 ];

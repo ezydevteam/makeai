@@ -54,5 +54,7 @@ class PaymentActivationService extends SubscriptionLifecycleService
             // Send notification
             app(NotificationEventService::class)->creditsAdded($user, $totalCredits, 'Credit top-up');
         });
+
+        $this->awardAffiliateRewards($payment);
     }
 }

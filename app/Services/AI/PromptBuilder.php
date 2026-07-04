@@ -53,10 +53,11 @@ class PromptBuilder
         // 3. Apply dynamic length instruction based on max tokens
         $system .= $this->getLengthInstruction($fields['length'] ?? 'medium', $maxTokens);
 
-        // 7. Temperature
-        $temperature = isset($fields['creativity'])
+        // 7. Temperature — clamp user-supplied creativity to a valid range
+        $temperature = isset($fields['creativity']) && is_numeric($fields['creativity'])
             ? (float) $fields['creativity']
             : (float) ($template->temperature ?? 0.7);
+        $temperature = max(0.0, min(2.0, $temperature));
 
         return new CompletionRequest(
             model: $model,
@@ -91,30 +92,35 @@ class PromptBuilder
      */
     private function interpolate(string $prompt, array $fields): string
     {
+        $replacements = [];
         foreach ($fields as $key => $value) {
             // Handle arrays (e.g. tags_input → comma-separated)
             if (is_array($value)) {
                 $value = implode(', ', $value);
             }
 
-            // Replace both {key} and {{key}} patterns
-            $prompt = str_replace('{'.$key.'}', (string) $value, $prompt);
-            $prompt = str_replace('{{'.$key.'}}', (string) $value, $prompt);
+            $replacements['{{'.$key.'}}'] = (string) $value;
+            $replacements['{'.$key.'}'] = (string) $value;
         }
 
-        // Replace unresolved placeholders with visible markers instead of silently removing them
-        // This helps admins identify missing field configurations
-        $prompt = preg_replace_callback('/\{\{([a-z_]+)\}\}/i', function ($matches) {
-            \Log::warning('PromptBuilder: unresolved placeholder', ['key' => $matches[1]]);
-            return "[MISSING: {$matches[1]}]";
+        // Mark unresolved placeholders BEFORE substituting, so braces inside
+        // user-provided values are never rewritten. Visible markers help
+        // admins spot missing field configurations.
+        $prompt = preg_replace_callback('/\{\{([a-z0-9_]+)\}\}|\{([a-z0-9_]+)\}/i', function ($matches) use ($replacements) {
+            if (array_key_exists($matches[0], $replacements)) {
+                return $matches[0];
+            }
+
+            $key = ($matches[1] ?? '') !== '' ? $matches[1] : ($matches[2] ?? '');
+            \Log::warning('PromptBuilder: unresolved placeholder', ['key' => $key]);
+
+            return "[MISSING: {$key}]";
         }, $prompt);
 
-        $prompt = preg_replace_callback('/\{([a-z_]+)\}/i', function ($matches) {
-            \Log::warning('PromptBuilder: unresolved placeholder', ['key' => $matches[1]]);
-            return "[MISSING: {$matches[1]}]";
-        }, $prompt);
-
-        return trim($prompt);
+        // Single-pass strtr ({{key}} wins over {key}); substituted values are
+        // never re-scanned, so a value containing "{other_field}" cannot
+        // expand into another field's value.
+        return trim(strtr($prompt, $replacements));
     }
 
     /**
@@ -213,6 +219,9 @@ class PromptBuilder
 
     /**
      * Estimate credit cost before generation.
+     *
+     * Uses the same credits_per_1k formula as TokenGuard so the estimate
+     * shown to the user matches what is actually deducted.
      */
     public function estimateCost(AiTool $template, string $model, ?string $outputLength = null): array
     {
@@ -224,22 +233,26 @@ class PromptBuilder
             $estimatedTokens = (int) round($estimatedTokens * ($multipliers[$outputLength] ?? 1));
         }
 
+        $estimatedInputTokens = 200; // rough prompt overhead
+        $totalTokens = $estimatedInputTokens + $estimatedTokens;
+
         $dbModel = AiModel::where('slug', $model)->first();
 
         if (! $dbModel) {
             return [
-                'estimated_credits' => round($estimatedTokens / 1000, 2),
+                'estimated_credits' => round($totalTokens / 1000, 2),
                 'estimated_tokens' => $estimatedTokens,
             ];
         }
 
-        $outputCost = ($estimatedTokens / 1000) * (float) $dbModel->cost_output_1k;
-        $inputCost = (200 / 1000) * (float) $dbModel->cost_input_1k; // estimate ~200 input tokens
-        $totalUsd = $inputCost + $outputCost;
-        $credits = $totalUsd * (float) settings('credits_per_usd', 100);
+        // Mirror TokenGuard::calculateCredits — credits_per_1k across all tokens
+        $credits = round($totalTokens * ((float) $dbModel->credits_per_1k / 1000), 2);
+
+        $totalUsd = ($estimatedInputTokens / 1000) * (float) $dbModel->cost_input_1k
+            + ($estimatedTokens / 1000) * (float) $dbModel->cost_output_1k;
 
         return [
-            'estimated_credits' => round($credits, 2),
+            'estimated_credits' => $credits,
             'estimated_tokens' => $estimatedTokens,
             'estimated_usd' => round($totalUsd, 6),
         ];

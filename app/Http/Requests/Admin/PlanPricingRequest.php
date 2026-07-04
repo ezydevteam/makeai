@@ -32,6 +32,8 @@ class PlanPricingRequest extends FormRequest
             'is_active' => ['boolean'],
             'trial_all_countries' => ['boolean'],
             'trial_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
+            'stripe_price_monthly_id' => ['nullable', 'string', 'max:255', 'starts_with:price_'],
+            'stripe_price_yearly_id' => ['nullable', 'string', 'max:255', 'starts_with:price_'],
             'country_prices' => ['array'],
             'country_prices.*.id' => ['nullable', 'integer', 'exists:plan_country_prices,id'],
             'country_prices.*.country_code' => ['required', 'string', 'size:2'],

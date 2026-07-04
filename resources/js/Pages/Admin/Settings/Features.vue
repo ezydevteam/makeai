@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3'
+import { computed } from 'vue'
+import { Head, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -39,17 +40,24 @@ const submit = () => {
     })
 }
 
-const featureToggles = [
-    { key: 'subscriptions_enabled', label: 'Premium Subscriptions', description: 'Enable the subscription/billing system for premium plans (requires Extended License).' },
-    { key: 'affiliate_enabled', label: 'Affiliate Program', description: 'Enable the affiliate/referral program system.' },
-    { key: 'tickets_enabled', label: 'Support Tickets', description: 'Enable the support ticket system for user inquiries.' },
-    { key: 'contact_enabled', label: 'Contact Form', description: 'Enable the public contact form for visitor inquiries.' },
-    { key: 'blog_enabled', label: 'Blog', description: 'Enable the blog system for publishing articles and posts.' },
-    { key: 'notifications_enabled', label: 'Notifications', description: 'Hide notification bells and stop delivery when disabled.' },
-    { key: 'registration_enabled', label: 'User Registration', description: 'Allow new users to register on the site.' },
-    { key: 'email_verification_enabled', label: 'Email Verification', description: 'Require email verification after registration.' },
-    { key: 'tools_review_approval_enabled', label: 'Tools Review Approval', description: 'Require admin approval before new tool reviews are published.' },
+const page = usePage()
+const isExtendedLicense = computed(() => Boolean(page.props.isExtendedLicense))
+
+const allFeatureToggles = [
+    // The subscriptions toggle only exists on Extended License installs; the server
+    // enforces this on save as well.
+    { key: 'subscriptions_enabled', label: 'Premium Subscriptions', description: 'Enable the subscription/billing system for premium plans (requires Extended License).', extendedOnly: true },
+    { key: 'affiliate_enabled', label: 'Affiliate Program', description: 'Enable the affiliate/referral program system.', extendedOnly: false },
+    { key: 'tickets_enabled', label: 'Support Tickets', description: 'Enable the support ticket system for user inquiries.', extendedOnly: false },
+    { key: 'contact_enabled', label: 'Contact Form', description: 'Enable the public contact form for visitor inquiries.', extendedOnly: false },
+    { key: 'blog_enabled', label: 'Blog', description: 'Enable the blog system for publishing articles and posts.', extendedOnly: false },
+    { key: 'notifications_enabled', label: 'Notifications', description: 'Hide notification bells and stop delivery when disabled.', extendedOnly: false },
+    { key: 'registration_enabled', label: 'User Registration', description: 'Allow new users to register on the site.', extendedOnly: false },
+    { key: 'email_verification_enabled', label: 'Email Verification', description: 'Require email verification after registration.', extendedOnly: false },
+    { key: 'tools_review_approval_enabled', label: 'Tools Review Approval', description: 'Require admin approval before new tool reviews are published.', extendedOnly: false },
 ] as const
+
+const featureToggles = computed(() => allFeatureToggles.filter((feature) => !feature.extendedOnly || isExtendedLicense.value))
 </script>
 
 <template>

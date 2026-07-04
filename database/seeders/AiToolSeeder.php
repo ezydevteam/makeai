@@ -18,7 +18,7 @@ class AiToolSeeder extends Seeder
     {
         $categories = Category::aiTools()->where('is_active', true)->get()->keyBy('slug');
         $catalog = $this->catalog();
-        $expectedTotal = 283;
+        $expectedTotal = 280;
         $actualTotal = collect($catalog)->flatten(1)->count();
 
         if ($actualTotal !== $expectedTotal) {
@@ -528,10 +528,6 @@ PROMPT;
             'grammar-checker' => ['writing_stage' => 'polish'],
             'citation-generator' => ['writing_stage' => 'polish'],
             'study-guide' => ['writing_stage' => 'polish'],
-        ];
-    }
-}
-ng_stage' => 'polish'],
         ];
     }
 }

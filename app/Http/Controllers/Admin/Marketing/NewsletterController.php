@@ -47,27 +47,66 @@ class NewsletterController extends Controller
             $subscribersQuery->where('status', $request->string('status')->toString());
         }
 
+        $now = now();
+        $sevenDaysAgo = $now->copy()->subDays(7);
+
+        // 1. Total Subscribers
+        $subscribersCurrent = NewsletterSubscriber::count();
+        $subscribersPrevious = NewsletterSubscriber::where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 2. Active Subscribers
+        $activeCurrent = NewsletterSubscriber::where('status', 'subscribed')->count();
+        $activePrevious = NewsletterSubscriber::where('status', 'subscribed')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 3. Unsubscribed
+        $unsubscribedCurrent = NewsletterSubscriber::where('status', 'unsubscribed')->count();
+        $unsubscribedPrevious = NewsletterSubscriber::where('status', 'unsubscribed')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 4. Sent Campaigns
+        $campaignsCurrent = NewsletterCampaign::where('status', 'sent')->count();
+        $campaignsPrevious = NewsletterCampaign::where('status', 'sent')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        $stats = [
+            'total' => [
+                'value' => $subscribersCurrent,
+                'comparison' => $this->calculateComparison($subscribersCurrent, $subscribersPrevious),
+            ],
+            'active' => [
+                'value' => $activeCurrent,
+                'comparison' => $this->calculateComparison($activeCurrent, $activePrevious),
+            ],
+            'unsubscribed' => [
+                'value' => $unsubscribedCurrent,
+                'comparison' => $this->calculateComparison($unsubscribedCurrent, $unsubscribedPrevious),
+            ],
+            'campaigns' => [
+                'value' => $campaignsCurrent,
+                'comparison' => $this->calculateComparison($campaignsCurrent, $campaignsPrevious),
+            ],
+            'users_all' => User::where('email_marketing', true)->count(),
+            'users_active' => User::where('email_marketing', true)->where('last_login_at', '>=', now()->subDays(30))->count(),
+            'users_inactive' => User::where('email_marketing', true)->where(function ($query) {
+                $query->whereNull('last_login_at')->orWhere('last_login_at', '<', now()->subDays(30));
+            })->count(),
+            'users_pro' => isProAvailable()
+                ? User::where('email_marketing', true)->whereIn('subscription_status', ['active', 'trialing'])->count()
+                : 0,
+            'users_free' => User::where('email_marketing', true)->where(function ($query) {
+                $query->whereNull('subscription_status')->orWhereNotIn('subscription_status', ['active', 'trialing']);
+            })->count(),
+        ];
+
         return Inertia::render('Admin/Marketing/Newsletter', [
             'subscribers' => $subscribersQuery->paginate(20)->withQueryString(),
             'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->paginate(10),
-            'stats' => [
-                'total' => NewsletterSubscriber::count(),
-                'active' => NewsletterSubscriber::where('status', 'subscribed')->count(),
-                'unsubscribed' => NewsletterSubscriber::where('status', 'unsubscribed')->count(),
-                'users_all' => User::where('email_marketing', true)->count(),
-                'users_active' => User::where('email_marketing', true)->where('last_login_at', '>=', now()->subDays(30))->count(),
-                'users_inactive' => User::where('email_marketing', true)->where(function ($query) {
-                    $query->whereNull('last_login_at')->orWhere('last_login_at', '<', now()->subDays(30));
-                })->count(),
-                'users_pro' => isProAvailable()
-                    ? User::where('email_marketing', true)->whereIn('subscription_status', ['active', 'trialing'])->count()
-                    : 0,
-                'users_free' => User::where('email_marketing', true)->where(function ($query) {
-                    $query->whereNull('subscription_status')->orWhereNotIn('subscription_status', ['active', 'trialing']);
-                })->count(),
-            ],
+            'stats' => $stats,
             'settings' => $settings,
             'configuredSecrets' => $configuredSecrets,
+            'isMailConfigured' => filled(settings('mail_driver')),
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'status' => $request->input('status', 'all'),
+            ],
         ]);
     }
 
@@ -94,6 +133,10 @@ class NewsletterController extends Controller
     public function sendCampaign(NewsletterCampaign $campaign)
     {
         $this->authorizeNewsletter();
+        if (blank(settings('mail_driver'))) {
+            return back()->with('error', translate('Mail configuration is not set. Please configure mail settings first.'));
+        }
+
         if (in_array($campaign->status, ['sending', 'sent'], true)) {
             return back()->with('error', translate('Campaign is already queued or sent.'));
         }
@@ -108,12 +151,12 @@ class NewsletterController extends Controller
             return back()->with('warning', translate('No active subscribers found.'));
         }
 
-        $campaign->update([
-            'status' => 'sending',
-            'recipient_count' => $recipientCount,
-            'sent_count' => 0,
-            'failed_count' => 0,
-        ]);
+        // Do NOT set status to 'sending' here. The job owns that transition via an
+        // optimistic lock (whereNotIn(['sending','sent']) → 'sending'); pre-setting
+        // it makes the lock fail so the job bails and the campaign silently never
+        // sends. That same lock also makes a double-dispatch safe — only the first
+        // job wins the claim and actually sends.
+        $campaign->update(['recipient_count' => $recipientCount]);
 
         SendNewsletterCampaign::dispatch($campaign->id)->onQueue('emails');
 
@@ -162,6 +205,10 @@ class NewsletterController extends Controller
     public function testCampaign(NewsletterCampaign $campaign)
     {
         $this->authorizeNewsletter();
+        if (blank(settings('mail_driver'))) {
+            return back()->with('error', translate('Mail configuration is not set. Please configure mail settings first.'));
+        }
+
         $adminEmail = auth('admin')->user()?->email;
 
         if (! $adminEmail) {
@@ -237,5 +284,30 @@ class NewsletterController extends Controller
         if (! auth('admin')->check()) {
             abort(403, translate('Unauthorized.'));
         }
+    }
+
+    private function calculateComparison(int $current, int $previous): array
+    {
+        if ($previous === 0) {
+            return [
+                'label' => $current === 0 ? '0%' : '+100%',
+                'type' => $current === 0 ? 'neutral' : 'up',
+            ];
+        }
+
+        $delta = (($current - $previous) / $previous) * 100;
+        $rounded = (int) round(abs($delta));
+
+        if ($rounded === 0) {
+            return [
+                'label' => '0%',
+                'type' => 'neutral',
+            ];
+        }
+
+        return [
+            'label' => ($delta > 0 ? '+' : '-') . $rounded . '%',
+            'type' => $delta > 0 ? 'up' : 'down',
+        ];
     }
 }

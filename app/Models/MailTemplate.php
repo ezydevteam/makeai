@@ -26,18 +26,18 @@ class MailTemplate extends Model
             'unsubscribe_url' => $variables['unsubscribe_url'] ?? '#',
         ], $variables);
 
-        $subject = $this->subject;
-        $content = $this->content;
-
+        // Build all replacements first, then substitute simultaneously with strtr
+        // so a value that happens to contain "{another_key}" is never re-processed
+        // as a placeholder on a later pass. Values are HTML-escaped; the template
+        // itself is trusted (admin-authored) HTML.
+        $replacements = [];
         foreach ($vars as $key => $value) {
-            $safe = e((string) $value);
-            $subject = str_replace('{'.$key.'}', $safe, $subject);
-            $content = str_replace('{'.$key.'}', $safe, $content);
+            $replacements['{'.$key.'}'] = e((string) $value);
         }
 
         return [
-            'subject' => $subject,
-            'content' => $content,
+            'subject' => strtr($this->subject, $replacements),
+            'content' => strtr($this->content, $replacements),
         ];
     }
 }

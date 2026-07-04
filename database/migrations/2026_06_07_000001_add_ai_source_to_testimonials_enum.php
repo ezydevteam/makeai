@@ -12,7 +12,7 @@ return new class extends Migration
         if (DB::getDriverName() === 'sqlite') {
             return;
         }
-        DB::statement("ALTER TABLE `testimonials` CHANGE `source` `source` ENUM('manual','google','trustpilot','import','ai') NOT NULL DEFAULT 'manual'");
+        DB::statement("ALTER TABLE `testimonials` CHANGE `source` `source` ENUM('manual','google','trustpilot','ai') NOT NULL DEFAULT 'manual'");
     }
 
     public function down(): void
@@ -20,6 +20,6 @@ return new class extends Migration
         if (DB::getDriverName() === 'sqlite') {
             return;
         }
-        DB::statement("ALTER TABLE `testimonials` CHANGE `source` `source` ENUM('manual','google','trustpilot','import') NOT NULL DEFAULT 'manual'");
+        DB::statement("ALTER TABLE `testimonials` CHANGE `source` `source` ENUM('manual','google','trustpilot') NOT NULL DEFAULT 'manual'");
     }
 };

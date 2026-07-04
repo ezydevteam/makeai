@@ -45,7 +45,7 @@ const submit = () => {
 <template>
     <Head :title="t('Contact Settings')" />
 
-    <div class="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-6">
+    <div class="mx-auto flex max-w-5xl flex-col gap-6 px-6">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Contact Settings') }}</h1>

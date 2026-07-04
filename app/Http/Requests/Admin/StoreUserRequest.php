@@ -23,6 +23,8 @@ class StoreUserRequest extends FormRequest
             'credits' => ['required', 'numeric', 'min:0'],
             'plan_id' => ['nullable', 'exists:plans,id'],
             'is_active' => ['required', 'boolean'],
+            'country' => ['nullable', 'string', 'size:2'],
+            'profession' => ['nullable', 'string', 'max:150'],
         ];
     }
 }

@@ -38,7 +38,39 @@ rsync -a "$SRC_DIR"/ "$BUILD_DIR/public_html/makeai/" \
     --exclude='/.idea' \
     --exclude='/distribution' \
     --exclude='/dist' \
-    --exclude='/public'
+    --exclude='/public' \
+    `# ── Dev/AI/planning artifacts that must NEVER ship to buyers ──` \
+    --exclude='/.agent' \
+    --exclude='/.agent-mem' \
+    --exclude='/.agents' \
+    --exclude='/.brainsync' \
+    --exclude='/.codex' \
+    --exclude='/.claude' \
+    --exclude='/.github' \
+    --exclude='/.tmp' \
+    --exclude='/.mcp.json' \
+    --exclude='/.mcp.json.bak' \
+    --exclude='/.editorconfig' \
+    --exclude='/.npmrc' \
+    --exclude='/.phpstorm.meta.php' \
+    --exclude='/.phpunit.result.cache' \
+    --exclude='/_ide_helper.php' \
+    --exclude='/_ide_helper_models.php' \
+    --exclude='/phpunit.xml' \
+    --exclude='/debug_rag.php' \
+    --exclude='/_check_page.php' \
+    --exclude='/getMessage()' \
+    --exclude='/tsc_errors.txt' \
+    --exclude='/tsc_out.txt' \
+    `# Root-level docs, prompts, plans, exports, binaries, mockups (anchored to root only)` \
+    --exclude='/*.md' \
+    --exclude='/*.svg' \
+    --exclude='/*.html' \
+    --exclude='/*.xlsx' \
+    --exclude='/*.exe' \
+    --exclude='/*.jpg' \
+    --exclude='/*.jpeg' \
+    --exclude='/*.png'
 
 echo "==> Placing pre-built Vite assets at root /build/"
 cp -r "$SRC_DIR/public/build" "$BUILD_DIR/public_html/build"
@@ -70,6 +102,11 @@ rm -f "$BUILD_DIR/public_html/makeai/.env.testing"
 
 echo "==> Sanity checks"
 test -f "$BUILD_DIR/public_html/makeai/vendor/autoload.php" || { echo "FATAL: vendor/ missing"; exit 1; }
+# Guard: no oversized binaries or internal artifacts leaked into the package
+LEAKED="$(find "$BUILD_DIR/public_html/makeai" -maxdepth 1 \( -name '*.exe' -o -name '_ide_helper*.php' -o -name '.phpstorm.meta.php' -o -name '*.md' \) 2>/dev/null)"
+if [ -n "$LEAKED" ]; then echo "FATAL: internal artifacts leaked into package:"; echo "$LEAKED"; exit 1; fi
+BIG="$(find "$BUILD_DIR/public_html/makeai" -type f -size +50M 2>/dev/null)"
+if [ -n "$BIG" ]; then echo "FATAL: file(s) larger than 50MB found — investigate before shipping:"; echo "$BIG"; exit 1; fi
 { test -f "$BUILD_DIR/public_html/build/manifest.json" || test -f "$BUILD_DIR/public_html/build/.vite/manifest.json"; } || { echo "FATAL: build manifest missing"; exit 1; }
 test -f "$BUILD_DIR/public_html/makeai/.env.example"        || { echo "FATAL: .env.example missing"; exit 1; }
 

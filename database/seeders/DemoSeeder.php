@@ -17,8 +17,8 @@ use App\Models\BlogCategory;
 use App\Models\BlogPost;
 use App\Models\BlogTag;
 use App\Models\Comment;
-use App\Models\Conversation;
-use App\Models\ConversationMessage;
+use Addons\AiChatbot\Models\Conversation;
+use Addons\AiChatbot\Models\ConversationMessage;
 use App\Models\CreditTransaction;
 use App\Models\Document;
 use App\Models\Favorite;
@@ -81,6 +81,20 @@ class DemoSeeder extends Seeder
             'is_active' => true,
             'is_free' => true,
             'sort_order' => 1,
+        ]);
+
+        $proPlan = Plan::where('slug', 'professional')->first() ?? Plan::firstOrCreate(['slug' => 'pro'], [
+            'name' => 'Professional',
+            'description' => 'For teams and growing businesses',
+            'price_monthly' => 29.99,
+            'price_yearly' => 287.88,
+            'credits' => 10000,
+            'max_chats' => 999999,
+            'features' => json_encode(['All AI templates', 'All AI models', 'Unlimited chats', 'Priority support', 'API access']),
+            'is_active' => true,
+            'is_free' => false,
+            'is_featured' => true,
+            'sort_order' => 2,
         ]);
 
         $unlimitedPlan = Plan::firstOrCreate(['slug' => 'unlimited'], [
@@ -477,6 +491,62 @@ class DemoSeeder extends Seeder
             );
         }
 
+        // ─── Support Canned Responses ────────────────────────────────
+        $admin = Admin::where('email', 'admin@demo.com')->first();
+        $adminId = $admin?->id;
+
+        $cannedResponses = [
+            [
+                'title' => 'Refund Policy Details',
+                'department_slug' => 'billing',
+                'content' => '<p>Hello,</p><p>Thank you for reaching out. Under our standard terms of service, subscription payments are non-refundable after credits have been used. However, if you haven\'t consumed any credits on your plan, we\'d be happy to process a full refund within 14 days of purchase. Please let us know if you\'d like to proceed.</p><p>Best regards,<br>Support Team</p>',
+                'usage_count' => 15,
+            ],
+            [
+                'title' => 'How to update billing information',
+                'department_slug' => 'billing',
+                'content' => '<p>Hello,</p><p>You can easily update your payment method directly from your dashboard:</p><ol><li>Navigate to <strong>Billing & Subscriptions</strong>.</li><li>Click on <strong>Manage Payment Method</strong>.</li><li>Enter your new card details and click save.</li></ol><p>Please let us know if you encounter any errors.</p><p>Best regards,<br>Support Team</p>',
+                'usage_count' => 8,
+            ],
+            [
+                'title' => 'API Access & Credentials Setup',
+                'department_slug' => 'technical',
+                'content' => '<p>Hello,</p><p>To generate your API keys, please follow these steps:</p><ul><li>Go to <strong>Settings -> Developer API</strong>.</li><li>Click on <strong>Create API Key</strong>.</li><li>Copy the generated key immediately and store it securely (it will only be shown once).</li></ul><p>Make sure to include this key in the header: <code>Authorization: Bearer YOUR_KEY</code>.</p><p>Best regards,<br>Developer Relations</p>',
+                'usage_count' => 24,
+            ],
+            [
+                'title' => 'Troubleshooting Slow Generation Speed',
+                'department_slug' => 'technical',
+                'content' => '<p>Hello,</p><p>AI generation speed depends on current model traffic and token sizes. If you notice unusually high latency, please try: </p><ul><li>Switching to a faster model (e.g., GPT-4o-mini).</li><li>Reducing the input character length.</li><li>Ensuring your network connection is stable.</li></ul><p>Our server status page is always updated if there are outages.</p><p>Best regards,<br>Technical Support</p>',
+                'usage_count' => 12,
+            ],
+            [
+                'title' => 'Welcome & Getting Started Guide',
+                'department_slug' => 'general',
+                'content' => '<p>Hi there,</p><p>Welcome to MakeAI! We\'re thrilled to have you on board. To get started, you can explore the various pre-built AI templates on the dashboard or try starting an interactive chat session.</p><p>If you have any questions or need custom feature integrations, feel free to ask!</p><p>Cheers,<br>Community Manager</p>',
+                'usage_count' => 45,
+            ],
+            [
+                'title' => 'Suggesting a Feature or New AI Tool',
+                'department_slug' => 'general',
+                'content' => '<p>Hello,</p><p>Thank you for your suggestion! We love hearing from our community about what tools we should build next. I have shared this request directly with our product team for evaluation.</p><p>Feel free to keep suggesting new templates!</p><p>Best regards,<br>MakeAI Product Team</p>',
+                'usage_count' => 19,
+            ],
+        ];
+
+        foreach ($cannedResponses as $cr) {
+            $dept = SupportDepartment::where('slug', $cr['department_slug'])->first();
+            \App\Models\SupportCannedResponse::updateOrCreate(
+                ['title' => $cr['title']],
+                [
+                    'content' => $cr['content'],
+                    'department_id' => $dept?->id,
+                    'created_by' => $adminId,
+                    'usage_count' => $cr['usage_count'],
+                ]
+            );
+        }
+
         if ($blogPosts->isNotEmpty()) {
             $commentStatuses = ['approved', 'pending', 'approved', 'spam'];
             foreach ($blogPosts as $index => $post) {
@@ -733,6 +803,122 @@ class DemoSeeder extends Seeder
             'mega_menu_content' => null,
             'sort_order' => 2,
         ]);
+
+        // ─── 15. Sample Tool Reviews ────────────────────────────────────
+        $reviewComments = [
+            5 => [
+                'Incredible tool! Saved me hours of copywriting work.',
+                'The quality of outputs is top-notch, highly recommended.',
+                'Blown away by how creative the suggestions are!',
+            ],
+            4 => [
+                'Very good quality, just needs a bit of editing before publishing.',
+                'Solid performance. The interface is clean and easy to navigate.',
+                'Helped me break my writer\'s block. Will use it daily.',
+            ],
+            3 => [
+                'Decent results, but sometimes repetitive.',
+                'Average tool. Good for quick drafts but not advanced research.',
+            ],
+            2 => [
+                'The generated copy was a bit robotic and generic.',
+            ],
+        ];
+
+        for ($i = 0; $i < 15; $i++) {
+            $user = $demoUsers[$i % count($demoUsers)];
+            $toolSlug = $toolSlugs[$i % count($toolSlugs)];
+            $rating = [5, 5, 4, 4, 4, 3, 3, 2][$i % 8];
+            $commentList = $reviewComments[$rating];
+            $comment = $commentList[array_rand($commentList)];
+
+            $review = \App\Models\ToolReview::updateOrCreate(
+                ['user_id' => $user->id, 'tool_slug' => $toolSlug],
+                [
+                    'rating' => $rating,
+                    'comment' => $comment,
+                    'is_approved' => ($i % 5 !== 0), // 80% approved, 20% pending approval
+                    'is_featured' => ($rating === 5 && $i % 3 === 0),
+                    'helpful_count' => 0,
+                    'created_at' => now()->subDays(random_int(1, 45))->subHours(random_int(0, 23)),
+                ]
+            );
+
+            // Add some votes to approved reviews
+            if ($review->is_approved) {
+                $voteCount = random_int(0, 8);
+                for ($v = 0; $v < $voteCount; $v++) {
+                    $voter = $demoUsers[($i + $v + 1) % count($demoUsers)];
+                    if ($voter->id === $user->id) {
+                        continue;
+                    }
+                    \App\Models\ToolReviewVote::updateOrCreate(
+                        ['review_id' => $review->id, 'user_id' => $voter->id],
+                        [
+                            'is_helpful' => (random_int(1, 10) > 2), // 80% helpful, 20% unhelpful
+                        ]
+                    );
+                }
+            }
+        }
+
+        // ─── 16. Sample Contact Messages ────────────────────────────────
+        $contactMessages = [
+            [
+                'name' => 'Alice Johnson',
+                'email' => 'alice.j@example.com',
+                'subject' => 'Partnership Inquiry',
+                'message' => 'Hello, I represent a startup incubator and we would love to discuss a bulk discount plan for our members. Please let me know who I can talk to regarding partnership options.',
+                'is_read' => true,
+                'replied_at' => now()->subDays(3),
+            ],
+            [
+                'name' => 'Michael Chen',
+                'email' => 'mchen@example.org',
+                'subject' => 'API Access Request',
+                'message' => 'Hi, I am interested in integrating MakeAI\'s text generation tool with my CMS. Do you offer public API endpoints and documentation? Thanks!',
+                'is_read' => false,
+                'replied_at' => null,
+            ],
+            [
+                'name' => 'Sophia Martinez',
+                'email' => 'sophia.m@example.com',
+                'subject' => 'Billing Question',
+                'message' => 'I noticed a charge on my credit card that I don\'t recognize. Could you please help me look up my invoice history? My account email is sophia.m@example.com.',
+                'is_read' => false,
+                'replied_at' => null,
+            ],
+            [
+                'name' => 'David Wilson',
+                'email' => 'david.w@example.net',
+                'subject' => 'Feature Request: Image Upscaling',
+                'message' => 'Hello, your AI image editor is amazing! It would be even better if you added an option for 4x image upscaling. Is that on your roadmap for future updates?',
+                'is_read' => true,
+                'replied_at' => now()->subDays(5),
+            ],
+            [
+                'name' => 'Elena Rostova',
+                'email' => 'elena.rostova@example.com',
+                'subject' => 'Incorrect translation in dashboard',
+                'message' => 'I found a translation typo in the Russian dashboard UI (on the settings page). I would love to submit a correction patch if there is a localization file.',
+                'is_read' => false,
+                'replied_at' => null,
+            ],
+        ];
+
+        foreach ($contactMessages as $index => $msg) {
+            \App\Models\ContactMessage::updateOrCreate(
+                ['email' => $msg['email'], 'subject' => $msg['subject']],
+                [
+                    'name' => $msg['name'],
+                    'message' => $msg['message'],
+                    'ip_address' => '192.168.10.' . (20 + $index),
+                    'is_read' => $msg['is_read'],
+                    'replied_at' => $msg['replied_at'],
+                    'created_at' => now()->subDays(random_int(1, 10))->subHours(random_int(1, 23)),
+                ]
+            );
+        }
     }
 
     private function seedShowcaseUserExperience(User $user, Plan $plan, array $toolSlugs): void
@@ -746,7 +932,7 @@ class DemoSeeder extends Seeder
             'subscription_ends_at' => now()->addMonths(11),
             'daily_limit' => 1200,
             'monthly_limit' => 15000,
-            'referral_earnings' => 1425.75,
+            'referral_earnings' => 1200.75,
             'referral_count' => 6,
             'use_case' => 'marketing',
             'onboarding_completed_at' => now()->subDays(20),
@@ -754,7 +940,33 @@ class DemoSeeder extends Seeder
             'last_login_ip' => '203.76.120.45',
             'theme_preference' => 'system',
             'email_marketing' => true,
+            'country' => 'US',
+            'profession' => 'Digital Marketer & Creator',
+            'avatar' => 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80',
+            'brand_voice' => 'Direct, conversational, persuasive, with a touch of wit. Focuses on benefits and action-oriented verbs.',
+            'chat_custom_instructions' => 'Provide concise, practical feedback. When writing code or copy, use clean formatting and bullet points. Avoid preamble.',
+            'preferences' => ['marketing_emails' => true, 'security_alerts' => true, 'weekly_newsletter' => true],
+            'cookie_consent' => ['analytics' => true, 'marketing' => true],
+            'dismissed_tooltips' => ['dashboard_welcome', 'editor_guide', 'template_search'],
+            'notification_preferences' => [
+                'in_app' => ['billing' => true, 'content' => true, 'security' => true, 'system' => true],
+                'email' => ['billing' => true, 'content' => false, 'security' => true, 'system' => false]
+            ],
+            'timezone' => 'America/New_York',
         ])->save();
+
+        // Seed api keys
+        $user->apiKeys()->delete();
+        $user->apiKeys()->create([
+            'provider' => 'openai',
+            'api_key' => 'sk-proj-DEMOOPENAIKEY1234567890abcdefghijklmnopqrstuv',
+            'is_active' => true,
+        ]);
+        $user->apiKeys()->create([
+            'provider' => 'anthropic',
+            'api_key' => 'sk-ant-api03-DEMOANTHROPICKEY1234567890abcdefghijklmnopqrstuv',
+            'is_active' => true,
+        ]);
 
         $this->seedShowcaseCreditTimeline($user);
         $documents = $this->seedShowcaseDocuments($user, $toolSlugs);
@@ -995,6 +1207,10 @@ class DemoSeeder extends Seeder
 
     private function seedShowcaseConversations(User $user): void
     {
+        if (! function_exists('is_addon_active') || ! is_addon_active('ai-chatbot') || ! class_exists(Conversation::class)) {
+            return;
+        }
+
         $conversations = [
             [
                 'title' => 'Homepage conversion refresh',

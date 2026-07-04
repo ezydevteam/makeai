@@ -11,6 +11,10 @@ class KbSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('kb_categories')) {
+            return;
+        }
+
         if (KbCategory::count() > 0) {
             return;
         }

@@ -371,322 +371,321 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Export Center')" />
 
-    <div class="py-6">
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Export Center') }}</h1>
-                    <p class="max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Build downloadable reports for users, subscriptions, support, and operational data from one admin workspace.') }}</p>
-                </div>
-                <button
-                    type="button"
-                    class="btn-primary inline-flex items-center justify-center gap-2 self-start rounded-lg px-4 py-2 text-sm font-medium"
-                    @click="builderOpen = true"
-                >
-                    <i class="ti ti-file-export text-base"></i>
-                    {{ t('Start Export') }}
-                </button>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Export Center') }}</h1>
+                <p class="max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Build downloadable reports for users, subscriptions, support, and operational data from one admin workspace.') }}</p>
             </div>
-
-            <div
-                v-if="builderOpen"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 px-4 py-6 backdrop-blur-sm"
-                @click.self="builderOpen = false"
+            <button
+                type="button"
+                class="btn-primary inline-flex items-center justify-center gap-2 self-start rounded-xl px-4 py-2 text-sm font-medium"
+                @click="builderOpen = true"
             >
-                <section class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
-                    <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-700">
-                        <div>
-                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Export Builder') }}</h2>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the dataset, time range, and file format before generating a downloadable report.') }}</p>
+                <i class="ti ti-file-export text-base"></i>
+                {{ t('Start Export') }}
+            </button>
+        </div>
+
+        <div
+            v-if="builderOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 px-4 py-6 backdrop-blur-sm"
+            @click.self="builderOpen = false"
+        >
+            <section class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
+                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-700">
+                    <div>
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Export Builder') }}</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the dataset, time range, and file format before generating a downloadable report.') }}</p>
+                    </div>
+                    <button
+                        type="button"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                        :aria-label="t('Close modal')"
+                        @click="builderOpen = false"
+                    >
+                        <i class="ti ti-x text-base"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-6 overflow-y-auto p-6">
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Data Type') }}</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-for="exportType in exportTypes"
+                                :key="exportType.value"
+                                type="button"
+                                @click="type = exportType.value"
+                                :class="type === exportType.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                                class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
+                            >
+                                {{ t(exportType.label) }}
+                            </button>
                         </div>
+                    </section>
+
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Date Range') }}</label>
+                        <div class="mb-3 flex flex-wrap gap-2">
+                            <button
+                                v-for="preset in datePresets"
+                                :key="preset.value"
+                                type="button"
+                                @click="setDatePreset(preset.value)"
+                                :class="datePreset === preset.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                                class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                            >
+                                {{ preset.label }}
+                            </button>
+                        </div>
+                        <div v-if="datePreset === 'custom'" class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                            <input
+                                v-model="customDateFrom"
+                                type="date"
+                                class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                            />
+                            <span class="self-center text-center text-sm text-gray-400">{{ t('to') }}</span>
+                            <input
+                                v-model="customDateTo"
+                                type="date"
+                                class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                            />
+                        </div>
+                    </section>
+
+                    <section
+                        v-if="type === 'ai-usage' || type === 'revenue' || type === 'users'"
+                        class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900"
+                    >
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Filters') }}</h3>
+                        <div class="mt-4 space-y-3">
+                            <template v-if="type === 'ai-usage'">
+                                <AppSelect
+                                    v-model="providerFilter"
+                                    :options="providerOptions"
+                                    :placeholder="t('All providers')"
+                                    :label="t('Provider')"
+                                    :live-search="true"
+                                    :multiple="true"
+                                    :compact-multiple="true"
+                                />
+                                <AppSelect
+                                    v-model="toolFilter"
+                                    :options="toolOptions"
+                                    :placeholder="t('All tools')"
+                                    :label="t('Tool')"
+                                    :live-search="true"
+                                    :multiple="true"
+                                    :compact-multiple="true"
+                                />
+                            </template>
+
+                            <template v-if="type === 'revenue'">
+                                <AppSelect
+                                    v-model="statusFilter"
+                                    :options="revenueStatusOptions"
+                                    :placeholder="t('All')"
+                                    :label="t('Status')"
+                                />
+                                <AppSelect
+                                    v-model="gatewayFilter"
+                                    :options="gatewayOptions"
+                                    :placeholder="t('All gateways')"
+                                    :label="t('Gateway')"
+                                    :live-search="true"
+                                    :multiple="true"
+                                    :compact-multiple="true"
+                                />
+                            </template>
+
+                            <template v-if="type === 'users'">
+                                <AppSelect
+                                    v-model="statusFilter"
+                                    :options="userStatusOptions"
+                                    :placeholder="t('All')"
+                                    :label="t('Status')"
+                                />
+                                <AppSelect
+                                    v-model="planFilter"
+                                    :options="planOptions"
+                                    :placeholder="t('All plans')"
+                                    :label="t('Plan')"
+                                />
+                            </template>
+                        </div>
+                    </section>
+
+                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Format') }}</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-for="fileFormat in formats"
+                                :key="fileFormat.value"
+                                type="button"
+                                @click="format = fileFormat.value"
+                                :class="format === fileFormat.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                                class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
+                            >
+                                {{ fileFormat.label }}
+                            </button>
+                        </div>
+                        <p v-if="pdfLimited" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                            {{ t('PDF limited to 5,000 rows. Use XLSX/CSV for full data.') }}
+                        </p>
+                    </section>
+
+                    <section class="rounded-xl border border-primary-100 bg-primary-50 p-5 dark:border-primary-900/40 dark:bg-primary-900/20">
+                        <h3 class="text-sm font-semibold text-primary-900 dark:text-primary-100">{{ t('Ready to export') }}</h3>
+                        <p v-if="exportMessage" class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ exportMessage }}</p>
+                        <p v-else class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ t('Generate a fresh export file using the selected filters.') }}</p>
+                        <p
+                            v-if="estimateMessage"
+                            :class="estimateMessageTone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-primary-700 dark:text-primary-200'"
+                            class="mt-2 text-xs font-medium"
+                        >
+                            {{ estimateMessage }}
+                        </p>
+                        <p v-if="estimatedRows !== null" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            ~{{ estimatedRows.toLocaleString() }} {{ t('rows match current filters') }}
+                        </p>
+                    </section>
+                </div>
+
+                <div class="flex items-center justify-between gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <button
+                        type="button"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                        @click="builderOpen = false"
+                    >
+                        {{ t('Cancel') }}
+                    </button>
+                    <div class="flex items-center gap-2">
                         <button
                             type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                            :aria-label="t('Close modal')"
-                            @click="builderOpen = false"
+                            :disabled="estimating"
+                            class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 disabled:opacity-50"
+                            @click="estimateRows"
+                        >
+                            <svg v-if="estimating" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            {{ estimating ? t('Estimating...') : t('Estimate rows') }}
+                        </button>
+                        <button
+                            type="button"
+                            :disabled="exporting"
+                            class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                            @click="doExport"
+                        >
+                            <svg v-if="exporting" class="mr-2 inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            {{ exporting ? t('Exporting...') : t('Start Export') }}
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Recent Exports') }}</h2>
+                <div class="w-full lg:max-w-sm">
+                    <div class="relative">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                            <i class="ti ti-search text-base"></i>
+                        </span>
+                        <input
+                            ref="searchInputRef"
+                            v-model="exportSearch"
+                            type="text"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            :placeholder="t('Search exports...')"
+                        >
+                        <span
+                            v-if="!exportSearch"
+                            class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                        >
+                            /
+                        </span>
+                        <button
+                            v-if="exportSearch"
+                            type="button"
+                            class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            :aria-label="t('Clear search')"
+                            :title="t('Clear search')"
+                            @click="clearExportSearch"
                         >
                             <i class="ti ti-x text-base"></i>
                         </button>
                     </div>
-
-                    <div class="space-y-6 overflow-y-auto p-6">
-                        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Data Type') }}</label>
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    v-for="exportType in exportTypes"
-                                    :key="exportType.value"
-                                    type="button"
-                                    @click="type = exportType.value"
-                                    :class="type === exportType.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                    class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
-                                >
-                                    {{ t(exportType.label) }}
-                                </button>
-                            </div>
-                        </section>
-
-                        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Date Range') }}</label>
-                            <div class="mb-3 flex flex-wrap gap-2">
-                                <button
-                                    v-for="preset in datePresets"
-                                    :key="preset.value"
-                                    type="button"
-                                    @click="setDatePreset(preset.value)"
-                                    :class="datePreset === preset.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                    class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-                                >
-                                    {{ preset.label }}
-                                </button>
-                            </div>
-                            <div v-if="datePreset === 'custom'" class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-                                <input
-                                    v-model="customDateFrom"
-                                    type="date"
-                                    class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
-                                />
-                                <span class="self-center text-center text-sm text-gray-400">{{ t('to') }}</span>
-                                <input
-                                    v-model="customDateTo"
-                                    type="date"
-                                    class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
-                                />
-                            </div>
-                        </section>
-
-                        <section
-                            v-if="type === 'ai-usage' || type === 'revenue' || type === 'users'"
-                            class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900"
-                        >
-                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Filters') }}</h3>
-                            <div class="mt-4 space-y-3">
-                                <template v-if="type === 'ai-usage'">
-                                    <AppSelect
-                                        v-model="providerFilter"
-                                        :options="providerOptions"
-                                        :placeholder="t('All providers')"
-                                        :label="t('Provider')"
-                                        :live-search="true"
-                                        :multiple="true"
-                                        :compact-multiple="true"
-                                    />
-                                    <AppSelect
-                                        v-model="toolFilter"
-                                        :options="toolOptions"
-                                        :placeholder="t('All tools')"
-                                        :label="t('Tool')"
-                                        :live-search="true"
-                                        :multiple="true"
-                                        :compact-multiple="true"
-                                    />
-                                </template>
-
-                                <template v-if="type === 'revenue'">
-                                    <AppSelect
-                                        v-model="statusFilter"
-                                        :options="revenueStatusOptions"
-                                        :placeholder="t('All')"
-                                        :label="t('Status')"
-                                    />
-                                    <AppSelect
-                                        v-model="gatewayFilter"
-                                        :options="gatewayOptions"
-                                        :placeholder="t('All gateways')"
-                                        :label="t('Gateway')"
-                                        :live-search="true"
-                                        :multiple="true"
-                                        :compact-multiple="true"
-                                    />
-                                </template>
-
-                                <template v-if="type === 'users'">
-                                    <AppSelect
-                                        v-model="statusFilter"
-                                        :options="userStatusOptions"
-                                        :placeholder="t('All')"
-                                        :label="t('Status')"
-                                    />
-                                    <AppSelect
-                                        v-model="planFilter"
-                                        :options="planOptions"
-                                        :placeholder="t('All plans')"
-                                        :label="t('Plan')"
-                                    />
-                                </template>
-                            </div>
-                        </section>
-
-                        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Format') }}</label>
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    v-for="fileFormat in formats"
-                                    :key="fileFormat.value"
-                                    type="button"
-                                    @click="format = fileFormat.value"
-                                    :class="format === fileFormat.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                    class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
-                                >
-                                    {{ fileFormat.label }}
-                                </button>
-                            </div>
-                            <p v-if="pdfLimited" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                                {{ t('PDF limited to 5,000 rows. Use XLSX/CSV for full data.') }}
-                            </p>
-                        </section>
-
-                        <section class="rounded-xl border border-primary-100 bg-primary-50 p-5 dark:border-primary-900/40 dark:bg-primary-900/20">
-                            <h3 class="text-sm font-semibold text-primary-900 dark:text-primary-100">{{ t('Ready to export') }}</h3>
-                            <p v-if="exportMessage" class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ exportMessage }}</p>
-                            <p v-else class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ t('Generate a fresh export file using the selected filters.') }}</p>
-                            <p
-                                v-if="estimateMessage"
-                                :class="estimateMessageTone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-primary-700 dark:text-primary-200'"
-                                class="mt-2 text-xs font-medium"
-                            >
-                                {{ estimateMessage }}
-                            </p>
-                            <p v-if="estimatedRows !== null" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                ~{{ estimatedRows.toLocaleString() }} {{ t('rows match current filters') }}
-                            </p>
-                        </section>
-                    </div>
-
-                    <div class="flex items-center justify-between gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900/40">
-                        <button
-                            type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                            @click="builderOpen = false"
-                        >
-                            {{ t('Cancel') }}
-                        </button>
-                        <div class="flex items-center gap-2">
-                            <button
-                                type="button"
-                                :disabled="estimating"
-                                class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 disabled:opacity-50"
-                                @click="estimateRows"
-                            >
-                                <svg v-if="estimating" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                {{ estimating ? t('Estimating...') : t('Estimate rows') }}
-                            </button>
-                            <button
-                                type="button"
-                                :disabled="exporting"
-                                class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
-                                @click="doExport"
-                            >
-                                <svg v-if="exporting" class="mr-2 inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                {{ exporting ? t('Exporting...') : t('Start Export') }}
-                            </button>
-                        </div>
-                    </div>
-                </section>
+                </div>
             </div>
-
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Recent Exports') }}</h2>
-                    <div class="w-full lg:max-w-sm">
-                        <div class="relative">
-                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                <i class="ti ti-search text-base"></i>
-                            </span>
-                            <input
-                                ref="searchInputRef"
-                                v-model="exportSearch"
-                                type="text"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                :placeholder="t('Search exports...')"
-                            >
-                            <span
-                                v-if="!exportSearch"
-                                class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
-                            >
-                                /
-                            </span>
-                            <button
-                                v-if="exportSearch"
-                                type="button"
-                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                :aria-label="t('Clear search')"
-                                :title="t('Clear search')"
-                                @click="clearExportSearch"
-                            >
-                                <i class="ti ti-x text-base"></i>
-                            </button>
-                        </div>
-                    </div>
+            <div v-if="filteredRecentExports.length" class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
+                        <tr>
+                            <th class="px-6 py-3">{{ t('Filename') }}</th>
+                            <th class="px-6 py-3">{{ t('Type') }}</th>
+                            <th class="px-6 py-3">{{ t('Format') }}</th>
+                            <th class="px-6 py-3">{{ t('Size') }}</th>
+                            <th class="px-6 py-3">{{ t('Date') }}</th>
+                            <th class="px-6 py-3 text-right">{{ t('Actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                        <tr v-for="file in filteredRecentExports" :key="file.path" class="hover:bg-primary-50/40 dark:hover:bg-primary-900/10">
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-gray-900 dark:text-white">{{ file.filename }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ t(file.type) }}</td>
+                            <td class="px-6 py-4">
+                                <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold uppercase text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ file.format }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ formatSize(file.size) }}</td>
+                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ timeAgo(file.modified) }}</td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center justify-end gap-2">
+                                    <Tooltip :content="t('Download export')" placement="top">
+                                        <a
+                                            :href="route('admin.reports.export.download', { file: file.filename })"
+                                            target="_blank"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
+                                        >
+                                            <i class="ti ti-download text-base"></i>
+                                        </a>
+                                    </Tooltip>
+                                    <Tooltip :content="t('Delete export')" placement="top">
+                                        <button
+                                            type="button"
+                                            :disabled="deletingPath === file.path"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+                                            @click="deleteTarget = file"
+                                        >
+                                            <i class="ti ti-trash text-base"></i>
+                                        </button>
+                                    </Tooltip>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div v-else class="px-6 py-14 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-800 dark:text-gray-500">
+                    <i class="ti ti-file-export text-2xl"></i>
                 </div>
-                <div v-if="filteredRecentExports.length" class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
-                            <tr>
-                                <th class="px-6 py-3">{{ t('Filename') }}</th>
-                                <th class="px-6 py-3">{{ t('Type') }}</th>
-                                <th class="px-6 py-3">{{ t('Format') }}</th>
-                                <th class="px-6 py-3">{{ t('Size') }}</th>
-                                <th class="px-6 py-3">{{ t('Date') }}</th>
-                                <th class="px-6 py-3 text-right">{{ t('Actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
-                            <tr v-for="file in filteredRecentExports" :key="file.path" class="hover:bg-primary-50/40 dark:hover:bg-primary-900/10">
-                                <td class="px-6 py-4">
-                                    <div class="font-medium text-gray-900 dark:text-white">{{ file.filename }}</div>
-                                </td>
-                                <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ t(file.type) }}</td>
-                                <td class="px-6 py-4">
-                                    <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold uppercase text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ file.format }}</span>
-                                </td>
-                                <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ formatSize(file.size) }}</td>
-                                <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ timeAgo(file.modified) }}</td>
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <Tooltip :content="t('Download export')" placement="top">
-                                            <a
-                                                :href="route('admin.reports.export.download', { file: file.filename })"
-                                                target="_blank"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
-                                            >
-                                                <i class="ti ti-download text-base"></i>
-                                            </a>
-                                        </Tooltip>
-                                        <Tooltip :content="t('Delete export')" placement="top">
-                                            <button
-                                                type="button"
-                                                :disabled="deletingPath === file.path"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
-                                                @click="deleteTarget = file"
-                                            >
-                                                <i class="ti ti-trash text-base"></i>
-                                            </button>
-                                        </Tooltip>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <div v-else class="px-6 py-14 text-center">
-                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-800 dark:text-gray-500">
-                        <i class="ti ti-file-export text-2xl"></i>
-                    </div>
-                    <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ exportSearch ? t('No matching exports') : t('No recent exports') }}</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        {{ exportSearch ? t('Try a different search term.') : t('Open the export builder to generate your first report file.') }}
-                    </p>
-                </div>
-            </section>
-        </div>
+                <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ exportSearch ? t('No matching exports') : t('No recent exports') }}</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ exportSearch ? t('Try a different search term.') : t('Open the export builder to generate your first report file.') }}
+                </p>
+            </div>
+        </section>
     </div>
+
 
     <ActionConfirmModal
         :open="Boolean(deleteTarget)"

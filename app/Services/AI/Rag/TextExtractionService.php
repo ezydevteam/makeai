@@ -62,8 +62,14 @@ class TextExtractionService
      */
     public function extractFromUrl(string $url): string
     {
+        // Block loopback/private/link-local targets (SSRF), including redirects.
+        \App\Services\Security\SsrfGuard::assertPublicUrl($url);
+
         try {
             $response = Http::timeout(30)
+                ->withOptions([
+                    'allow_redirects' => \App\Services\Security\SsrfGuard::redirectOptions(3),
+                ])
                 ->withHeaders([
                     'User-Agent' => 'Mozilla/5.0 (compatible; MakeAI RAG Bot/1.0)',
                     'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -76,6 +82,11 @@ class TextExtractionService
             }
 
             $html = $response->body();
+
+            $maxBytes = max(1, (int) settings('rag_max_url_fetch_mb', 10)) * 1024 * 1024;
+            if (strlen($html) > $maxBytes) {
+                throw new RuntimeException('The page is too large to ingest.');
+            }
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             throw new RuntimeException("Could not connect to URL: {$url} — {$e->getMessage()}");
         }

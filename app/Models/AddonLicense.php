@@ -12,6 +12,7 @@ class AddonLicense extends Model
         'addon_slug', 'purchase_code', 'envato_item_id',
         'license_type', 'buyer', 'purchased_at', 'supported_until',
         'domain', 'verified_at', 'status', 'grace_started_at',
+        'signed_payload', 'signature',
     ];
 
     protected $casts = [
@@ -23,5 +24,5 @@ class AddonLicense extends Model
         'grace_started_at' => 'datetime',
     ];
 
-    protected $hidden = ['purchase_code'];
+    protected $hidden = ['purchase_code', 'signed_payload', 'signature'];
 }

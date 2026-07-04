@@ -56,6 +56,8 @@ const confirmModal = ref<ConfirmModalState>({
     action: null,
 });
 
+const showPassword = ref(false);
+
 const form = useForm({
     title: props.page?.title ?? '',
     slug: props.page?.slug ?? '',
@@ -341,7 +343,7 @@ onClickOutside(publishMenuRef, () => {
 
 <template>
     <Head :title="page ? t('Edit Page') : t('Create Page')" />
-    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-8">
             <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                 <div>
@@ -373,14 +375,14 @@ onClickOutside(publishMenuRef, () => {
                                 @click="submit"
                                 :disabled="form.processing"
                                 type="button"
-                                class="btn-primary-admin inline-flex items-center justify-center gap-2 rounded-none px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                                class="bg-primary-500 inline-flex items-center justify-center gap-2 !rounded-l-lg !rounded-r-none px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
                             >
                                 <i class="ti ti-device-floppy text-base"></i>
                                 {{ form.processing ? t('Saving...') : primaryActionLabel }}
                             </button>
                             <button
                                 type="button"
-                                class="btn-primary-admin inline-flex items-center justify-center rounded-none px-3 text-white disabled:opacity-60"
+                                class="bg-primary-500 inline-flex items-center justify-center !rounded-r-lg !rounded-l-none px-2 text-white disabled:opacity-60"
                                 :aria-label="t('Change page status')"
                                 @click="publishMenuOpen = !publishMenuOpen"
                             >
@@ -429,7 +431,7 @@ onClickOutside(publishMenuRef, () => {
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Slug') }}</label>
                             <div class="flex flex-col gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 md:flex-row md:items-center">
                                 <span class="truncate text-gray-700 dark:text-gray-300">{{ $page.props.app?.url }}/</span>
-                                <input v-model="form.slug" @input="markSlugTouched" type="text" :placeholder="t('page-slug')" class="min-w-[220px] rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-900 dark:text-white">
+                                <input v-model="form.slug" @input="markSlugTouched" type="text" :placeholder="t('page-slug')" class="w-full flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-900 dark:text-white">
                             </div>
                             <p v-if="form.errors.slug" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.slug }}</p>
                         </div>
@@ -529,7 +531,23 @@ onClickOutside(publishMenuRef, () => {
                         </div>
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Password Protection') }}</label>
-                            <input v-model="form.password" type="password" :placeholder="page?.has_password ? t('Leave blank to keep current password') : t('Optional page password')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                            <div class="relative">
+                                <input
+                                    v-model="form.password"
+                                    :type="showPassword ? 'text' : 'password'"
+                                    :placeholder="page?.has_password ? t('Leave blank to keep current password') : t('Optional page password')"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                />
+                                <button
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="showPassword ? t('Hide password') : t('Show password')"
+                                    :title="showPassword ? t('Hide password') : t('Show password')"
+                                    @click="showPassword = !showPassword"
+                                >
+                                    <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
+                                </button>
+                            </div>
                             <p v-if="form.errors.password" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.password }}</p>
                             <p v-if="page?.has_password" class="mt-2 text-xs font-semibold text-primary-600 dark:text-primary-300">{{ t('Password enabled') }}</p>
                         </div>

@@ -26,7 +26,7 @@ return new class extends Migration
             $table->char('ulid', 26)->unique();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('project_id')->nullable()->constrained('chat_projects')->nullOnDelete();
-            $table->string('product_slug', 100)->nullable();
+            $table->string('mode_slug', 100)->nullable();
             $table->string('title')->nullable();
             $table->string('model', 150)->nullable();
             $table->integer('total_tokens')->default(0);
@@ -48,7 +48,7 @@ return new class extends Migration
             $table->integer('output_tokens')->default(0);
             $table->decimal('credits_charged', 10, 4)->default(0);
             $table->json('attachments')->nullable();
-            $table->string('product_switch', 100)->nullable();
+            $table->string('mode_switch', 100)->nullable();
             $table->timestamp('created_at')->useCurrent();
 
             $table->index(['conversation_id', 'created_at']);

@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
+import { applyPurchaseCodeMask } from '@/lib/purchaseCode'
 
 const props = defineProps<{
     formData: Record<string, any>
@@ -13,15 +14,8 @@ const licenseTestMode = computed(() => !!page.props.licenseTestMode)
 const purchaseCode = ref(props.formData?.step_4?.purchase_code ?? '')
 const { t } = useTranslate()
 
-function applyMask(value: string) {
-    if (licenseTestMode.value) {
-        return value.replace(/[^a-z0-9-]/gi, '').slice(0, 50).toUpperCase()
-    }
-    return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
-}
-
 function onInput(e: Event) {
-    purchaseCode.value = applyMask((e.target as HTMLInputElement).value)
+    purchaseCode.value = applyPurchaseCodeMask((e.target as HTMLInputElement).value, true)
 }
 
 defineExpose({ getData: () => ({ purchase_code: purchaseCode.value.trim() }) })

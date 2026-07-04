@@ -11,6 +11,7 @@ use App\Models\KnowledgeBase;
 use App\Models\RagMessage;
 use App\Models\RagSession;
 use App\Models\User;
+use App\Services\AI\AiErrors;
 use App\Services\AI\AiService;
 use App\Services\AI\ProviderRegistry;
 use App\Services\AI\Rag\HybridSearchService;
@@ -37,6 +38,9 @@ class RagToolService
     {
         $fields = $tool->fields ?? [];
         $sourceType = $fields['source_type'] ?? 'file';
+
+        // Charge ingestion credits up front (admin-configurable, defaults to free)
+        $this->chargeIngestionCredits($user, $tool, $input, $sourceType);
 
         // Create ephemeral knowledge base
         $kb = KnowledgeBase::create([
@@ -204,6 +208,49 @@ class RagToolService
             'status' => 'ready',
             'source_meta' => ['collection_name' => $kb->name],
         ]);
+    }
+
+    /**
+     * Charge credits for ingesting new content (admin-configurable, default 0 = free).
+     *
+     * File sources are billed per MB (rag_ingest_credits_per_mb); URL and
+     * YouTube sources are billed a flat amount (rag_ingest_credits_url).
+     * Re-using an existing collection is free — it was billed at ingest time.
+     */
+    private function chargeIngestionCredits(User $user, AiTool $tool, array $input, string $sourceType): void
+    {
+        $credits = 0.0;
+
+        if ($sourceType === 'file') {
+            $perMb = (float) settings('rag_ingest_credits_per_mb', 0);
+            if ($perMb <= 0) {
+                return;
+            }
+
+            $bytes = 0;
+            if (isset($input['files']) && is_array($input['files'])) {
+                foreach ($input['files'] as $file) {
+                    $bytes += (int) $file->getSize();
+                }
+            } elseif (isset($input['file'])) {
+                $bytes = (int) $input['file']->getSize();
+            }
+
+            $credits = round(($bytes / 1_048_576) * $perMb, 2);
+        } elseif (in_array($sourceType, ['url', 'youtube'], true)) {
+            $credits = (float) settings('rag_ingest_credits_url', 0);
+        }
+
+        if ($credits <= 0) {
+            return;
+        }
+
+        if (! $user->deductCredits($credits, "RAG ingestion: {$tool->slug}", [
+            'source_type' => $sourceType,
+            'tool_slug' => $tool->slug,
+        ])) {
+            throw new RuntimeException(translate('You do not have enough credits to ingest this content.'));
+        }
     }
 
     /**
@@ -430,14 +477,17 @@ class RagToolService
                     ['tool_slug' => $session->tool_slug],
                 );
 
-                // Add chunk-based credits
+                // Add chunk-based credits — through the ledger so the balance
+                // check, transaction record and usage counters all apply.
                 $chunksPerCredit = (int) settings('rag_chunks_per_credit', 50);
                 if ($chunksPerCredit > 0 && count($sources) > 0) {
-                    $chunkCredits = (int) ceil(count($sources) / $chunksPerCredit);
-                    $creditsUsed += $chunkCredits;
-                    
-                    // Deduct additional credits for chunks
-                    $user->decrement('credits', $chunkCredits);
+                    $chunkCredits = (float) ceil(count($sources) / $chunksPerCredit);
+                    if ($user->deductCredits($chunkCredits, 'RAG context retrieval', [
+                        'tool_slug' => $session->tool_slug,
+                        'chunks' => count($sources),
+                    ])) {
+                        $creditsUsed += $chunkCredits;
+                    }
                 }
 
                 $inputTokens = $usageStats['input_tokens'] ?? 0;
@@ -471,7 +521,8 @@ class RagToolService
 
             yield ['type' => 'done'];
         } catch (\Throwable $e) {
-            yield ['type' => 'error', 'message' => $e->getMessage()];
+            Log::error('RAG query failed', ['session' => $session->id, 'error' => $e->getMessage()]);
+            yield ['type' => 'error', 'message' => AiErrors::sanitize($e->getMessage())];
         }
     }
 
@@ -504,34 +555,57 @@ class RagToolService
         $labels = ['A', 'B', 'C'];
         $topK = (int) settings('rag_top_k', 6);
         $provider = settings('default_ai_provider', 'openai');
+        $modelName = settings('default_ai_model', 'gpt-4o-mini');
+
+        try {
+            TokenGuard::before($user, null, $modelName);
+        } catch (\Throwable $e) {
+            yield ['type' => 'error', 'message' => $e->getMessage()];
+
+            return;
+        }
 
         try {
             $embeddingModel = settings('rag_embedding_model', '') ?: null;
             $embeddingResult = $this->ai->embedText($aspect, $provider, $embeddingModel);
             $hybridSearch = app(HybridSearchService::class);
 
+            // One search sized for all documents, grouped per document afterwards
+            $matches = $hybridSearch->search(
+                (string) $kb->id,
+                $embeddingResult->vector,
+                $aspect,
+                $topK * max(1, $documents->count()),
+            );
+
+            $matchesByDocument = [];
+            foreach ($matches as $match) {
+                $chunk = DB::table('knowledge_base_chunks')
+                    ->where('id', $match['chunk_id'])
+                    ->first();
+
+                if ($chunk) {
+                    $matchesByDocument[(int) $chunk->document_id][] = ['match' => $match, 'chunk' => $chunk];
+                }
+            }
+
             $allSources = [];
             $contextBlocks = [];
 
             foreach ($documents as $idx => $doc) {
-                $matches = $hybridSearch->search((string) $kb->id, $embeddingResult->vector, $aspect, $topK);
                 $label = $labels[$idx] ?? chr(68 + $idx);
+                $docMatches = array_slice($matchesByDocument[(int) $doc->id] ?? [], 0, $topK);
 
-                foreach ($matches as $match) {
-                    $chunk = DB::table('knowledge_base_chunks')
-                        ->where('id', $match['chunk_id'])
-                        ->first();
-
-                    if ($chunk && (int) $chunk->document_id === (int) $doc->id) {
-                        $contextBlocks[] = "[{$label}] {$chunk->text}";
-                        $allSources[] = [
-                            'doc' => $doc->filename,
-                            'doc_label' => $label,
-                            'chunk' => $chunk->chunk_index,
-                            'score' => round($match['score'], 4),
-                            'snippet' => Str::limit($chunk->text, 200),
-                        ];
-                    }
+                foreach ($docMatches as $entry) {
+                    $chunk = $entry['chunk'];
+                    $contextBlocks[] = "[{$label}] {$chunk->text}";
+                    $allSources[] = [
+                        'doc' => $doc->filename,
+                        'doc_label' => $label,
+                        'chunk' => $chunk->chunk_index,
+                        'score' => round($entry['match']['score'], 4),
+                        'snippet' => Str::limit($chunk->text, 200),
+                    ];
                 }
             }
 
@@ -544,21 +618,36 @@ class RagToolService
                 ['role' => 'user', 'content' => "Compare these documents regarding: {$aspect}"],
             ];
 
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
             $adapter = ProviderRegistry::resolve($provider);
 
             $fullContent = '';
+            $usageStats = null;
             foreach ($adapter->streamChatCompletion($messages, $modelName) as $chunk) {
                 if (is_string($chunk)) {
                     $fullContent .= $chunk;
                     yield ['type' => 'token', 'content' => $chunk];
-                } elseif (is_array($chunk) && ! isset($chunk['reasoning']) && ! isset($chunk['reasoning_start'])) {
-                    yield ['type' => 'usage',
-                        'input_tokens' => $chunk['input_tokens'] ?? 0,
-                        'output_tokens' => $chunk['output_tokens'] ?? 0,
-                        'model' => $chunk['model'] ?? $modelName,
-                    ];
+                } elseif (is_array($chunk) && ! isset($chunk['reasoning']) && ! isset($chunk['reasoning_start']) && ! isset($chunk['reasoning_end'])) {
+                    $usageStats = $chunk;
                 }
+            }
+
+            if ($usageStats) {
+                $creditsUsed = TokenGuard::after(
+                    $user,
+                    $usageStats['input_tokens'] ?? 0,
+                    $usageStats['output_tokens'] ?? 0,
+                    $usageStats['model'] ?? $modelName,
+                    $provider,
+                    'rag',
+                    ['tool_slug' => $session->tool_slug, 'mode' => 'compare'],
+                );
+
+                yield ['type' => 'usage',
+                    'input_tokens' => $usageStats['input_tokens'] ?? 0,
+                    'output_tokens' => $usageStats['output_tokens'] ?? 0,
+                    'credits' => $creditsUsed,
+                    'model' => $usageStats['model'] ?? $modelName,
+                ];
             }
 
             // Persist
@@ -577,7 +666,8 @@ class RagToolService
 
             yield ['type' => 'done'];
         } catch (\Throwable $e) {
-            yield ['type' => 'error', 'message' => $e->getMessage()];
+            Log::error('RAG compare failed', ['session' => $session->id, 'error' => $e->getMessage()]);
+            yield ['type' => 'error', 'message' => AiErrors::sanitize($e->getMessage())];
         }
     }
 
@@ -617,6 +707,15 @@ class RagToolService
         }
 
         $length = $options['length'] ?? 'medium';
+
+        try {
+            TokenGuard::before($user, null, $modelName);
+        } catch (\Throwable $e) {
+            yield ['type' => 'error', 'message' => $e->getMessage()];
+
+            return;
+        }
+
         $adapter = ProviderRegistry::resolve($provider);
 
         // Phase 1: Summarize chunks in batches (map)
@@ -624,6 +723,8 @@ class RagToolService
         $batchSize = (int) settings('rag_map_reduce_batch_size', 10);
         $totalBatches = (int) ceil($chunks->count() / $batchSize);
         $batchIdx = 0;
+        $totalInputTokens = 0;
+        $totalOutputTokens = 0;
 
         yield ['type' => 'progress', 'stage' => 'mapping', 'total' => $totalBatches, 'current' => 0];
 
@@ -639,6 +740,8 @@ class RagToolService
                 ], $modelName);
 
                 $batchSummaries[] = $result['content'];
+                $totalInputTokens += (int) ($result['input_tokens'] ?? 0);
+                $totalOutputTokens += (int) ($result['output_tokens'] ?? 0);
             } catch (\Throwable $e) {
                 // If a batch fails, include the raw text as fallback
                 $batchSummaries[] = "Batch {$batchIdx}: ".Str::limit($batchText, 500);
@@ -664,22 +767,60 @@ class RagToolService
         $finalPrompt = "The following is a set of summaries of sections of a document. Combine them into a single coherent summary. {$lengthInstructions}\n\nSection summaries:\n{$combinedSummary}\n\nFinal summary:";
 
         try {
+            $fullContent = '';
+            $usageStats = null;
             foreach ($adapter->streamChatCompletion([
                 ['role' => 'user', 'content' => $finalPrompt],
             ], $modelName) as $chunk) {
                 if (is_string($chunk)) {
+                    $fullContent .= $chunk;
                     yield ['type' => 'token', 'content' => $chunk];
+                } elseif (is_array($chunk) && ! isset($chunk['reasoning']) && ! isset($chunk['reasoning_start']) && ! isset($chunk['reasoning_end'])) {
+                    $usageStats = $chunk;
                 }
             }
+
+            $totalInputTokens += (int) ($usageStats['input_tokens'] ?? 0);
+            $totalOutputTokens += (int) ($usageStats['output_tokens'] ?? 0);
+
+            $creditsUsed = TokenGuard::after(
+                $user,
+                $totalInputTokens,
+                $totalOutputTokens,
+                $usageStats['model'] ?? $modelName,
+                $provider,
+                'rag',
+                ['tool_slug' => $session->tool_slug, 'mode' => 'summarize', 'batches' => $totalBatches],
+            );
+
+            yield ['type' => 'usage',
+                'input_tokens' => $totalInputTokens,
+                'output_tokens' => $totalOutputTokens,
+                'credits' => $creditsUsed,
+                'model' => $usageStats['model'] ?? $modelName,
+            ];
 
             RagMessage::create([
                 'session_id' => $session->id,
                 'role' => 'assistant',
-                'content' => 'Summary generated.',
+                'content' => $fullContent !== '' ? $fullContent : 'Summary generated.',
                 'sources' => [['doc' => $session->source_meta['filename'] ?? 'Document']],
+                'input_tokens' => $totalInputTokens,
+                'output_tokens' => $totalOutputTokens,
+                'credits_used' => $creditsUsed,
             ]);
         } catch (\Throwable $e) {
-            yield ['type' => 'error', 'message' => $e->getMessage()];
+            Log::error('RAG summarize failed', ['session' => $session->id, 'error' => $e->getMessage()]);
+
+            // Bill the map-phase tokens that were already consumed
+            TokenGuard::recordFailure($user, $provider, $modelName, 'rag', $totalInputTokens, $totalOutputTokens, [
+                'tool_slug' => $session->tool_slug,
+                'mode' => 'summarize',
+                'error' => $e->getMessage(),
+            ]);
+
+            yield ['type' => 'error', 'message' => AiErrors::sanitize($e->getMessage())];
+
             return;
         }
 
@@ -707,9 +848,24 @@ class RagToolService
         }
 
         $kb = $session->knowledgeBase;
+        if (! $kb) {
+            yield ['type' => 'error', 'message' => 'Knowledge base not found.'];
+
+            return;
+        }
+
         $topK = (int) settings('rag_top_k', 6);
         $provider = settings('default_ai_provider', 'openai');
+        $modelName = settings('default_ai_model', 'gpt-4o-mini');
         $embeddingModel = settings('rag_embedding_model', '') ?: null;
+
+        try {
+            TokenGuard::before($user, null, $modelName);
+        } catch (\Throwable $e) {
+            yield ['type' => 'error', 'message' => $e->getMessage()];
+
+            return;
+        }
 
         try {
             $embeddingResult = $this->ai->embedText($topic, $provider, $embeddingModel);
@@ -745,15 +901,37 @@ class RagToolService
                 ['role' => 'user', 'content' => "Write a {$contentType} about: {$topic}"],
             ];
 
-            $modelName = settings('default_ai_model', 'gpt-4o-mini');
             $adapter = ProviderRegistry::resolve($provider);
 
             $fullContent = '';
+            $usageStats = null;
             foreach ($adapter->streamChatCompletion($messages, $modelName) as $chunk) {
                 if (is_string($chunk)) {
                     $fullContent .= $chunk;
                     yield ['type' => 'token', 'content' => $chunk];
+                } elseif (is_array($chunk) && ! isset($chunk['reasoning']) && ! isset($chunk['reasoning_start']) && ! isset($chunk['reasoning_end'])) {
+                    $usageStats = $chunk;
                 }
+            }
+
+            $creditsUsed = 0.0;
+            if ($usageStats) {
+                $creditsUsed = TokenGuard::after(
+                    $user,
+                    $usageStats['input_tokens'] ?? 0,
+                    $usageStats['output_tokens'] ?? 0,
+                    $usageStats['model'] ?? $modelName,
+                    $provider,
+                    'rag',
+                    ['tool_slug' => $session->tool_slug, 'mode' => 'kb_write'],
+                );
+
+                yield ['type' => 'usage',
+                    'input_tokens' => $usageStats['input_tokens'] ?? 0,
+                    'output_tokens' => $usageStats['output_tokens'] ?? 0,
+                    'credits' => $creditsUsed,
+                    'model' => $usageStats['model'] ?? $modelName,
+                ];
             }
 
             RagMessage::create([
@@ -767,11 +945,15 @@ class RagToolService
                 'role' => 'assistant',
                 'content' => $fullContent,
                 'sources' => $sources,
+                'input_tokens' => $usageStats['input_tokens'] ?? 0,
+                'output_tokens' => $usageStats['output_tokens'] ?? 0,
+                'credits_used' => $creditsUsed,
             ]);
 
             yield ['type' => 'done'];
         } catch (\Throwable $e) {
-            yield ['type' => 'error', 'message' => $e->getMessage()];
+            Log::error('RAG kb_write failed', ['session' => $session->id, 'error' => $e->getMessage()]);
+            yield ['type' => 'error', 'message' => AiErrors::sanitize($e->getMessage())];
         }
     }
 

@@ -19,6 +19,15 @@ class UserApiKey extends Model
         'masked_api_key',
     ];
 
+    /**
+     * Hide the raw (decrypting) api_key from JSON/array serialization — only the
+     * appended masked_api_key should ever reach the frontend. Without this the
+     * decrypted key would be exposed anywhere the model is serialized.
+     */
+    protected $hidden = [
+        'api_key',
+    ];
+
     protected function casts(): array
     {
         return [

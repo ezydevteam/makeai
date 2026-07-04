@@ -15,7 +15,15 @@ class ConversationTagController extends Controller
 {
     public function index(): JsonResponse
     {
-        $tags = Auth::user()->conversationTags()->withCount('conversations')->get();
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+            ]);
+        }
+
+        $tags = $user->conversationTags()->withCount('conversations')->get();
 
         return response()->json([
             'success' => true,
@@ -25,12 +33,20 @@ class ConversationTagController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sign in to create tags.',
+            ], 403);
+        }
+
         $validated = $request->validate([
             'name' => 'required|string|max:50',
             'color' => 'nullable|string|max:7|regex:/^#[0-9A-Fa-f]{6}$/',
         ]);
 
-        $tag = Auth::user()->conversationTags()->create($validated);
+        $tag = $user->conversationTags()->create($validated);
 
         return response()->json([
             'success' => true,

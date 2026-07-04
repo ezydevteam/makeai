@@ -18,7 +18,7 @@ class DepartmentRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:120'],
-            'slug' => ['nullable', 'string', 'max:140', Rule::unique('support_departments', 'slug')->ignore($departmentId)],
+            'slug' => ['required', 'string', 'max:140', Rule::unique('support_departments', 'slug')->ignore($departmentId)],
             'description' => ['nullable', 'string', 'max:1000'],
             'email' => ['nullable', 'email', 'max:255'],
             'assigned_role_id' => ['nullable', 'integer', 'exists:admin_roles,id'],

@@ -92,12 +92,17 @@ class NewsletterController extends Controller
         $decodedEmail = base64_decode($email, true);
 
         if ($decodedEmail) {
-            $campaign->increment('opened_count');
-
-            \App\Models\NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
+            // Count only the FIRST open of a real recipient — prevents inflating
+            // opened_count via pixel refreshes or bogus (non-recipient) emails.
+            $updated = \App\Models\NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
                 ->where('email', $decodedEmail)
                 ->where('status', 'sent')
+                ->whereNull('opened_at')
                 ->update(['opened_at' => now()]);
+
+            if ($updated) {
+                $campaign->increment('opened_count');
+            }
         }
 
         $pixel = base64_decode('R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==', true);

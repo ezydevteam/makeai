@@ -6,6 +6,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
+import { applyPurchaseCodeMask } from '@/lib/purchaseCode'
 
 defineOptions({ layout: AdminLayout })
 
@@ -350,13 +351,9 @@ function handleActivate(addon: AddonConfig) {
     activate(addon.slug)
 }
 
-// Purchase code mask
-function applyMask(value: string) {
-    return value.replace(/[^a-f0-9-]/gi, '').slice(0, 36).toLowerCase()
-}
-
+// Purchase code mask — allows the fake TEST-... codes while LICENSE_TEST_MODE is on
 function onPurchaseCodeInput(e: Event) {
-    purchaseCode.value = applyMask((e.target as HTMLInputElement).value)
+    purchaseCode.value = applyPurchaseCodeMask((e.target as HTMLInputElement).value, true)
 }
 
 async function focusSearch() {
@@ -402,211 +399,210 @@ onBeforeUnmount(() => {
 
 <template>
     <Head :title="t('Addons')" />
-    <div class="py-6">
         <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Addon Manager') }}</h1>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Install, activate, and configure platform addons.') }}</p>
+        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Addon Manager') }}</h1>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Install, activate, and configure platform addons.') }}</p>
+            </div>
+            <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary">
+                <i class="ti ti-upload text-base"></i>
+                {{ t('Upload Addon') }}
+            </button>
+        </div>
+
+        <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="w-full xl:max-w-md">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInputRef"
+                                v-model="searchQuery"
+                                type="text"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                :placeholder="t('Filter this list by addon name, slug, version, or description...')"
+                            />
+                            <span
+                                v-if="!searchQuery"
+                                class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                            >
+                                /
+                            </span>
+                            <button
+                                v-if="searchQuery"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                :title="t('Clear search')"
+                                @click="searchQuery = ''"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="w-44 md:ml-auto">
+                        <AppSelect
+                            v-model="statusFilter"
+                            :options="statusOptions"
+                            :placeholder="t('All Status')"
+                        />
+                    </div>
+
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                            @click="clearFilters"
+                        >
+                            <i class="ti ti-filter-off text-base"></i>
+                            {{ t('Clear') }}
+                        </button>
+                        <div v-if="filteredAddons.length" class="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                :checked="allSelected"
+                                @change="toggleSelectAll"
+                                id="bulkAddonSelect"
+                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                            />
+                            <label class="text-sm text-gray-600 dark:text-gray-400" for="bulkAddonSelect">{{ t('Select All') }}</label>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <div v-if="filteredAddons.length" class="space-y-4 p-4 sm:p-6">
+                <!-- Bulk Actions Bar -->
+                <div v-if="selectedAddons.length" class="flex flex-col gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 dark:border-primary-800 dark:bg-primary-900/20 lg:flex-row lg:items-center lg:justify-between">
+                    <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
+                        {{ t(':count selected', { count: selectedAddons.length }) }}
+                    </span>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            @click="confirmBulkActivate"
+                            :disabled="bulkProcessing"
+                            class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                        >
+                            <i v-if="bulkProcessing" class="ti ti-loader-2 animate-spin"></i>
+                            {{ t('Activate Selected') }}
+                        </button>
+                        <button
+                            @click="confirmBulkDeactivate"
+                            :disabled="bulkProcessing"
+                            class="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/20 disabled:opacity-50"
+                        >
+                            <i v-if="bulkProcessing" class="ti ti-loader-2 animate-spin"></i>
+                            {{ t('Deactivate Selected') }}
+                        </button>
+                        <button
+                            @click="selectedAddons = []"
+                            class="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        >
+                            {{ t('Clear Selection') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div v-for="addon in filteredAddons" :key="addon.slug" :class="[addon.is_active ? 'border-primary-500/30 bg-primary-50/30 dark:bg-primary-500/5' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40']" class="rounded-xl border p-5 shadow-sm transition-colors">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div class="flex min-w-0 items-start gap-4">
+                <!-- Checkbox -->
+                <input
+                    type="checkbox"
+                    :checked="selectedAddons.includes(addon.slug)"
+                    @change="toggleSelect(addon.slug)"
+                    class="mt-3 h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
+                />
+                <div :class="[addon.is_active ? 'bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400']" class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
+                    <img
+                        v-if="shouldShowLogo(addon)"
+                        :src="addon.logo_url ?? undefined"
+                        :alt="t(':name logo', { name: addon.name })"
+                        class="h-8 w-8 rounded-md object-contain"
+                        @error="hideLogo(addon)"
+                    />
+                    <i v-else class="ti ti-puzzle text-2xl"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="mb-0.5 flex flex-wrap items-center gap-2">
+                        <h3 class="text-gray-900 dark:text-white font-semibold">{{ addon.name }}</h3>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">v{{ addon.version }}</span>
+                        <span v-if="addon.is_active" class="px-2 py-0.5 bg-emerald-500/15 text-emerald-500 text-[10px] font-bold rounded-full">{{ t('ACTIVE') }}</span>
+                        <span v-if="addon.license?.status === 'grace'" class="px-2 py-0.5 bg-amber-500/15 text-amber-500 text-[10px] font-bold rounded-full">{{ t('GRACE') }}</span>
+                        <span v-if="!addon.license_ok" class="px-2 py-0.5 bg-red-500/15 text-red-500 text-[10px] font-bold rounded-full">{{ t('LICENSE') }}</span>
+                    </div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ addon.description || t('No description') }}</p>
+
+                    <!-- License info row -->
+                    <div v-if="addon.license?.buyer" class="flex items-center gap-3 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                        <span>{{ t('Licensed to :buyer', { buyer: addon.license.buyer }) }}</span>
+                        <span class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                        <span>{{ addon.license.license_type_label }}</span>
+                        <span v-if="!addon.license.domain_ok" class="text-amber-500">{{ t('Domain changed') }}</span>
+                    </div>
+                </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                    <Link v-if="addon.settings?.length" :href="route('admin.addons.settings', { slug: addon.slug })" :aria-label="t('Settings for :name addon', { name: addon.name })" class="px-3 py-2 bg-white dark:bg-gray-700 text-primary-500 border border-gray-200 dark:border-gray-700 dark:text-primary-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 text-sm">{{ t('Settings') }}</Link>
+                    <button
+                        v-if="addon.is_active"
+                        @click="deactivate(addon.slug)"
+                        :disabled="processing[addon.slug]"
+                        :aria-label="t('Deactivate :name addon', { name: addon.name })"
+                        class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
+                            <i class="ti ti-loader-2 animate-spin"></i>
+                            {{ t('Deactivating...') }}
+                        </span>
+                        <span v-else>{{ t('Deactivate') }}</span>
+                    </button>
+                    <button
+                        v-else-if="addon.license_ok"
+                        @click="handleActivate(addon)"
+                        :disabled="processing[addon.slug]"
+                        :aria-label="t('Activate :name addon', { name: addon.name })"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
+                            <i class="ti ti-loader-2 animate-spin"></i>
+                            {{ t('Activating...') }}
+                        </span>
+                        <span v-else>{{ t('Activate') }}</span>
+                    </button>
+                    <span v-else class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-lg text-sm">{{ t('Locked') }}</span>
+                    <button
+                        v-if="!addon.is_active"
+                        type="button"
+                        :aria-label="t('Delete :name addon', { name: addon.name })"
+                        class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors"
+                        @click="confirmDelete(addon)"
+                    >
+                        {{ t('Delete') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+            </div>
+
+            <div v-else class="px-6 py-16 text-center">
+                <i class="ti ti-puzzle-off text-5xl text-gray-300 dark:text-gray-600"></i>
+                <p class="mt-4 text-gray-500 dark:text-gray-400 text-sm mb-2">{{ t('No addons installed yet') }}</p>
+                <p class="text-gray-400 dark:text-gray-500 text-xs mb-6">{{ t('Upload an addon zip or place it manually in the addons directory.') }}</p>
                 <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary">
                     <i class="ti ti-upload text-base"></i>
                     {{ t('Upload Addon') }}
                 </button>
             </div>
-
-            <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <i class="ti ti-search text-base"></i>
-                                </span>
-                                <input
-                                    ref="searchInputRef"
-                                    v-model="searchQuery"
-                                    type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Filter this list by addon name, slug, version, or description...')"
-                                />
-                                <span
-                                    v-if="!searchQuery"
-                                    class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
-                                >
-                                    /
-                                </span>
-                                <button
-                                    v-if="searchQuery"
-                                    type="button"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                    :aria-label="t('Clear search')"
-                                    :title="t('Clear search')"
-                                    @click="searchQuery = ''"
-                                >
-                                    <i class="ti ti-x text-base"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="w-44 md:ml-auto">
-                            <AppSelect
-                                v-model="statusFilter"
-                                :options="statusOptions"
-                                :placeholder="t('All Status')"
-                            />
-                        </div>
-
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-                            <button
-                                v-if="hasActiveFilters"
-                                type="button"
-                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                                @click="clearFilters"
-                            >
-                                <i class="ti ti-filter-off text-base"></i>
-                                {{ t('Clear') }}
-                            </button>
-                            <div v-if="filteredAddons.length" class="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    :checked="allSelected"
-                                    @change="toggleSelectAll"
-                                    id="bulkAddonSelect"
-                                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
-                                />
-                                <label class="text-sm text-gray-600 dark:text-gray-400" for="bulkAddonSelect">{{ t('Select All') }}</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="filteredAddons.length" class="space-y-4 p-4 sm:p-6">
-                    <!-- Bulk Actions Bar -->
-                    <div v-if="selectedAddons.length" class="flex flex-col gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 dark:border-primary-800 dark:bg-primary-900/20 lg:flex-row lg:items-center lg:justify-between">
-                        <span class="text-sm font-medium text-primary-700 dark:text-primary-300">
-                            {{ t(':count selected', { count: selectedAddons.length }) }}
-                        </span>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <button
-                                @click="confirmBulkActivate"
-                                :disabled="bulkProcessing"
-                                class="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
-                            >
-                                <i v-if="bulkProcessing" class="ti ti-loader-2 animate-spin"></i>
-                                {{ t('Activate Selected') }}
-                            </button>
-                            <button
-                                @click="confirmBulkDeactivate"
-                                :disabled="bulkProcessing"
-                                class="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-500 hover:bg-red-500/20 disabled:opacity-50"
-                            >
-                                <i v-if="bulkProcessing" class="ti ti-loader-2 animate-spin"></i>
-                                {{ t('Deactivate Selected') }}
-                            </button>
-                            <button
-                                @click="selectedAddons = []"
-                                class="inline-flex items-center gap-2 rounded-lg bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                            >
-                                {{ t('Clear Selection') }}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div v-for="addon in filteredAddons" :key="addon.slug" :class="[addon.is_active ? 'border-primary-500/30 bg-primary-50/30 dark:bg-primary-500/5' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40']" class="rounded-xl border p-5 shadow-sm transition-colors">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="flex min-w-0 items-start gap-4">
-                    <!-- Checkbox -->
-                    <input
-                        type="checkbox"
-                        :checked="selectedAddons.includes(addon.slug)"
-                        @change="toggleSelect(addon.slug)"
-                        class="mt-3 h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600"
-                    />
-                    <div :class="[addon.is_active ? 'bg-primary-100 text-primary-600 dark:bg-primary-500/20 dark:text-primary-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400']" class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0">
-                        <img
-                            v-if="shouldShowLogo(addon)"
-                            :src="addon.logo_url ?? undefined"
-                            :alt="t(':name logo', { name: addon.name })"
-                            class="h-8 w-8 rounded-md object-contain"
-                            @error="hideLogo(addon)"
-                        />
-                        <i v-else class="ti ti-puzzle text-2xl"></i>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="mb-0.5 flex flex-wrap items-center gap-2">
-                            <h3 class="text-gray-900 dark:text-white font-semibold">{{ addon.name }}</h3>
-                            <span class="text-xs text-gray-500 dark:text-gray-400">v{{ addon.version }}</span>
-                            <span v-if="addon.is_active" class="px-2 py-0.5 bg-emerald-500/15 text-emerald-500 text-[10px] font-bold rounded-full">{{ t('ACTIVE') }}</span>
-                            <span v-if="addon.license?.status === 'grace'" class="px-2 py-0.5 bg-amber-500/15 text-amber-500 text-[10px] font-bold rounded-full">{{ t('GRACE') }}</span>
-                            <span v-if="!addon.license_ok" class="px-2 py-0.5 bg-red-500/15 text-red-500 text-[10px] font-bold rounded-full">{{ t('LICENSE') }}</span>
-                        </div>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ addon.description || t('No description') }}</p>
-
-                        <!-- License info row -->
-                        <div v-if="addon.license?.buyer" class="flex items-center gap-3 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                            <span>{{ t('Licensed to :buyer', { buyer: addon.license.buyer }) }}</span>
-                            <span class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-                            <span>{{ addon.license.license_type_label }}</span>
-                            <span v-if="!addon.license.domain_ok" class="text-amber-500">{{ t('Domain changed') }}</span>
-                        </div>
-                    </div>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 xl:justify-end">
-                        <Link v-if="addon.settings?.length" :href="route('admin.addons.settings', { slug: addon.slug })" :aria-label="t('Settings for :name addon', { name: addon.name })" class="px-3 py-2 bg-white dark:bg-gray-700 text-primary-500 border border-gray-200 dark:border-gray-700 dark:text-primary-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 text-sm">{{ t('Settings') }}</Link>
-                        <button
-                            v-if="addon.is_active"
-                            @click="deactivate(addon.slug)"
-                            :disabled="processing[addon.slug]"
-                            :aria-label="t('Deactivate :name addon', { name: addon.name })"
-                            class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
-                                <i class="ti ti-loader-2 animate-spin"></i>
-                                {{ t('Deactivating...') }}
-                            </span>
-                            <span v-else>{{ t('Deactivate') }}</span>
-                        </button>
-                        <button
-                            v-else-if="addon.license_ok"
-                            @click="handleActivate(addon)"
-                            :disabled="processing[addon.slug]"
-                            :aria-label="t('Activate :name addon', { name: addon.name })"
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
-                                <i class="ti ti-loader-2 animate-spin"></i>
-                                {{ t('Activating...') }}
-                            </span>
-                            <span v-else>{{ t('Activate') }}</span>
-                        </button>
-                        <span v-else class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-lg text-sm">{{ t('Locked') }}</span>
-                        <button
-                            v-if="!addon.is_active"
-                            type="button"
-                            :aria-label="t('Delete :name addon', { name: addon.name })"
-                            class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors"
-                            @click="confirmDelete(addon)"
-                        >
-                            {{ t('Delete') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-                </div>
-
-                <div v-else class="px-6 py-16 text-center">
-                    <i class="ti ti-puzzle-off text-5xl text-gray-300 dark:text-gray-600"></i>
-                    <p class="mt-4 text-gray-500 dark:text-gray-400 text-sm mb-2">{{ t('No addons installed yet') }}</p>
-                    <p class="text-gray-400 dark:text-gray-500 text-xs mb-6">{{ t('Upload an addon zip or place it manually in the addons directory.') }}</p>
-                    <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary">
-                        <i class="ti ti-upload text-base"></i>
-                        {{ t('Upload Addon') }}
-                    </button>
-                </div>
-            </div>
         </div>
     </div>
+
 
     <ActionConfirmModal
         :open="confirmModal.open"

@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
-use Addons\AiChatbot\Database\Seeders\ChatbotProductSeeder;
+use Addons\AiChatbot\Database\Seeders\ChatbotModeSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -22,9 +22,8 @@ class DatabaseSeeder extends Seeder
             AiModelSeeder::class,
             AiToolCategorySeeder::class,
             AiToolSeeder::class,
-            ChatbotProductSeeder::class,
+            ChatbotModeSeeder::class,
             RagToolSeeder::class,
-            SiteTemplateSeeder::class,
             PlanSeeder::class,
             PaymentGatewaySeeder::class,
             PageSeeder::class,

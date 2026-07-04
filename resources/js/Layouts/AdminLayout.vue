@@ -197,13 +197,17 @@ watch(adminSettings, (settings) => {
 }, { immediate: true })
 
 onMounted(() => {
+    document.documentElement.classList.add('admin-layout-root')
     document.addEventListener('click', closeHeaderMenus)
     document.addEventListener('keydown', onKeydown)
 })
 onUnmounted(() => {
+    if (!window.location.pathname.startsWith('/admin')) {
+        document.documentElement.classList.remove('admin-layout-root')
+        applyAdminCssVars()
+    }
     document.removeEventListener('click', closeHeaderMenus)
     document.removeEventListener('keydown', onKeydown)
-    applyAdminCssVars()
 })
 </script>
 
@@ -414,6 +418,38 @@ onUnmounted(() => {
 </template>
 
 <style>
+html.admin-layout-root {
+    --admin-primary-color: var(--admin-primary, #9028f1);
+    --admin-secondary-color: var(--admin-text-primary, #111827);
+
+    /* Local overrides for Tailwind CSS v4 color variables inside Admin Layout (including teleported modals) */
+    --color-primary: var(--admin-primary-color);
+    --color-primary-50: color-mix(in srgb, var(--admin-primary-color) 8%, #ffffff);
+    --color-primary-100: color-mix(in srgb, var(--admin-primary-color) 18%, #ffffff);
+    --color-primary-200: color-mix(in srgb, var(--admin-primary-color) 32%, #ffffff);
+    --color-primary-300: color-mix(in srgb, var(--admin-primary-color) 48%, #ffffff);
+    --color-primary-400: color-mix(in srgb, var(--admin-primary-color) 72%, #ffffff);
+    --color-primary-500: var(--admin-primary-color);
+    --color-primary-600: color-mix(in srgb, var(--admin-primary-color) 86%, #000000);
+    --color-primary-700: color-mix(in srgb, var(--admin-primary-color) 74%, #000000);
+    --color-primary-800: color-mix(in srgb, var(--admin-primary-color) 62%, #000000);
+    --color-primary-900: color-mix(in srgb, var(--admin-primary-color) 50%, #000000);
+    --color-primary-950: color-mix(in srgb, var(--admin-primary-color) 36%, #000000);
+
+    --color-secondary: var(--admin-secondary-color);
+    --color-secondary-50: color-mix(in srgb, var(--admin-secondary-color) 8%, #ffffff);
+    --color-secondary-100: color-mix(in srgb, var(--admin-secondary-color) 18%, #ffffff);
+    --color-secondary-200: color-mix(in srgb, var(--admin-secondary-color) 32%, #ffffff);
+    --color-secondary-300: color-mix(in srgb, var(--admin-secondary-color) 48%, #ffffff);
+    --color-secondary-400: color-mix(in srgb, var(--admin-secondary-color) 72%, #ffffff);
+    --color-secondary-500: var(--admin-secondary-color);
+    --color-secondary-600: color-mix(in srgb, var(--admin-secondary-color) 86%, #000000);
+    --color-secondary-700: color-mix(in srgb, var(--admin-secondary-color) 74%, #000000);
+    --color-secondary-800: color-mix(in srgb, var(--admin-secondary-color) 62%, #000000);
+    --color-secondary-900: color-mix(in srgb, var(--admin-secondary-color) 50%, #000000);
+    --color-secondary-950: color-mix(in srgb, var(--admin-secondary-color) 36%, #000000);
+}
+
 .admin-layout {
     --admin-bg-color: var(--admin-bg, #ffffff);
     --admin-surface: color-mix(in srgb, var(--admin-navbar-bg, #ffffff) 92%, white);
@@ -571,4 +607,5 @@ onUnmounted(() => {
 .admin-profile-trigger:hover {
     background: color-mix(in srgb, var(--admin-navbar-bg, #ffffff) 68%, var(--admin-accent, #3b82f6) 10%);
 }
+
 </style>

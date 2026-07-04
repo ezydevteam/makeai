@@ -56,12 +56,28 @@ class InstallController extends Controller
 
         $validated = $this->validateStep($request, $step);
 
-        // Test DB connection for step 2 before storing (skip for SQLite)
+        // Persist an uploaded demo SQL file to disk NOW: finalize() is a separate
+        // request, so the UploadedFile is gone by then (and can't be serialized
+        // into the session). Store the path instead.
+        if ($step === 6) {
+            unset($validated['demo_file']);
+
+            if (($validated['demo_method'] ?? null) === 'upload' && $request->hasFile('demo_file')) {
+                $dest = storage_path('app/install');
+                if (! is_dir($dest)) {
+                    mkdir($dest, 0755, true);
+                }
+                $request->file('demo_file')->move($dest, 'demo-upload.sql');
+                $validated['demo_file_path'] = $dest . DIRECTORY_SEPARATOR . 'demo-upload.sql';
+            }
+        }
+
+        // Test DB connection + write privileges for step 2 before storing (skip for SQLite)
         if ($step === 2 && ($validated['db_driver'] ?? 'mysql') === 'mysql') {
             try {
                 $this->testDatabaseConnection($validated);
-            } catch (\Exception $e) {
-                return back()->with('error', translate('Database connection failed: :error', ['error' => $e->getMessage()]));
+            } catch (\Throwable $e) {
+                return back()->with('error', $this->friendlyDbError($e->getMessage()));
             }
         }
 
@@ -120,11 +136,25 @@ class InstallController extends Controller
         $wizard = $this->getWizardState($request);
         $data = $wizard['data'] ?? [];
 
+        // Shared hosting frequently caps max_execution_time at ~30s, which can
+        // kill the migration/seed run mid-way and leave a half-installed app.
+        // Give finalize the room it needs (best-effort; silently ignored when the
+        // host disables these via disable_functions).
+        @set_time_limit(0);
+        @ini_set('memory_limit', '512M');
+
         // Ensure all 6 data steps are completed
         for ($i = 1; $i <= 6; $i++) {
             if (! isset($data["step_{$i}"])) {
                 return back()->with('error', translate('Step :step is incomplete. Please complete all steps.', ['step' => $i]));
             }
+        }
+
+        // Re-run environment checks right before committing. Step 1 may have passed
+        // hours ago (or on a different worker); bail out cleanly BEFORE writing the
+        // database or .env if a hard requirement regressed, rather than half-installing.
+        if (! app(SystemCheckService::class)->allPass()) {
+            return back()->with('error', translate('Your server no longer meets all requirements. Please go back to the Requirements step and resolve the failures before finishing.'));
         }
 
         $envPath = base_path('.env');
@@ -246,16 +276,18 @@ class InstallController extends Controller
             $dbReady = true;
             $debug('Phase 2: OK — migrations complete');
         } catch (\Throwable $e) {
-            $errors[] = 'Database/Migration: ' . $e->getMessage();
             $debug('Phase 2: FAILED — ' . $e->getMessage());
             $debug('Phase 2: Trace — ' . $e->getTraceAsString());
-            // Do NOT return here — continue to Phase 3 to write INSTALLED=true
+
+            // Migrations failed. Do NOT mark the app installed and do NOT clear
+            // the wizard — keep every entered value so the buyer can correct their
+            // database settings and retry entirely from the browser. No CLI needed.
+            return $this->migrationFailedResponse($request, $e);
         }
 
-        // ─── Phase 3: WRITE INSTALLED=true (ALWAYS RUNS) ───
-        // This is the critical write. Uses raw file I/O to ensure reliability.
-        // Even if Phase 2 failed, we mark installed to prevent redirect loops.
-        // The admin can fix DB issues post-install via CLI.
+        // ─── Phase 3: WRITE INSTALLED=true ───
+        // Only reached once migrations have succeeded. Uses raw file I/O for
+        // reliability.
         try {
             clearstatcache(true, $envPath);
             $envContents = file_get_contents($envPath);
@@ -416,22 +448,8 @@ class InstallController extends Controller
 
         $debug('=== Finalize completed. DB ready: ' . ($dbReady ? 'YES' : 'NO') . '. Errors: ' . count($errors) . ' ===');
 
-        if (! $dbReady) {
-            $errorMessage = translate('Installation partially complete. Database migration failed: :error. Please run "php artisan migrate --force" from the command line.', [
-                'error' => $errors[0] ?? 'Unknown error',
-            ]);
-
-            if ($request->wantsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => $errorMessage,
-                    'redirect' => route('admin.login'),
-                ], 400);
-            }
-
-            // DB failed but INSTALLED=true is set — redirect with error info
-            return redirect()->route('admin.login')->with('error', $errorMessage);
-        }
+        // Migration failure is handled earlier (Phase 2) by bailing out before the
+        // app is ever marked installed, so reaching here means the database is ready.
 
         $successMessage = translate('Installation complete! You may now log in as the admin user.');
         if (! empty($errors)) {
@@ -470,11 +488,17 @@ class InstallController extends Controller
             ]),
             2 => $request->validate([
                 'db_driver' => ['required', 'in:mysql,sqlite'],
-                'db_host' => ['nullable', 'string', 'max:255'],
-                'db_port' => ['nullable', 'integer', 'between:1,65535'],
-                'db_database' => ['nullable', 'string', 'max:255'],
-                'db_username' => ['nullable', 'string', 'max:255'],
+                // Host/name/user are required for MySQL, ignored for SQLite.
+                'db_host' => ['required_if:db_driver,mysql', 'nullable', 'string', 'max:255'],
+                'db_port' => ['required_if:db_driver,mysql', 'nullable', 'integer', 'between:1,65535'],
+                'db_database' => ['required_if:db_driver,mysql', 'nullable', 'string', 'max:255'],
+                'db_username' => ['required_if:db_driver,mysql', 'nullable', 'string', 'max:255'],
                 'db_password' => ['nullable', 'string', 'max:255'],
+            ], [
+                'db_host.required_if' => translate('The database host is required (most shared hosts use "localhost").'),
+                'db_port.required_if' => translate('The database port is required (MySQL default is 3306).'),
+                'db_database.required_if' => translate('The database name is required.'),
+                'db_username.required_if' => translate('The database username is required.'),
             ]),
             3 => $request->validate([
                 'site_name' => ['required', 'string', 'max:255'],
@@ -516,10 +540,65 @@ class InstallController extends Controller
         ]);
 
         try {
-            DB::connection('_install_test')->getPdo();
+            $connection = DB::connection('_install_test');
+            $connection->getPdo();
+
+            // Connectivity alone isn't enough — verify the user can actually
+            // create and drop tables. Missing privileges are the most common
+            // reason migrations fail deep inside finalize on shared hosting, and
+            // catching it here lets the buyer fix it while still on this step.
+            $probe = 'install_privilege_check_' . substr(md5(uniqid('', true)), 0, 8);
+            $connection->statement("CREATE TABLE `{$probe}` (`id` INT)");
+            $connection->statement("DROP TABLE `{$probe}`");
         } finally {
             DB::purge('_install_test');
         }
+    }
+
+    /**
+     * Turn a raw database exception message into buyer-friendly, actionable
+     * guidance so non-technical Envato buyers can self-serve without the CLI.
+     */
+    private function friendlyDbError(string $raw): string
+    {
+        $lower = strtolower($raw);
+
+        return match (true) {
+            str_contains($lower, 'access denied') => translate(
+                'Database access was denied. Go back to the Database step and double-check the database username and password.'
+            ),
+            str_contains($lower, 'unknown database') => translate(
+                'That database name does not exist yet. Create it in your hosting panel (e.g. cPanel → MySQL Databases), then go back and re-enter the name.'
+            ),
+            (str_contains($lower, 'command denied') || str_contains($lower, 'create command denied') || str_contains($lower, 'denied to user')) => translate(
+                'The database user is missing required privileges. In your hosting panel, grant it ALL PRIVILEGES on this database, then try again.'
+            ),
+            (str_contains($lower, 'connection refused') || str_contains($lower, "can't connect") || str_contains($lower, 'could not connect') || str_contains($lower, 'timed out') || str_contains($lower, 'no such host') || str_contains($lower, 'getaddrinfo')) => translate(
+                'Could not reach the database server. Check the database host and port on the Database step — most shared hosts use "localhost".'
+            ),
+            default => translate('Database setup failed: :error. Please review your Database settings and try again.', [
+                'error' => \Illuminate\Support\Str::limit($raw, 200),
+            ]),
+        };
+    }
+
+    /**
+     * Response for a failed migration: the app is left UN-installed and the wizard
+     * state is preserved, so the buyer can correct their settings and retry from
+     * the browser. Never mentions the command line.
+     */
+    private function migrationFailedResponse(Request $request, \Throwable $e): \Symfony\Component\HttpFoundation\Response
+    {
+        $message = $this->friendlyDbError($e->getMessage());
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 200);
+        }
+
+        return redirect()->route('install')->with('error', $message);
     }
 
     private function importDemo(array $step6Data): void
@@ -527,9 +606,11 @@ class InstallController extends Controller
         $method = $step6Data['demo_method'] ?? 'file';
 
         if ($method === 'upload') {
-            $file = request()->file('demo_file');
-            if ($file && $file->isValid()) {
-                DB::unprepared(file_get_contents($file->getRealPath()));
+            // The file was moved to disk during step 6 (finalize is a separate request).
+            $path = $step6Data['demo_file_path'] ?? null;
+            if ($path && file_exists($path)) {
+                DB::unprepared(file_get_contents($path));
+                @unlink($path);
             }
 
             return;

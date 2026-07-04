@@ -18,7 +18,7 @@ function handleRepeat(messageId: number | string) {
     const index = messages.findIndex(m => m.id === messageId)
     if (index > 0 && messages[index - 1].role === 'user') {
         const userMessage = messages[index - 1]
-        chat.sendMessage(userMessage.content, chat.selectedProduct.value?.slug ?? undefined)
+        chat.sendMessage(userMessage.content, chat.selectedMode.value?.slug ?? undefined)
     }
 }
 

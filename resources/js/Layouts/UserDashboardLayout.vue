@@ -85,6 +85,7 @@ interface NavItem {
 const socialScheduler = computed(() => (page.props.socialScheduler as any) ?? { enabled: false })
 const videoCreator = computed(() => (page.props.videoCreator as any) ?? { enabled: false })
 const voiceover = computed(() => (page.props.voiceover as any) ?? { enabled: false })
+const imageEditor = computed(() => (page.props.imageEditor as any) ?? { enabled: false })
 const frontendHeaderSettings = computed(() => (page.props as any).frontendHeaderSettings ?? {})
 const mobileBottomHeaderHeight = computed(() => {
     const mobileBottom = frontendHeaderSettings.value?.mobile_bottom ?? {}
@@ -169,6 +170,12 @@ const navItems = computed<NavItem[]>(() => {
                 { label: t('Accounts'), routeName: 'addon.social.user.accounts', active: is('addon.social.user.accounts') },
                 { label: t('Analytics'), routeName: 'addon.social.user.analytics', active: is('addon.social.user.analytics') },
             ],
+        }] : []),
+        ...(imageEditor.value.enabled ? [{
+            label: t('Image Editor'),
+            icon: 'ti ti-photo-edit',
+            active: is('addon.ie.user.*'),
+            routeName: 'addon.ie.user.editor',
         }] : []),
         ...(affiliateEnabled.value ? [{ label: t('Affiliate'), routeName: 'user.dashboard.affiliate', active: is('user.dashboard.affiliate*'), icon: 'ti ti-affiliate' }] : []),
         {

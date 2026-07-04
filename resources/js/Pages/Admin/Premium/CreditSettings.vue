@@ -99,9 +99,8 @@ const removeBonusTier = (index: number) => {
 <template>
     <Head :title="t('Credit Settings')" />
 
-    <div class="py-6">
-        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+            <div class="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Credit Settings') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure credit top-up pricing, entry points, and bonus rules.') }}</p>
@@ -128,9 +127,9 @@ const removeBonusTier = (index: number) => {
             </div>
 
             <form class="space-y-6" @submit.prevent="submit">
-                <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-                        <div class="space-y-6">
+                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                        <div class="space-y-5">
                             <div class="rounded-xl border border-gray-100 bg-gray-50 p-5 dark:border-surface-800 dark:bg-surface-950/60">
                                 <div class="flex items-start justify-between gap-4">
                                     <div>
@@ -349,6 +348,5 @@ const removeBonusTier = (index: number) => {
                     </div>
                 </section>
             </form>
-        </div>
     </div>
 </template>

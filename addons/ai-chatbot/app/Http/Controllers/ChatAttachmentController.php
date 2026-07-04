@@ -30,10 +30,11 @@ class ChatAttachmentController extends Controller
 
         $file = $request->file('file');
         $user = Auth::user();
+        $ownerDirectory = $user ? (string) $user->id : 'guest_' . session()->getId();
         $ulid = (string) Str::ulid();
         $ext = $file->getClientOriginalExtension();
         $path = $file->storeAs(
-            "chat-attachments/{$user->id}",
+            "chat-attachments/{$ownerDirectory}",
             "{$ulid}.{$ext}",
             'local'
         );
@@ -72,28 +73,29 @@ class ChatAttachmentController extends Controller
     private function getPlanSetting(string $key, $default = null)
     {
         $user = Auth::user();
-        $plan = $user?->plan;
 
-        if ($plan && !$plan->is_free) {
-            $planKey = "plan_{$plan->slug}_{$key}";
-            $val = addon_setting('ai-chatbot', $planKey);
-            if ($val !== null && $val !== '') {
-                if ($val === 'true' || $val === '1') return true;
-                if ($val === 'false' || $val === '0') return false;
-                return $val;
-            }
-
-            // Fallback to legacy pro setting
-            $legacyKey = "pro_{$key}";
-            $legacyVal = addon_setting('ai-chatbot', $legacyKey);
-            if ($legacyVal !== null && $legacyVal !== '') {
-                if ($legacyVal === 'true' || $legacyVal === '1') return true;
-                if ($legacyVal === 'false' || $legacyVal === '0') return false;
-                return $legacyVal;
+        if ($user) {
+            $plan = $user->plan;
+            if ($plan && !$plan->is_free) {
+                $planKey = "plan_{$plan->slug}_{$key}";
+                $val = addon_setting('ai-chatbot', $planKey);
+                if ($val !== null && $val !== '') {
+                    if ($val === 'true' || $val === '1') return true;
+                    if ($val === 'false' || $val === '0') return false;
+                    return $val;
+                }
+            } else {
+                $freeKey = "free_{$key}";
+                $val = addon_setting('ai-chatbot', $freeKey);
+                if ($val !== null && $val !== '') {
+                    if ($val === 'true' || $val === '1') return true;
+                    if ($val === 'false' || $val === '0') return false;
+                    return $val;
+                }
             }
         } else {
-            $freeKey = "free_{$key}";
-            $val = addon_setting('ai-chatbot', $freeKey);
+            $guestKey = "guest_{$key}";
+            $val = addon_setting('ai-chatbot', $guestKey);
             if ($val !== null && $val !== '') {
                 if ($val === 'true' || $val === '1') return true;
                 if ($val === 'false' || $val === '0') return false;
@@ -108,7 +110,11 @@ class ChatAttachmentController extends Controller
     {
         // Find the attachment by ID in the user's recent messages
         $user = Auth::user();
-        $message = $user->conversations()
+        $query = $user 
+            ? $user->conversations() 
+            : \Addons\AiChatbot\Models\Conversation::whereNull('user_id')->where('session_id', session()->getId());
+
+        $message = $query
             ->with(['messages' => function ($query) use ($id) {
                 $query->whereJsonContains('attachments->id', $id);
             }])
@@ -127,7 +133,16 @@ class ChatAttachmentController extends Controller
         }
 
         $path = $attachment['storage_path'] ?? null;
-        if (!$path || !Storage::disk('local')->exists($path)) {
+
+        // Defense-in-depth: only ever serve files from the caller's own upload
+        // directory, regardless of what path is stored on the message.
+        $ownerDirectory = $user ? (string) $user->id : 'guest_' . session()->getId();
+        $ownerPrefix = "chat-attachments/{$ownerDirectory}/";
+        if (!$path || str_contains($path, '..') || !str_starts_with($path, $ownerPrefix)) {
+            abort(404);
+        }
+
+        if (!Storage::disk('local')->exists($path)) {
             abort(404);
         }
 

@@ -8,7 +8,7 @@ use Addons\AiVideoCreator\Http\Controllers\User\VideoLibraryController;
 use Addons\AiVideoCreator\Http\Controllers\User\VideoViewerController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'addon.enabled:ai-video-creator'])
     ->prefix('video-creator')
     ->name('addon.video.user.')
     ->group(function () {

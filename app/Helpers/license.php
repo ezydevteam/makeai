@@ -53,7 +53,11 @@ if (! function_exists('license_verified')) {
      */
     function license_verified(): bool
     {
-        if (app()->environment('local')) {
+        // Local-dev convenience bypass. Deliberately requires an EXPLICIT opt-in
+        // flag (LICENSE_DEV_BYPASS) in addition to the local environment, so that
+        // simply flipping APP_ENV=local on a production null does NOT disable
+        // license enforcement.
+        if (app()->environment('local') && config('license.dev_bypass', false)) {
             return true;
         }
 

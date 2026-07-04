@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
 import typescript from 'highlight.js/lib/languages/typescript'
@@ -79,8 +80,15 @@ function renderMarkdown(content: string): string {
         }
         return `<pre class="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 overflow-x-auto"><code class="text-sm">${highlighted}</code></pre>`
     })
-    
-    return html
+
+    // Sanitize — this view is PUBLIC and renders attacker-controllable message
+    // content, so raw marked output must never reach v-html.
+    return DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        FORBID_TAGS: ['style', 'form', 'input', 'button'],
+        FORBID_ATTR: ['style'],
+        ADD_ATTR: ['target', 'rel'],
+    })
 }
 </script>
 

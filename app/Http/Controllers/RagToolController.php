@@ -5,7 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\AiTool;
 use App\Models\KnowledgeBase;
 use App\Models\RagSession;
+use App\Services\AI\AiErrors;
+use App\Services\AI\ToolAccessService;
 use App\Services\RagToolService;
+use App\Services\Security\SsrfGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +22,7 @@ class RagToolController extends Controller
 {
     public function __construct(
         private RagToolService $ragToolService,
+        private ToolAccessService $toolAccess,
     ) {}
 
     /**
@@ -33,6 +37,9 @@ class RagToolController extends Controller
         abort_if($tool->type !== 'rag', 404);
 
         $user = Auth::user();
+
+        // Enforce the tool's access level (premium / plan gating)
+        $this->toolAccess->assertCanUse($tool, $user);
 
         $recentSessions = $user
             ? RagSession::where('user_id', $user->id)
@@ -86,6 +93,10 @@ class RagToolController extends Controller
         abort_if($tool->type !== 'rag', 404);
 
         $user = Auth::user();
+
+        // Enforce the tool's access level (premium / plan gating)
+        $this->toolAccess->assertCanUse($tool, $user);
+
         $fields = $tool->fields ?? [];
         $sourceType = $fields['source_type'] ?? 'file';
 
@@ -127,16 +138,23 @@ class RagToolController extends Controller
 
             case 'url':
                 $request->validate([
-                    'url' => 'required|url|max:2048',
+                    'url' => 'required|url:http,https|max:2048',
                     'title' => 'nullable|string|max:255',
                 ]);
+
+                try {
+                    SsrfGuard::assertPublicUrl($request->input('url'));
+                } catch (\RuntimeException $e) {
+                    return response()->json(['message' => $e->getMessage()], 422);
+                }
+
                 $input['url'] = $request->input('url');
                 $input['title'] = $request->input('title', $request->input('url'));
                 break;
 
             case 'youtube':
                 $request->validate([
-                    'url' => 'required|string|max:2048',
+                    'url' => ['required', 'string', 'max:2048', 'regex:#^https?://(www\.|m\.)?(youtube\.com|youtu\.be)/#i'],
                     'title' => 'nullable|string|max:255',
                 ]);
                 $input['url'] = $request->input('url');
@@ -243,6 +261,12 @@ class RagToolController extends Controller
             abort(422, translate('Session is not ready for chat yet.'));
         }
 
+        // Enforce the tool's access level (premium / plan gating)
+        $tool = AiTool::where('slug', $session->tool_slug)->where('is_active', true)->first();
+        if ($tool) {
+            $this->toolAccess->assertCanUse($tool, Auth::user());
+        }
+
         $validated = $request->validate([
             'message' => 'required|string|max:16000',
             'mode' => 'nullable|string|in:chat,compare,summarize,kb_write',
@@ -285,7 +309,8 @@ class RagToolController extends Controller
                     }
                 }
             } catch (\Throwable $e) {
-                echo 'data: '.json_encode(['type' => 'error', 'message' => $e->getMessage()])."\n\n";
+                \Log::error('RAG chat stream failed', ['session' => $session->id, 'error' => $e->getMessage()]);
+                echo 'data: '.json_encode(['type' => 'error', 'message' => AiErrors::sanitize($e->getMessage())])."\n\n";
 
                 if (ob_get_level() > 0) {
                     ob_flush();

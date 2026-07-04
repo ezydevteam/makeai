@@ -24,13 +24,22 @@ type RecentPost = {
     user: { name: string } | null
 }
 
+interface ComparisonData {
+    label: string
+    type: 'up' | 'down' | 'neutral'
+}
+
+interface StatObject {
+    value: number
+    comparison: ComparisonData
+}
+
 const props = defineProps<{
-    total_posts: number
-    scheduled_posts: number
-    pending_approval: number
-    published_today: number
-    failed_posts: number
-    connected_accounts: number
+    total_posts: StatObject
+    scheduled_posts: StatObject
+    pending_approval: StatObject
+    published_today: StatObject
+    failed_posts: StatObject
     platform_breakdown: PlatformRow[]
     recent_posts: RecentPost[]
 }>()
@@ -69,7 +78,7 @@ const approvalBadgeClass = computed(() => (
 <template>
     <Head :title="t('Social Scheduler Overview')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -92,12 +101,12 @@ const approvalBadgeClass = computed(() => (
                     :class="approvalBadgeClass"
                 >
                     <i class="ti ti-clipboard-check text-base"></i>
-                    <template v-if="pending_approval > 0">
-                        {{ t('Approval Queue') }} ({{ pending_approval }})
-                    </template>
-                    <template v-else>
+                    <span v-if="pending_approval.value > 0">
+                        {{ t('Approval Queue') }} ({{ pending_approval.value }})
+                    </span>
+                    <span v-else>
                         {{ t('Approval Queue') }}
-                    </template>
+                    </span>
                 </Link>
 
                 <Link
@@ -110,21 +119,73 @@ const approvalBadgeClass = computed(() => (
             </div>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-            <StatsCard :title="t('Total Posts')" :value="`${total_posts}`" />
-            <StatsCard :title="t('Scheduled')" :value="`${scheduled_posts}`" />
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <StatsCard
+                :title="t('Total Posts')"
+                :value="total_posts.value"
+                :comparison="total_posts.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="total_posts.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-notes text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Scheduled')"
+                :value="scheduled_posts.value"
+                :comparison="scheduled_posts.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="scheduled_posts.comparison.type"
+                color="primary"
+            >
+                <template #icon>
+                    <i class="ti ti-calendar-event text-lg"></i>
+                </template>
+            </StatsCard>
+
             <StatsCard
                 :title="t('Pending Approval')"
-                :value="`${pending_approval}`"
-                :color="pending_approval > 0 ? 'warning' : undefined"
-            />
-            <StatsCard :title="t('Published Today')" :value="`${published_today}`" />
+                :value="pending_approval.value"
+                :comparison="pending_approval.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="pending_approval.comparison.type"
+                :color="pending_approval.value > 0 ? 'warning' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-clock text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Published Today')"
+                :value="published_today.value"
+                :comparison="published_today.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="published_today.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-circle-check text-lg"></i>
+                </template>
+            </StatsCard>
+
             <StatsCard
                 :title="t('Failed')"
-                :value="`${failed_posts}`"
-                :color="failed_posts > 0 ? 'danger' : undefined"
-            />
-            <StatsCard :title="t('Accounts')" :value="`${connected_accounts}`" />
+                :value="failed_posts.value"
+                :comparison="failed_posts.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="failed_posts.comparison.type"
+                :color="failed_posts.value > 0 ? 'danger' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-alert-triangle text-lg"></i>
+                </template>
+            </StatsCard>
+
+
         </div>
 
         <div class="mt-6 grid gap-6 lg:grid-cols-2">

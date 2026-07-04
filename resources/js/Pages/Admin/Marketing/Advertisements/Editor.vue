@@ -49,7 +49,7 @@ const submit = () => {
 <template>
     <Head :title="ad ? t('Edit Ad') : t('Create Ad')" />
 
-    <div class="mx-auto max-w-6xl px-6 py-6">
+    <div class="mx-auto max-w-6xl px-6">
         <div class="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <div>
                 <h1 class="text-xl font-semibold text-gray-900 dark:text-white">{{ ad ? t('Edit Advertisement') : t('Create Advertisement') }}</h1>

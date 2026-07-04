@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { useForm, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 import { useTranslate } from '@/Composables/useTranslate'
+import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
 
 const props = defineProps<{
     settings?: {
@@ -13,6 +14,18 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslate()
+const page = usePage()
+
+interface CaptchaConfig {
+    enabled: boolean
+    provider: 'recaptcha' | 'hcaptcha'
+    site_key: string
+}
+
+const captcha = computed<CaptchaConfig>(
+    () => (page.props as unknown as { captcha?: CaptchaConfig }).captcha
+        ?? { enabled: false, provider: 'recaptcha', site_key: '' }
+)
 
 const form = useForm({
     name: '',
@@ -20,6 +33,7 @@ const form = useForm({
     subject: '',
     message: '',
     website: '',
+    captcha_token: '',
 });
 
 const isSubmitted = ref(false);
@@ -112,8 +126,15 @@ const submit = () => {
                 <p v-if="form.errors.message" class="mt-2 text-xs font-bold text-red-500 uppercase tracking-wider">{{ form.errors.message }}</p>
             </div>
 
-            <button 
-                type="submit" 
+            <AuthCaptchaField
+                v-if="captcha.enabled"
+                v-model="form.captcha_token"
+                :config="captcha"
+                :error="form.errors.captcha_token"
+            />
+
+            <button
+                type="submit"
                 :disabled="form.processing"
                 class="w-full btn-primary py-5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-primary-600/20 disabled:opacity-50"
             >

@@ -4,7 +4,6 @@ namespace App\Http\Controllers\User;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiTool;
-use Addons\AiChatbot\Models\Conversation;
 use App\Models\CreditTransaction;
 use App\Models\Document;
 use App\Models\LoginHistory;
@@ -57,7 +56,9 @@ class DashboardController extends Controller
             'credits' => (float) $user->credits,
             'credits_used_today' => (float) $user->credits_used_today,
             'credits_used_month' => (float) $user->credits_used_month,
-            'total_conversations' => $user->conversations()->count(),
+            'total_conversations' => (is_addon_active('ai-chatbot') && \Illuminate\Support\Facades\Schema::hasTable('conversations'))
+                ? $user->conversations()->count()
+                : 0,
             'total_documents' => $user->documents()->count(),
             'total_favorites' => $user->favorites()->count(),
             'total_collections' => UserCollection::where('user_id', $user->id)->count(),
@@ -137,11 +138,15 @@ class DashboardController extends Controller
 
     private function recentConversations(User $user): array
     {
+        if (! is_addon_active('ai-chatbot') || ! \Illuminate\Support\Facades\Schema::hasTable('conversations')) {
+            return [];
+        }
+
         return $user->conversations()
             ->latest('last_message_at')
             ->take(3)
             ->get()
-            ->map(fn (Conversation $conversation) => [
+            ->map(fn ($conversation) => [
                 'id' => $conversation->id,
                 'ulid' => $conversation->ulid,
                 'title' => $conversation->title ?: translate('Untitled'),

@@ -12,10 +12,28 @@ class KbAnalyticsController extends Controller
 {
     public function index()
     {
-        $searchesToday = KbSearch::whereDate('created_at', today())->count();
-        $searches7d = KbSearch::where('created_at', '>=', now()->subDays(7))->count();
-        $answered7d = KbSearch::where('created_at', '>=', now()->subDays(7))->where('was_answered', true)->count();
-        $answerRate = $searches7d > 0 ? round(($answered7d / $searches7d) * 100) : 0;
+        $now = now();
+        $sevenDaysAgo = $now->copy()->subDays(7);
+        $fourteenDaysAgo = $now->copy()->subDays(14);
+
+        // 1. Searches Today
+        $searchesTodayCurrent = KbSearch::whereDate('created_at', today())->count();
+        $searchesTodayPrevious = KbSearch::whereDate('created_at', today()->subDays(7))->count();
+
+        // 2. Searches 7 Days
+        $searches7dCurrent = KbSearch::where('created_at', '>=', $sevenDaysAgo)->count();
+        $searches7dPrevious = KbSearch::where('created_at', '>=', $fourteenDaysAgo)->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 3. Answer Rate
+        $answered7dCurrent = KbSearch::where('created_at', '>=', $sevenDaysAgo)->where('was_answered', true)->count();
+        $answerRateCurrent = $searches7dCurrent > 0 ? (int) round(($answered7dCurrent / $searches7dCurrent) * 100) : 0;
+
+        $answered7dPrevious = KbSearch::where('created_at', '>=', $fourteenDaysAgo)->where('created_at', '<', $sevenDaysAgo)->where('was_answered', true)->count();
+        $answerRatePrevious = $searches7dPrevious > 0 ? (int) round(($answered7dPrevious / $searches7dPrevious) * 100) : 0;
+
+        // 4. Published Articles
+        $publishedCurrent = KbArticle::published()->count();
+        $publishedPrevious = KbArticle::published()->where('created_at', '<', $sevenDaysAgo)->count();
 
         $unanswered = KbSearch::where('was_answered', false)
             ->latest()
@@ -40,14 +58,51 @@ class KbAnalyticsController extends Controller
             ->toArray();
 
         return Inertia::render('Addons/public-knowledge-base/Admin/Analytics', [
-            'searches_today' => $searchesToday,
-            'searches_7d' => $searches7d,
-            'answer_rate' => $answerRate,
+            'searches_today' => [
+                'value' => $searchesTodayCurrent,
+                'comparison' => $this->calculateComparison($searchesTodayCurrent, $searchesTodayPrevious),
+            ],
+            'searches_7d' => [
+                'value' => $searches7dCurrent,
+                'comparison' => $this->calculateComparison($searches7dCurrent, $searches7dPrevious),
+            ],
+            'answer_rate' => [
+                'value' => $answerRateCurrent,
+                'comparison' => $this->calculateComparison($answerRateCurrent, $answerRatePrevious),
+            ],
+            'published_count' => [
+                'value' => $publishedCurrent,
+                'comparison' => $this->calculateComparison($publishedCurrent, $publishedPrevious),
+            ],
             'unanswered' => $unanswered,
             'top_queries' => $topQueries,
             'top_articles' => $topArticles,
             'embed_summary' => $embedSummary,
-            'published_count' => KbArticle::published()->count(),
         ]);
+    }
+
+    private function calculateComparison(float|int $current, float|int $previous): array
+    {
+        if ($previous == 0) {
+            return [
+                'label' => $current == 0 ? '0%' : '+100%',
+                'type' => $current == 0 ? 'neutral' : 'up',
+            ];
+        }
+
+        $delta = (($current - $previous) / $previous) * 100;
+        $rounded = (int) round(abs($delta));
+
+        if ($rounded === 0) {
+            return [
+                'label' => '0%',
+                'type' => 'neutral',
+            ];
+        }
+
+        return [
+            'label' => ($delta > 0 ? '+' : '-') . $rounded . '%',
+            'type' => $delta > 0 ? 'up' : 'down',
+        ];
     }
 }

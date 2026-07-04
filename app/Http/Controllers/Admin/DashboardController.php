@@ -34,7 +34,42 @@ class DashboardController extends Controller
             return $this->buildDashboardData($period);
         });
 
+        // Revenue and subscription analytics are premium (Extended License) data.
+        // The Vue page hides these sections, but the data must not ship in the
+        // Inertia payload either. Applied after the cache so a license/toggle
+        // change takes effect immediately.
+        if (! isProAvailable()) {
+            $data = $this->stripPremiumData($data);
+        }
+
         return Inertia::render('Admin/Dashboard/Index', $data);
+    }
+
+    private function stripPremiumData(array $data): array
+    {
+        $emptySeries = ['today' => [], '7d' => [], '30d' => [], '90d' => [], 'lifetime' => []];
+
+        foreach (['totalRevenue', 'revenueToday', 'revenueThisMonth', 'revenueLastMonth', 'mrr'] as $key) {
+            $data['dashboardStats'][$key] = 0.0;
+        }
+
+        foreach (['activeSubscriptions', 'trialingSubscriptions', 'pastDueSubscriptions'] as $key) {
+            $data['dashboardStats'][$key] = 0;
+        }
+
+        foreach (['revenueChart', 'subscriptionRevenueChart', 'subscriptionConversionsChart', 'subscriptionRetainedChart', 'subscriptionChurnedChart', 'revenueVsCost', 'proSubs'] as $key) {
+            $data['dashboardCharts'][$key] = $emptySeries;
+        }
+
+        foreach ($data['dashboardCharts']['cardComparisons'] ?? [] as $period => $comparison) {
+            if (isset($comparison['revenue'])) {
+                $data['dashboardCharts']['cardComparisons'][$period]['revenue'] = ['current' => 0.0, 'previous' => 0.0];
+            }
+        }
+
+        $data['recentProSubscriptions'] = [];
+
+        return $data;
     }
 
     private function buildDashboardData(string $period): array

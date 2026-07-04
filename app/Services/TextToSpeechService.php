@@ -4,50 +4,65 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\IntegrationSettings;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
 class TextToSpeechService
 {
-    private ?string $provider;
-    private ?string $apiKey;
-
-    public function __construct(?string $provider = null, ?string $apiKey = null)
-    {
-        $this->provider = $provider;
-        $this->apiKey = $apiKey;
-    }
+    /**
+     * @param  array<string, ?string>  $secrets
+     * @param  array<string, string>  $options
+     */
+    public function __construct(
+        private readonly ?string $provider = null,
+        private readonly array $secrets = [],
+        private readonly array $options = [],
+    ) {}
 
     public static function fromSettings(): self
     {
-        $provider = settings('external_text_to_speech_provider', 'elevenlabs');
-        $apiKey = settings("external_text_to_speech_{$provider}_api_key");
+        $config = IntegrationSettings::forSelectedProvider('text_to_speech', 'elevenlabs');
 
-        return new self($provider, $apiKey);
+        return new self($config['provider'], $config['secrets'], $config['options']);
     }
 
     public function isConfigured(): bool
     {
-        return filled($this->apiKey);
+        // Every declared secret for the selected provider must be present — e.g.
+        // amazon_polly needs access_key + secret_key, playht needs user_id + api_key.
+        return IntegrationSettings::allSecretsPresent($this->secrets);
     }
 
     public function testConnection(): array
     {
         if (! $this->isConfigured()) {
-            return ['success' => false, 'error' => 'No API key configured.'];
+            return ['success' => false, 'error' => 'Credentials are not fully configured.'];
         }
+
+        $apiKey = (string) ($this->secrets['api_key'] ?? '');
 
         try {
             $response = match ($this->provider) {
-                'elevenlabs' => Http::timeout(15)->withHeader('xi-api-key', $this->apiKey)->get('https://api.elevenlabs.io/v1/user'),
-                'openai_tts' => Http::timeout(15)->withToken($this->apiKey)->get('https://api.openai.com/v1/models'),
-                'murf' => Http::timeout(15)->withToken($this->apiKey)->get('https://api.murf.ai/v1/voices'),
-                'playht' => Http::timeout(15)->withToken($this->apiKey)->get('https://api.play.ht/api/v2/voices'),
-                'azure_speech' => Http::timeout(15)->withHeader('Ocp-Apim-Subscription-Key', $this->apiKey)->get('https://eastus.api.cognitive.microsoft.com/sts/v1.0/issuetoken'),
-                'google_tts' => Http::timeout(15)->get('https://texttospeech.googleapis.com/$discovery/rest'),
-                'amazon_polly' => Http::timeout(15)->get('https://polly.amazonaws.com'),
-                default => Http::timeout(15)->get('https://httpbin.org/get'),
+                'elevenlabs' => Http::timeout(15)->withHeader('xi-api-key', $apiKey)->get('https://api.elevenlabs.io/v1/user'),
+                'openai_tts' => Http::timeout(15)->withToken($apiKey)->get('https://api.openai.com/v1/models'),
+                'murf' => Http::timeout(15)->withHeader('api-key', $apiKey)->get('https://api.murf.ai/v1/voices'),
+                'playht' => Http::timeout(15)
+                    ->withHeader('X-User-ID', (string) ($this->secrets['user_id'] ?? ''))
+                    ->withHeader('Authorization', 'Bearer '.$apiKey)
+                    ->get('https://api.play.ht/api/v2/voices'),
+                'azure_speech' => Http::timeout(15)
+                    ->withHeader('Ocp-Apim-Subscription-Key', $apiKey)
+                    ->post('https://'.($this->options['region'] ?: 'eastus').'.api.cognitive.microsoft.com/sts/v1.0/issueToken'),
+                // AWS SigV4 (Polly) and Google service-account JWT (Google TTS) can't
+                // be validated with a plain request — confirm credentials are present.
+                'amazon_polly', 'google_tts' => null,
+                default => null,
             };
+
+            if ($response === null) {
+                return ['success' => true, 'message' => "{$this->provider} credentials saved (no live check available for this provider)."];
+            }
 
             return ['success' => $response->successful(), 'message' => "{$this->provider} API reachable."];
         } catch (Throwable $e) {

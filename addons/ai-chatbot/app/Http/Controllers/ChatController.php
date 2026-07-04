@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Addons\AiChatbot\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use Addons\AiChatbot\Models\ChatbotProduct;
+use Addons\AiChatbot\Models\ChatbotMode;
 use Addons\AiChatbot\Models\Conversation;
 use App\Services\AI\AiService;
 use App\Services\AI\ProviderRegistry;
@@ -26,11 +26,10 @@ class ChatController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $query = $user->conversations()->orderByDesc('is_pinned')->latest('last_message_at');
+        $query = $this->getConversationsQuery()->orderByDesc('is_pinned')->latest('last_message_at');
 
-        $unlimited = $this->getPlanSetting('unlimited_history', false);
-        $limit = $unlimited ? 1000 : (int) $this->getPlanSetting('max_chat_history', 50);
+        $historyLimit = (int) $this->getPlanSetting('max_chat_history', 50);
+        $limit = ($historyLimit <= 0) ? 1000 : $historyLimit;
         $query->limit($limit);
 
         if ($request->filled('project_id')) {
@@ -54,13 +53,15 @@ class ChatController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'product_slug' => 'nullable|string|exists:chatbot_products,slug',
+            'mode_slug' => 'nullable|string|exists:chatbot_modes,slug',
             'model' => 'nullable|string|max:150',
             'project_id' => 'nullable|integer|exists:chat_projects,id',
         ]);
 
-        $conversation = $user->conversations()->create([
-            'product_slug' => $validated['product_slug'] ?? null,
+        $conversation = Conversation::create([
+            'user_id' => $user?->id,
+            'session_id' => $user ? null : session()->getId(),
+            'mode_slug' => $validated['mode_slug'] ?? null,
             'project_id' => $validated['project_id'] ?? null,
             'model' => $validated['model'] ?? null,
             'last_message_at' => now(),
@@ -74,9 +75,7 @@ class ChatController extends Controller
 
     public function show(Request $request, string $ulid): JsonResponse
     {
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $perPage = 30;
         $beforeId = $request->input('before');
@@ -111,9 +110,7 @@ class ChatController extends Controller
 
     public function update(Request $request, string $ulid): JsonResponse
     {
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
@@ -131,9 +128,7 @@ class ChatController extends Controller
 
     public function destroy(string $ulid): JsonResponse
     {
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $conversation->delete();
 
@@ -145,9 +140,7 @@ class ChatController extends Controller
 
     public function togglePin(string $ulid): JsonResponse
     {
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $conversation->update(['is_pinned' => !$conversation->is_pinned]);
 
@@ -159,9 +152,7 @@ class ChatController extends Controller
 
     public function share(string $ulid): JsonResponse
     {
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         if (!$conversation->share_token) {
             $conversation->update(['share_token' => (string) \Illuminate\Support\Str::ulid()]);
@@ -178,9 +169,7 @@ class ChatController extends Controller
 
     public function unshare(string $ulid): JsonResponse
     {
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $conversation->update(['share_token' => null]);
 
@@ -209,9 +198,7 @@ class ChatController extends Controller
     public function branch(Request $request, string $ulid): JsonResponse
     {
         $user = Auth::user();
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $validated = $request->validate([
             'message_id' => 'required|integer|exists:conversation_messages,id',
@@ -223,8 +210,10 @@ class ChatController extends Controller
         }
 
         // Create new conversation branched from this point
-        $newConversation = $user->conversations()->create([
-            'product_slug' => $conversation->product_slug,
+        $newConversation = Conversation::create([
+            'user_id' => $user?->id,
+            'session_id' => $user ? null : session()->getId(),
+            'mode_slug' => $conversation->mode_slug,
             'project_id' => $conversation->project_id,
             'model' => $conversation->model,
             'title' => ($conversation->title ?: 'Chat') . ' (branch)',
@@ -305,10 +294,7 @@ class ChatController extends Controller
 
     public function export(Request $request, string $ulid): \Symfony\Component\HttpFoundation\Response
     {
-        $user = Auth::user();
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
 
         $format = $request->input('format', 'md');
         $messages = $conversation->messages()->orderBy('created_at')->get();
@@ -422,15 +408,19 @@ class ChatController extends Controller
 
         $instructions = $request->input('chat_custom_instructions') ?? $request->input('custom_instructions');
 
-        $user->update([
-            'chat_custom_instructions' => $instructions,
-        ]);
+        if ($user) {
+            $user->update([
+                'chat_custom_instructions' => $instructions,
+            ]);
+        } else {
+            session(['chat_custom_instructions' => $instructions]);
+        }
 
         return response()->json([
             'success' => true,
             'message' => translate('Settings updated successfully.'),
             'data' => [
-                'chat_custom_instructions' => $user->chat_custom_instructions,
+                'chat_custom_instructions' => $user ? $user->chat_custom_instructions : session('chat_custom_instructions'),
             ],
         ]);
     }
@@ -438,15 +428,37 @@ class ChatController extends Controller
     public function sendMessage(Request $request, string $ulid): StreamedResponse
     {
         $user = Auth::user();
-        $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+        $conversation = $this->getConversationsQuery()->where('ulid', $ulid)->firstOrFail();
+
+        // 0. Enforce guest max messages limit if not authenticated
+        if (!$user) {
+            $maxGuestMessages = (int) addon_setting('ai-chatbot', 'guest_max_messages', 10);
+            $count = \Addons\AiChatbot\Models\ConversationMessage::where('role', 'user')
+                ->whereHas('conversation', fn($q) => $q->whereNull('user_id')->where('session_id', session()->getId()))
+                ->count();
+            if ($count >= $maxGuestMessages) {
+                return response()->stream(function () use ($maxGuestMessages) {
+                    echo 'data: '.json_encode(['type' => 'error', 'message' => "You have reached the guest limit of {$maxGuestMessages} messages. Please sign in to continue."])."\n\n";
+                    echo 'data: '.json_encode(['type' => 'done'])."\n\n";
+                }, 200, [
+                    'Content-Type' => 'text/event-stream',
+                    'X-Accel-Buffering' => 'no',
+                    'Cache-Control' => 'no-cache',
+                ]);
+            }
+        }
 
         // 1. Enforce 5-hour limit
         $limit5h = (int) $this->getPlanSetting('max_messages_5h', 0);
         if ($limit5h > 0) {
             $count = \Addons\AiChatbot\Models\ConversationMessage::where('role', 'user')
-                ->whereHas('conversation', fn($q) => $q->where('user_id', $user->id))
+                ->whereHas('conversation', function($q) use ($user) {
+                    if ($user) {
+                        $q->where('user_id', $user->id);
+                    } else {
+                        $q->whereNull('user_id')->where('session_id', session()->getId());
+                    }
+                })
                 ->where('created_at', '>=', now()->subHours(5))
                 ->count();
             if ($count >= $limit5h) {
@@ -465,7 +477,13 @@ class ChatController extends Controller
         $limitWeekly = (int) $this->getPlanSetting('max_messages_weekly', 0);
         if ($limitWeekly > 0) {
             $count = \Addons\AiChatbot\Models\ConversationMessage::where('role', 'user')
-                ->whereHas('conversation', fn($q) => $q->where('user_id', $user->id))
+                ->whereHas('conversation', function($q) use ($user) {
+                    if ($user) {
+                        $q->where('user_id', $user->id);
+                    } else {
+                        $q->whereNull('user_id')->where('session_id', session()->getId());
+                    }
+                })
                 ->where('created_at', '>=', now()->subDays(7))
                 ->count();
             if ($count >= $limitWeekly) {
@@ -484,7 +502,13 @@ class ChatController extends Controller
         $limitMonthly = (int) $this->getPlanSetting('max_messages_monthly', 0);
         if ($limitMonthly > 0) {
             $count = \Addons\AiChatbot\Models\ConversationMessage::where('role', 'user')
-                ->whereHas('conversation', fn($q) => $q->where('user_id', $user->id))
+                ->whereHas('conversation', function($q) use ($user) {
+                    if ($user) {
+                        $q->where('user_id', $user->id);
+                    } else {
+                        $q->whereNull('user_id')->where('session_id', session()->getId());
+                    }
+                })
                 ->where('created_at', '>=', now()->subDays(30))
                 ->count();
             if ($count >= $limitMonthly) {
@@ -501,7 +525,7 @@ class ChatController extends Controller
 
         // 4. Enforce custom credits per message balance check
         $creditsPerMessage = $this->getPlanSetting('credits_per_message', null);
-        if ($creditsPerMessage !== null && $creditsPerMessage !== '') {
+        if ($user && $creditsPerMessage !== null && $creditsPerMessage !== '') {
             $requiredCredits = (float) $creditsPerMessage;
             if ($user->credits < $requiredCredits) {
                 return response()->stream(function () use ($requiredCredits, $user) {
@@ -517,7 +541,7 @@ class ChatController extends Controller
 
         $validated = $request->validate([
             'content' => 'required|string|max:16000',
-            'product_slug' => 'nullable|string|exists:chatbot_products,slug',
+            'mode_slug' => 'nullable|string|exists:chatbot_modes,slug',
             'model' => 'nullable|string|max:150',
             'attachments' => 'nullable|array|max:5',
             'attachments.*.id' => 'required|string|max:26',
@@ -530,14 +554,59 @@ class ChatController extends Controller
             'use_knowledge_base' => 'nullable|boolean',
         ]);
 
-        $product = null;
-        if ($validated['product_slug'] ?? null) {
-            $product = ChatbotProduct::where('slug', $validated['product_slug'])->active()->first();
-        } elseif ($conversation->product_slug) {
-            $product = ChatbotProduct::where('slug', $conversation->product_slug)->active()->first();
+        // Security: `storage_path` is client-supplied. Ensure every attachment
+        // points inside THIS caller's own upload directory — otherwise a crafted
+        // message could reference another user's file (or traverse the disk) and
+        // have preview() serve it back. See ChatAttachmentController::preview().
+        if (! empty($validated['attachments'])) {
+            $ownerDir = 'chat-attachments/' . ($user ? (string) $user->id : 'guest_' . session()->getId()) . '/';
+            foreach ($validated['attachments'] as $attachment) {
+                $storagePath = $attachment['storage_path'] ?? '';
+                if (! str_starts_with($storagePath, $ownerDir) || str_contains($storagePath, '..')) {
+                    abort(403, 'Invalid attachment reference.');
+                }
+            }
         }
 
-        $model = $validated['model'] ?? $conversation->model ?? $product?->default_model ?? 'gpt-4o-mini';
+        $mode = null;
+        if ($validated['mode_slug'] ?? null) {
+            $mode = ChatbotMode::where('slug', $validated['mode_slug'])->active()->first();
+        } elseif ($conversation->mode_slug) {
+            $mode = ChatbotMode::where('slug', $conversation->mode_slug)->active()->first();
+        }
+
+        // Resolve default model for the active mode
+        $modeDefaultModel = null;
+        if ($mode) {
+            $modeDefaultModels = addon_setting('ai-chatbot', 'mode_default_models', []);
+            if (is_array($modeDefaultModels)) {
+                $modeDefaultModel = $modeDefaultModels[$mode->slug] ?? null;
+            }
+            if (empty($modeDefaultModel)) {
+                $modeDefaultModel = $mode->default_model;
+            }
+        }
+
+        $globalDefaultModel = addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini');
+        $model = $validated['model'] ?? $conversation->model ?? $modeDefaultModel ?? $globalDefaultModel ?? 'gpt-4o-mini';
+
+        $systemPrompt = $mode?->system_prompt ?? null;
+
+        // Handle custom models if enabled
+        if ((bool) addon_setting('ai-chatbot', 'show_custom_models', false)) {
+            $customModels = addon_setting('ai-chatbot', 'custom_models', []);
+            if (is_array($customModels)) {
+                foreach ($customModels as $customModel) {
+                    if (isset($customModel['id']) && $customModel['id'] === $model) {
+                        if (!empty($customModel['system_prompt'])) {
+                            $systemPrompt = (!empty($systemPrompt) ? $systemPrompt . "\n\n" : '') . $customModel['system_prompt'];
+                        }
+                        $model = $customModel['model'] ?? 'gpt-4o-mini';
+                        break;
+                    }
+                }
+            }
+        }
 
         // Validate model exists and is active
         $aiModel = \App\Models\AiModel::where('slug', $model)->where('is_active', true)->first();
@@ -551,11 +620,10 @@ class ChatController extends Controller
             ]);
         }
 
-        $systemPrompt = $product?->system_prompt ?? null;
-
         // Inject user's custom instructions if they exist
-        if ($user->chat_custom_instructions) {
-            $customInstructions = "\n\nUser's Custom Instructions:\n" . $user->chat_custom_instructions;
+        $instructions = $user ? $user->chat_custom_instructions : session('chat_custom_instructions');
+        if ($instructions) {
+            $customInstructions = "\n\nUser's Custom Instructions:\n" . $instructions;
             $systemPrompt = ($systemPrompt ?? '') . $customInstructions;
         }
 
@@ -576,10 +644,10 @@ class ChatController extends Controller
             }
         }
 
-        $productSwitch = null;
-        if ($product && $conversation->product_slug !== $product->slug) {
-            $productSwitch = $product->slug;
-            $conversation->update(['product_slug' => $product->slug]);
+        $modeSwitch = null;
+        if ($mode && $conversation->mode_slug !== $mode->slug) {
+            $modeSwitch = $mode->slug;
+            $conversation->update(['mode_slug' => $mode->slug]);
         }
 
         $attachments = $validated['attachments'] ?? null;
@@ -588,7 +656,7 @@ class ChatController extends Controller
             'role' => 'user',
             'content' => $validated['content'],
             'model' => $model,
-            'product_switch' => $productSwitch,
+            'mode_switch' => $modeSwitch,
             'attachments' => $attachments,
         ]);
 
@@ -747,7 +815,7 @@ class ChatController extends Controller
                 $outputTokens = $this->estimateTokens([['role' => 'assistant', 'content' => $fullContent]]);
 
                 $creditsPerMessage = $this->getPlanSetting('credits_per_message', null);
-                if ($creditsPerMessage !== null && $creditsPerMessage !== '') {
+                if ($user && $creditsPerMessage !== null && $creditsPerMessage !== '') {
                     $credits = (float) $creditsPerMessage;
                     if ($success) {
                         $user->deductCredits($credits, "AI Chatbot message: {$model}", [
@@ -787,7 +855,7 @@ class ChatController extends Controller
                         $provider,
                         'chat',
                         ['conversation_ulid' => $conversation->ulid],
-                        true,
+                        $user ? true : false, // don't charge if guest, but log
                         $success,
                         $responseTime
                     );
@@ -903,28 +971,29 @@ class ChatController extends Controller
     private function getPlanSetting(string $key, $default = null)
     {
         $user = Auth::user();
-        $plan = $user?->plan;
 
-        if ($plan && !$plan->is_free) {
-            $planKey = "plan_{$plan->slug}_{$key}";
-            $val = addon_setting('ai-chatbot', $planKey);
-            if ($val !== null && $val !== '') {
-                if ($val === 'true' || $val === '1') return true;
-                if ($val === 'false' || $val === '0') return false;
-                return $val;
-            }
-            
-            // Fallback to legacy pro setting
-            $legacyKey = "pro_{$key}";
-            $legacyVal = addon_setting('ai-chatbot', $legacyKey);
-            if ($legacyVal !== null && $legacyVal !== '') {
-                if ($legacyVal === 'true' || $legacyVal === '1') return true;
-                if ($legacyVal === 'false' || $legacyVal === '0') return false;
-                return $legacyVal;
+        if ($user) {
+            $plan = $user->plan;
+            if ($plan && !$plan->is_free) {
+                $planKey = "plan_{$plan->slug}_{$key}";
+                $val = addon_setting('ai-chatbot', $planKey);
+                if ($val !== null && $val !== '') {
+                    if ($val === 'true' || $val === '1') return true;
+                    if ($val === 'false' || $val === '0') return false;
+                    return $val;
+                }
+            } else {
+                $freeKey = "free_{$key}";
+                $val = addon_setting('ai-chatbot', $freeKey);
+                if ($val !== null && $val !== '') {
+                    if ($val === 'true' || $val === '1') return true;
+                    if ($val === 'false' || $val === '0') return false;
+                    return $val;
+                }
             }
         } else {
-            $freeKey = "free_{$key}";
-            $val = addon_setting('ai-chatbot', $freeKey);
+            $guestKey = "guest_{$key}";
+            $val = addon_setting('ai-chatbot', $guestKey);
             if ($val !== null && $val !== '') {
                 if ($val === 'true' || $val === '1') return true;
                 if ($val === 'false' || $val === '0') return false;
@@ -933,5 +1002,16 @@ class ChatController extends Controller
         }
 
         return $default;
+    }
+
+    private function getConversationsQuery()
+    {
+        $user = Auth::user();
+        if ($user) {
+            return $user->conversations();
+        }
+
+        return \Addons\AiChatbot\Models\Conversation::whereNull('user_id')
+            ->where('session_id', session()->getId());
     }
 }

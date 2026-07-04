@@ -36,14 +36,91 @@ class UserManagementController extends Controller
             $query->where('plan_id', $request->plan);
         }
 
+        // Search Filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('ulid', 'like', "%{$search}%")
+                  ->orWhere('profession', 'like', "%{$search}%")
+                  ->orWhere('country', 'like', "%{$search}%");
+            });
+        }
+
         $users = $query->latest()->paginate(20)->withQueryString();
+
+        $now = now();
+        $sevenDaysAgo = $now->copy()->subDays(7);
+        $fourteenDaysAgo = $now->copy()->subDays(14);
+
+        // 1. Total Users
+        $totalUsersCurrent = User::count();
+        $totalUsersPrevious = User::where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 2. New Users (Last 7 Days)
+        $newUsersCurrent = User::where('created_at', '>=', $sevenDaysAgo)->count();
+        $newUsersPrevious = User::whereBetween('created_at', [$fourteenDaysAgo, $sevenDaysAgo])->count();
+
+        // 3. Active Users
+        $activeUsersCurrent = User::where('is_active', true)->where('is_banned', false)->count();
+        $activeUsersPrevious = User::where('is_active', true)->where('is_banned', false)->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 4. Banned Users
+        $bannedUsersCurrent = User::where('is_banned', true)->count();
+        $bannedUsersPrevious = User::where('is_banned', true)->where('created_at', '<', $sevenDaysAgo)->count();
+
+        $stats = [
+            'total_users' => [
+                'value' => $totalUsersCurrent,
+                'comparison' => $this->calculateComparison($totalUsersCurrent, $totalUsersPrevious),
+            ],
+            'new_users' => [
+                'value' => $newUsersCurrent,
+                'comparison' => $this->calculateComparison($newUsersCurrent, $newUsersPrevious),
+            ],
+            'active_users' => [
+                'value' => $activeUsersCurrent,
+                'comparison' => $this->calculateComparison($activeUsersCurrent, $activeUsersPrevious),
+            ],
+            'banned_users' => [
+                'value' => $bannedUsersCurrent,
+                'comparison' => $this->calculateComparison($bannedUsersCurrent, $bannedUsersPrevious),
+            ],
+        ];
 
         return Inertia::render('Admin/Roles/Users/Index', [
             'users' => $users,
-            'filters' => $request->only(['status', 'plan']),
+            'filters' => $request->only(['status', 'plan', 'search']),
             'plans' => Plan::active()->get(['id', 'name']),
             'hasTrashedUsers' => User::onlyTrashed()->exists(),
+            'stats' => $stats,
         ]);
+    }
+
+    private function calculateComparison(int $current, int $previous): array
+    {
+        if ($previous === 0) {
+            return [
+                'label' => $current === 0 ? '0%' : '+100%',
+                'type' => $current === 0 ? 'neutral' : 'up',
+            ];
+        }
+
+        $delta = (($current - $previous) / $previous) * 100;
+        $rounded = (int) round(abs($delta));
+
+        if ($rounded === 0) {
+            return [
+                'label' => '0%',
+                'type' => 'neutral',
+            ];
+        }
+
+        return [
+            'label' => ($delta > 0 ? '+' : '-') . $rounded . '%',
+            'type' => $delta > 0 ? 'up' : 'down',
+        ];
     }
 
     /**
@@ -61,6 +138,18 @@ class UserManagementController extends Controller
             $query->where('plan_id', $request->plan);
         }
 
+        // Search Filter
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('ulid', 'like', "%{$search}%")
+                  ->orWhere('profession', 'like', "%{$search}%")
+                  ->orWhere('country', 'like', "%{$search}%");
+            });
+        }
+
         $users = $query
             ->latest('deleted_at')
             ->paginate(20)
@@ -68,7 +157,7 @@ class UserManagementController extends Controller
 
         return Inertia::render('Admin/Roles/Users/Trash', [
             'users' => $users,
-            'filters' => $request->only(['status', 'plan']),
+            'filters' => $request->only(['status', 'plan', 'search']),
             'plans' => Plan::active()->get(['id', 'name']),
         ]);
     }
@@ -80,6 +169,10 @@ class UserManagementController extends Controller
     {
         return Inertia::render('Admin/Roles/Users/Create', [
             'plans' => Plan::active()->get(['id', 'name']),
+            'countries' => collect(\App\Support\CountryCatalog::countries(app()->getLocale()))->map(fn($c) => [
+                'value' => $c['code'],
+                'label' => $c['name']
+            ])->values()->all(),
         ]);
     }
 
@@ -97,6 +190,8 @@ class UserManagementController extends Controller
             'credits' => $validated['credits'],
             'plan_id' => $validated['plan_id'] ?? null,
             'is_active' => $validated['is_active'],
+            'country' => $validated['country'] ?? null,
+            'profession' => $validated['profession'] ?? null,
             'email_verified_at' => now(),
         ]);
 
@@ -113,6 +208,10 @@ class UserManagementController extends Controller
         return Inertia::render('Admin/Roles/Users/Show', [
             'user' => $user->load(['plan', 'loginHistory' => fn($q) => $q->latest()->limit(5)]),
             'plans' => Plan::active()->get(['id', 'name']),
+            'countries' => collect(\App\Support\CountryCatalog::countries(app()->getLocale()))->map(fn($c) => [
+                'value' => $c['code'],
+                'label' => $c['name']
+            ])->values()->all(),
             'usageHistory' => AiUsageLog::query()
                 ->where('user_id', $user->id)
                 ->latest()
@@ -142,10 +241,12 @@ class UserManagementController extends Controller
             'credits' => 'required|numeric|min:0',
             'plan_id' => 'nullable|exists:plans,id',
             'is_active' => 'required|boolean',
+            'country' => 'nullable|string|size:2',
+            'profession' => 'nullable|string|max:150',
             'password' => 'nullable|min:8|confirmed',
         ]);
 
-        $data = $request->only(['name', 'email', 'credits', 'plan_id', 'is_active']);
+        $data = $request->only(['name', 'email', 'credits', 'plan_id', 'is_active', 'country', 'profession']);
 
         if ($request->filled('password')) {
             // Check password history (prevent reuse of last 3 passwords)
@@ -271,8 +372,9 @@ class UserManagementController extends Controller
     {
         $request->validate([
             'ids' => 'required|array',
+            'ids.*' => 'integer',
             'action' => 'required|string|in:activate,deactivate,add_credits,delete',
-            'value' => 'nullable',
+            'value' => 'nullable|numeric|min:0|required_if:action,add_credits',
         ]);
 
         $users = User::whereIn('id', $request->ids);
@@ -308,6 +410,11 @@ class UserManagementController extends Controller
             'action' => 'required|string|in:restore,force_delete',
         ]);
 
+        // Permanent deletion is irreversible — Super Admins only.
+        if ($request->action === 'force_delete' && ! auth('admin')->user()->isSuperAdmin()) {
+            abort(403, translate('This action is restricted to Super Admins.'));
+        }
+
         $query = User::onlyTrashed()->whereIn('id', $request->ids);
 
         if ($request->action === 'restore') {
@@ -326,6 +433,10 @@ class UserManagementController extends Controller
      */
     public function impersonate(User $user)
     {
+        if (! $user->is_active || $user->is_banned) {
+            return back()->with('error', translate('You cannot impersonate a deactivated or banned user.'));
+        }
+
         // Save current admin ID in session
         session(['admin_impersonator_id' => Auth::guard('admin')->id()]);
 
@@ -366,7 +477,6 @@ class UserManagementController extends Controller
     public function export()
     {
         $fileName = 'users_' . date('Y-m-d_H-i-s') . '.csv';
-        $users = User::all();
 
         $headers = [
             'Content-type' => 'text/csv',
@@ -386,11 +496,12 @@ class UserManagementController extends Controller
             translate('Joined At'),
         ];
 
-        $callback = function () use ($users, $columns) {
+        $callback = function () use ($columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
-            foreach ($users as $user) {
+            // Stream in chunks so exporting a large user base never exhausts memory.
+            User::query()->with('plan')->orderBy('id')->lazy(500)->each(function (User $user) use ($file) {
                 fputcsv($file, [
                     $user->ulid,
                     $user->name,
@@ -400,11 +511,21 @@ class UserManagementController extends Controller
                     $user->is_active ? translate('Active') : translate('Inactive'),
                     $user->created_at->format('Y-m-d H:i:s'),
                 ]);
-            }
+            });
 
             fclose($file);
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Toggle the active status of a user.
+     */
+    public function toggleStatus(User $user)
+    {
+        $user->update(['is_active' => !$user->is_active]);
+        $statusText = $user->is_active ? translate('User account activated successfully.') : translate('User account deactivated successfully.');
+        return back()->with('success', $statusText);
     }
 }

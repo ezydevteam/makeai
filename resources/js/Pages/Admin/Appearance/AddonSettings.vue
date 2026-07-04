@@ -332,7 +332,7 @@ const save = () => form.post(route('admin.addons.settings.save', { slug: props.a
                 <div
                     v-if="stackedSettings(group).length && (group.key !== 'guests' || guestAccessEnabled(group))"
                     class="grid grid-cols-1 gap-5"
-                    :class="group.key.startsWith('plan_') ? 'md:grid-cols-2 xl:grid-cols-3' : 'md:grid-cols-2'"
+                    :class="group.key.startsWith('plan_') || group.key === 'guests' ? 'md:grid-cols-2 xl:grid-cols-3' : 'md:grid-cols-2'"
                 >
                     <div
                         v-for="setting in stackedSettings(group)"

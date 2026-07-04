@@ -5,7 +5,6 @@ import Layout from '@/Layouts/AppLayout.vue'
 import { sectionComponentMap } from '@/Components/Home'
 import { useTranslate } from '@/Composables/useTranslate'
 
-type SectionConfigValue = string | number | boolean | string[] | Record<string, string | number | boolean>[]
 type SectionType = 'hero' | 'features' | 'tools_showcase' | 'how_it_works' | 'pricing' | 'testimonials' | 'faq' | 'stats_bar' | 'cta_banner' | 'latest_posts' | 'newsletter' | 'custom_html' | 'all_tools' | 'richtext' | 'image_carousel' | 'ad_slot' | 'ad_slot_2' | 'ad_slot_3' | 'announcement'
 
 interface Testimonial { id: number; name: string; role: string | null; company: string | null; avatar: string | null; content: string; rating: number; is_featured: boolean; source: string }
@@ -16,6 +15,7 @@ interface BlogPostPreview { title: string; slug: string; published_at: string | 
 interface PricingCycle { amount: number; subtotal_amount: number; original_amount: number | null; formatted: string; subtotal_formatted: string; original_formatted: string | null; vat_percentage: number; vat_formatted: string; uses_default: boolean; is_trial: boolean; trial_days: number | null }
 interface PricingPlan { id: number; name: string; slug: string; description: string; bottom_info_text: string | null; credits: number | string; features: string[] | string; is_featured: boolean; is_free: boolean; pricing: Record<string, PricingCycle> }
 interface PricingSettings { pricing_show_monthly: boolean; pricing_show_yearly: boolean; pricing_show_lifetime: boolean; pricing_currency_code: string; pricing_trial_button_text: string; pricing_featured_label_text: string; pricing_checkout_button_text: string }
+type SectionConfigValue = string | number | boolean | null | unknown
 interface HomepageSection { id: string; type: SectionType; enabled: boolean; core: boolean; config: Record<string, SectionConfigValue> }
 interface HomepageConfig { sections: HomepageSection[]; settings: { seo: { meta_title: string; meta_description: string; og_image: string }; scroll_to_top: { enabled: boolean; position: 'left' | 'right'; show_after_px: number }; chat_widget_embed: string } }
 

@@ -105,7 +105,7 @@ class AdminRole extends Model
                 'dashboard.view', 'dashboard.analytics',
                 'users.view', 'users.create', 'users.edit', 'users.credits', 'users.manage',
                 'settings.manage', 'settings.general', 'settings.ai', 'settings.payment', 'settings.mail', 'settings.gdpr',
-                'ai.tools', 'ai.templates', 'ai.models', 'ai.providers', 'ai.logs',
+                'ai.tools', 'ai.models', 'ai.providers', 'ai.logs',
                 'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
                 'plans.view', 'plans.create', 'plans.edit',
                 'payments.view', 'payments.gateways',
@@ -121,7 +121,7 @@ class AdminRole extends Model
             ],
             'content-manager' => [
                 'dashboard.view',
-                'ai.tools', 'ai.templates',
+                'ai.tools',
                 'content.pages', 'content.blog', 'content.comments', 'content.faq', 'content.testimonials',
                 'translations.view', 'translations.edit',
             ],

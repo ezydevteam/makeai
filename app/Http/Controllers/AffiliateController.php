@@ -8,11 +8,13 @@ use App\Models\AffiliateCommission;
 use App\Models\AffiliatePayout;
 use App\Models\AffiliateReferral;
 use App\Models\Page;
+use App\Models\User;
 use App\Services\AffiliateService;
 use App\Services\NotificationEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,6 +46,7 @@ class AffiliateController extends Controller
                 'commission_type' => $program->commission_type,
                 'commission_value' => (float) $program->commission_value,
                 'min_payout' => (float) $program->min_payout,
+                'max_payout' => (float) ($program->max_payout ?? 0),
                 'payouts_enabled' => (bool) $program->payouts_enabled,
                 'payout_methods' => $program->payout_methods ?: ['paypal', 'bank_transfer', 'credits'],
                 'commission_hold_days' => (int) $program->commission_hold_days,
@@ -120,30 +123,44 @@ class AffiliateController extends Controller
 
     public function storePayout(AffiliatePayoutRequest $request): RedirectResponse|JsonResponse
     {
-        abort_unless((bool) $this->affiliate->program()->payouts_enabled, 404);
+        $program = $this->affiliate->program();
+        abort_unless((bool) $program->payouts_enabled, 404);
 
         $user = $request->user();
-        $available = $this->affiliate->availableBalance($user);
+        abort_unless(! $user->is_banned && ! $user->affiliate_banned, 403);
+
         $amount = (float) $request->validated('amount');
+        $maxPayout = (float) ($program->max_payout ?? 0);
 
-        if ($amount > $available) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'success' => false,
-                    'code' => 'PAYOUT_AMOUNT_EXCEEDS_BALANCE',
-                    'message' => translate('Requested amount exceeds available balance.'),
-                ], 422);
-            }
-
-            return back()->withErrors(['amount' => translate('Requested amount exceeds available balance.')]);
+        if ($maxPayout > 0 && $amount > $maxPayout) {
+            return $this->payoutError($request, 'PAYOUT_AMOUNT_EXCEEDS_MAX', translate('Amount exceeds the maximum payout limit.'), 'amount');
         }
 
-        $payout = AffiliatePayout::create([
-            'user_id' => $user->id,
-            'amount' => $amount,
-            'method' => $request->validated('method'),
-            'payout_details' => $request->validated('details'),
-        ]);
+        // Atomic balance check + payout creation: lock the user row so two
+        // concurrent requests cannot both read the same balance and overdraw.
+        $exceedsBalance = false;
+        $payout = DB::transaction(function () use ($user, $amount, $request, &$exceedsBalance) {
+            $locked = User::lockForUpdate()->find($user->id);
+            $available = $this->affiliate->availableBalance($locked);
+
+            if ($amount > $available) {
+                $exceedsBalance = true;
+
+                return null;
+            }
+
+            return AffiliatePayout::create([
+                'user_id' => $user->id,
+                'amount' => $amount,
+                'method' => $request->validated('method'),
+                'payout_details' => $request->validated('details'),
+                'status' => 'pending',
+            ]);
+        });
+
+        if ($exceedsBalance || ! $payout) {
+            return $this->payoutError($request, 'PAYOUT_AMOUNT_EXCEEDS_BALANCE', translate('Requested amount exceeds available balance.'), 'amount');
+        }
 
         app(NotificationEventService::class)->payoutRequested($payout);
 
@@ -156,6 +173,19 @@ class AffiliateController extends Controller
         }
 
         return back()->with('success', translate('Payout request submitted successfully.'));
+    }
+
+    protected function payoutError(Request $request, string $code, string $message, string $field): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => false,
+                'code' => $code,
+                'message' => $message,
+            ], 422);
+        }
+
+        return back()->withErrors([$field => $message]);
     }
 
     public function updateAlias(AffiliateAliasRequest $request): RedirectResponse
@@ -214,10 +244,19 @@ class AffiliateController extends Controller
 
         return [
             'success' => true,
-            'data' => AffiliatePayout::query()
+            'data' => tap(AffiliatePayout::query()
                 ->where('user_id', $request->user()->id)
                 ->latest()
-                ->paginate(20),
+                ->paginate(20), function ($paginator) {
+                    $paginator->getCollection()->transform(fn (AffiliatePayout $payout) => [
+                        'id' => $payout->id,
+                        'amount' => format_currency((float) $payout->amount),
+                        'method' => $payout->method,
+                        'status' => $payout->status,
+                        'created_at' => $payout->created_at?->toIso8601String(),
+                        'processed_at' => $payout->processed_at?->toIso8601String(),
+                    ]);
+                }),
             'message' => translate('Done'),
         ];
     }

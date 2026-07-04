@@ -4,9 +4,11 @@ namespace App\Http\Controllers\AI;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\RecordGenerationHistoryJob;
+use App\Models\AiModel;
 use App\Models\AiTool;
 use App\Models\Document;
 use App\Models\User;
+use App\Services\AI\AiErrors;
 use App\Services\AI\PromptBuilder;
 use App\Services\AI\ProviderRegistry;
 use App\Services\AI\TokenGuard;
@@ -15,6 +17,7 @@ use App\Services\NotificationEventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -42,9 +45,13 @@ class GenerateController extends Controller
     {
         $validated = $request->validate([
             'slug' => 'required|string|max:100',
-            'fields' => 'required|array',
+            'fields' => 'required|array|max:50',
             'model' => 'nullable|string|max:100',
+            'refine_content' => 'nullable|string|max:30000',
+            'refine_instruction' => 'nullable|string|max:2000',
         ]);
+
+        $this->assertFieldsWithinLimits($validated['fields']);
 
         $user = $this->currentUser();
         $template = AiTool::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
@@ -55,7 +62,11 @@ class GenerateController extends Controller
         // Build prompt
         $fields = $validated['fields'];
         if (! empty($validated['model'])) {
+            $this->assertModelAllowed($validated['model']);
             $fields['model'] = $validated['model'];
+        } else {
+            // Never trust a model smuggled through the fields array
+            unset($fields['model']);
         }
 
         $refineContent = $request->input('refine_content') ?? data_get($fields, 'refine_content');
@@ -88,7 +99,7 @@ class GenerateController extends Controller
             ? ProviderRegistry::resolveWithKey($completion->provider ?? 'openai', $completion->apiKey)
             : ProviderRegistry::resolve($completion->provider ?? 'openai');
 
-        $isGuestPublic = ! $user && $template->getEffectiveAccessLevel() === 'public';
+        $isGuestPublic = ! $user && $template->getEffectiveAccessLevel() === 'guest';
         $publicMaxChars = (int) settings('public_tool_max_output_chars', 1200);
 
         return response()->stream(function () use ($completion, $provider, $user, $template, $fields, $isGuestPublic, $publicMaxChars) {
@@ -183,6 +194,8 @@ class GenerateController extends Controller
                 }
 
                 if (! $completed && $usageStats) {
+                    // Client aborted mid-stream: the provider still generated
+                    // (and billed us for) these tokens, so charge them too.
                     TokenGuard::after(
                         $user,
                         $usageStats['input_tokens'] ?? 0,
@@ -190,8 +203,8 @@ class GenerateController extends Controller
                         $usageStats['model'] ?? $completion->model,
                         $completion->provider ?? 'openai',
                         'template',
-                        ['template_slug' => $template->slug, 'aborted' => true],
-                        false,
+                        ['template_slug' => $template->slug, 'aborted' => true, 'personal_api_key' => (bool) $completion->apiKey],
+                        ! $completion->apiKey && ! $isGuestPublic,
                         false
                     );
                 }
@@ -250,8 +263,10 @@ class GenerateController extends Controller
                 }
 
             } catch (\Throwable $e) {
-                // Check if we can failover to the fallback provider
-                $fallback = $this->resolveFallback($completion->provider ?? 'unknown');
+                // Failover only for errors a different provider can actually fix
+                $fallback = AiErrors::isRetryable($e)
+                    ? $this->resolveFallback($completion->provider ?? 'unknown')
+                    : null;
 
                 if ($fallback) {
                     Log::warning('AI generation failed, attempting fallback', [
@@ -391,7 +406,7 @@ class GenerateController extends Controller
                             ['template_slug' => $template->slug, 'error' => $fbError->getMessage(), 'fallback' => true]
                         );
 
-                        echo 'data: '.json_encode(['error' => translate('Generation failed. Please try again or contact support if it continues.')])."\n\n";
+                        echo 'data: '.json_encode(['error' => AiErrors::sanitize($fbError->getMessage())])."\n\n";
                         if (ob_get_level() > 0) { ob_flush(); }
                         flush();
                     }
@@ -406,7 +421,7 @@ class GenerateController extends Controller
                         ['template_slug' => $template->slug, 'error' => $e->getMessage()]
                     );
 
-                    echo 'data: '.json_encode(['error' => translate('Generation failed. Please try again or contact support if it continues.')])."\n\n";
+                    echo 'data: '.json_encode(['error' => AiErrors::sanitize($e->getMessage())])."\n\n";
                     if (ob_get_level() > 0) { ob_flush(); }
                     flush();
                 }
@@ -433,9 +448,13 @@ class GenerateController extends Controller
     {
         $validated = $request->validate([
             'slug' => 'required|string|max:100',
-            'fields' => 'required|array',
+            'fields' => 'required|array|max:50',
             'model' => 'nullable|string|max:100',
+            'refine_content' => 'nullable|string|max:30000',
+            'refine_instruction' => 'nullable|string|max:2000',
         ]);
+
+        $this->assertFieldsWithinLimits($validated['fields']);
 
         $user = $this->currentUser();
         $template = AiTool::where('slug', $validated['slug'])->where('is_active', true)->firstOrFail();
@@ -443,10 +462,20 @@ class GenerateController extends Controller
         // Access control check
         $this->checkToolAccess($template, $user);
 
+        // Idempotency: replay a recent identical submission instead of re-billing
+        $idempotencyKey = $this->idempotencyCacheKey($request, $user);
+        if ($idempotencyKey && ($cached = Cache::get($idempotencyKey))) {
+            return response()->json($cached);
+        }
+
         // Build prompt
         $fields = $validated['fields'];
         if (! empty($validated['model'])) {
+            $this->assertModelAllowed($validated['model']);
             $fields['model'] = $validated['model'];
+        } else {
+            // Never trust a model smuggled through the fields array
+            unset($fields['model']);
         }
 
         $refineContent = $request->input('refine_content') ?? data_get($fields, 'refine_content');
@@ -474,7 +503,7 @@ class GenerateController extends Controller
             $completion = $this->promptBuilder->build($template, $fields, $user);
         }
 
-        $isGuestPublic = ! $user && $template->getEffectiveAccessLevel() === 'public';
+        $isGuestPublic = ! $user && $template->getEffectiveAccessLevel() === 'guest';
         $publicMaxChars = (int) settings('public_tool_max_output_chars', 1200);
 
         // Resolve provider
@@ -530,7 +559,7 @@ class GenerateController extends Controller
                 ])->onQueue('ai');
             }
 
-            return response()->json([
+            $payload = [
                 'success' => true,
                 'data' => [
                     'content' => $content,
@@ -546,13 +575,19 @@ class GenerateController extends Controller
                         'credits_used' => $creditsUsed,
                     ],
                 ],
-            ]);
+            ];
+
+            if ($idempotencyKey) {
+                Cache::put($idempotencyKey, $payload, now()->addMinutes(10));
+            }
+
+            return response()->json($payload);
 
         } catch (\Throwable $e) {
-            // Check if we can failover to the fallback provider
+            // Failover only for errors a different provider can actually fix
             $fallback = $this->resolveFallback($completion->provider ?? 'unknown');
 
-            if ($e instanceof FailoverableException && $fallback) {
+            if (AiErrors::isRetryable($e) && $fallback) {
                 Log::warning('AI text generation failed, attempting fallback', [
                     'primary_provider' => $completion->provider,
                     'fallback_provider' => $fallback['provider'],
@@ -608,7 +643,7 @@ class GenerateController extends Controller
                         ])->onQueue('ai');
                     }
 
-                    return response()->json([
+                    $payload = [
                         'success' => true,
                         'data' => [
                             'content' => $content,
@@ -624,7 +659,13 @@ class GenerateController extends Controller
                                 'credits_used' => $creditsUsed,
                             ],
                         ],
-                    ]);
+                    ];
+
+                    if ($idempotencyKey) {
+                        Cache::put($idempotencyKey, $payload, now()->addMinutes(10));
+                    }
+
+                    return response()->json($payload);
 
                 } catch (\Throwable $fbError) {
                     Log::error('AI text fallback also failed', [
@@ -654,7 +695,7 @@ class GenerateController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => translate('Generation failed. Please try again or contact support if it continues.'),
+                'message' => AiErrors::sanitize($e->getMessage()),
             ], 422);
         }
     }
@@ -757,45 +798,41 @@ class GenerateController extends Controller
     }
 
     /**
-     * Sanitize raw provider error messages before sending to the client.
-     *
-     * @param  string  $message  Raw exception message from provider SDK
+     * Reject inputs whose combined size would explode input-token costs.
      */
-    private function sanitizeError(string $message): string
+    private function assertFieldsWithinLimits(array $fields): void
     {
-        $lower = mb_strtolower($message);
+        $maxChars = max(1000, (int) settings('ai_max_input_chars', 30000));
+        $totalChars = strlen((string) json_encode($fields));
 
-        if (preg_match('/rate.?limit|too many requests|quota exceeded|insufficient_?quota|credits? exhausted|429/i', $lower)) {
-            return (string) translate('Rate limit reached. Please try again in a moment.');
+        if ($totalChars > $maxChars) {
+            abort(422, translate('Your input is too long. Please shorten it and try again.'));
         }
-        if (preg_match('/content.?policy|content.?filter|safety filter|flagged by|inappropriate|violates.*policy/i', $lower)) {
-            return (string) translate('Your request was flagged. Please modify your input and try again.');
+    }
+
+    /**
+     * Only models the admin has registered and activated may be requested.
+     */
+    private function assertModelAllowed(string $slug): void
+    {
+        $allowed = AiModel::where('slug', $slug)->active()->exists();
+
+        if (! $allowed) {
+            abort(422, translate('The selected model is unavailable. Please try a different one.'));
         }
-        if (preg_match('/context.?length|token.?limit|max.?tokens|too long|exceed.*token|exceed.*context/i', $lower)) {
-            return (string) translate('Your input is too long. Please shorten it and try again.');
-        }
-        if (preg_match('/timeout|timed.?out/i', $lower)) {
-            return (string) translate('Generation timed out. Try a shorter length or a different model.');
-        }
-        if (preg_match('/api.?key|invalid.?key|authentication|unauthorized|401|not.?authorized/i', $lower)) {
-            return (string) translate('This AI provider is not configured. Please contact support.');
-        }
-        if (preg_match('/model.?not.?found|model.?unavailable|invalid.?model|unsupported.?model|no.?such.?model|deprecated/i', $lower)) {
-            return (string) translate('The selected model is unavailable. Please try a different one.');
-        }
-        if (preg_match('/network.?error|connection.?refused|connection.?reset|econnrefused|econnreset|enotfound|etimedout/i', $lower)) {
-            return (string) translate('Connection error. Please check your internet and try again.');
-        }
-        if (preg_match('/internal.?server.?error|bad.?gateway|gateway.?timeout|service.?unavailable|overloaded|500|502|503|504/i', $lower)) {
-            return (string) translate('The AI service is temporarily unavailable. Please try again later.');
-        }
-        if (preg_match('/stream.?error|sse.?error/i', $lower)) {
-            return (string) translate('Generation interrupted. Please try again.');
-        }
-        if (preg_match('/exception|stack.?trace/i', $lower)) {
-            return (string) translate('Something went wrong. Please try again or contact support.');
+    }
+
+    /**
+     * Build the idempotency cache key when the client supplies one.
+     */
+    private function idempotencyCacheKey(Request $request, ?User $user): ?string
+    {
+        $key = (string) $request->header('X-Idempotency-Key', '');
+
+        if ($key === '' || ! $user) {
+            return null;
         }
 
-        return $message;
+        return 'gen_idem:'.$user->id.':'.sha1($key);
     }
 }

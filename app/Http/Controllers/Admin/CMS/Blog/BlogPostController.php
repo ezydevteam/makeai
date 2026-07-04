@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\BlogPostRequest;
 use App\Models\Admin;
 use App\Models\BlogCategory;
 use App\Models\BlogPost;
+use App\Models\Comment;
 use App\Models\BlogTag;
 use App\Models\User;
 use App\Services\AI\AiService;
@@ -45,6 +46,45 @@ class BlogPostController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        $now = now();
+        $sevenDaysAgo = $now->copy()->subDays(7);
+        $fourteenDaysAgo = $now->copy()->subDays(14);
+
+        // 1. Total Posts
+        $totalCurrent = BlogPost::count();
+        $totalPrevious = BlogPost::where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 2. Published Posts
+        $publishedCurrent = BlogPost::where('status', 'published')->count();
+        $publishedPrevious = BlogPost::where('status', 'published')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 3. Total Comments
+        $commentsCurrent = Comment::where('commentable_type', BlogPost::class)->count();
+        $commentsPrevious = Comment::where('commentable_type', BlogPost::class)->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 4. Total Views
+        $viewsCurrent = (int) BlogPost::sum('views_count');
+        $viewsPrevious = (int) BlogPost::where('created_at', '<', $sevenDaysAgo)->sum('views_count');
+
+        $stats = [
+            'total' => [
+                'value' => $totalCurrent,
+                'comparison' => $this->calculateComparison($totalCurrent, $totalPrevious),
+            ],
+            'published' => [
+                'value' => $publishedCurrent,
+                'comparison' => $this->calculateComparison($publishedCurrent, $publishedPrevious),
+            ],
+            'comments' => [
+                'value' => $commentsCurrent,
+                'comparison' => $this->calculateComparison($commentsCurrent, $commentsPrevious),
+            ],
+            'views' => [
+                'value' => $this->formatShorthand($viewsCurrent),
+                'comparison' => $this->calculateComparison($viewsCurrent, $viewsPrevious),
+            ],
+        ];
+
         return Inertia::render('Admin/CMS/Blog/Posts/Index', [
             'posts' => $posts,
             'categories' => BlogCategory::orderBy('sort_order')->get(['id', 'name']),
@@ -52,6 +92,7 @@ class BlogPostController extends Controller
             'filters' => $request->only(['search', 'status', 'category', 'author']),
             'hasTrashedPosts' => BlogPost::onlyTrashed()->exists(),
             'trashMode' => false,
+            'stats' => $stats,
         ]);
     }
 
@@ -327,6 +368,11 @@ class BlogPostController extends Controller
             'action' => ['required', 'in:publish,draft,delete,restore,force-delete'],
         ]);
 
+        // Permanent deletion is irreversible — Super Admins only.
+        if ($validated['action'] === 'force-delete' && ! auth('admin')->user()->isSuperAdmin()) {
+            abort(403, translate('This action is restricted to Super Admins.'));
+        }
+
         $query = BlogPost::query();
 
         if (in_array($validated['action'], ['restore', 'force-delete'], true)) {
@@ -512,5 +558,41 @@ class BlogPostController extends Controller
         $validated['featured_image'] = Storage::url($path);
 
         return $validated;
+    }
+
+    private function calculateComparison(int $current, int $previous): array
+    {
+        if ($previous === 0) {
+            return [
+                'label' => $current === 0 ? '0%' : '+100%',
+                'type' => $current === 0 ? 'neutral' : 'up',
+            ];
+        }
+
+        $delta = (($current - $previous) / $previous) * 100;
+        $rounded = (int) round(abs($delta));
+
+        if ($rounded === 0) {
+            return [
+                'label' => '0%',
+                'type' => 'neutral',
+            ];
+        }
+
+        return [
+            'label' => ($delta > 0 ? '+' : '-') . $rounded . '%',
+            'type' => $delta > 0 ? 'up' : 'down',
+        ];
+    }
+
+    private function formatShorthand(int $number): string
+    {
+        if ($number >= 1000000) {
+            return round($number / 1000000, 1) . 'm';
+        }
+        if ($number >= 1000) {
+            return round($number / 1000, 1) . 'k';
+        }
+        return (string) $number;
     }
 }

@@ -5,6 +5,7 @@ import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Pagination from '@/Components/Pagination.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -61,6 +62,7 @@ const { t } = useTranslate()
 const showPayloadModal = ref(false)
 const selectedPayload = ref<string | null>(null)
 const searchQuery = ref(props.filters.action ?? '')
+const searchFocused = ref(false)
 const adminFilter = ref(props.filters.admin_id ?? '')
 const actionSearchInputRef = ref<HTMLInputElement | null>(null)
 const filterDropdownOpen = ref(false)
@@ -199,10 +201,23 @@ function formatAction(action: string): string {
     if (/^admin\/appearance/.test(path)) {
         return t('Updated Appearance Settings')
     }
+    if (/^admin\/marketing\/affiliate\/commissions\/[^\/]+\/approve$/.test(path)) {
+        return t('Approved Affiliate Commission')
+    }
+    if (/^admin\/premium\/transactions\/[^\/]+\/reject$/.test(path)) {
+        return t('Rejected Transaction')
+    }
+    if (/^admin\/premium\/transactions\/[^\/]+\/approve$/.test(path)) {
+        return t('Approved Transaction')
+    }
+    if (path === 'admin/premium/gateways/sort') {
+        return t('Updated Gateway Order')
+    }
 
     const cleaned = path
         .replace(/^admin\//, '')
         .replace(/\/\d+/g, '/{id}')
+        .replace(/\/([0-9a-zA-Z-]{20,})/g, '/{id}')
         .replace(/\//g, ' › ')
         .replace(/-/g, ' ')
 
@@ -292,7 +307,10 @@ function focusActionSearchOnSlash(event: KeyboardEvent) {
 }
 
 function handleEscape(event: KeyboardEvent) {
-    if (event.key !== 'Escape' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
+    if (event.key === 'Escape' && document.activeElement === actionSearchInputRef.value) {
+        event.preventDefault()
+        searchQuery.value = ''
+        actionSearchInputRef.value?.blur()
         return
     }
 
@@ -336,290 +354,297 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Admin Activity Logs')" />
 
-    <div class="py-6">
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Admin Activity Logs') }}</h1>
-                    <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Review administrator changes from the last 30 days, inspect request metadata, and trace sensitive system updates from one place.') }}
-                    </p>
-                </div>
+        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Admin Activity Logs') }}</h1>
+                <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Review administrator changes from the last 30 days, inspect request metadata, and trace sensitive system updates from one place.') }}
+                </p>
+            </div>
 
-                <div class="flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+                <Link
+                    :href="route('admin.system.index')"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                >
+                    <i class="ti ti-arrow-left text-base"></i>
+                    {{ t('Back') }}
+                </Link>
+
+                <div class="inline-flex gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <Link
-                        :href="route('admin.system.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        :href="route('admin.activity.admin-logs.index')"
+                        class="inline-flex items-center justify-center rounded-lg bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition-colors dark:bg-primary-900/30 dark:text-primary-300"
                     >
-                        <i class="ti ti-arrow-left text-base"></i>
-                        {{ t('Back') }}
+                        {{ t('Admin') }}
                     </Link>
-
-                    <div class="inline-flex gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                        <Link
-                            :href="route('admin.activity.admin-logs.index')"
-                            class="inline-flex items-center justify-center rounded-lg bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition-colors dark:bg-primary-900/30 dark:text-primary-300"
-                        >
-                            {{ t('Admin') }}
-                        </Link>
-                        <Link
-                            :href="route('admin.activity.user-logs.index')"
-                            class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60"
-                        >
-                            {{ t('User') }}
-                        </Link>
-                    </div>
+                    <Link
+                        :href="route('admin.activity.user-logs.index')"
+                        class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60"
+                    >
+                        {{ t('User') }}
+                    </Link>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <section class="rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                    <form method="GET" :action="route('admin.activity.admin-logs.index')" class="flex flex-col gap-4">
-                        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                            <div class="w-full xl:max-w-md">
-                                <div class="relative">
-                                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                        <i class="ti ti-search text-base"></i>
-                                    </span>
-                                    <input
-                                        ref="actionSearchInputRef"
-                                        v-model="searchQuery"
-                                        type="text"
-                                        name="action"
-                                        :placeholder="t('Filter by method, path, or keyword...')"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    >
-                                    <button
-                                        v-if="searchQuery"
-                                        type="button"
-                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                        :aria-label="t('Clear search')"
-                                        :title="t('Clear search')"
-                                        @click="clearSearch"
-                                    >
-                                        <i class="ti ti-x text-base"></i>
-                                    </button>
-                                    <span
-                                        v-else
-                                        class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
-                                    >
-                                        /
-                                    </span>
-                                </div>
+        <section class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                <form method="GET" :action="route('admin.activity.admin-logs.index')" class="flex flex-col gap-4">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div class="w-full xl:max-w-md">
+                            <div class="relative">
+                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-search text-base"></i>
+                                </span>
+                                <input
+                                    ref="actionSearchInputRef"
+                                    v-model="searchQuery"
+                                    type="text"
+                                    name="action"
+                                    :placeholder="t('Filter by method, path, or keyword...')"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                    @focus="searchFocused = true"
+                                    @blur="searchFocused = false"
+                                >
+                                <button
+                                    v-if="searchQuery"
+                                    type="button"
+                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                    :aria-label="t('Clear search')"
+                                    :title="t('Clear search')"
+                                    @click="clearSearch"
+                                >
+                                    <i class="ti ti-x text-base"></i>
+                                </button>
+                                <span
+                                    v-if="!searchQuery && !searchFocused"
+                                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                                >/</span>
                             </div>
+                        </div>
 
-                            <div class="flex flex-wrap items-center gap-3 xl:justify-end">
-                                <div class="relative" ref="filterDropdownRef">
-                                    <button
-                                        type="button"
-                                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                                        :aria-expanded="filterDropdownOpen"
-                                        @click="toggleFilterDropdown"
+                        <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                            <div class="relative" ref="filterDropdownRef">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                    :aria-expanded="filterDropdownOpen"
+                                    @click="toggleFilterDropdown"
+                                >
+                                    <i class="ti ti-adjustments-horizontal text-base"></i>
+                                    {{ t('Filters') }}
+                                    <span
+                                        v-if="filters.admin_id || filters.date_from || filters.date_to"
+                                        class="inline-flex min-w-5 items-center justify-center rounded-full bg-primary-100 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
                                     >
-                                        <i class="ti ti-adjustments-horizontal text-base"></i>
-                                        {{ t('Filters') }}
-                                        <span
-                                            v-if="filters.admin_id || filters.date_from || filters.date_to"
-                                            class="inline-flex min-w-5 items-center justify-center rounded-full bg-primary-100 px-1.5 py-0.5 text-[11px] font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
-                                        >
-                                            {{ [filters.admin_id, filters.date_from, filters.date_to].filter(Boolean).length }}
-                                        </span>
-                                        <i :class="filterDropdownOpen ? 'ti ti-chevron-up' : 'ti ti-chevron-down'" class="text-sm"></i>
-                                    </button>
+                                        {{ [filters.admin_id, filters.date_from, filters.date_to].filter(Boolean).length }}
+                                    </span>
+                                    <i :class="filterDropdownOpen ? 'ti ti-chevron-up' : 'ti ti-chevron-down'" class="text-sm"></i>
+                                </button>
 
-                                    <div
-                                        v-if="filterDropdownOpen"
-                                        class="absolute right-0 z-20 mt-2 w-[min(92vw,22rem)] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-surface-700 dark:bg-surface-900"
-                                    >
-                                        <div class="space-y-4">
+                                <div
+                                    v-if="filterDropdownOpen"
+                                    class="absolute right-0 z-20 mt-2 w-[min(92vw,22rem)] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl dark:border-surface-700 dark:bg-surface-900"
+                                >
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Administrator') }}</label>
+                                            <input type="hidden" name="admin_id" :value="adminFilter">
+                                            <AppSelect
+                                                v-model="adminFilter"
+                                                :options="adminOptions"
+                                                :placeholder="t('All Admins')"
+                                                live-search
+                                                dropdown-placement="bottom"
+                                            />
+                                        </div>
+
+                                        <div class="grid gap-4 sm:grid-cols-2">
                                             <div>
-                                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Administrator') }}</label>
-                                                <input type="hidden" name="admin_id" :value="adminFilter">
-                                                <AppSelect
-                                                    v-model="adminFilter"
-                                                    :options="adminOptions"
-                                                    :placeholder="t('All Admins')"
-                                                    live-search
-                                                    dropdown-placement="bottom"
-                                                />
-                                            </div>
-
-                                            <div class="grid gap-4 sm:grid-cols-2">
-                                                <div>
-                                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('From') }}</label>
-                                                    <input
-                                                        type="date"
-                                                        name="date_from"
-                                                        :value="filters.date_from"
-                                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
-                                                    >
-                                                </div>
-
-                                                <div>
-                                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('To') }}</label>
-                                                    <input
-                                                        type="date"
-                                                        name="date_to"
-                                                        :value="filters.date_to"
-                                                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
-                                                    >
-                                                </div>
-                                            </div>
-
-                                            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-surface-800">
-                                                <Link
-                                                    :href="route('admin.activity.admin-logs.index')"
-                                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('From') }}</label>
+                                                <input
+                                                    type="date"
+                                                    name="date_from"
+                                                    :value="filters.date_from"
+                                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
                                                 >
-                                                    <i class="ti ti-x text-base"></i>
-                                                    {{ t('Clear Filters') }}
-                                                </Link>
-
-                                                <button
-                                                    type="submit"
-                                                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
-                                                >
-                                                    <i class="ti ti-filter text-base"></i>
-                                                    {{ t('Apply Filters') }}
-                                                </button>
                                             </div>
+
+                                            <div>
+                                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('To') }}</label>
+                                                <input
+                                                    type="date"
+                                                    name="date_to"
+                                                    :value="filters.date_to"
+                                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                                                >
+                                            </div>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-surface-800">
+                                            <Link
+                                                :href="route('admin.activity.admin-logs.index')"
+                                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                            >
+                                                <i class="ti ti-x text-base"></i>
+                                                {{ t('Clear Filters') }}
+                                            </Link>
+
+                                            <button
+                                                type="submit"
+                                                class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
+                                            >
+                                                <i class="ti ti-filter text-base"></i>
+                                                {{ t('Apply Filters') }}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </form>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-                        <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
-                            <tr>
-                                <th class="px-6 py-3">{{ t('Administrator') }}</th>
-                                <th class="px-6 py-3">{{ t('Action') }}</th>
-                                <th class="px-6 py-3">{{ t('IP Address') }}</th>
-                                <th class="px-6 py-3">{{ t('User Agent') }}</th>
-                                <th class="px-6 py-3">{{ t('Date') }}</th>
-                                <th class="px-6 py-3 text-right">{{ t('Payload') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="logs.data.length === 0">
-                                <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                                    {{ t('No admin activity logs found.') }}
-                                </td>
-                            </tr>
-
-                            <tr
-                                v-for="log in logs.data"
-                                :key="log.id"
-                                class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                            <Link
+                                v-if="filters.admin_id || filters.date_from || filters.date_to || filters.action"
+                                :href="route('admin.activity.admin-logs.index')"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
                             >
-                                <td class="px-6 py-4">
-                                    <div class="min-w-0">
-                                        <p class="truncate font-medium text-gray-900 dark:text-white">{{ log.admin_name }}</p>
-                                        <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ log.admin_email }}</p>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span
-                                        class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                        :class="getMethodColor(log.action)"
-                                    >
-                                        {{ formatAction(log.action) }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
-                                    {{ log.ip_address }}
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                    <div class="max-w-xs truncate" :title="log.user_agent || ''">
-                                        {{ log.user_agent || '-' }}
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
-                                    <div>{{ timeAgo(log.created_at) }}</div>
-                                    <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ formatDate(log.created_at) }}</div>
-                                </td>
-                                <td class="px-6 py-4 text-right text-sm">
+                                <i class="ti ti-rotate-clockwise text-base"></i>
+                                {{ t('Reset') }}
+                            </Link>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                    <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
+                        <tr>
+                            <th class="px-6 py-3">{{ t('Administrator') }}</th>
+                            <th class="px-6 py-3">{{ t('Action') }}</th>
+                            <th class="px-6 py-3">{{ t('IP Address') }}</th>
+                            <th class="px-6 py-3">{{ t('User Agent') }}</th>
+                            <th class="px-6 py-3">{{ t('Date') }}</th>
+                            <th class="px-6 py-3 text-right">{{ t('Payload') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-if="logs.data.length === 0">
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                {{ t('No admin activity logs found.') }}
+                            </td>
+                        </tr>
+
+                        <tr
+                            v-for="log in logs.data"
+                            :key="log.id"
+                            class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                        >
+                            <td class="px-6 py-4">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium text-gray-900 dark:text-white">{{ log.admin_name }}</p>
+                                    <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ log.admin_email }}</p>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span
+                                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                    :class="getMethodColor(log.action)"
+                                >
+                                    {{ formatAction(log.action) }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                                {{ log.ip_address }}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                <div class="max-w-xs truncate" :title="log.user_agent || ''">
+                                    {{ log.user_agent || '-' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                <div>{{ timeAgo(log.created_at) }}</div>
+                                <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ formatDate(log.created_at) }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-right text-sm">
+                                <Tooltip v-if="log.payload" :content="t('View payload')" placement="top">
                                     <button
-                                        v-if="log.payload"
                                         type="button"
-                                        class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20"
+                                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-primary-600 transition hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-950/30"
                                         @click="viewPayload(log.payload)"
                                     >
                                         <i class="ti ti-file-text text-base"></i>
-                                        {{ t('View') }}
                                     </button>
-                                    <span v-else class="text-gray-400 dark:text-gray-500">-</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div
-                    v-if="logs.links.length > 3"
-                    class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6"
-                >
-                    <Pagination
-                        :links="logs.links"
-                        :from="logs.from"
-                        :to="logs.to"
-                        :total="logs.total"
-                    />
-                </div>
-            </section>
+                                </Tooltip>
+                                <span v-else class="text-gray-400 dark:text-gray-500">-</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
             <div
-                v-if="showPayloadModal"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm"
-                @click.self="closePayloadModal"
+                v-if="logs.links.length > 3"
+                class="border-t border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6"
             >
-                <div class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
-                    <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Request Payload') }}</h3>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Inspect the captured request payload for this audit log entry.') }}</p>
-                        </div>
+                <Pagination
+                    :links="logs.links"
+                    :from="logs.from"
+                    :to="logs.to"
+                    :total="logs.total"
+                />
+            </div>
+        </section>
 
-                        <button
-                            type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                            :aria-label="t('Close modal')"
-                            @click="closePayloadModal"
+        <div
+            v-if="showPayloadModal"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm"
+            @click.self="closePayloadModal"
+        >
+            <div class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
+                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Request Payload') }}</h3>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Inspect the captured request payload for this audit log entry.') }}</p>
+                    </div>
+
+                    <button
+                        type="button"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
+                        :aria-label="t('Close modal')"
+                        @click="closePayloadModal"
+                    >
+                        <i class="ti ti-x text-base"></i>
+                    </button>
+                </div>
+
+                <div v-if="formattedPayload.length" class="overflow-auto p-6">
+                    <div class="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-surface-700 dark:border-surface-700">
+                        <div
+                            v-for="item in formattedPayload"
+                            :key="item.field"
+                            class="flex items-start gap-4 px-4 py-3"
                         >
-                            <i class="ti ti-x text-base"></i>
-                        </button>
-                    </div>
-
-                    <div v-if="formattedPayload.length" class="overflow-auto p-6">
-                        <div class="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-surface-700 dark:border-surface-700">
-                            <div
-                                v-for="item in formattedPayload"
-                                :key="item.field"
-                                class="flex items-start gap-4 px-4 py-3"
-                            >
-                                <span class="min-w-[140px] text-sm font-medium text-gray-700 dark:text-gray-300">{{ item.field }}</span>
-                                <span class="break-all text-sm text-gray-600 dark:text-gray-400">{{ item.value }}</span>
-                            </div>
+                            <span class="min-w-[140px] text-sm font-medium text-gray-700 dark:text-gray-300">{{ item.field }}</span>
+                            <span class="break-all text-sm text-gray-600 dark:text-gray-400">{{ item.value }}</span>
                         </div>
                     </div>
-                    <div v-else class="overflow-auto p-6">
-                        <pre class="overflow-auto rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-200"><code>{{ selectedPayload }}</code></pre>
-                    </div>
+                </div>
+                <div v-else class="overflow-auto p-6">
+                    <pre class="overflow-auto rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-200"><code>{{ selectedPayload }}</code></pre>
+                </div>
 
-                    <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-800/50">
-                        <button
-                            type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                            @click="closePayloadModal"
-                        >
-                            {{ t('Close') }}
-                        </button>
-                    </div>
+                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-800/50">
+                    <button
+                        type="button"
+                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                        @click="closePayloadModal"
+                    >
+                        {{ t('Close') }}
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+
 </template>

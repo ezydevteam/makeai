@@ -67,6 +67,7 @@ class HandleInertiaRequests extends Middleware
                 'translations' => [],
                 'languages' => [],
                 'licenseTestMode' => config('app.license_test_mode', false),
+                'purchaseCodeFormat' => \App\Support\PurchaseCode::frontendConfig(),
                 'flash' => [
                     'success' => fn () => $request->session()->get('success'),
                     'error' => fn () => $request->session()->get('error'),
@@ -109,6 +110,7 @@ class HandleInertiaRequests extends Middleware
 
             'appName' => $siteName,
             'licenseTestMode' => config('app.license_test_mode', false),
+            'purchaseCodeFormat' => \App\Support\PurchaseCode::frontendConfig(),
 
             'branding' => [
                 'site_name'          => $siteName,
@@ -194,6 +196,11 @@ class HandleInertiaRequests extends Middleware
             ],
 
             'updateAvailable' => fn () => (bool) settings('update_available'),
+
+            'ai' => [
+                'model_names' => config('ai.model_names', []),
+                'provider_names' => config('ai.provider_names', []),
+            ],
 
             'auth' => fn () => $this->getAuthProps($request),
 
@@ -442,10 +449,12 @@ class HandleInertiaRequests extends Middleware
                 ->latest()
                 ->take(20)
                 ->get(['id', 'title', 'tool_slug']),
-            'paletteChats' => fn () => $user->conversations()
-                ->latest('last_message_at')
-                ->take(10)
-                ->get(['id', 'ulid', 'title']),
+            'paletteChats' => fn () => (is_addon_active('ai-chatbot') && \Illuminate\Support\Facades\Schema::hasTable('conversations'))
+                ? $user->conversations()
+                    ->latest('last_message_at')
+                    ->take(10)
+                    ->get(['id', 'ulid', 'title'])
+                : [],
         ];
     }
 
@@ -540,6 +549,22 @@ class HandleInertiaRequests extends Middleware
             'permissions' => $admin->getAllPermissions(),
             'role' => $admin->role?->name,
             'pendingCommentsCount' => Comment::where('status', 'pending')->count(),
+            'sidebarCounts' => [
+                'premium' => [
+                    'subscriptions' => \App\Models\GatewaySubscription::where('status', 'past_due')->count(),
+                    'transactions' => \App\Models\Payment::where('status', 'pending')->count(),
+                ],
+                'blog' => [
+                    'comments' => Comment::where('status', 'pending')->count(),
+                ],
+                'tool_reviews' => \App\Models\ToolReview::where('is_approved', false)->count(),
+                'messages' => \App\Models\ContactMessage::where('is_read', false)->count(),
+                'tickets' => \App\Models\SupportTicket::whereIn('status', ['open', 'in_progress'])->count(),
+                'affiliates' => [
+                    'payouts' => \App\Models\AffiliatePayout::where('status', 'pending')->count(),
+                    'commissions' => \App\Models\AffiliateCommission::where('status', 'pending')->count(),
+                ],
+            ]
         ];
     }
 

@@ -26,6 +26,12 @@ const props = defineProps<{
         fallback_model: string
         max_tokens: number
         show_tool_credit_costs: boolean
+        user_daily_credit_limit: number
+        user_monthly_credit_limit: number
+        global_daily_ai_budget_usd: number
+        credit_alert_threshold: number
+        public_tool_max_output_chars: number
+        ai_max_input_chars: number
     }
 }>()
 
@@ -39,6 +45,12 @@ const form = useForm({
     fallback_model: props.globalSettings.fallback_model || '',
     max_tokens: props.globalSettings.max_tokens,
     show_tool_credit_costs: props.globalSettings.show_tool_credit_costs,
+    user_daily_credit_limit: props.globalSettings.user_daily_credit_limit,
+    user_monthly_credit_limit: props.globalSettings.user_monthly_credit_limit,
+    global_daily_ai_budget_usd: props.globalSettings.global_daily_ai_budget_usd,
+    credit_alert_threshold: props.globalSettings.credit_alert_threshold,
+    public_tool_max_output_chars: props.globalSettings.public_tool_max_output_chars,
+    ai_max_input_chars: props.globalSettings.ai_max_input_chars,
 })
 
 const availableModels = computed<ProviderModel[]>(() => props.providerModels[form.default_provider] ?? [])
@@ -252,6 +264,60 @@ const providerColorClasses: Record<string, string> = {
                                 </div>
                                 <p v-if="form.errors.show_tool_credit_costs" class="mt-2 text-xs text-danger-600">{{ form.errors.show_tool_credit_costs }}</p>
                             </div>
+
+                            <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-5 dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                                <div class="flex items-start gap-3">
+                                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                        <i class="ti ti-shield-dollar text-lg"></i>
+                                    </span>
+                                    <div class="min-w-0 flex-1">
+                                        <h3 class="text-sm font-bold text-gray-900 dark:text-white">{{ t('Spend Controls') }}</h3>
+                                        <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ t('Protect your provider bill with per-user credit caps and a global daily budget. Set 0 to disable a limit.') }}</p>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                    <label class="block">
+                                        <span class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Per-User Daily Credit Limit') }}</span>
+                                        <input v-model="form.user_daily_credit_limit" type="number" min="0" step="any" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                        <p v-if="form.errors.user_daily_credit_limit" class="mt-1 text-xs text-danger-600">{{ form.errors.user_daily_credit_limit }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Per-User Monthly Credit Limit') }}</span>
+                                        <input v-model="form.user_monthly_credit_limit" type="number" min="0" step="any" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                        <p v-if="form.errors.user_monthly_credit_limit" class="mt-1 text-xs text-danger-600">{{ form.errors.user_monthly_credit_limit }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Global Daily AI Budget (USD)') }}</span>
+                                        <input v-model="form.global_daily_ai_budget_usd" type="number" min="0" step="any" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t('All AI requests pause for the day once this is reached.') }}</p>
+                                        <p v-if="form.errors.global_daily_ai_budget_usd" class="mt-1 text-xs text-danger-600">{{ form.errors.global_daily_ai_budget_usd }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Low-Credit Alert Threshold') }}</span>
+                                        <input v-model="form.credit_alert_threshold" type="number" min="0" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t('Email users when their balance drops to this many credits.') }}</p>
+                                        <p v-if="form.errors.credit_alert_threshold" class="mt-1 text-xs text-danger-600">{{ form.errors.credit_alert_threshold }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Guest Preview Output Limit (chars)') }}</span>
+                                        <input v-model="form.public_tool_max_output_chars" type="number" min="0" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t('Guests on free tools see a truncated preview with a sign-in prompt.') }}</p>
+                                        <p v-if="form.errors.public_tool_max_output_chars" class="mt-1 text-xs text-danger-600">{{ form.errors.public_tool_max_output_chars }}</p>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">{{ t('Max Input Size (chars)') }}</span>
+                                        <input v-model="form.ai_max_input_chars" type="number" min="1000" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ t('Rejects oversized tool inputs before they inflate token costs.') }}</p>
+                                        <p v-if="form.errors.ai_max_input_chars" class="mt-1 text-xs text-danger-600">{{ form.errors.ai_max_input_chars }}</p>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="shrink-0 border-t border-gray-100 bg-gray-50/80 px-5 py-3 dark:border-surface-800 dark:bg-surface-950">
@@ -280,7 +346,7 @@ const providerColorClasses: Record<string, string> = {
         </Transition>
     </Teleport>
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Providers') }}</h1>

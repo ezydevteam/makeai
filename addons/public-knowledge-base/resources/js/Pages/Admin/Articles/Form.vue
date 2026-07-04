@@ -93,7 +93,7 @@ function save(status: 'draft' | 'published') {
 <template>
     <Head :title="pageTitle" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">

@@ -87,7 +87,7 @@ class LanguageStoreRequest extends FormRequest
                         $validator->errors()->add('flag_file', translate('The flag file must be a valid SVG image.'));
                     }
 
-                    if (preg_match('/<script|on[a-z]+\s*=|javascript:/i', $contents)) {
+                    if (preg_match('/<script|<foreignObject|<iframe|<embed|on[a-z]+\s*=|javascript:|data:text\/html/i', $contents)) {
                         $validator->errors()->add('flag_file', translate('The SVG flag contains unsafe content.'));
                     }
 

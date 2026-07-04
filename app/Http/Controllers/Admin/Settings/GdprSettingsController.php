@@ -54,8 +54,10 @@ class GdprSettingsController extends Controller
             'banner_button_color' => ['required', 'string', 'max:20'],
             'banner_button_text_color' => ['required', 'string', 'max:20'],
             'show_policy_links' => ['required', 'boolean'],
-            'privacy_policy_url' => ['nullable', 'string', 'max:500'],
-            'cookie_policy_url' => ['nullable', 'string', 'max:500'],
+            // Rendered as an <a href> in the cookie banner shown to every visitor —
+            // block javascript:/data:/vbscript: so a policy URL can't become stored XSS.
+            'privacy_policy_url' => ['nullable', 'string', 'max:500', 'not_regex:/^\s*(?:javascript|data|vbscript):/i'],
+            'cookie_policy_url' => ['nullable', 'string', 'max:500', 'not_regex:/^\s*(?:javascript|data|vbscript):/i'],
         ]);
 
         foreach ($validated as $key => $value) {

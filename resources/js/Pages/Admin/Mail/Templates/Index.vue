@@ -4,6 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -33,11 +34,10 @@ const props = defineProps<{
 const { t } = useTranslate()
 
 const search = ref('')
+const searchFocused = ref(false)
 const category = ref('')
 const type = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
-const openActionMenuId = ref<number | null>(null)
-const actionMenuPosition = ref({ top: 0, left: 0 })
 const deleteTarget = ref<MailTemplate | null>(null)
 
 const categoryOptions = computed<SelectOption[]>(() => {
@@ -92,33 +92,6 @@ const stats = computed(() => ({
     custom: props.templates.filter((template) => !template.is_system).length,
 }))
 
-const toggleActionMenu = async (templateId: number, event: MouseEvent) => {
-    if (openActionMenuId.value === templateId) {
-        openActionMenuId.value = null
-        return
-    }
-
-    const trigger = event.currentTarget
-
-    if (!(trigger instanceof HTMLElement)) {
-        return
-    }
-
-    const rect = trigger.getBoundingClientRect()
-
-    openActionMenuId.value = templateId
-    actionMenuPosition.value = {
-        top: rect.bottom + 8,
-        left: rect.right,
-    }
-
-    await nextTick()
-}
-
-const closeActionMenu = () => {
-    openActionMenuId.value = null
-}
-
 const focusSearch = async () => {
     await nextTick()
     searchInput.value?.focus()
@@ -132,7 +105,6 @@ const clearFilters = () => {
 }
 
 const requestDelete = (template: MailTemplate) => {
-    closeActionMenu()
     deleteTarget.value = template
 }
 
@@ -147,20 +119,6 @@ const confirmDelete = () => {
             deleteTarget.value = null
         },
     })
-}
-
-const handleDocumentClick = (event: MouseEvent) => {
-    const target = event.target
-
-    if (!(target instanceof HTMLElement) || target.closest('[data-mail-template-actions]')) {
-        return
-    }
-
-    openActionMenuId.value = null
-}
-
-const handleViewportChange = () => {
-    openActionMenuId.value = null
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
@@ -179,7 +137,14 @@ const handleKeydown = (event: KeyboardEvent) => {
         return
     }
 
-    if (event.key === 'Escape' && !deleteTarget.value && !openActionMenuId.value && hasActiveFilters.value) {
+    if (event.key === 'Escape' && document.activeElement === searchInput.value) {
+        event.preventDefault()
+        search.value = ''
+        searchInput.value?.blur()
+        return
+    }
+
+    if (event.key === 'Escape' && !deleteTarget.value && hasActiveFilters.value) {
         clearFilters()
     }
 }
@@ -193,24 +158,18 @@ const statusBadgeClass = (active: boolean) => active
     : 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'
 
 onMounted(() => {
-    document.addEventListener('click', handleDocumentClick)
     document.addEventListener('keydown', handleKeydown)
-    window.addEventListener('resize', handleViewportChange)
-    window.addEventListener('scroll', handleViewportChange, true)
 })
 
 onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick)
     document.removeEventListener('keydown', handleKeydown)
-    window.removeEventListener('resize', handleViewportChange)
-    window.removeEventListener('scroll', handleViewportChange, true)
 })
 </script>
 
 <template>
     <Head :title="t('Mail Templates')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Templates') }}</h1>
@@ -219,7 +178,7 @@ onBeforeUnmount(() => {
 
                 <Link
                     :href="route('admin.mail.templates.create')"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold"
+                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('New Template') }}
@@ -228,8 +187,8 @@ onBeforeUnmount(() => {
 
             <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-gray-900">
                 <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[240px]">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -238,15 +197,15 @@ onBeforeUnmount(() => {
                                     ref="searchInput"
                                     v-model="search"
                                     type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                                     :placeholder="t('Filter this table by template, slug, subject, or category...')"
+                                    @focus="searchFocused = true"
+                                    @blur="searchFocused = false"
                                 >
                                 <span
-                                    v-if="!search"
-                                    class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
-                                >
-                                    /
-                                </span>
+                                    v-if="!search && !searchFocused"
+                                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                                >/</span>
                                 <button
                                     v-if="search"
                                     type="button"
@@ -260,21 +219,21 @@ onBeforeUnmount(() => {
                             </div>
                         </div>
 
-                        <div class="flex flex-col gap-4 xl:ml-auto xl:flex-row xl:items-center xl:justify-end">
-                            <div class="w-full md:w-56">
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-56 lg:flex-none">
                                 <AppSelect v-model="category" :options="categoryOptions" :placeholder="t('All Categories')" />
                             </div>
-                            <div class="w-full md:w-48">
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-48 lg:flex-none">
                                 <AppSelect v-model="type" :options="typeOptions" :placeholder="t('All Types')" />
                             </div>
                             <button
                                 v-if="hasActiveFilters"
                                 type="button"
-                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 w-full sm:w-auto"
                                 @click="clearFilters"
                             >
-                                <i class="ti ti-filter-off text-base"></i>
-                                {{ t('Clear') }}
+                                <i class="ti ti-rotate-clockwise text-base"></i>
+                                {{ t('Reset') }}
                             </button>
                         </div>
                     </div>
@@ -326,47 +285,29 @@ onBeforeUnmount(() => {
                                         {{ template.is_active ? t('Active') : t('Disabled') }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-5 text-right align-top">
-                                    <div class="relative inline-flex justify-end" data-mail-template-actions>
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
-                                            @click.stop="toggleActionMenu(template.id, $event)"
-                                        >
-                                            <i class="ti ti-dots-vertical text-base"></i>
-                                        </button>
-                                    </div>
-
-                                    <Teleport to="body">
-                                        <div
-                                            v-if="openActionMenuId === template.id"
-                                            data-mail-template-actions
-                                            class="fixed z-[80] w-48 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
-                                            :style="{
-                                                top: `${actionMenuPosition.top}px`,
-                                                left: `${actionMenuPosition.left}px`,
-                                                transform: 'translateX(-100%)',
-                                            }"
-                                        >
+                                <td class="overflow-visible px-6 py-5 align-top text-end">
+                                    <TableActionMenu>
+                                        <template #default="{ close }">
                                             <Link
                                                 :href="route('admin.mail.templates.edit', template.id)"
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
-                                                @click="closeActionMenu"
+                                                @click="close"
                                             >
-                                                <i class="ti ti-pencil text-base"></i>
-                                                {{ t('Edit') }}
+                                                <i class="ti ti-edit text-base"></i>
+                                                {{ t('Edit Details') }}
                                             </Link>
+                                            <hr v-if="!template.is_system" class="h-px bg-gray-100 dark:bg-surface-800" />
                                             <button
                                                 v-if="!template.is_system"
                                                 type="button"
                                                 class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
-                                                @click="requestDelete(template)"
+                                                @click="requestDelete(template); close()"
                                             >
                                                 <i class="ti ti-trash text-base"></i>
                                                 {{ t('Delete') }}
                                             </button>
-                                        </div>
-                                    </Teleport>
+                                        </template>
+                                    </TableActionMenu>
                                 </td>
                             </tr>
 

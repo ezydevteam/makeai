@@ -62,5 +62,8 @@ class BlogTagController extends Controller
 
     private function authorizeBlog(): void
     {
+        if (! auth('admin')->user()?->hasPermission('content.blog')) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

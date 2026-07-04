@@ -26,7 +26,9 @@ class PodcastRssFeedService
 
     private function buildXml(VoProject $project): string
     {
-        $appUrl = rtrim((string) settings('app_url', ''), '/');
+        // Prefer the admin-configured podcast base URL (e.g. a CDN or canonical
+        // podcast domain) and fall back to the site URL.
+        $appUrl = rtrim((string) (addon_setting('ai-voiceover', 'podcast_base_url') ?: settings('app_url', '')), '/');
         $appName = e(settings('app_name', 'MakeAI'));
         $rssUrl = $project->rss_url;
 

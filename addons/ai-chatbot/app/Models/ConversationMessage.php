@@ -13,7 +13,7 @@ class ConversationMessage extends Model
     protected $fillable = [
         'conversation_id', 'role', 'content', 'model',
         'input_tokens', 'output_tokens', 'credits_charged',
-        'attachments', 'product_switch',
+        'attachments', 'mode_switch',
     ];
 
     protected function casts(): array

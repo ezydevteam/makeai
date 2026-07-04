@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\PurchaseCode;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ActivateLicenseRequest extends FormRequest
@@ -13,8 +14,10 @@ class ActivateLicenseRequest extends FormRequest
 
     public function rules(): array
     {
+        // Format comes from the single source of truth (App\Support\PurchaseCode):
+        // relaxed TEST-... codes in test mode, strict Envato UUID otherwise.
         return [
-            'purchase_code' => ['required', 'string', 'regex:/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i'],
+            'purchase_code' => ['required', 'string', 'regex:' . PurchaseCode::validationPattern()],
         ];
     }
 

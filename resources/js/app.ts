@@ -13,7 +13,6 @@ import { useGlobalShortcuts } from './Composables/useKeyboardShortcuts'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
 const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
-const templates = import.meta.glob<{ default: DefineComponent }>('./Templates/**/*.vue')
 const addonPages = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Pages/**/*.vue')
 const addonComponents = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Components/**/*.vue')
 const addonTemplates = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Templates/**/*.vue')
@@ -106,10 +105,7 @@ createInertiaApp({
         const page = pages[`./Pages/${name}.vue`]
             ?? (
                 name.startsWith('Templates/')
-                ? (
-                    templates[`./Templates/${name.slice('Templates/'.length)}.vue`]
-                    ?? addonTemplateMap[`ai-chatbot/${name.slice('Templates/'.length)}`]
-                  )
+                ? addonTemplateMap[`ai-chatbot/${name.slice('Templates/'.length)}`]
                 : null
             )
             ?? (

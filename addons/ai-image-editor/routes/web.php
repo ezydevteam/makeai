@@ -6,7 +6,7 @@ use Addons\AiImageEditor\Http\Controllers\Admin\ImageEditorSettingsController;
 use Addons\AiImageEditor\Http\Controllers\User\ImageEditorController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['web', 'auth'])
+Route::middleware(['web', 'auth', 'addon.enabled:ai-image-editor'])
     ->prefix('image-editor')
     ->name('addon.ie.user.')
     ->group(function () {

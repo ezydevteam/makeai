@@ -4,6 +4,7 @@ namespace App\Services;
  
 use App\DTO\LicenseResult;
 use App\Models\AddonLicense;
+use App\Support\PurchaseCode;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -12,16 +13,17 @@ use Illuminate\Support\Facades\Log;
  
 class AddonLicenseService
 {
-    private const PURCHASE_CODE_PATTERN = '/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i';
- 
     private const CACHE_KEY_PREFIX = 'addon_license.';
  
     private const CACHE_TTL = 3600;
 
     // Public key shipped in core — pairs with the private key on the license server.
     // Stored as a class constant, NOT in settings/DB (settings can be edited by a nuller).
+    // ⚠️ BEFORE PACKAGING: replace with the REAL base64 Ed25519 public key
+    // (must be identical to LicenseService::LICENSE_SERVER_PUBLIC_KEY).
     private const LICENSE_SERVER_PUBLIC_KEY = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
-    private const LICENSE_SERVER_URL        = 'https://license.yourdomain.com/api/v1/verify';
+    private const PLACEHOLDER_PUBLIC_KEY    = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
+    private const LICENSE_SERVER_URL        = 'https://license.ezydev.net/api/v1/verify';
  
     /**
      * Verify a purchase code via the author's license server.
@@ -37,14 +39,29 @@ class AddonLicenseService
             );
         }
 
+        // Test-mode activation — recognized fake codes (shared with core) never
+        // reach the license server. Checked before the format/public-key checks so
+        // the TEST-... codes work exactly like core activation.
+        if (($testType = PurchaseCode::matchTestCode($purchaseCode)) !== null) {
+            return $this->buildTestResult($addonSlug, $purchaseCode, $testType);
+        }
+
         // 1. Validate purchase code format locally → fail fast, no network call
-        if (! preg_match(self::PURCHASE_CODE_PATTERN, $purchaseCode)) {
+        if (! PurchaseCode::isValidUuid($purchaseCode)) {
             return LicenseResult::failure(
                 translate('Invalid purchase code format. It should look like: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'),
                 'invalid_format'
             );
         }
  
+        if ($this->getPublicKey() === self::PLACEHOLDER_PUBLIC_KEY) {
+            \Illuminate\Support\Facades\Log::critical('AddonLicenseService: LICENSE_SERVER_PUBLIC_KEY is still the placeholder — real key not set before packaging.');
+            return LicenseResult::failure(
+                translate('License verification is not configured on this build. Please contact the author/support.'),
+                'public_key_missing'
+            );
+        }
+
         // 2. POST to LICENSE_SERVER_URL { product:'addon', slug, purchase_code, domain, version }
         //    — timeout 15s, 2 retries with backoff
         $manifest = app(AddonService::class)->getAddonConfig($addonSlug);
@@ -155,6 +172,8 @@ class AddonLicenseService
                     'verified_at' => now(),
                     'status' => 'valid',
                     'grace_started_at' => null,
+                    'signed_payload' => $rawPayload,
+                    'signature' => $data['signature'],
                 ]
             );
 
@@ -259,10 +278,23 @@ class AddonLicenseService
             $this->markInvalid($addonSlug);
             return;
         }
- 
+
+        // Test-mode licenses never reach the server — keep them valid.
+        if (PurchaseCode::matchTestCode($purchaseCode) !== null) {
+            $license->update([
+                'verified_at' => now(),
+                'status' => 'valid',
+                'grace_started_at' => null,
+            ]);
+            Cache::forget(self::CACHE_KEY_PREFIX . $addonSlug);
+            Log::info('AddonLicenseService: addon re-verified via TEST MODE', ['addon' => $addonSlug]);
+
+            return;
+        }
+
         $manifest = app(AddonService::class)->getAddonConfig($addonSlug);
         $version = $manifest['version'] ?? '1.0.0';
- 
+
         try {
             $response = Http::timeout(15)
                 ->retry(2, 1000)
@@ -276,6 +308,7 @@ class AddonLicenseService
  
             if (! $response->successful()) {
                 Log::warning('AddonLicenseService: Re-verify API error (transient)', ['addon' => $addonSlug]);
+                $this->checkOfflineDeadline($addonSlug, $license);
                 return;
             }
  
@@ -307,29 +340,45 @@ class AddonLicenseService
             }
  
             $payload = $data['payload'];
- 
+
             if (empty($payload['valid'])) {
+                // Transient marketplace/author-side errors must NOT start a grace
+                // period — otherwise an Envato outage invalidates a legit addon.
+                $transientErrors = ['envato_error', 'api_error', 'network', 'connection_error'];
+                if (in_array($payload['error'] ?? '', $transientErrors, true)) {
+                    Log::warning('AddonLicenseService: Re-verify returned a transient server error — keeping current status', [
+                        'addon' => $addonSlug,
+                        'error' => $payload['error'] ?? null,
+                    ]);
+                    return;
+                }
+
                 $this->startGracePeriod($addonSlug, $license);
                 return;
             }
- 
+
             // All good — reset grace
             $license->update([
                 'verified_at' => now(),
                 'status' => 'valid',
                 'grace_started_at' => null,
+                'signed_payload' => $rawPayload,
+                'signature' => $data['signature'],
             ]);
- 
+
             Cache::forget(self::CACHE_KEY_PREFIX . $addonSlug);
- 
+
             Log::info('AddonLicenseService: Re-verify successful', ['addon' => $addonSlug]);
             return;
         } catch (ConnectionException $e) {
-            // Network error — never punish for transient issues
+            // Network error — never punish for a transient issue, but DO enforce the
+            // offline deadline so blocking the license server can't keep a nulled
+            // addon alive forever.
             Log::warning('AddonLicenseService: Re-verify connection error (transient)', [
                 'addon' => $addonSlug,
                 'error' => $e->getMessage(),
             ]);
+            $this->checkOfflineDeadline($addonSlug, $license);
         }
     }
  
@@ -409,10 +458,68 @@ class AddonLicenseService
         return null;
     }
  
+    /**
+     * Enforce the offline deadline for an addon. Reads the last genuinely
+     * server-confirmed `verified_at` from the stored SIGNED payload — re-verifying
+     * the signature offline so a DB-edited timestamp is rejected. If no signed
+     * confirmation has happened within license.max_offline_days, grace starts.
+     * Mirrors LicenseService::checkOfflineDeadline for the core license.
+     */
+    private function checkOfflineDeadline(string $addonSlug, AddonLicense $license): void
+    {
+        $maxDays = (int) config('license.max_offline_days', 14);
+        if ($maxDays <= 0) {
+            return; // deadline disabled
+        }
+
+        $payloadJson = $license->signed_payload;
+        $signatureB64 = $license->signature;
+
+        // No stored signed proof (activated before this feature) — fall back to the
+        // plain last-success timestamp so the deadline still applies.
+        if (blank($payloadJson) || blank($signatureB64)) {
+            if ($license->verified_at
+                && abs(now()->diffInDays($license->verified_at)) > $maxDays) {
+                Log::warning('AddonLicenseService: Offline deadline exceeded (no signed proof) — starting grace', ['addon' => $addonSlug]);
+                $this->startGracePeriod($addonSlug, $license);
+            }
+            return;
+        }
+
+        if (! function_exists('sodium_crypto_sign_verify_detached')) {
+            return;
+        }
+
+        // Re-verify the stored signature offline. If it fails, the proof was
+        // tampered with (or the key changed) — do not trust the local timestamp.
+        $sig = @base64_decode($signatureB64);
+        $pk = @base64_decode($this->getPublicKey());
+
+        if (! $sig || ! $pk || ! @sodium_crypto_sign_verify_detached($sig, $payloadJson, $pk)) {
+            Log::warning('AddonLicenseService: Stored addon proof failed offline signature check — starting grace', ['addon' => $addonSlug]);
+            $this->startGracePeriod($addonSlug, $license);
+            return;
+        }
+
+        $data = json_decode($payloadJson, true);
+        $verifiedAt = $data['verified_at'] ?? null;
+        if (blank($verifiedAt)) {
+            return;
+        }
+
+        if (abs(now()->diffInDays(\Illuminate\Support\Carbon::parse($verifiedAt))) > $maxDays) {
+            Log::warning('AddonLicenseService: Offline deadline exceeded — no signed re-verification in :days days, starting grace', [
+                'addon' => $addonSlug,
+                'days' => $maxDays,
+            ]);
+            $this->startGracePeriod($addonSlug, $license);
+        }
+    }
+
     private function startGracePeriod(string $addonSlug, AddonLicense $license): void
     {
         $graceHours = 72;
- 
+
         if ($license->grace_started_at) {
             $expiresAt = $license->grace_started_at->copy()->addHours($graceHours);
  
@@ -503,5 +610,42 @@ class AddonLicenseService
             return app('test.license_public_key');
         }
         return self::LICENSE_SERVER_PUBLIC_KEY;
+    }
+
+    /**
+     * Build and store a mock addon license for LICENSE_TEST_MODE — never contacts
+     * the license server. Mirrors LicenseService::buildTestResult for core.
+     */
+    private function buildTestResult(string $addonSlug, string $purchaseCode, int $type): LicenseResult
+    {
+        AddonLicense::updateOrCreate(
+            ['addon_slug' => $addonSlug],
+            [
+                'purchase_code' => Crypt::encryptString(strtoupper(trim($purchaseCode))),
+                'envato_item_id' => 0,
+                'license_type' => $type,
+                'buyer' => 'test-buyer',
+                'purchased_at' => now(),
+                'supported_until' => now()->addYears(10),
+                'domain' => request()->getHost(),
+                'verified_at' => now(),
+                'status' => 'valid',
+                'grace_started_at' => null,
+            ]
+        );
+
+        Cache::forget(self::CACHE_KEY_PREFIX . $addonSlug);
+
+        Log::info('AddonLicenseService: addon activated via TEST MODE', [
+            'addon' => $addonSlug,
+            'type' => $type,
+        ]);
+
+        return LicenseResult::success([
+            'type' => $type,
+            'buyer' => 'test-buyer',
+            'purchase_date' => now()->toDateString(),
+            'license' => $type === 2 ? 'Extended License' : 'Regular License',
+        ]);
     }
 }

@@ -8,6 +8,8 @@ import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
+import { useAiModel } from '@/Composables/useAiModel'
+
 defineOptions({ layout: UserDashboardLayout })
 
 interface ApiKey {
@@ -24,6 +26,7 @@ const props = defineProps<{
 const { formatDate } = useDateFormat()
 const { t } = useTranslate()
 const toast = useToastr()
+const { providerNames } = useAiModel()
 
 const form = useForm({
     provider: '',
@@ -35,31 +38,27 @@ const showForm = ref(false)
 const confirmDelete = ref<ApiKey | null>(null)
 const deleting = ref(false)
 
-const providers = [
-    { value: 'openai', label: 'OpenAI' },
-    { value: 'anthropic', label: 'Anthropic' },
-    { value: 'google', label: 'Google' },
-    { value: 'xai', label: 'xAI' },
-    { value: 'deepseek', label: 'DeepSeek' },
-    { value: 'openrouter', label: 'OpenRouter' },
-    { value: 'groq', label: 'Groq' },
-    { value: 'mistral', label: 'Mistral' },
-]
+const providers = computed(() => {
+    const names = providerNames()
+    return [
+        { value: 'openai', label: names['openai'] || 'OpenAI' },
+        { value: 'anthropic', label: names['anthropic'] || 'Anthropic' },
+        { value: 'google', label: names['google'] || 'Google Gemini' },
+        { value: 'xai', label: names['xai'] || 'xAI (Grok)' },
+        { value: 'deepseek', label: names['deepseek'] || 'DeepSeek' },
+        { value: 'openrouter', label: names['openrouter'] || 'OpenRouter' },
+        { value: 'groq', label: names['groq'] || 'Groq' },
+        { value: 'mistral', label: names['mistral'] || 'Mistral AI' },
+    ]
+})
 
-const providerOptions = computed(() => providers)
+const providerOptions = computed(() => providers.value)
 
-const providerLabels: Record<string, string> = {
-    openai: 'OpenAI',
-    anthropic: 'Anthropic',
-    google: 'Google',
-    xai: 'xAI',
-    deepseek: 'DeepSeek',
-    openrouter: 'OpenRouter',
-    groq: 'Groq',
-    mistral: 'Mistral',
+const displayProvider = (provider: string) => {
+    const names = providerNames()
+    const key = provider.toLowerCase()
+    return names[key] || key.replace(/\b\w/g, c => c.toUpperCase())
 }
-
-const displayProvider = (provider: string) => providerLabels[provider.toLowerCase()] ?? provider
 
 const submit = () => {
     form.post(route('user.dashboard.api-keys.store'), {

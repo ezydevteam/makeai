@@ -142,8 +142,8 @@ watch(() => props.open, async (isOpen) => {
                 <!-- Header -->
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                     <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Admin Notes') }}</h2>
-                    <button @click="emit('close')" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    <button @click="emit('close')" class="rounded-full w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800">
+                        <i class="ti ti-x text-lg"></i>
                     </button>
                 </div>
 
@@ -169,7 +169,7 @@ watch(() => props.open, async (isOpen) => {
                         <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
                         <div class="flex items-center gap-2 pt-1">
                             <button @click="save" :disabled="loading"
-                                class="px-5 py-2.5 btn-primary rounded-xl text-sm font-bold transition-all disabled:opacity-50">
+                                class="px-5 py-2.5 btn-primary-admin rounded-xl text-sm font-bold transition-all disabled:opacity-50">
                                 {{ editingNote ? t('Update') : t('Add Note') }}
                             </button>
                             <button v-if="editingNote" @click="resetForm" class="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">{{ t('Cancel') }}</button>

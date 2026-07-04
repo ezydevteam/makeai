@@ -57,6 +57,33 @@ class AdminNoteController extends Controller
         $note->update($validated);
 
         return response()->json(['message' => translate('Note updated successfully.')]);
+     }
+
+    public function snooze(AdminNote $note)
+    {
+        if ($note->admin_id !== auth()->guard('admin')->id()) {
+            abort(403);
+        }
+
+        $note->update([
+            'reminder_date' => now()->addHour(),
+            'reminder_sent' => false,
+        ]);
+
+        return response()->json(['message' => translate('Reminder postponed by 1 hour.')]);
+    }
+
+    public function dismiss(AdminNote $note)
+    {
+        if ($note->admin_id !== auth()->guard('admin')->id()) {
+            abort(403);
+        }
+
+        $note->update([
+            'reminder_sent' => true,
+        ]);
+
+        return response()->json(['message' => translate('Reminder dismissed.')]);
     }
 
     public function destroy(AdminNote $note)

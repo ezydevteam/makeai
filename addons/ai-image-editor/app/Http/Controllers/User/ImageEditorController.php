@@ -25,7 +25,7 @@ class ImageEditorController extends \App\Http\Controllers\Controller
             $session = IeSession::where('user_id', auth()->id())->latest()->first();
 
             if (! $session) {
-                abort(404, translate('No active editor session. Open an image from your library.'));
+                return $this->renderEditorWithNoSession();
             }
 
             return $this->renderEditor($session);
@@ -41,7 +41,7 @@ class ImageEditorController extends \App\Http\Controllers\Controller
 
             $sourcePath = $request->file('upload')->store(
                 'image-editor/' . auth()->id() . '/sources',
-                'local',
+                'public',
             );
             $sourceType = 'uploaded';
             $sourceImageId = null;
@@ -61,7 +61,7 @@ class ImageEditorController extends \App\Http\Controllers\Controller
             $content = json_decode($generatedImage->content ?? '{}', true);
             $sourcePath = $content['output_path'] ?? null;
 
-            if (! $sourcePath || ! Storage::exists($sourcePath)) {
+            if (! $sourcePath || ! Storage::disk('public')->exists($sourcePath)) {
                 abort(422, translate('Source image file is no longer available.'));
             }
 
@@ -70,7 +70,7 @@ class ImageEditorController extends \App\Http\Controllers\Controller
         }
 
         // Create or replace session
-        [$width, $height] = getimagesize(storage_path('app/' . $sourcePath)) ?: [null, null];
+        [$width, $height] = getimagesize(Storage::disk('public')->path($sourcePath)) ?: [null, null];
         $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
 
         // Delete previous session (cascades to edits)
@@ -81,9 +81,9 @@ class ImageEditorController extends \App\Http\Controllers\Controller
             'source_type' => $sourceType,
             'source_image_id' => $sourceImageId ?? null,
             'source_path' => $sourcePath,
-            'source_url' => Storage::url($sourcePath),
+            'source_url' => Storage::disk('public')->url($sourcePath),
             'current_path' => $sourcePath,
-            'current_url' => Storage::url($sourcePath),
+            'current_url' => Storage::disk('public')->url($sourcePath),
             'width' => $width,
             'height' => $height,
             'format' => $ext,
@@ -218,7 +218,7 @@ class ImageEditorController extends \App\Http\Controllers\Controller
 
         $filename = 'edited-' . $edit->operation . '-' . $edit->ulid . '.png';
 
-        return Storage::download($edit->output_path, $filename);
+        return Storage::disk('public')->download($edit->output_path, $filename);
     }
 
     public function saveToLibrary(IeEdit $edit): JsonResponse
@@ -266,6 +266,28 @@ class ImageEditorController extends \App\Http\Controllers\Controller
         return Inertia::render('Addons/ai-image-editor/User/Editor', [
             'session' => $session,
             'history' => $history,
+            'operationsAvailable' => $operationsAvailable,
+            'maxOutputDimension' => $maxOutputDimension,
+        ]);
+    }
+
+    private function renderEditorWithNoSession(): Response
+    {
+        $service = app(ImageEditorService::class);
+
+        $operationsAvailable = collect([
+            'inpaint', 'outpaint', 'bg_remove', 'upscale', 'style_transfer',
+            'object_remove', 'color_correction', 'text_overlay',
+        ])->mapWithKeys(fn ($op) => [$op => [
+            'available' => $service->isProviderConfigured($op),
+            'credits' => $service->getCreditsForOperation($op),
+        ]])->toArray();
+
+        $maxOutputDimension = (int) addon_setting('ai-image-editor', 'max_output_dimension', 4096);
+
+        return Inertia::render('Addons/ai-image-editor/User/Editor', [
+            'session' => null,
+            'history' => [],
             'operationsAvailable' => $operationsAvailable,
             'maxOutputDimension' => $maxOutputDimension,
         ]);

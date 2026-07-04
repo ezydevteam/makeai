@@ -187,7 +187,7 @@ const removeBackground = () => {
 <template>
     <Head :title="t('System Tools')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="mx-auto max-w-7xl px-6">
         <div class="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('System Tools') }}</h1>
@@ -195,8 +195,8 @@ const removeBackground = () => {
             </div>
             <button
                 type="button"
-                :class="status.is_maintenance ? 'btn-primary' : 'btn-danger'"
-                class="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-60"
+                :class="status.is_maintenance ? 'btn-primary' : 'bg-danger-600 hover:bg-danger-700 hover:-translate-y-px active:translate-y-0'"
+                class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-60"
                 :disabled="toggleForm.processing"
                 @click="confirmOpen = true"
             >
@@ -268,15 +268,15 @@ const removeBackground = () => {
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Current version') }}</div>
                             <div class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ update.current_version }}</div>
                         </div>
-                        <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Latest version') }}</div>
                             <div class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ update.latest_version || '—' }}</div>
                         </div>
-                        <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Last checked') }}</div>
                             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ update.last_checked || t('Never') }}</div>
                         </div>
@@ -307,16 +307,16 @@ const removeBackground = () => {
                     </div>
 
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Last scheduler run') }}</div>
                             <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ cron.last_run_human || t('Never detected') }}</div>
                             <div v-if="cron.last_run_at" class="mt-1 font-mono text-xs text-gray-500">{{ cron.last_run_at }}</div>
                         </div>
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Project path') }}</div>
                             <div class="mt-1 break-all font-mono text-xs font-semibold text-gray-900 dark:text-white">{{ cron.project_path }}</div>
                         </div>
-                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('PHP binary') }}</div>
                             <div class="mt-1 break-all font-mono text-xs font-semibold text-gray-900 dark:text-white">{{ cron.php_binary }}</div>
                         </div>

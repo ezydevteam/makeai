@@ -22,13 +22,19 @@ class PlaygroundController extends Controller
     {
         $enabled = ProviderRegistry::getEnabledProviders();
 
+        $friendlyModelNames = config('ai.model_names', []);
+        $friendlyProviderNames = config('ai.provider_names', []);
+
         // Build provider → models map for the frontend
         $providers = [];
         foreach ($enabled as $provider => $models) {
             $providers[] = [
                 'slug' => $provider,
-                'name' => ucfirst($provider),
-                'models' => array_map(fn ($m) => ['slug' => $m, 'name' => $m], array_values($models)),
+                'name' => $friendlyProviderNames[$provider] ?? ucfirst($provider),
+                'models' => array_map(fn ($m) => [
+                    'slug' => $m,
+                    'name' => $friendlyModelNames[$m] ?? ucwords(str_replace(['-', '_'], ' ', $m))
+                ], array_values($models)),
             ];
         }
 

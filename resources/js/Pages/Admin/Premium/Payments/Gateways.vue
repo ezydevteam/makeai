@@ -244,9 +244,8 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
     <Head :title="t('Payment Gateways')" />
 
     <AdminLayout>
-        <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <div class="space-y-6">
-                <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+                <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Payment Gateways') }}</h1>
                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -263,9 +262,9 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
                         <i :class="form.processing ? 'ti ti-loader-2 animate-spin' : 'ti ti-device-floppy'" class="text-base"></i>
                         {{ form.processing ? t('Saving...') : t('Save Gateway') }}
                     </button>
-                </section>
+                </div>
 
-                <div class="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <div class="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
                     <aside class="self-start border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
                         <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                             <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Gateways') }}</h2>
@@ -338,61 +337,14 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
                         </div>
                     </aside>
 
-                    <form v-if="selectedGateway" class="space-y-6" @submit.prevent="submit">
+                    <form v-if="selectedGateway" class="space-y-5" @submit.prevent="submit">
                         <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-                                <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                    <div>
-                                        <div class="flex items-center gap-3">
-                                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
-                                                <i class="ti ti-credit-card text-lg"></i>
-                                            </span>
-                                            <div>
-                                                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ selectedGateway.name }}</h2>
-                                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                    {{ selectedGateway.description || t('Configure the payment flow, credentials, and fees for this gateway.') }}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-
-                            <div class="grid gap-4 p-6 md:grid-cols-3">
-                                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Status') }}</p>
-                                    <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                        {{ form.is_enabled ? t('Enabled for checkout') : t('Hidden from checkout') }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Use this to instantly show or hide the gateway.') }}</p>
-                                </div>
-
-                                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Mode') }}</p>
-                                    <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                        {{ form.is_test_mode ? t('Test mode active') : t('Live mode active') }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Keep sandbox keys in test mode and production keys in live mode.') }}</p>
-                                </div>
-
-                                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Configured fields') }}</p>
-                                    <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                                        {{ t(':count of :total ready', { count: configuredFieldCount, total: selectedGateway.fields.length }) }}
-                                    </p>
-                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Existing secrets stay unchanged when you leave a field blank.') }}</p>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Gateway Settings') }}</h2>
                                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose visibility, environment mode, and payment fee behavior.') }}</p>
                             </div>
 
-                            <div class="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                            <div class="p-5">
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900/50 dark:text-gray-200">
                                         <span>{{ t('Enable gateway') }}</span>
@@ -451,45 +403,16 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
                                         />
                                     </label>
                                 </div>
-
-                                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Fee Preview') }}</h3>
-                                    <div class="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-300">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <span>{{ t('Type') }}</span>
-                                            <span class="font-medium text-gray-900 dark:text-white">
-                                                {{
-                                                    form.processing_fee_type === 'percentage'
-                                                        ? t('Percentage')
-                                                        : form.processing_fee_type === 'fixed'
-                                                            ? t('Fixed')
-                                                            : t('None')
-                                                }}
-                                            </span>
-                                        </div>
-                                        <div class="flex items-center justify-between gap-3">
-                                            <span>{{ t('Value') }}</span>
-                                            <span class="font-medium text-gray-900 dark:text-white">{{ form.processing_fee_value || '0' }}</span>
-                                        </div>
-                                        <div class="flex items-center justify-between gap-3">
-                                            <span>{{ t('Currency') }}</span>
-                                            <span class="font-medium text-gray-900 dark:text-white">{{ form.processing_fee_currency || '-' }}</span>
-                                        </div>
-                                    </div>
-                                    <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-                                        {{ t('Use percentage for variable fees or fixed for a flat amount added at checkout.') }}
-                                    </p>
-                                </div>
                             </div>
                         </section>
 
                         <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('API Credentials') }}</h2>
                                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Add only the values you want to replace. Existing secrets remain untouched when left blank.') }}</p>
                             </div>
 
-                            <div class="space-y-6 p-6">
+                            <div class="space-y-5 p-5">
                                 <div v-if="selectedGateway.webhook_url" class="rounded-lg border border-blue-100 bg-blue-50 px-4 py-4 dark:border-blue-900/40 dark:bg-blue-900/10">
                                     <div class="flex items-start gap-3">
                                         <span class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-blue-600 shadow-sm dark:bg-blue-900/30 dark:text-blue-300">
@@ -551,7 +474,6 @@ const moveGateway = async (gatewayId: number, direction: 'up' | 'down') => {
                             </div>
                         </section>
                     </form>
-                </div>
             </div>
         </div>
     </AdminLayout>

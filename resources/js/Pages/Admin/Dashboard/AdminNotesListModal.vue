@@ -98,15 +98,13 @@ async function confirmDelete() {
                     <div class="flex items-center gap-2">
                         <button
                             @click="emit('create')"
-                            class="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300"
+                            class="inline-flex items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300"
                         >
                             <i class="ti ti-plus text-sm"></i>
                             {{ t('Create') }}
                         </button>
-                        <button @click="emit('close')" class="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800">
-                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                        <button @click="emit('close')" class="rounded-full w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800">
+                            <i class="ti ti-x text-lg"></i>
                         </button>
                     </div>
                 </div>
@@ -129,14 +127,14 @@ async function confirmDelete() {
                         <div
                             v-for="note in filteredNotes"
                             :key="note.id"
-                            class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/50"
+                            class="rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/50"
                         >
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ note.subject }}</p>
                                     <p v-if="note.description" class="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{{ note.description }}</p>
                                     <div class="mt-2 flex flex-wrap gap-2 text-[10px] text-gray-500 dark:text-gray-400">
-                                        <span v-if="note.reminder_date" class="rounded-full bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                        <span v-if="note.reminder_date && !note.reminder_sent && new Date(note.reminder_date) > new Date()" class="rounded-full bg-amber-50 px-2 py-1 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
                                             {{ t('Reminder') }}: {{ formatDate(note.reminder_date) }}
                                         </span>
                                         <span v-if="note.auto_delete_date" class="rounded-full bg-red-50 px-2 py-1 text-red-700 dark:bg-red-900/20 dark:text-red-300">
@@ -147,14 +145,14 @@ async function confirmDelete() {
                                 <div class="flex shrink-0 items-center gap-1">
                                     <button
                                         @click="emit('edit', note.id)"
-                                        class="rounded-lg p-2 text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                                        class="rounded-full w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-surface-700 dark:hover:text-gray-200"
                                         :aria-label="t('Edit note')"
                                     >
-                                        <i class="ti ti-pencil text-base"></i>
+                                        <i class="ti ti-edit text-base"></i>
                                     </button>
                                     <button
                                         @click="requestDelete(note.id)"
-                                        class="rounded-lg p-2 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                                        class="rounded-full w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-300"
                                         :aria-label="t('Delete note')"
                                     >
                                         <i class="ti ti-trash text-base"></i>

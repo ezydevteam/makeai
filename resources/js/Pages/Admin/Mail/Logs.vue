@@ -133,7 +133,7 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('Mail Logs')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="space-y-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Delivery Logs') }}</h1>

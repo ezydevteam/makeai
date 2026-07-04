@@ -47,7 +47,7 @@ const send = async () => {
     uploadedAttachments.value = []
     uploadError.value = ''
     resetTextareaHeight()
-    await chat.sendMessage(text || '(file attached)', chat.selectedProduct.value?.slug ?? undefined, attachments)
+    await chat.sendMessage(text || '(file attached)', chat.selectedMode.value?.slug ?? undefined, attachments)
     void focusTextarea()
 }
 
@@ -156,7 +156,7 @@ onMounted(() => {
 })
 
 watch(
-    () => [chat.activeConversation.value?.ulid, chat.selectedProduct.value?.slug],
+    () => [chat.activeConversation.value?.ulid, chat.selectedMode.value?.slug],
     () => {
         void focusTextarea()
     },
@@ -214,8 +214,8 @@ watch(
                 <textarea
                     ref="textareaRef"
                     v-model="inputText"
-                    :placeholder="chat.selectedProduct.value
-                        ? t('Ask anything in :product mode...', { product: chat.selectedProduct.value.name })
+                    :placeholder="chat.selectedMode.value
+                        ? t('Ask anything in :mode mode...', { mode: chat.selectedMode.value.name })
                         : t('Ask anything...')
                     "
                     class="chat-textarea w-full resize-none rounded-2xl border border-transparent bg-transparent px-1 py-2 text-[15px] leading-relaxed text-gray-900 placeholder:text-gray-400 dark:text-white/90 dark:placeholder:text-white/25"

@@ -3,18 +3,29 @@ import { computed } from 'vue'
 import { Head } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 
 defineOptions({ layout: AdminLayout })
 
 const { t } = useTranslate()
 
+interface ComparisonData {
+    label: string
+    type: 'up' | 'down' | 'neutral'
+}
+
+interface StatObject {
+    value: number
+    comparison: ComparisonData
+}
+
 interface Stats {
-    total_episodes: number
-    processing: number
-    completed_today: number
-    failed: number
-    total_storage: number
-    credits_used_today: number
+    total_episodes: StatObject
+    processing: StatObject
+    completed_today: StatObject
+    failed: StatObject
+    total_storage: StatObject
+    credits_used_today: StatObject
     by_provider: Record<string, number>
 }
 
@@ -22,58 +33,7 @@ const props = defineProps<{
     stats: Stats
 }>()
 
-type StatCard = {
-    label: string
-    value: string | number
-    icon: string
-    iconClass: string
-    toneClass: string
-}
 
-const statCards = computed<StatCard[]>(() => [
-    {
-        label: t('Total Episodes'),
-        value: props.stats.total_episodes,
-        icon: 'ti ti-headphones',
-        iconClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-        toneClass: 'border-blue-100 dark:border-blue-900/30',
-    },
-    {
-        label: t('Processing'),
-        value: props.stats.processing,
-        icon: 'ti ti-loader-2',
-        iconClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
-        toneClass: 'border-amber-100 dark:border-amber-900/30',
-    },
-    {
-        label: t('Completed Today'),
-        value: props.stats.completed_today,
-        icon: 'ti ti-circle-check',
-        iconClass: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-        toneClass: 'border-green-100 dark:border-green-900/30',
-    },
-    {
-        label: t('Failed'),
-        value: props.stats.failed,
-        icon: 'ti ti-alert-triangle',
-        iconClass: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
-        toneClass: 'border-red-100 dark:border-red-900/30',
-    },
-    {
-        label: t('Credits Used Today'),
-        value: props.stats.credits_used_today,
-        icon: 'ti ti-coins',
-        iconClass: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',
-        toneClass: 'border-violet-100 dark:border-violet-900/30',
-    },
-    {
-        label: t('Total Storage'),
-        value: formatBytes(props.stats.total_storage),
-        icon: 'ti ti-database',
-        iconClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400',
-        toneClass: 'border-sky-100 dark:border-sky-900/30',
-    },
-])
 
 const providerRows = computed(() =>
     Object.entries(props.stats.by_provider)
@@ -87,7 +47,7 @@ const providerRows = computed(() =>
         .sort((a, b) => b.count - a.count),
 )
 
-const hasFailures = computed(() => props.stats.failed > 0)
+const hasFailures = computed(() => props.stats.failed.value > 0)
 
 function formatBytes(bytes: number): string {
     if (bytes === 0) {
@@ -107,7 +67,7 @@ function formatBytes(bytes: number): string {
 <template>
     <Head :title="t('Voiceover Overview')" />
 
-    <div class="mx-auto max-w-7xl px-6 py-6">
+    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
@@ -134,37 +94,73 @@ function formatBytes(bytes: number): string {
             </div>
         </div>
 
-        <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <div
-                v-for="card in statCards"
-                :key="card.label"
-                class="rounded-2xl border bg-white p-5 shadow-sm transition dark:border-surface-800 dark:bg-gray-900"
-                :class="card.toneClass"
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <StatsCard
+                :title="t('Total Episodes')"
+                :value="stats.total_episodes.value"
+                :comparison="stats.total_episodes.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.total_episodes.comparison.type"
+                color="primary"
             >
-                <div class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                        <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl text-lg" :class="card.iconClass">
-                            <i :class="card.icon"></i>
-                        </span>
-                        <div>
-                            <p class="text-2xl font-bold text-gray-900 dark:text-white">
-                                {{ card.value }}
-                            </p>
-                            <p class="mt-1 text-xs uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400">
-                                {{ card.label }}
-                            </p>
-                        </div>
-                    </div>
+                <template #icon>
+                    <i class="ti ti-headphones text-lg"></i>
+                </template>
+            </StatsCard>
 
-                    <span
-                        v-if="card.label === t('Failed') && hasFailures"
-                        class="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-300"
-                    >
-                        {{ t('Needs review') }}
-                    </span>
-                </div>
-            </div>
-        </section>
+            <StatsCard
+                :title="t('Processing')"
+                :value="stats.processing.value"
+                :comparison="stats.processing.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.processing.comparison.type"
+                :color="stats.processing.value > 0 ? 'warning' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-loader text-lg animate-spin"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Completed Today')"
+                :value="stats.completed_today.value"
+                :comparison="stats.completed_today.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.completed_today.comparison.type"
+                color="success"
+            >
+                <template #icon>
+                    <i class="ti ti-circle-check text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Failed')"
+                :value="stats.failed.value"
+                :comparison="stats.failed.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.failed.comparison.type"
+                :color="stats.failed.value > 0 ? 'danger' : 'primary'"
+            >
+                <template #icon>
+                    <i class="ti ti-alert-triangle text-lg"></i>
+                </template>
+            </StatsCard>
+
+            <StatsCard
+                :title="t('Credits Used Today')"
+                :value="stats.credits_used_today.value"
+                :comparison="stats.credits_used_today.comparison.label"
+                :comparison-detail="t('vs last week')"
+                :comparison-type="stats.credits_used_today.comparison.type"
+                color="pink"
+            >
+                <template #icon>
+                    <i class="ti ti-coins text-lg"></i>
+                </template>
+            </StatsCard>
+
+        </div>
 
         <section class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,0.7fr)]">
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-gray-900">
@@ -223,7 +219,7 @@ function formatBytes(bytes: number): string {
                             {{ t('Processing Queue') }}
                         </p>
                         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                            {{ props.stats.processing }} {{ t('episodes in progress') }}
+                            {{ props.stats.processing.value }} {{ t('episodes in progress') }}
                         </p>
                     </div>
 
@@ -232,7 +228,7 @@ function formatBytes(bytes: number): string {
                             {{ t('Completion Today') }}
                         </p>
                         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                            {{ props.stats.completed_today }} {{ t('episodes completed') }}
+                            {{ props.stats.completed_today.value }} {{ t('episodes completed') }}
                         </p>
                     </div>
 
@@ -241,7 +237,7 @@ function formatBytes(bytes: number): string {
                             {{ t('Storage Footprint') }}
                         </p>
                         <p class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-                            {{ formatBytes(props.stats.total_storage) }}
+                            {{ formatBytes(props.stats.total_storage.value) }}
                         </p>
                     </div>
                 </div>

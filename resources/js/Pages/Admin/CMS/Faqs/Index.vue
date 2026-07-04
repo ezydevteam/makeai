@@ -5,6 +5,7 @@ import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -44,10 +45,6 @@ const editingFaqId = ref<number | null>(null)
 const editingCatId = ref<number | null>(null)
 const deleteFaqId = ref<number | null>(null)
 const deleteCategoryId = ref<number | null>(null)
-const importInput = ref<HTMLInputElement | null>(null)
-const importCategoryId = ref<number | null>(null)
-const openCategoryMenuId = ref<number | null>(null)
-const openFaqMenuKey = ref<string | null>(null)
 const collapsedSections = ref<Record<string, boolean>>({})
 
 const faqForm = useForm({
@@ -153,7 +150,6 @@ const submitFaq = () => {
 }
 
 const requestFaqDelete = (id: number) => {
-    openFaqMenuKey.value = null
     deleteFaqId.value = id
 }
 
@@ -171,7 +167,6 @@ const confirmFaqDelete = () => {
 }
 
 const toggleFaqActive = (id: number) => {
-    openFaqMenuKey.value = null
     router.post(route('admin.faqs.active', { faq: id }), {}, { preserveScroll: true })
 }
 
@@ -214,7 +209,6 @@ const submitCat = () => {
 }
 
 const requestCategoryDelete = (id: number) => {
-    openCategoryMenuId.value = null
     deleteCategoryId.value = id
 }
 
@@ -231,35 +225,7 @@ const confirmCategoryDelete = () => {
     })
 }
 
-const handleImport = (event: Event) => {
-    const file = (event.target as HTMLInputElement).files?.[0]
 
-    if (!file) {
-        return
-    }
-
-    const payload = new FormData()
-    payload.append('csv', file)
-
-    if (importCategoryId.value !== null) {
-        payload.append('category_id', String(importCategoryId.value))
-    }
-
-    router.post(route('admin.faqs.import'), payload, {
-        preserveScroll: true,
-        onFinish: () => {
-            if (importInput.value) {
-                importInput.value.value = ''
-            }
-            importCategoryId.value = null
-        },
-    })
-}
-
-const triggerImport = (categoryId: number | null = null) => {
-    importCategoryId.value = categoryId
-    importInput.value?.click()
-}
 
 const generateFaqs = async () => {
     if (aiGenerating.value) {
@@ -295,44 +261,17 @@ const generateFaqs = async () => {
     }
 }
 
-const toggleCategoryMenu = (id: number) => {
-    openCategoryMenuId.value = openCategoryMenuId.value === id ? null : id
-}
-
-const toggleFaqMenu = (key: string) => {
-    openFaqMenuKey.value = openFaqMenuKey.value === key ? null : key
-}
-
 const toggleSectionCollapse = (key: string) => {
     collapsedSections.value[key] = !collapsedSections.value[key]
 }
 
 const isSectionCollapsed = (key: string) => collapsedSections.value[key] === true
-
-const handleDocumentClick = (event: MouseEvent) => {
-    const target = event.target
-
-    if (!(target instanceof HTMLElement) || target.closest('[data-faq-actions]')) {
-        return
-    }
-
-    openCategoryMenuId.value = null
-    openFaqMenuKey.value = null
-}
-
-onMounted(() => {
-    document.addEventListener('click', handleDocumentClick)
-})
-
-onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick)
-})
 </script>
 
 <template>
     <Head :title="t('FAQs - Admin')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div class="space-y-2">
                 <div>
@@ -344,31 +283,6 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
-                <input
-                    ref="importInput"
-                    type="file"
-                    accept=".csv,.txt"
-                    class="hidden"
-                    @change="handleImport"
-                >
-                <Tooltip :content="t('Import CSV')" placement="top">
-                    <button
-                        type="button"
-                        class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                        @click="triggerImport()"
-                    >
-                        <i class="ti ti-file-import text-lg"></i>
-                    </button>
-                </Tooltip>
-                <Tooltip :content="t('AI Generate')" placement="top">
-                    <button
-                        type="button"
-                        class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
-                        @click="showAiForm = true"
-                    >
-                        <i class="ti ti-sparkles text-lg"></i>
-                    </button>
-                </Tooltip>
                 <button
                     type="button"
                     class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
@@ -376,6 +290,14 @@ onBeforeUnmount(() => {
                 >
                     <i class="ti ti-folder-plus text-base"></i>
                     {{ t('Category') }}
+                </button>
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:border-violet-800 dark:hover:bg-violet-900/30 dark:hover:text-violet-300"
+                    @click="showAiForm = true"
+                >
+                    <i class="ti ti-sparkles text-base"></i>
+                    {{ t('AI Generate') }}
                 </button>
                 <button
                     type="button"
@@ -441,47 +363,28 @@ onBeforeUnmount(() => {
                             <i class="ti ti-plus text-base"></i>
                             {{ t('FAQ') }}
                         </button>
-                        <Tooltip :content="t('Import CSV into this category')" placement="top">
-                            <button
-                                type="button"
-                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                                @click="triggerImport(category.id)"
-                            >
-                                <i class="ti ti-file-import text-base"></i>
-                            </button>
-                        </Tooltip>
-                        <div class="relative" data-faq-actions>
-                            <button
-                                type="button"
-                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
-                                @click.stop="toggleCategoryMenu(category.id)"
-                            >
-                                <i class="ti ti-dots-vertical text-base"></i>
-                            </button>
 
-                            <div
-                                v-if="openCategoryMenuId === category.id"
-                                class="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
-                            >
+                        <TableActionMenu>
+                            <template #default="{ close }">
                                 <button
                                     type="button"
                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
-                                    @click="openEditCat(category); openCategoryMenuId = null"
+                                    @click="openEditCat(category); close()"
                                 >
-                                    <i class="ti ti-pencil text-base"></i>
+                                    <i class="ti ti-edit text-base"></i>
                                     {{ t('Edit') }}
                                 </button>
                                 <hr class="border-gray-200 dark:border-surface-700">
                                 <button
                                     type="button"
                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
-                                    @click="requestCategoryDelete(category.id)"
+                                    @click="requestCategoryDelete(category.id); close()"
                                 >
                                     <i class="ti ti-trash text-base"></i>
                                     {{ t('Delete') }}
                                 </button>
-                            </div>
-                        </div>
+                            </template>
+                        </TableActionMenu>
                     </div>
                 </div>
 
@@ -521,38 +424,27 @@ onBeforeUnmount(() => {
                                         :class="faq.is_active ? 'translate-x-5' : 'translate-x-0.5'"
                                     ></span>
                                 </button>
-                                <div class="relative" data-faq-actions>
-                                    <button
-                                        type="button"
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
-                                        @click.stop="toggleFaqMenu(`cat-${category.id}-faq-${faq.id}`)"
-                                    >
-                                        <i class="ti ti-dots-vertical text-base"></i>
-                                    </button>
-
-                                    <div
-                                        v-if="openFaqMenuKey === `cat-${category.id}-faq-${faq.id}`"
-                                        class="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
-                                    >
+                                <TableActionMenu>
+                                    <template #default="{ close }">
                                         <button
                                             type="button"
                                             class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
-                                            @click="openEditFaq(faq); openFaqMenuKey = null"
+                                            @click="openEditFaq(faq); close()"
                                         >
-                                            <i class="ti ti-pencil text-base"></i>
+                                            <i class="ti ti-edit text-base"></i>
                                             {{ t('Edit') }}
                                         </button>
                                         <hr class="border-gray-200 dark:border-surface-700">
                                         <button
                                             type="button"
                                             class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
-                                            @click="requestFaqDelete(faq.id)"
+                                            @click="requestFaqDelete(faq.id); close()"
                                         >
                                             <i class="ti ti-trash text-base"></i>
                                             {{ t('Delete') }}
                                         </button>
-                                    </div>
-                                </div>
+                                    </template>
+                                </TableActionMenu>
                             </div>
                         </div>
                     </div>
@@ -614,38 +506,27 @@ onBeforeUnmount(() => {
                                         :class="faq.is_active ? 'translate-x-5' : 'translate-x-0.5'"
                                     ></span>
                                 </button>
-                                <div class="relative" data-faq-actions>
-                                    <button
-                                        type="button"
-                                        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
-                                        @click.stop="toggleFaqMenu(`uncategorized-${faq.id}`)"
-                                    >
-                                        <i class="ti ti-dots-vertical text-base"></i>
-                                    </button>
-
-                                    <div
-                                        v-if="openFaqMenuKey === `uncategorized-${faq.id}`"
-                                        class="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
-                                    >
+                                <TableActionMenu>
+                                    <template #default="{ close }">
                                         <button
                                             type="button"
                                             class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
-                                            @click="openEditFaq(faq); openFaqMenuKey = null"
+                                            @click="openEditFaq(faq); close()"
                                         >
-                                            <i class="ti ti-pencil text-base"></i>
+                                            <i class="ti ti-edit text-base"></i>
                                             {{ t('Edit') }}
                                         </button>
                                         <hr class="border-gray-200 dark:border-surface-700">
                                         <button
                                             type="button"
                                             class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
-                                            @click="requestFaqDelete(faq.id)"
+                                            @click="requestFaqDelete(faq.id); close()"
                                         >
                                             <i class="ti ti-trash text-base"></i>
                                             {{ t('Delete') }}
                                         </button>
-                                    </div>
-                                </div>
+                                    </template>
+                                </TableActionMenu>
                             </div>
                         </div>
                     </div>

@@ -211,102 +211,110 @@ const confirmDelete = (category: Category) => {
 <template>
     <Head :title="t('Blog Categories')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="min-w-0">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Blog Categories') }}</h1>
-                <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Organize blog posts with active, hierarchical categories and cleaner taxonomy rules.') }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Organize blog posts with active, hierarchical categories and cleaner taxonomy rules.') }}</p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
-                <Link :href="route('admin.blog.posts.index')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
+            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
+                <Link
+                    :href="route('admin.blog.posts.index')"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 w-full sm:w-auto"
+                >
                     <i class="ti ti-article text-base"></i>
                     {{ t('Posts') }}
                 </Link>
-                <Link :href="route('admin.blog.tags.index')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800">
+                <Link
+                    :href="route('admin.blog.tags.index')"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 w-full sm:w-auto"
+                >
                     <i class="ti ti-tags text-base"></i>
                     {{ t('Tags') }}
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-2 btn-primary-admin px-4 py-2 text-sm font-medium text-white"
+                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition w-full sm:w-auto"
                     @click="openCreate"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('Create Category') }}
                 </button>
             </div>
-        </section>
+        </div>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="overflow-x-auto">
-                <table class="w-full min-w-[760px] text-left text-sm text-gray-500 dark:text-gray-400">
-                    <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-surface-800 dark:bg-surface-800/50 dark:text-gray-400">
-                        <tr>
-                            <th class="px-6 py-3.5">{{ t('Category') }}</th>
-                            <th class="px-4 py-3.5">{{ t('Parent') }}</th>
-                            <th class="px-4 py-3.5">{{ t('Posts') }}</th>
-                            <th class="px-4 py-3.5">{{ t('Status') }}</th>
-                            <th class="px-6 py-3.5 text-right">{{ t('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
-                        <tr
-                            v-for="category in categories.data"
-                            :key="category.id"
-                            class="bg-white transition-colors hover:bg-gray-50/50 dark:bg-surface-900 dark:hover:bg-surface-800/30"
-                        >
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
-                                        <i :class="category.icon || 'ti ti-category'" class="text-base"></i>
+        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="overflow-hidden rounded-b-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                            <tr>
+                                <th class="px-4 py-3">{{ t('Category') }}</th>
+                                <th class="px-4 py-3">{{ t('Parent') }}</th>
+                                <th class="px-4 py-3">{{ t('Posts') }}</th>
+                                <th class="px-4 py-3">{{ t('Status') }}</th>
+                                <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
+                            <tr
+                                v-for="category in categories.data"
+                                :key="category.id"
+                                class="transition-colors hover:bg-primary-50/40 dark:hover:bg-gray-900/30"
+                            >
+                                <td class="px-4 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-300">
+                                            <i :class="category.icon || 'ti ti-category'" class="text-base"></i>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <p class="truncate font-semibold text-gray-900 dark:text-white">{{ category.name }}</p>
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ category.slug }}</p>
+                                        </div>
                                     </div>
-                                    <div class="min-w-0">
-                                        <p class="truncate font-medium text-gray-900 dark:text-white">{{ category.name }}</p>
-                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ category.slug }}</p>
+                                </td>
+                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ category.parent?.name ?? t('None') }}</td>
+                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ category.posts_count }}</td>
+                                <td class="px-4 py-4">
+                                    <span :class="category.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                                        {{ category.is_active ? t('Active') : t('Inactive') }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <Tooltip :content="t('Edit category')">
+                                            <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20" @click="edit(category)">
+                                                <i class="ti ti-edit text-base"></i>
+                                            </button>
+                                        </Tooltip>
+                                        <Tooltip :content="t('Delete category')">
+                                            <button type="button" class="flex h-8 w-8 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" @click="confirmDelete(category)">
+                                                <i class="ti ti-trash text-base"></i>
+                                            </button>
+                                        </Tooltip>
                                     </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ category.parent?.name ?? t('None') }}</td>
-                            <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ category.posts_count }}</td>
-                            <td class="px-4 py-4">
-                                <span :class="category.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
-                                    {{ category.is_active ? t('Active') : t('Inactive') }}
-                                </span>
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="inline-flex items-center gap-2">
-                                    <Tooltip :content="t('Edit category')" placement="top">
-                                        <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20" @click="edit(category)">
-                                            <i class="ti ti-edit text-base"></i>
-                                        </button>
-                                    </Tooltip>
-                                    <Tooltip :content="t('Delete category')" placement="top">
-                                        <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" @click="confirmDelete(category)">
-                                            <i class="ti ti-trash text-base"></i>
-                                        </button>
-                                    </Tooltip>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr v-if="!categories.data.length">
-                            <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No blog categories found.') }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                                </td>
+                            </tr>
+                            <tr v-if="!categories.data.length">
+                                <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No blog categories found.') }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-            <div v-if="categories.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                <Pagination
-                    :links="categories.links"
-                    :from="categories.from"
-                    :to="categories.to"
-                    :total="categories.total"
-                    :current-page="categories.current_page"
-                    :last-page="categories.last_page"
-                />
+                <div v-if="categories.links.length > 3" class="border-t border-gray-100 p-4 dark:border-surface-800">
+                    <Pagination
+                        :links="categories.links"
+                        :from="categories.from"
+                        :to="categories.to"
+                        :total="categories.total"
+                        :current-page="categories.current_page"
+                        :last-page="categories.last_page"
+                    />
+                </div>
             </div>
-        </section>
+        </div>
     </div>
 
     <Teleport to="body">

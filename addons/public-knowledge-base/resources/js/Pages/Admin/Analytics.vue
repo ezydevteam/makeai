@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import StatsCard from '@/Components/UI/StatsCard.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 interface TopQueryItem {
@@ -24,11 +25,21 @@ interface EmbedSummaryItem {
 
 const { t } = useTranslate()
 
+interface ComparisonData {
+  label: string
+  type: 'up' | 'down' | 'neutral'
+}
+
+interface StatObject {
+  value: number
+  comparison: ComparisonData
+}
+
 const props = defineProps<{
-    searches_today: number
-    searches_7d: number
-    answer_rate: number
-    published_count: number
+    searches_today: StatObject
+    searches_7d: StatObject
+    answer_rate: StatObject
+    published_count: StatObject
     unanswered: string[]
     top_queries: TopQueryItem[]
     top_articles: TopArticleItem[]
@@ -64,7 +75,7 @@ const helpfulRate = (article: TopArticleItem) => {
 
 <template>
     <AdminLayout :title="t('KB Analytics')">
-        <div class="mx-auto max-w-7xl px-6 py-8">
+        <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
             <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -77,69 +88,57 @@ const helpfulRate = (article: TopArticleItem) => {
             </div>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                                {{ t('Searches Today') }}
-                            </p>
-                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                {{ props.searches_today }}
-                            </p>
-                        </div>
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                            <i class="ti ti-search text-lg"></i>
-                        </div>
-                    </div>
-                </div>
+                <StatsCard
+                    :title="t('Searches Today')"
+                    :value="props.searches_today.value"
+                    :comparison="props.searches_today.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="props.searches_today.comparison.type"
+                    color="primary"
+                >
+                    <template #icon>
+                        <i class="ti ti-search text-lg"></i>
+                    </template>
+                </StatsCard>
 
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                                {{ t('Searches in 7 Days') }}
-                            </p>
-                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                {{ props.searches_7d }}
-                            </p>
-                        </div>
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
-                            <i class="ti ti-history text-lg"></i>
-                        </div>
-                    </div>
-                </div>
+                <StatsCard
+                    :title="t('Searches in 7 Days')"
+                    :value="props.searches_7d.value"
+                    :comparison="props.searches_7d.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="props.searches_7d.comparison.type"
+                    color="success"
+                >
+                    <template #icon>
+                        <i class="ti ti-history text-lg"></i>
+                    </template>
+                </StatsCard>
 
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                                {{ t('Answer Rate') }}
-                            </p>
-                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                {{ props.answer_rate }}%
-                            </p>
-                        </div>
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
-                            <i class="ti ti-badge-check text-lg"></i>
-                        </div>
-                    </div>
-                </div>
+                <StatsCard
+                    :title="t('Answer Rate')"
+                    :value="`${props.answer_rate.value}%`"
+                    :comparison="props.answer_rate.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="props.answer_rate.comparison.type"
+                    color="warning"
+                >
+                    <template #icon>
+                        <i class="ti ti-circle-check text-lg"></i>
+                    </template>
+                </StatsCard>
 
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.08em] text-gray-500 dark:text-gray-400">
-                                {{ t('Published Articles') }}
-                            </p>
-                            <p class="mt-2 text-3xl font-bold text-gray-900 dark:text-white">
-                                {{ props.published_count }}
-                            </p>
-                        </div>
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
-                            <i class="ti ti-article text-lg"></i>
-                        </div>
-                    </div>
-                </div>
+                <StatsCard
+                    :title="t('Published Articles')"
+                    :value="props.published_count.value"
+                    :comparison="props.published_count.comparison.label"
+                    :comparison-detail="t('vs last week')"
+                    :comparison-type="props.published_count.comparison.type"
+                    color="accent"
+                >
+                    <template #icon>
+                        <i class="ti ti-article text-lg"></i>
+                    </template>
+                </StatsCard>
             </div>
 
             <div class="mt-6 grid gap-6 lg:grid-cols-2">

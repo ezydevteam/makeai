@@ -2,12 +2,21 @@
 import { Head, useForm, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import DOMPurify from 'dompurify'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 
 const { t } = useTranslate()
 const page = usePage()
+
+// Sanitize AI output before it reaches v-html (strips scripts / event handlers).
+function renderContent(text: string): string {
+    return DOMPurify.sanitize((text ?? '').replace(/\n/g, '<br>'), {
+        FORBID_TAGS: ['style', 'form', 'input', 'button'],
+        FORBID_ATTR: ['style'],
+    })
+}
 
 interface Output {
   ulid: string
@@ -292,7 +301,7 @@ onUnmounted(() => {
                 <span v-else class="text-xs text-green-600">{{ t('Saved') }} ✓</span>
               </div>
             </div>
-            <div class="prose prose-sm max-w-none dark:prose-invert" v-html="currentOutput.content.replace(/\n/g, '<br>')" />
+            <div class="prose prose-sm max-w-none dark:prose-invert" v-html="renderContent(currentOutput.content)" />
           </template>
 
           <!-- Twitter Thread -->

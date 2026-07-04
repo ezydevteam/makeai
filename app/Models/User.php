@@ -35,7 +35,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'daily_limit', 'monthly_limit',
         'plan_id', 'subscription_status', 'subscription_ends_at',
         'email_verified_at', 'trial_ends_at',
-        'referral_code', 'affiliate_custom_slug', 'referred_by', 'referral_earnings', 'referral_count',
+        'referral_code', 'affiliate_custom_slug', 'referred_by', 'affiliate_banned',
         'theme_preference', 'locale', 'timezone',
         'preferences', 'personal_api_keys', 'brand_voice', 'chat_custom_instructions',
         'stripe_id', 'pm_type', 'pm_last_four',
@@ -68,6 +68,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_active' => 'boolean',
             'has_trialed' => 'boolean',
             'is_banned' => 'boolean',
+            'affiliate_banned' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_recovery_codes' => 'array',
             'preferences' => 'array',
@@ -155,7 +156,9 @@ class User extends Authenticatable implements MustVerifyEmail
                 $user->ulid = (string) Str::ulid();
             }
             if (empty($user->referral_code)) {
-                $user->referral_code = strtoupper(Str::random(8));
+                do {
+                    $user->referral_code = strtoupper(Str::random(8));
+                } while (User::withTrashed()->where('referral_code', $user->referral_code)->exists());
             }
             if (is_null($user->credits)) {
                 $user->credits = (float) settings('default_credits_new_user', 100);
@@ -183,6 +186,35 @@ class User extends Authenticatable implements MustVerifyEmail
     public static function internalAiName(): string
     {
         return 'Internal AI';
+    }
+
+    /**
+     * The internal "system" user that backs admin AI-assist (page/blog/FAQ/mail
+     * generation). It is not a paying account, so it bypasses per-user credit
+     * balances and daily/monthly limits — its usage is still tracked against the
+     * global AI budget.
+     */
+    public function isInternalAi(): bool
+    {
+        return $this->email === self::internalAiEmail();
+    }
+
+    /**
+     * Resolve (creating if needed) the internal "system" user used to back
+     * admin AI tasks (translation, page/blog assist). Always use this instead of
+     * User::first() so system AI work isn't billed to a random real account.
+     */
+    public static function internalAi(): self
+    {
+        return self::firstOrCreate(
+            ['email' => self::internalAiEmail()],
+            [
+                'name' => self::internalAiName(),
+                'password' => bcrypt(Str::random(32)),
+                'is_active' => true,
+                'is_banned' => false,
+            ]
+        );
     }
 
     // ─── Relationships ──────────────────────────
@@ -492,7 +524,10 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         if ($this->plan && ! $this->plan->is_free) {
-            return true;
+            // NULL subscription_ends_at means unlimited access (lifetime plans and
+            // admin-granted plans). A past date means the subscription lapsed and
+            // access is revoked even before the expiry cron has run.
+            return $this->subscription_ends_at === null || $this->subscription_ends_at->isFuture();
         }
 
         return false;

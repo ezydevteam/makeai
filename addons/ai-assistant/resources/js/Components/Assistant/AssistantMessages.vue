@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { usePage } from '@inertiajs/vue3'
+import DOMPurify from 'dompurify'
 import AssistantMessage from './AssistantMessage.vue'
 
 interface Message {
@@ -49,11 +50,12 @@ watch(() => props.messages.length, () => {
 })
 
 function renderMarkdown(text: string): string {
-    return text
+    const html = text
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
         .replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">$1</code>')
         .replace(/\n/g, '<br>')
+    return DOMPurify.sanitize(html, { FORBID_TAGS: ['style', 'form', 'input', 'button'], FORBID_ATTR: ['style'] })
 }
 
 function copyToClipboard(text: string) {

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BankPaymentProofRequest;
 use App\Http\Requests\CheckoutSessionRequest;
 use App\Models\Coupon;
-use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\Plan;
@@ -14,13 +13,12 @@ use App\Services\NotificationEventService;
 use App\Services\Payment\PaymentActivationService;
 use App\Services\Payment\PaymentGatewayManager;
 use App\Services\Pricing\PlanPriceResolver;
+use App\Services\Subscription\SubscriptionLifecycleService;
 use App\Support\CountryCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -103,7 +101,18 @@ class CheckoutController extends Controller
         $total = $gateways->totalWithFee($gateway, $amount);
 
         if ($cycle['is_trial'] && $amount <= 0) {
-            $subscription = $this->createTrialSubscription($request, $plan, $data['billing'], $gateway, $cycle, $pricing);
+            if ($request->user()->has_trialed) {
+                return back()->with('error', translate('You have already used your free trial. Please choose a paid plan.'));
+            }
+
+            $subscription = app(SubscriptionLifecycleService::class)->startTrial(
+                $request->user(),
+                $plan,
+                $data['billing'],
+                $gateway->slug,
+                (int) ($cycle['trial_days'] ?: 30),
+                $pricing['currency_code'],
+            );
 
             Payment::create([
                 'user_id' => $request->user()->id,
@@ -119,6 +128,35 @@ class CheckoutController extends Controller
             ]);
 
             return redirect()->route('user.dashboard')->with('success', translate('Trial activated successfully.'));
+        }
+
+        // A 100%-off coupon leaves nothing to charge — gateways reject zero-amount
+        // sessions, so activate the subscription directly.
+        if ($amount <= 0) {
+            $payment = Payment::create([
+                'user_id' => $request->user()->id,
+                'plan_id' => $plan->id,
+                'gateway' => $gateway->slug,
+                'amount' => 0,
+                'currency' => $pricing['currency_code'],
+                'status' => 'pending',
+                'type' => 'subscription',
+                'metadata' => $this->paymentMetadata($data['billing'], $pricing, $cycle, $gateway, $fee, $total, $coupon),
+            ]);
+
+            // Hard-block duplicate free activations: unlike a paid checkout, there
+            // is no gateway charge to deter re-use, so we atomically claim the
+            // per-user coupon slot BEFORE granting anything. If the user already
+            // redeemed it (or a concurrent request won the race), abort.
+            if ($coupon && ! app(PaymentActivationService::class)->claimCouponRedemption($coupon, $payment)) {
+                $payment->update(['status' => 'failed']);
+
+                return back()->with('error', translate('You have already used this coupon.'));
+            }
+
+            app(PaymentActivationService::class)->activateFromPayment($payment, 'coupon-'.$payment->ulid);
+
+            return redirect()->route('user.dashboard')->with('success', translate('Subscription activated successfully.'));
         }
 
         // Ensure payment_gateways table exists by creating payment with zero gateway metadata via DB
@@ -236,12 +274,14 @@ class CheckoutController extends Controller
         abort_unless($payment->user_id === $request->user()->id && $payment->gateway === 'bank_transfer', 404);
         abort_unless($payment->status === 'pending', 422);
 
-        $path = $request->file('proof')->store('payment-proofs/'.$payment->ulid, 'public');
+        // Store on the PRIVATE disk — payment proofs are financial documents and
+        // must not be publicly reachable by URL. They are served to admins via an
+        // authenticated route (admin.transactions.proof).
+        $path = $request->file('proof')->store('payment-proofs/'.$payment->ulid, 'local');
         $metadata = $payment->metadata ?: [];
         $metadata['bank_transfer'] = [
             'proof_path' => $path,
-            'proof_disk' => 'public',
-            'proof_url' => Storage::disk('public')->url($path),
+            'proof_disk' => 'local',
             'original_name' => $request->file('proof')->getClientOriginalName(),
             'reference' => $request->validated('reference'),
             'note' => $request->validated('note'),
@@ -298,41 +338,6 @@ class CheckoutController extends Controller
             ->with('success', translate('Payment confirmed successfully.'));
     }
 
-    private function createTrialSubscription(Request $request, Plan $plan, string $billing, PaymentGateway $gateway, array $cycle, array $pricing): GatewaySubscription
-    {
-        return DB::transaction(function () use ($request, $plan, $billing, $gateway, $cycle, $pricing) {
-            // Prevent trial abuse
-            if ($request->user()->has_trialed) {
-                throw new \Exception(translate('You have already used your free trial.'));
-            }
-
-            $trialEndsAt = now()->addDays((int) ($cycle['trial_days'] ?: 30));
-
-            $subscription = GatewaySubscription::create([
-                'user_id' => $request->user()->id,
-                'plan_id' => $plan->id,
-                'billing_cycle' => $billing,
-                'status' => 'trialing',
-                'gateway' => $gateway->slug,
-                'amount' => 0,
-                'currency' => $pricing['currency_code'],
-                'trial_ends_at' => $trialEndsAt,
-                'current_period_start' => now(),
-                'current_period_end' => $trialEndsAt,
-            ]);
-
-            $request->user()->update([
-                'plan_id' => $plan->id,
-                'subscription_status' => 'trialing',
-                'trial_ends_at' => $trialEndsAt,
-                'subscription_ends_at' => $trialEndsAt,
-                'has_trialed' => true,
-            ]);
-
-            return $subscription;
-        });
-    }
-
     private function paymentMetadata(string $billing, array $pricing, array $cycle, PaymentGateway $gateway, float $fee, float $total, ?Coupon $coupon = null): array
     {
         return [
@@ -340,6 +345,9 @@ class CheckoutController extends Controller
             'pricing_country' => $pricing['country_code'],
             'pricing_source' => $pricing['source'],
             'discount_amount' => $cycle['discount_amount'] ?? 0,
+            // Flat key read by activateFromPayment (usage counting) and by
+            // renewFromGatewaySubscription (recurring discounts).
+            'coupon_code' => $coupon?->code,
             'coupon' => $coupon ? [
                 'id' => $coupon->id,
                 'code' => $coupon->code,
@@ -584,6 +592,7 @@ class CheckoutController extends Controller
         if (! $coupon || ! $coupon->isValid()) { abort(422, translate('Coupon is invalid or expired.')); }
         if ($coupon->plan_id && (int) $coupon->plan_id !== (int) $plan->id) { abort(422, translate('Coupon is not valid for this plan.')); }
         if (! $coupon->isEligibleForUser($user)) { abort(422, translate('Coupon is not valid for your account.')); }
+        if ($coupon->hasReachedUserLimit($user)) { abort(422, translate('You have already used this coupon.')); }
         return $coupon;
     }
 

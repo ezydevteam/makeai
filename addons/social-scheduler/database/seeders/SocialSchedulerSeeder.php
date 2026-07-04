@@ -12,6 +12,10 @@ class SocialSchedulerSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('ss_scheduled_posts')) {
+            return;
+        }
+
         if (SsScheduledPost::count() > 0) {
             return;
         }

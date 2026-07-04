@@ -312,11 +312,12 @@ class AddonService
                         'group' => $groupName
                     ];
                     $settings[] = [
-                        'key' => "plan_{$plan->slug}_unlimited_history",
-                        'type' => 'boolean',
-                        'label' => "{$plan->name} Plan: Unlimited History",
-                        'default' => true,
-                        'group' => $groupName
+                        'key' => "plan_{$plan->slug}_max_chat_history",
+                        'type' => 'integer',
+                        'label' => "{$plan->name} Plan: Max Chat History Messages",
+                        'default' => 0,
+                        'group' => $groupName,
+                        'description' => '0 for unlimited.'
                     ];
                     $settings[] = [
                         'key' => "plan_{$plan->slug}_max_messages_5h",
@@ -373,7 +374,7 @@ class AddonService
                     $settings[] = ['key' => "plan_{$plan->slug}_credits_per_message", 'type' => 'string'];
                     $settings[] = ['key' => "plan_{$plan->slug}_max_tokens", 'type' => 'integer'];
                     $settings[] = ['key' => "plan_{$plan->slug}_max_file_size_mb", 'type' => 'integer'];
-                    $settings[] = ['key' => "plan_{$plan->slug}_unlimited_history", 'type' => 'boolean'];
+                    $settings[] = ['key' => "plan_{$plan->slug}_max_chat_history", 'type' => 'integer'];
                     $settings[] = ['key' => "plan_{$plan->slug}_max_messages_5h", 'type' => 'integer'];
                     $settings[] = ['key' => "plan_{$plan->slug}_max_messages_weekly", 'type' => 'integer'];
                     $settings[] = ['key' => "plan_{$plan->slug}_max_messages_monthly", 'type' => 'integer'];

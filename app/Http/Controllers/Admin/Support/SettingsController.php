@@ -27,5 +27,8 @@ class SettingsController extends Controller
 
     private function authorizeSupport(): void
     {
+        if (! auth('admin')->user()?->hasPermission('support.tickets')) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

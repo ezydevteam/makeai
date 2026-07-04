@@ -5,6 +5,7 @@ import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -23,7 +24,7 @@ interface Testimonial {
     is_active: boolean
     is_featured: boolean
     sort_order: number
-    source: 'manual' | 'google' | 'trustpilot' | 'import' | 'ai'
+    source: 'manual' | 'google' | 'trustpilot' | 'ai'
 }
 
 interface TestimonialForm {
@@ -50,13 +51,10 @@ const showAiForm = ref(false)
 const aiGenerating = ref(false)
 const editingId = ref<number | null>(null)
 const deleteTargetId = ref<number | null>(null)
-const openActionMenuId = ref<number | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const selectedStatus = ref<'all' | 'active' | 'inactive' | 'featured'>('all')
 const selectedSource = ref<'all' | Testimonial['source']>('all')
-const actionMenuPosition = ref({ top: 0, left: 0, placement: 'bottom' as 'top' | 'bottom' })
-const importInput = ref<HTMLInputElement | null>(null)
 const avatarPreview = ref<string | null>(null)
 
 const aiForm = ref({
@@ -84,7 +82,6 @@ const sourceOptions = [
     { value: 'manual', label: t('Manual') },
     { value: 'google', label: t('Google') },
     { value: 'trustpilot', label: t('Trustpilot') },
-    { value: 'import', label: t('Import') },
     { value: 'ai', label: t('AI') },
 ]
 
@@ -104,7 +101,6 @@ const sourceClasses: Record<Testimonial['source'], string> = {
     manual: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
     google: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
     trustpilot: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
-    import: 'bg-gray-100 text-gray-700 dark:bg-surface-800 dark:text-gray-300',
     ai: 'bg-violet-50 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300',
 }
 
@@ -211,7 +207,6 @@ const submit = () => {
 }
 
 const remove = (id: number) => {
-    openActionMenuId.value = null
     deleteTargetId.value = id
 }
 
@@ -229,58 +224,11 @@ const confirmDelete = () => {
 }
 
 const toggleFeatured = (id: number) => {
-    openActionMenuId.value = null
     router.post(route('admin.testimonials.featured', { testimonial: id }), {}, { preserveScroll: true })
 }
 
 const toggleActive = (id: number) => {
-    openActionMenuId.value = null
     router.post(route('admin.testimonials.active', { testimonial: id }), {}, { preserveScroll: true })
-}
-
-const toggleActionMenu = async (id: number, event: MouseEvent) => {
-    if (openActionMenuId.value === id) {
-        openActionMenuId.value = null
-        return
-    }
-
-    const trigger = event.currentTarget
-
-    if (!(trigger instanceof HTMLElement)) {
-        return
-    }
-
-    const rect = trigger.getBoundingClientRect()
-    const menuWidth = 176
-    const menuHeight = 170
-    const menuOffset = 8
-    const viewportPadding = 12
-    const hasBottomSpace = window.innerHeight - rect.bottom >= menuHeight + viewportPadding
-
-    openActionMenuId.value = id
-    actionMenuPosition.value = {
-        top: hasBottomSpace
-            ? rect.bottom + menuOffset
-            : Math.max(viewportPadding, rect.top - menuHeight - menuOffset),
-        left: Math.max(viewportPadding, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - viewportPadding)),
-        placement: hasBottomSpace ? 'bottom' : 'top',
-    }
-
-    await nextTick()
-}
-
-const handleDocumentClick = (event: MouseEvent) => {
-    const target = event.target
-
-    if (!(target instanceof HTMLElement) || target.closest('[data-testimonial-actions]')) {
-        return
-    }
-
-    openActionMenuId.value = null
-}
-
-const handleViewportChange = () => {
-    openActionMenuId.value = null
 }
 
 const clearFilters = () => {
@@ -318,11 +266,6 @@ const handleKeydown = (event: KeyboardEvent) => {
         return
     }
 
-    if (openActionMenuId.value !== null) {
-        openActionMenuId.value = null
-        return
-    }
-
     if (deleteTargetId.value !== null) {
         deleteTargetId.value = null
         return
@@ -348,42 +291,14 @@ const handleKeydown = (event: KeyboardEvent) => {
 }
 
 onMounted(() => {
-    document.addEventListener('click', handleDocumentClick)
     document.addEventListener('keydown', handleKeydown)
-    window.addEventListener('resize', handleViewportChange)
-    window.addEventListener('scroll', handleViewportChange, true)
 })
 
 onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick)
     document.removeEventListener('keydown', handleKeydown)
-    window.removeEventListener('resize', handleViewportChange)
-    window.removeEventListener('scroll', handleViewportChange, true)
 })
 
-const importFile = () => {
-    importInput.value?.click()
-}
 
-const handleImport = (event: Event) => {
-    const file = (event.target as HTMLInputElement).files?.[0]
-
-    if (!file) {
-        return
-    }
-
-    const payload = new FormData()
-    payload.append('csv', file)
-
-    router.post(route('admin.testimonials.import'), payload, {
-        preserveScroll: true,
-        onFinish: () => {
-            if (importInput.value) {
-                importInput.value.value = ''
-            }
-        },
-    })
-}
 
 const handleAvatarChange = (event: Event) => {
     const file = (event.target as HTMLInputElement).files?.[0] ?? null
@@ -457,7 +372,7 @@ const generateTestimonials = async () => {
 <template>
     <Head :title="t('Testimonials - Admin')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div class="space-y-2">
                     <div>
@@ -469,34 +384,17 @@ const generateTestimonials = async () => {
                 </div>
 
                 <div class="flex flex-wrap items-center gap-3">
-                    <input
-                        ref="importInput"
-                        type="file"
-                        accept=".csv,.txt"
-                        class="hidden"
-                        @change="handleImport"
-                    >
-                    <Tooltip :content="t('Import CSV')" placement="top">
-                        <button
-                            type="button"
-                            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                            @click="importFile"
-                        >
-                            <i class="ti ti-file-import text-lg"></i>
-                        </button>
-                    </Tooltip>
-                    <Tooltip :content="t('AI Generate')" placement="top">
-                        <button
-                            type="button"
-                            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
-                            @click="showAiForm = true"
-                        >
-                            <i class="ti ti-sparkles text-lg"></i>
-                        </button>
-                    </Tooltip>
                     <button
                         type="button"
-                        class="inline-flex items-center gap-2 btn-primary px-4 py-2 text-sm"
+                        class="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
+                        @click="showAiForm = true"
+                    >
+                        <i class="ti ti-sparkles text-base"></i>
+                        {{ t('AI Generate') }}
+                    </button>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 btn-primary px-4 py-2 text-sm font-semibold"
                         @click="openCreate"
                     >
                         <i class="ti ti-plus text-base"></i>
@@ -505,45 +403,51 @@ const generateTestimonials = async () => {
                 </div>
         </section>
 
-        <section class="overflow-visible rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-col gap-3 border-b border-gray-100 px-6 py-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
-                <div class="relative w-full lg:max-w-xl lg:flex-1">
-                    <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
-                    <input
-                        ref="searchInput"
-                        v-model="searchQuery"
-                        type="text"
-                        :placeholder="t('Search testimonials, company, role, or review')"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                    >
-                    <span
-                        v-if="!searchQuery"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >/</span>
-                    <button
-                        v-if="searchQuery"
-                        type="button"
-                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                        @click="searchQuery = ''"
-                    >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
-
-                <div class="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[26rem] lg:flex-row lg:justify-end">
-                    <div class="w-full lg:w-52">
-                        <AppSelect
-                            v-model="selectedStatus"
-                            :options="statusOptions"
-                            :placeholder="t('All Status')"
-                        />
+        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="border-b border-gray-100 py-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div class="flex-1 min-w-[240px]">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInput"
+                                v-model="searchQuery"
+                                type="text"
+                                :placeholder="t('Search testimonials, company, role, or review')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            >
+                            <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                                <span v-if="!searchQuery" class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500">/</span>
+                            </div>
+                            <button
+                                v-if="searchQuery"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="searchQuery = ''"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
                     </div>
-                    <div class="w-full lg:w-52">
-                        <AppSelect
-                            v-model="selectedSource"
-                            :options="filterSourceOptions"
-                            :placeholder="t('All Sources')"
-                        />
+
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="selectedStatus"
+                                :options="statusOptions"
+                                :placeholder="t('All Status')"
+                            />
+                        </div>
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="selectedSource"
+                                :options="filterSourceOptions"
+                                :placeholder="t('All Sources')"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -569,10 +473,10 @@ const generateTestimonials = async () => {
                     </button>
             </div>
 
-            <div v-else class="overflow-visible">
-                <div class="overflow-x-auto overflow-y-visible">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-surface-700">
-                        <thead class="bg-gray-50 dark:bg-surface-800/70">
+            <div v-else class="overflow-hidden rounded-b-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
                             <tr>
                                 <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Customer') }}</th>
                                 <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Review') }}</th>
@@ -655,40 +559,21 @@ const generateTestimonials = async () => {
                                 <td class="px-6 py-5 align-top text-sm font-medium text-gray-700 dark:text-gray-200">
                                     {{ testimonial.sort_order }}
                                 </td>
-                                <td class="overflow-visible px-6 py-5 align-top">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <div class="relative" data-testimonial-actions>
-                                            <button
-                                                type="button"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
-                                                @click.stop="toggleActionMenu(testimonial.id, $event)"
-                                            >
-                                                <i class="ti ti-dots-vertical text-base"></i>
-                                            </button>
-                                        </div>
-                                        <Teleport to="body">
-                                            <div
-                                                v-if="openActionMenuId === testimonial.id"
-                                                data-testimonial-actions
-                                                class="fixed z-[80] w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl dark:border-surface-700 dark:bg-surface-900"
-                                                :style="{
-                                                    top: `${actionMenuPosition.top}px`,
-                                                    left: `${actionMenuPosition.left}px`,
-                                                    transformOrigin: actionMenuPosition.placement === 'bottom' ? 'top right' : 'bottom right',
-                                                }"
-                                            >
+                                    <td class="overflow-visible px-6 py-5 align-top text-end">
+                                        <TableActionMenu>
+                                            <template #default="{ close }">
                                                 <button
                                                     type="button"
                                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
-                                                    @click="openEdit(testimonial); openActionMenuId = null"
+                                                    @click="openEdit(testimonial); close()"
                                                 >
-                                                    <i class="ti ti-pencil text-base"></i>
+                                                    <i class="ti ti-edit text-base"></i>
                                                     {{ t('Edit') }}
                                                 </button>
                                                 <button
                                                     type="button"
                                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-amber-50 hover:text-amber-700 dark:text-gray-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-                                                    @click="toggleFeatured(testimonial.id)"
+                                                    @click="toggleFeatured(testimonial.id); close()"
                                                 >
                                                     <i class="ti ti-star text-base"></i>
                                                     {{ testimonial.is_featured ? t('Unfeature') : t('Feature') }}
@@ -696,29 +581,29 @@ const generateTestimonials = async () => {
                                                 <button
                                                     type="button"
                                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                                                    @click="toggleActive(testimonial.id)"
+                                                    @click="toggleActive(testimonial.id); close()"
                                                 >
                                                     <i class="ti ti-toggle-right text-base"></i>
                                                     {{ testimonial.is_active ? t('Deactivate') : t('Activate') }}
                                                 </button>
+                                                <hr class="border-gray-200 dark:border-surface-700">
                                                 <button
                                                     type="button"
                                                     class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
-                                                    @click="remove(testimonial.id)"
+                                                    @click="remove(testimonial.id); close()"
                                                 >
                                                     <i class="ti ti-trash text-base"></i>
                                                     {{ t('Delete') }}
                                                 </button>
-                                            </div>
-                                        </Teleport>
-                                    </div>
-                                </td>
+                                            </template>
+                                        </TableActionMenu>
+                                    </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-        </section>
+        </div>
 
         <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeForm">
             <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">

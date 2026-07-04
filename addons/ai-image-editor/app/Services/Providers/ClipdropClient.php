@@ -15,7 +15,7 @@ class ClipdropClient
     {
         $response = Http::timeout(60)
             ->withHeader('x-api-key', $this->apiKey())
-            ->attach('image_file', Storage::get($imagePath), basename($imagePath))
+            ->attach('image_file', Storage::disk('public')->get($imagePath), basename($imagePath))
             ->post("{$this->baseUrl}/remove-background/v1");
 
         if (! $response->successful()) {
@@ -31,8 +31,8 @@ class ClipdropClient
     {
         $response = Http::timeout(60)
             ->withHeader('x-api-key', $this->apiKey())
-            ->attach('image_file', Storage::get($imagePath), basename($imagePath))
-            ->attach('mask_file', Storage::get($maskPath), 'mask.png')
+            ->attach('image_file', Storage::disk('public')->get($imagePath), basename($imagePath))
+            ->attach('mask_file', Storage::disk('public')->get($maskPath), 'mask.png')
             ->post("{$this->baseUrl}/cleanup/v1");
 
         if (! $response->successful()) {
@@ -57,7 +57,7 @@ class ClipdropClient
 
     private function saveToStorage(string $binaryContent, string $storagePath): string
     {
-        Storage::put($storagePath, $binaryContent);
+        Storage::disk('public')->put($storagePath, $binaryContent);
 
         return $storagePath;
     }

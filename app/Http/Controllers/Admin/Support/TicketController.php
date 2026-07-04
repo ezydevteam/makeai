@@ -261,17 +261,67 @@ class TicketController extends Controller
 
     private function stats(): array
     {
-        $statusCounts = SupportTicket::query()
-            ->selectRaw('status, COUNT(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
+        $now = now();
+        $sevenDaysAgo = $now->copy()->subDays(7);
+
+        // 1. Total Tickets
+        $totalCurrent = SupportTicket::count();
+        $totalPrevious = SupportTicket::where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 2. Open Tickets
+        $openCurrent = SupportTicket::where('status', 'open')->count();
+        $openPrevious = SupportTicket::where('status', 'open')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 3. In Progress Tickets
+        $inProgressCurrent = SupportTicket::where('status', 'in_progress')->count();
+        $inProgressPrevious = SupportTicket::where('status', 'in_progress')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 4. Resolved Tickets
+        $resolvedCurrent = SupportTicket::where('status', 'resolved')->count();
+        $resolvedPrevious = SupportTicket::where('status', 'resolved')->where('created_at', '<', $sevenDaysAgo)->count();
 
         return [
-            'total' => (int) $statusCounts->sum(),
-            'open' => (int) ($statusCounts['open'] ?? 0),
-            'in_progress' => (int) ($statusCounts['in_progress'] ?? 0),
-            'waiting_user' => (int) ($statusCounts['waiting_user'] ?? 0),
-            'resolved' => (int) ($statusCounts['resolved'] ?? 0),
+            'total' => [
+                'value' => $totalCurrent,
+                'comparison' => $this->calculateComparison($totalCurrent, $totalPrevious),
+            ],
+            'open' => [
+                'value' => $openCurrent,
+                'comparison' => $this->calculateComparison($openCurrent, $openPrevious),
+            ],
+            'in_progress' => [
+                'value' => $inProgressCurrent,
+                'comparison' => $this->calculateComparison($inProgressCurrent, $inProgressPrevious),
+            ],
+            'resolved' => [
+                'value' => $resolvedCurrent,
+                'comparison' => $this->calculateComparison($resolvedCurrent, $resolvedPrevious),
+            ],
+        ];
+    }
+
+    private function calculateComparison(int $current, int $previous): array
+    {
+        if ($previous === 0) {
+            return [
+                'label' => $current === 0 ? '0%' : '+100%',
+                'type' => $current === 0 ? 'neutral' : 'up',
+            ];
+        }
+
+        $delta = (($current - $previous) / $previous) * 100;
+        $rounded = (int) round(abs($delta));
+
+        if ($rounded === 0) {
+            return [
+                'label' => '0%',
+                'type' => 'neutral',
+            ];
+        }
+
+        return [
+            'label' => ($delta > 0 ? '+' : '-') . $rounded . '%',
+            'type' => $delta > 0 ? 'up' : 'down',
         ];
     }
 
@@ -315,5 +365,8 @@ class TicketController extends Controller
 
     private function authorizeSupport(): void
     {
+        if (! auth('admin')->user()?->hasPermission('support.tickets')) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

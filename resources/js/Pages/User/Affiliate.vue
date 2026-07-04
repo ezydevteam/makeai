@@ -4,6 +4,8 @@ import { Head, useForm } from '@inertiajs/vue3'
 import axios from 'axios'
 import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useTheme } from '@/Composables/useTheme'
+import { useNumberFormat } from '@/Composables/useNumberFormat'
 import AppSelect from '@/Components/AppSelect.vue'
 import QRCode from 'qrcode'
 
@@ -11,6 +13,7 @@ interface Program {
     commission_type: 'percentage' | 'fixed'
     commission_value: number
     min_payout: number
+    max_payout: number
     payouts_enabled: boolean
     payout_methods: string[]
     commission_hold_days: number
@@ -42,6 +45,8 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+const { isDark } = useTheme()
+const { formatCurrency } = useNumberFormat()
 const selectedMethod = ref(props.program.payout_methods[0] ?? 'paypal')
 const commissionStatusFilter = ref('')
 const isPayoutModalOpen = ref(false)
@@ -93,13 +98,6 @@ const chartData = ref<Array<{ label: string; clicks: number; registrations: numb
 if (Array.isArray(props.chart)) {
     chartData.value = props.chart
 }
-
-const isDark = computed(() => {
-    if (typeof document !== 'undefined') {
-        return document.documentElement.classList.contains('dark')
-    }
-    return false
-})
 
 const buildChart = async () => {
     if (!chartCanvas.value) return
@@ -201,6 +199,13 @@ onUnmounted(() => {
     }
 })
 
+// Rebuild the chart when the theme toggles so colors stay in sync with dark mode.
+watch(isDark, () => {
+    if (chartCanvas.value) {
+        buildChart()
+    }
+})
+
 // ── Shared ──
 const shareText = computed(() => encodeURIComponent(t('Try this AI platform with my referral link.')))
 const referralUrl = computed(() => props.referral.alias_link || props.referral.link)
@@ -226,9 +231,7 @@ const getStatIconClass = (key: string) => {
     return 'ti ti-chart-bar'
 }
 const isCurrencyStat = (key: string) => ['total_earnings', 'pending_earnings'].includes(key)
-const formatMoney = (value: string | number) => (typeof value === 'number'
-    ? new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(value)
-    : value)
+const formatMoney = (value: string | number) => (typeof value === 'number' ? formatCurrency(value) : value)
 const formatChoiceLabel = (value: string) => value
     .replaceAll('_', ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase())
@@ -458,6 +461,9 @@ const filterCommissions = (status: string) => {
                                         </td>
                                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{{ formatMoney(ref.commission) }}</td>
                                     </tr>
+                                    <tr v-if="referrals.length === 0">
+                                        <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-400 dark:text-gray-500">{{ t('No referrals yet. Share your link to get started.') }}</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -468,7 +474,7 @@ const filterCommissions = (status: string) => {
                         <div class="flex flex-col gap-3 border-b border-gray-100 p-5 sm:flex-row sm:items-center sm:justify-between">
                             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Commissions') }}</h2>
                             <div class="flex flex-wrap gap-1">
-                                <button v-for="s in ['', 'pending', 'approved', 'paid', 'rejected']" :key="s" type="button" :class="commissionStatusFilter === s ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'" class="rounded-lg px-2.5 py-1 text-xs font-medium" @click="filterCommissions(s)">{{ s ? formatChoiceLabel(s) : t('All') }}</button>
+                                <button v-for="s in ['', 'pending', 'approved', 'paid', 'rejected', 'cancelled']" :key="s" type="button" :class="commissionStatusFilter === s ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'" class="rounded-lg px-2.5 py-1 text-xs font-medium" @click="filterCommissions(s)">{{ s ? formatChoiceLabel(s) : t('All') }}</button>
                             </div>
                         </div>
                         <div class="min-w-0 overflow-x-auto">
@@ -487,7 +493,7 @@ const filterCommissions = (status: string) => {
                                         <td class="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">{{ c.payment ? c.payment.amount : '—' }}</td>
                                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{{ formatMoney(c.amount) }}</td>
                                         <td class="px-4 py-3">
-                                            <span :class="c.status === 'approved' || c.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300' : c.status === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'" class="rounded-full px-2.5 py-1 text-xs font-bold">
+                                            <span :class="c.status === 'approved' || c.status === 'paid' ? 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300' : c.status === 'pending' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300' : c.status === 'cancelled' ? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' : 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'" class="rounded-full px-2.5 py-1 text-xs font-bold">
                                                 {{ t(c.status) }}
                                             </span>
                                         </td>
@@ -592,19 +598,29 @@ const filterCommissions = (status: string) => {
                     <form class="mt-6 space-y-4" @submit.prevent="submit">
                         <label class="block">
                             <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Amount') }}</span>
-                            <input v-model="form.amount" type="number" min="0" step="0.01" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition focus:border-primary-400 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:bg-gray-900" />
+                            <input v-model="form.amount" type="number" :min="program.min_payout" :max="program.max_payout > 0 ? program.max_payout : undefined" step="0.01" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition focus:border-primary-400 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:bg-gray-900" />
+                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                                {{ t('Minimum :min', { min: formatMoney(program.min_payout) }) }}<template v-if="program.max_payout > 0"> · {{ t('Maximum :max', { max: formatMoney(program.max_payout) }) }}</template>
+                            </span>
+                            <p v-if="form.errors.amount" class="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{{ form.errors.amount }}</p>
                         </label>
                         <div>
                             <AppSelect v-model="selectedMethod" :options="program.payout_methods.map((m: string) => ({ value: m, label: formatChoiceLabel(m) }))" :label="t('Payout method')" />
+                            <p v-if="form.errors.method" class="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{{ form.errors.method }}</p>
                         </div>
                         <label v-if="selectedMethod === 'paypal'" class="block">
                             <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('PayPal email') }}</span>
                             <input v-model="form.details.paypal_email" type="email" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition focus:border-primary-400 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:bg-gray-900" />
+                            <p v-if="form.errors['details.paypal_email']" class="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{{ form.errors['details.paypal_email'] }}</p>
                         </label>
                         <label v-if="selectedMethod === 'bank_transfer'" class="block">
                             <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Bank details') }}</span>
                             <textarea v-model="form.details.bank_account" rows="4" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition focus:border-primary-400 focus:bg-white focus:outline-none dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:focus:bg-gray-900" />
+                            <p v-if="form.errors['details.bank_account']" class="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{{ form.errors['details.bank_account'] }}</p>
                         </label>
+                        <p v-if="selectedMethod === 'credits'" class="rounded-xl bg-sky-50 px-3 py-2.5 text-xs text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">
+                            {{ t('The payout amount will be added to your account credit balance.') }}
+                        </p>
 
                         <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                             <button type="button" class="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800" @click="closePayoutModal">

@@ -84,8 +84,22 @@ class LicenseMiddleware
                 ->with('error', translate('License verification is required. Please activate your license to continue.'));
         }
 
-        // Public frontend — allow page to load; the Inertia shared prop `licenseBlocked`
-        // will trigger a blocking banner overlay that stops all features/functions.
+        // Public frontend. Read-only (GET/HEAD/OPTIONS) requests are allowed so the
+        // page can render with the `licenseBlocked` Inertia prop that shows a blocking
+        // banner overlay. Any state-changing request (a feature action) is blocked
+        // server-side — the client banner alone is trivially bypassed by a nuller.
+        if (! $request->isMethodSafe()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'LICENSE_INVALID',
+                    'error' => 'License verification required. Please activate your license in the admin panel.',
+                ], 403);
+            }
+
+            return redirect()->back()
+                ->with('error', translate('This action is unavailable until the application license is activated.'));
+        }
+
         return $next($request);
     }
 }

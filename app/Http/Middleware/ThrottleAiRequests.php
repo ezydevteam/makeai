@@ -24,6 +24,7 @@ class ThrottleAiRequests
         $windowSeconds = isset($args[2]) && is_numeric($args[2]) ? (int) $args[2] : null;
 
         // Check per-model rate limit if a model slug is in the request
+        $modelLimitSlug = null;
         if ($category === 'text_gen' && ! $maxAttempts) {
             $modelSlug = $request->input('model') ?? $request->input('fields.model');
             if ($modelSlug) {
@@ -31,6 +32,7 @@ class ThrottleAiRequests
                 if ($model && $model->rate_limit_per_min) {
                     $maxAttempts = $model->rate_limit_per_min;
                     $windowSeconds = 60;
+                    $modelLimitSlug = $model->slug;
                 }
             }
         }
@@ -47,7 +49,7 @@ class ThrottleAiRequests
         }
         $ip = $request->ip();
 
-        if ($this->rateLimiter->isIpBanned($ip)) {
+        if ($this->rateLimiter->isIpBanned($ip, $category)) {
             return response()->json([
                 'success' => false,
                 'message' => translate('Your IP has been temporarily blocked due to abuse.'),
@@ -57,6 +59,12 @@ class ThrottleAiRequests
         }
 
         $key = $this->buildKey($request, $category);
+
+        // Per-model limits get their own counter so they don't share (and
+        // corrupt) the window of the user-wide limit.
+        if ($modelLimitSlug !== null) {
+            $key .= '|model:'.$modelLimitSlug;
+        }
 
         $result = $this->rateLimiter->attempt($category, $key, $maxAttempts, $windowSeconds, $user);
 
@@ -86,7 +94,8 @@ class ThrottleAiRequests
         $ip = $request->ip();
 
         return match ($category) {
-            'text_gen' => ($request->user()?->ulid ?? 'ip:'.$ip).'|tool:'.($request->input('slug') ?? '_'),
+            // User-wide key: the limit covers all tools combined, not N requests per tool
+            'text_gen' => $request->user()?->ulid ?? 'ip:'.$ip,
             'auth' => strtolower((string) ($request->input('email') ?? '')).'|'.$ip,
             'otp' => ($request->session()->get('admin_2fa_id')
                 ?? $request->session()->get('user_2fa_id')

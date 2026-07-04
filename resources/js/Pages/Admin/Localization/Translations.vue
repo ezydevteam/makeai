@@ -454,207 +454,206 @@ function handleKeydown(event: KeyboardEvent) {
 
 <template>
     <Head :title="t('Translations — :language', { language: language.name })" />
-    <div class="py-6">
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="min-w-0">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        {{ t(':language Translations', { language: language.name }) }}
-                    </h1>
-                    <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Review keys, edit translated strings, and use AI to fill missing phrases from one unified admin workspace.') }}
-                    </p>
-                </div>
+        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    {{ t(':language Translations', { language: language.name }) }}
+                </h1>
+                <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Review keys, edit translated strings, and use AI to fill missing phrases from one unified admin workspace.') }}
+                </p>
+            </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                    <Link
-                        :href="route('admin.languages.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                    >
-                        <i class="ti ti-arrow-left text-base"></i>
-                        <span>{{ t('Back') }}</span>
-                    </Link>
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
-                        :disabled="savingAll || translatingAiAll"
-                        @click="aiTranslateAll"
-                    >
-                        <svg v-if="translatingAiAll" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                        <i v-else class="ti ti-sparkles text-sm"></i>
-                        {{ t('AI Translate') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="savingAll"
-                        @click="saveAllChanges"
-                    >
-                        <svg v-if="savingAll" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                        </svg>
-                        {{ savingAll ? t('Saving...') : t('Save Changes') }}
-                    </button>
+            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <Link
+                    :href="route('admin.languages.index')"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                    <i class="ti ti-arrow-left text-base"></i>
+                    <span>{{ t('Back') }}</span>
+                </Link>
+                <button
+                    type="button"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
+                    :disabled="savingAll || translatingAiAll"
+                    @click="aiTranslateAll"
+                >
+                    <svg v-if="translatingAiAll" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                    <i v-else class="ti ti-sparkles text-sm"></i>
+                    {{ t('AI Translate') }}
+                </button>
+                <button
+                    type="button"
+                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                    :disabled="savingAll"
+                    @click="saveAllChanges"
+                >
+                    <svg v-if="savingAll" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    {{ savingAll ? t('Saving...') : t('Save Changes') }}
+                </button>
+            </div>
+        </div>
+
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                    <div class="w-full xl:max-w-md">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInputRef"
+                                v-model="search"
+                                type="text"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                :placeholder="t('Search by key or translation...')"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
+                            />
+                            <span
+                                v-if="!search && !searchFocused"
+                                class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                            >
+                                /
+                            </span>
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                :title="t('Clear search')"
+                                @click="clearSearch"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 text-sm">
+                        <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-surface-800 dark:text-gray-300">
+                            {{ t(':count filled', { count: filledCount }) }}
+                        </span>
+                        <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                            {{ t(':count missing', { count: missingCount }) }}
+                        </span>
+                        <span
+                            v-if="dirtyCount > 0"
+                            class="inline-flex rounded-full bg-primary-100 px-3 py-1 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
+                        >
+                            {{ t(':count unsaved', { count: dirtyCount }) }}
+                        </span>
+                    </div>
                 </div>
             </div>
 
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
-                            <div class="relative">
-                                <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
-                                    <i class="ti ti-search text-base"></i>
-                                </span>
-                                <input
-                                    ref="searchInputRef"
-                                    v-model="search"
-                                    type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Search by key or translation...')"
-                                    @focus="searchFocused = true"
-                                    @blur="searchFocused = false"
-                                />
+            <div class="grid grid-cols-12 gap-3 border-b border-gray-100 bg-gray-50 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-surface-800 dark:bg-surface-950/40 dark:text-gray-400">
+                <div class="col-span-12 lg:col-span-4">{{ t('Original / Key') }}</div>
+                <div class="col-span-12 lg:col-span-8">{{ t('Translation') }}</div>
+            </div>
+
+            <div v-if="rows.length" class="divide-y divide-gray-100 dark:divide-surface-800">
+                <div
+                    v-for="translation in rows"
+                    :key="translation.id"
+                    class="grid grid-cols-12 gap-4 px-6 py-5 transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-900/10"
+                >
+                    <div class="col-span-12 lg:col-span-4">
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Source key') }}</div>
+                        <p class="mt-2 break-words rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 font-mono text-xs leading-5 text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
+                            {{ translation.key }}
+                        </p>
+                    </div>
+
+                    <div class="col-span-12 lg:col-span-8">
+                        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <label class="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                                {{ t('Translated value') }}
+                            </label>
+                            <div class="flex items-center gap-2">
                                 <span
-                                    v-if="!search && !searchFocused"
-                                    class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                                    v-if="isDirty(translation)"
+                                    class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                                 >
-                                    /
+                                    {{ t('Unsaved') }}
                                 </span>
-                                <button
-                                    v-if="search"
-                                    type="button"
-                                    class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                    :aria-label="t('Clear search')"
-                                    :title="t('Clear search')"
-                                    @click="clearSearch"
-                                >
-                                    <i class="ti ti-x text-base"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-wrap items-center gap-2 text-sm">
-                            <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-surface-800 dark:text-gray-300">
-                                {{ t(':count filled', { count: filledCount }) }}
-                            </span>
-                            <span class="inline-flex rounded-full bg-amber-100 px-3 py-1 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                {{ t(':count missing', { count: missingCount }) }}
-                            </span>
-                            <span
-                                v-if="dirtyCount > 0"
-                                class="inline-flex rounded-full bg-primary-100 px-3 py-1 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
-                            >
-                                {{ t(':count unsaved', { count: dirtyCount }) }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-12 gap-3 border-b border-gray-100 bg-gray-50 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-surface-800 dark:bg-surface-950/40 dark:text-gray-400">
-                    <div class="col-span-12 lg:col-span-4">{{ t('Original / Key') }}</div>
-                    <div class="col-span-12 lg:col-span-8">{{ t('Translation') }}</div>
-                </div>
-
-                <div v-if="rows.length" class="divide-y divide-gray-100 dark:divide-surface-800">
-                    <div
-                        v-for="translation in rows"
-                        :key="translation.id"
-                        class="grid grid-cols-12 gap-4 px-6 py-5 transition-colors hover:bg-primary-50/40 dark:hover:bg-primary-900/10"
-                    >
-                        <div class="col-span-12 lg:col-span-4">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Source key') }}</div>
-                            <p class="mt-2 break-words rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 font-mono text-xs leading-5 text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200">
-                                {{ translation.key }}
-                            </p>
-                        </div>
-
-                        <div class="col-span-12 lg:col-span-8">
-                            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                <label class="text-xs font-semibold uppercase tracking-wide text-gray-400">
-                                    {{ t('Translated value') }}
-                                </label>
-                                <div class="flex items-center gap-2">
-                                    <span
-                                        v-if="isDirty(translation)"
-                                        class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                <Tooltip :content="t('AI Auto-Fill')" placement="top">
+                                    <button
+                                        type="button"
+                                        class="inline-flex h-5 w-5 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
+                                        :disabled="translatingAi !== null"
+                                        @click="aiTranslate(translation.id)"
                                     >
-                                        {{ t('Unsaved') }}
-                                    </span>
-                                    <Tooltip :content="t('AI Auto-Fill')" placement="top">
-                                        <button
-                                            type="button"
-                                            class="inline-flex h-5 w-5 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
-                                            :disabled="translatingAi !== null"
-                                            @click="aiTranslate(translation.id)"
-                                        >
-                                            <svg v-if="translatingAi === translation.id" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                                            <i v-else class="ti ti-sparkles text-sm"></i>
-                                        </button>
-                                    </Tooltip>
-                                </div>
+                                        <svg v-if="translatingAi === translation.id" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+                                        <i v-else class="ti ti-sparkles text-sm"></i>
+                                    </button>
+                                </Tooltip>
                             </div>
-
-                            <textarea
-                                v-model="translation.value"
-                                rows="3"
-                                class="block w-full resize-y rounded-lg border bg-gray-50 px-3 py-2.5 text-sm leading-6 text-gray-900 transition-all focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:text-white"
-                                :class="isDirty(translation)
-                                    ? 'border-primary-300 ring-2 ring-primary-100 dark:border-primary-700 dark:ring-primary-900/30'
-                                    : 'border-gray-200 dark:border-surface-700'"
-                            ></textarea>
                         </div>
+
+                        <textarea
+                            v-model="translation.value"
+                            rows="3"
+                            class="block w-full resize-y rounded-lg border bg-gray-50 px-3 py-2.5 text-sm leading-6 text-gray-900 transition-all focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:text-white"
+                            :class="isDirty(translation)
+                                ? 'border-primary-300 ring-2 ring-primary-100 dark:border-primary-700 dark:ring-primary-900/30'
+                                : 'border-gray-200 dark:border-surface-700'"
+                        ></textarea>
                     </div>
                 </div>
+            </div>
 
-                <div v-else class="px-6 py-14 text-center">
-                    <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-800 dark:text-gray-500">
-                        <i class="ti ti-language text-2xl"></i>
-                    </div>
-                    <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('No translations found') }}</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Try a different search term or sync more phrases for this language.') }}</p>
+            <div v-else class="px-6 py-14 text-center">
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 text-gray-400 dark:bg-surface-800 dark:text-gray-500">
+                    <i class="ti ti-language text-2xl"></i>
                 </div>
+                <h3 class="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{{ t('No translations found') }}</h3>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Try a different search term or sync more phrases for this language.') }}</p>
+            </div>
 
-                <div v-if="translations.links.length > 3" class="flex flex-col gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-surface-800 dark:bg-surface-950/40">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Showing :from-:to of :count phrases', { from: translations.from, to: translations.to, count: translations.total }) }}
-                    </p>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <template v-for="link in paginationDisplayLinks" :key="link.key">
-                            <span
-                                v-if="link.isEllipsis"
-                                class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                            >
+            <div v-if="translations.links.length > 3" class="flex flex-col gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-surface-800 dark:bg-surface-950/40">
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Showing :from-:to of :count phrases', { from: translations.from, to: translations.to, count: translations.total }) }}
+                </p>
+                <div class="flex flex-wrap items-center gap-2">
+                    <template v-for="link in paginationDisplayLinks" :key="link.key">
+                        <span
+                            v-if="link.isEllipsis"
+                            class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                        >
+                            {{ link.label }}
+                        </span>
+                        <Link
+                            v-else
+                            :href="link.url || '#'"
+                            class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
+                            :class="[
+                            link.active
+                                ? 'border-primary-600 bg-primary-600 text-white'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300',
+                            !link.url ? 'cursor-not-allowed opacity-50' : '',
+                        ]"
+                        >
+                            <template v-if="link.isPrev">
+                                <i class="ti ti-chevron-left text-sm"></i>
+                            </template>
+                            <template v-else-if="link.isNext">
+                                <i class="ti ti-chevron-right text-sm"></i>
+                            </template>
+                            <template v-else>
                                 {{ link.label }}
-                            </span>
-                            <Link
-                                v-else
-                                :href="link.url || '#'"
-                                class="rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-                                :class="[
-                                link.active
-                                    ? 'border-primary-600 bg-primary-600 text-white'
-                                    : 'border-gray-200 bg-white text-gray-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300',
-                                !link.url ? 'cursor-not-allowed opacity-50' : '',
-                            ]"
-                            >
-                                <template v-if="link.isPrev">
-                                    <i class="ti ti-chevron-left text-sm"></i>
-                                </template>
-                                <template v-else-if="link.isNext">
-                                    <i class="ti ti-chevron-right text-sm"></i>
-                                </template>
-                                <template v-else>
-                                    {{ link.label }}
-                                </template>
-                            </Link>
-                        </template>
-                    </div>
+                            </template>
+                        </Link>
+                    </template>
                 </div>
-            </section>
-        </div>
+            </div>
+        </section>
     </div>
+
 
     <ActionConfirmModal
         :open="confirmModalOpen"

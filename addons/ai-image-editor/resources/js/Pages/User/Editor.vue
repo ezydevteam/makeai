@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, usePage } from '@inertiajs/vue3'
+import { Head, Link, usePage, router } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import * as fabric from 'fabric'
@@ -8,8 +8,66 @@ import axios from 'axios'
 const { t } = useTranslate()
 const page = usePage()
 
+const isDragging = ref(false)
+const fileToUpload = ref<File | null>(null)
+const isUploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const uploadError = ref('')
+
+function triggerFileInput() {
+    fileInput.value?.click()
+}
+
+function handleFileSelect(e: Event) {
+    const target = e.target as HTMLInputElement
+    if (target.files?.[0]) {
+        fileToUpload.value = target.files[0]
+        uploadError.value = ''
+    }
+}
+
+function handleDrop(e: DragEvent) {
+    isDragging.value = false
+    if (e.dataTransfer?.files?.[0]) {
+        const file = e.dataTransfer.files[0]
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg']
+        if (allowedTypes.includes(file.type)) {
+            fileToUpload.value = file
+            uploadError.value = ''
+        } else {
+            uploadError.value = t('Invalid file type. Please upload a JPG, PNG, or WEBP image.')
+        }
+    }
+}
+
+async function handleUpload() {
+    if (!fileToUpload.value || isUploading.value) return
+    isUploading.value = true
+    uploadError.value = ''
+
+    const fd = new FormData()
+    fd.append('upload', fileToUpload.value)
+
+    try {
+        router.post(route('addon.ie.user.upload'), fd, {
+            forceFormData: true,
+            onSuccess: () => {
+                isUploading.value = false
+                fileToUpload.value = null
+            },
+            onError: (errors) => {
+                isUploading.value = false
+                uploadError.value = Object.values(errors)[0] || t('Upload failed')
+            }
+        })
+    } catch (e: any) {
+        isUploading.value = false
+        uploadError.value = e.message || t('Upload failed')
+    }
+}
+
 const props = defineProps<{
-    session: {
+    session?: {
         id: number
         ulid: string
         source_path: string
@@ -18,7 +76,7 @@ const props = defineProps<{
         current_url: string
         width: number | null
         height: number | null
-    }
+    } | null
     history: {
         id: number
         ulid: string
@@ -37,8 +95,8 @@ const props = defineProps<{
 const creditCosts = (page.props.imageEditor as any)?.creditCosts || {}
 const isProcessing = ref(false)
 const processingOperation = ref('')
-const currentVersion = ref(props.session.width && props.session.height ? `${props.session.width}×${props.session.height}px` : '')
-const currentImageUrl = ref(props.session.current_url || props.session.source_url)
+const currentVersion = ref(props.session?.width && props.session?.height ? `${props.session.width}×${props.session.height}px` : '')
+const currentImageUrl = ref(props.session?.current_url || props.session?.source_url || '')
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const fabricCanvas: any = ref(null)
 
@@ -94,6 +152,24 @@ const operations = [
 ]
 
 const activeTab = ref('operations')
+
+function selectOperation(op: string) {
+    activeOperation.value = op
+    if (op === 'inpaint' || op === 'object_remove') {
+        brushMode.value = true
+        if (fabricCanvas.value) {
+            fabricCanvas.value.isDrawingMode = true
+            fabricCanvas.value.freeDrawingBrush = new fabric.PencilBrush(fabricCanvas.value)
+            fabricCanvas.value.freeDrawingBrush.width = brushSize.value
+            fabricCanvas.value.freeDrawingBrush.color = maskColor.value
+        }
+    } else {
+        brushMode.value = false
+        if (fabricCanvas.value) {
+            fabricCanvas.value.isDrawingMode = false
+        }
+    }
+}
 
 function applyPreset(preset: string) {
     if (preset === 'restore_old_photo') {
@@ -360,7 +436,67 @@ watch(brushSize, (size) => {
             </div>
         </div>
 
-        <div class="flex flex-1 overflow-hidden">
+        <!-- Render Upload component if there is no active session -->
+        <div v-if="!session" class="flex-1 flex flex-col items-center justify-center p-8 bg-gray-950">
+            <div class="max-w-md w-full bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-2xl">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-500/20">
+                        <i class="ti ti-photo-edit text-3xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-white mb-2">{{ t('AI Image Editor') }}</h2>
+                    <p class="text-gray-400 text-sm">
+                        {{ t('Upload an image from your computer to begin editing, or select one from your library.') }}
+                    </p>
+                </div>
+
+                <!-- Drag & drop upload form -->
+                <form @submit.prevent="handleUpload" class="space-y-4">
+                    <div
+                        @dragover.prevent="isDragging = true"
+                        @dragleave.prevent="isDragging = false"
+                        @drop.prevent="handleDrop"
+                        :class="['border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200', isDragging ? 'border-blue-500 bg-blue-500/5' : 'border-gray-750 hover:border-gray-700 bg-gray-900']"
+                        @click="triggerFileInput"
+                    >
+                        <input
+                            type="file"
+                            ref="fileInput"
+                            @change="handleFileSelect"
+                            class="hidden"
+                            accept=".jpg,.jpeg,.png,.webp"
+                        />
+                        <i class="ti ti-cloud-upload text-3xl text-gray-500 mb-2 block"></i>
+                        <span class="text-sm font-semibold text-gray-300 block mb-1">
+                            {{ fileToUpload ? fileToUpload.name : t('Choose image file') }}
+                        </span>
+                        <span class="text-xs text-gray-500 block">
+                            {{ t('Supports PNG, JPG, JPEG, WEBP up to 10MB') }}
+                        </span>
+                    </div>
+
+                    <div v-if="uploadError" class="text-red-500 text-xs text-center mt-2">
+                        {{ uploadError }}
+                    </div>
+
+                    <button
+                        type="submit"
+                        :disabled="!fileToUpload || isUploading"
+                        class="btn btn-primary w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2"
+                    >
+                        <span v-if="isUploading" class="spinner mr-2" style="border-width: 2px; width: 16px; height: 16px;"></span>
+                        <span>{{ isUploading ? t('Uploading...') : t('Open in Editor') }}</span>
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-6 border-t border-gray-800 text-center">
+                    <Link :href="route('user.dashboard.history.index')" class="text-sm text-blue-400 hover:text-blue-300 font-medium">
+                        {{ t('Browse your generated images') }} →
+                    </Link>
+                </div>
+            </div>
+        </div>
+
+        <div v-else class="flex flex-1 overflow-hidden">
             <!-- Left Panel — Operations -->
             <div class="w-[280px] bg-gray-800 border-r border-gray-700 overflow-y-auto shrink-0">
                 <div class="flex border-b border-gray-700">
@@ -375,7 +511,34 @@ watch(brushSize, (size) => {
                 <!-- Operations Tab -->
                 <div v-if="activeTab === 'operations'" class="p-3 space-y-3">
                     <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ t('AI Operations') }}</h3>
-                    <!-- ... (Existing operation list) ... -->
+                    <button
+                        v-for="op in operations.slice(0, 6)"
+                        :key="op.key"
+                        @click="selectOperation(op.key)"
+                        :class="[
+                            'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition cursor-pointer',
+                            activeOperation === op.key ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700',
+                        ]"
+                    >
+                        <i :class="op.icon" class="text-base"></i>
+                        <span class="flex-1 text-left">{{ op.label }}</span>
+                        <span class="text-xs text-gray-500" :class="{ 'text-blue-300': activeOperation === op.key }">{{ op.credits }} cr</span>
+                    </button>
+
+                    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider !mt-5">{{ t('Local Edits') }}</h3>
+                    <button
+                        v-for="op in operations.slice(6)"
+                        :key="op.key"
+                        @click="selectOperation(op.key)"
+                        :class="[
+                            'w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition cursor-pointer',
+                            activeOperation === op.key ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700',
+                        ]"
+                    >
+                        <i :class="op.icon" class="text-base"></i>
+                        <span class="flex-1 text-left">{{ op.label }}</span>
+                        <span class="text-xs text-gray-500" :class="{ 'text-blue-300': activeOperation === op.key }">0 cr</span>
+                    </button>
                 </div>
 
                 <!-- Presets Tab -->
@@ -397,7 +560,7 @@ watch(brushSize, (size) => {
                     <!-- Inpaint Form -->
                     <template v-if="activeOperation === 'inpaint'">
                         <p class="text-xs text-gray-500">{{ t('Brush over the area you want to regenerate') }}</p>
-                        <button @click="toggleBrush" :class="['btn w-full text-sm py-1.5', brushMode ? 'btn-danger' : 'btn-secondary']">
+                        <button @click="toggleBrush" :class="['btn w-full text-sm py-1.5 rounded-xl transition-all', brushMode ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white']">
                             {{ brushMode ? t('Stop Brush') : t('Start Brush') }}
                         </button>
                         <div>
@@ -443,12 +606,12 @@ watch(brushSize, (size) => {
                         <div>
                             <label class="text-xs text-gray-400">{{ t('Scale Factor') }}</label>
                             <div class="flex gap-2">
-                                <button @click="upscaleFactor = 2" :class="['btn text-sm py-1 px-3', upscaleFactor === 2 ? 'btn-primary' : 'btn-secondary']">2×</button>
-                                <button @click="upscaleFactor = 4" :class="['btn text-sm py-1 px-3', upscaleFactor === 4 ? 'btn-primary' : 'btn-secondary']">4×</button>
+                                <button @click="upscaleFactor = 2" :class="['btn text-sm py-1 px-3 rounded-xl', upscaleFactor === 2 ? 'btn-primary' : 'bg-gray-600 hover:bg-gray-700 text-white transition-all']">2×</button>
+                                <button @click="upscaleFactor = 4" :class="['btn text-sm py-1 px-3 rounded-xl', upscaleFactor === 4 ? 'btn-primary' : 'bg-gray-600 hover:bg-gray-700 text-white transition-all']">4×</button>
                             </div>
                         </div>
                         <p class="text-xs text-gray-500">
-                            {{ t('Estimated output') }}: {{ (props.session.width || 0) * upscaleFactor }}×{{ (props.session.height || 0) * upscaleFactor }}px
+                            {{ t('Estimated output') }}: {{ (props.session?.width || 0) * upscaleFactor }}×{{ (props.session?.height || 0) * upscaleFactor }}px
                         </p>
                         <button @click="applyOperation" :disabled="isProcessing" class="btn btn-primary w-full text-sm py-1.5">
                             {{ isProcessing ? t('Upscaling...') : t('Upscale Image') }}
@@ -478,7 +641,7 @@ watch(brushSize, (size) => {
                     <!-- Object Removal -->
                     <template v-if="activeOperation === 'object_remove'">
                         <p class="text-xs text-gray-500">{{ t('Brush over the object you want to remove') }}</p>
-                        <button @click="toggleBrush" :class="['btn w-full text-sm py-1.5', brushMode ? 'btn-danger' : 'btn-secondary']">
+                        <button @click="toggleBrush" :class="['btn w-full text-sm py-1.5 rounded-xl transition-all', brushMode ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white']">
                             {{ brushMode ? t('Stop Brush') : t('Start Brush') }}
                         </button>
                         <div>
@@ -583,7 +746,7 @@ watch(brushSize, (size) => {
                                 <button
                                     v-if="edit.status === 'completed' && !edit.is_current"
                                     @click="revertToVersion(edit)"
-                                    class="btn btn-secondary text-[10px] py-0.5 px-2"
+                                    class="btn bg-gray-600 hover:bg-gray-700 text-white rounded-xl transition-all text-[10px] py-0.5 px-2"
                                 >
                                     {{ t('Revert') }}
                                 </button>

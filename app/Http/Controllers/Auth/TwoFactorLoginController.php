@@ -32,11 +32,12 @@ class TwoFactorLoginController extends Controller
                 $otpCode = $user->generateOtp();
                 $request->session()->put('user_otp_sent', true);
 
-                dispatch(new \App\Jobs\SendTemplatedEmail(
-                    $user,
-                    'login_2fa_otp',
-                    ['code' => $otpCode, 'name' => $user->name]
-                ));
+                \App\Jobs\SendTemplatedEmail::dispatch('login_otp', $user->email, [
+                    'user_name' => $user->name,
+                    'user_email' => $user->email,
+                    'otp_code' => $otpCode,
+                    'site_name' => settings('app_name', translate('Application')),
+                ])->onQueue('otp');
             }
         }
 

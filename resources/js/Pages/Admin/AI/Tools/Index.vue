@@ -334,209 +334,232 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('AI Tools — Admin')" />
 
-    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="flex items-center justify-between">
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tools') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage AI tools, prompts, and configurations.') }}</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
                     @click="openGlobalSettingsModal"
                 >
-                    <i class="ti ti-settings"></i>
+                    <i class="ti ti-settings text-base"></i>
                     {{ t('Global Settings') }}
                 </button>
                 <Link
                     v-if="hasTrashedTools"
                     :href="route('admin.ai.tools.trash')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
                 >
-                    <i class="ti ti-trash"></i>
+                    <i class="ti ti-trash text-base"></i>
                     {{ t('Trash') }}
                 </Link>
-                <Link :href="route('admin.ai.tools.create')" class="btn-primary-admin inline-flex items-center gap-2 px-4 py-2 text-sm text-white">
-                    <i class="ti ti-plus"></i>
+                <Link
+                    :href="route('admin.ai.tools.create')"
+                    class="btn-primary-admin inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm text-white w-full sm:w-auto"
+                >
+                    <i class="ti ti-plus text-base"></i>
                     {{ t('New Tool') }}
                 </Link>
             </div>
         </div>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                <div class="relative min-w-[240px] flex-1">
-                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
-                    <input
-                        ref="searchInput"
-                        v-model="search"
-                        type="text"
-                        :placeholder="t('Search tools...')"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        @input="handleSearchInput"
-                        @focus="searchFocused = true"
-                        @blur="searchFocused = false"
-                    />
-                    <span
-                        v-if="!search && !searchFocused"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >
-                        /
-                    </span>
-                    <button
-                        v-if="search"
-                        type="button"
-                        class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
-                        :aria-label="t('Clear search')"
-                        @click="clearSearch"
-                    >
-                        <i class="ti ti-x text-sm"></i>
-                    </button>
-                </div>
-                <AppSelect
-                    v-model="selectedCategory"
-                    :options="categoryOptions"
-                    :placeholder="t('All Categories')"
-                    live-search
-                    class="w-full sm:w-56"
-                    @update:model-value="applyFilters"
-                />
-                <AppSelect
-                    v-model="selectedStatus"
-                    :options="statusOptions"
-                    :placeholder="t('All Status')"
-                    class="w-full sm:w-44"
-                    @update:model-value="applyFilters"
-                />
-                <div v-if="selectedIds.length" class="ml-auto flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-                    <span class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ t(':count selected', { count: selectedIds.length }) }}
-                    </span>
-                    <AppSelect
-                        v-model="bulkAction"
-                        :options="bulkActionOptions"
-                        :placeholder="t('Bulk Actions')"
-                        class="w-full sm:w-44"
-                    />
-                    <button
-                        type="button"
-                        class="inline-flex items-center justify-center btn-primary-admin px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="!bulkAction || selectedIds.length === 0"
-                        @click="applyBulkAction"
-                    >
-                        {{ t('Apply') }}
-                    </button>
+        <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
+            <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                    <div class="flex-1 min-w-[240px]">
+                        <div class="relative">
+                            <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                                <i class="ti ti-search text-base"></i>
+                            </span>
+                            <input
+                                ref="searchInput"
+                                v-model="search"
+                                type="text"
+                                :placeholder="t('Search tools...')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                @input="handleSearchInput"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
+                            />
+                            <span
+                                v-if="!search && !searchFocused"
+                                class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                            >
+                                /
+                            </span>
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="clearSearch"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[200px] lg:w-56 lg:flex-none">
+                            <AppSelect
+                                v-model="selectedCategory"
+                                :options="categoryOptions"
+                                :placeholder="t('All Categories')"
+                                live-search
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+
+                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                            <AppSelect
+                                v-model="selectedStatus"
+                                :options="statusOptions"
+                                :placeholder="t('All Status')"
+                                @update:model-value="applyFilters"
+                            />
+                        </div>
+
+                        <template v-if="selectedIds.length">
+                            <span class="text-sm text-gray-500 dark:text-gray-400 sm:whitespace-nowrap">
+                                {{ t(':count selected', { count: selectedIds.length }) }}
+                            </span>
+
+                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                                <AppSelect
+                                    v-model="bulkAction"
+                                    :options="bulkActionOptions"
+                                    :placeholder="t('Bulk Actions')"
+                                />
+                            </div>
+
+                            <button
+                                type="button"
+                                class="inline-flex w-full sm:w-auto items-center justify-center btn-primary-admin px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="!bulkAction || selectedIds.length === 0"
+                                @click="applyBulkAction"
+                            >
+                                {{ t('Apply') }}
+                            </button>
+                        </template>
+                    </div>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-[760px] w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
-                            <th class="w-4 px-4 py-3.5 text-left">
-                                <input
-                                    type="checkbox"
-                                    class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-                                    :checked="isAllSelected"
-                                    @change="toggleAll"
-                                />
-                            </th>
-                            <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
-                            <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
-                            <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                            <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Uses') }}</th>
-                            <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
-                        <tr v-for="tool in tools.data" :key="tool.id" class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30">
-                            <td class="w-4 px-4 py-4">
-                                <input
-                                    v-model="selectedIds"
-                                    type="checkbox"
-                                    :value="tool.id"
-                                    class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
-                                />
-                            </td>
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div :style="{ background: tool.color || '#6366f1' }" class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl text-sm text-white shadow-sm">
-                                        <i v-if="tool.icon" :class="tool.icon"></i>
-                                        <span v-else class="font-bold leading-none">{{ String(tool.name || '?').charAt(0).toUpperCase() }}</span>
-                                    </div>
-                                    <div>
-                                        <p class="font-semibold text-gray-900 dark:text-white">{{ tool.name }}</p>
-                                        <p class="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{{ tool.slug }}</p>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-4 py-4">
-                                <span v-if="tool.category" class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-400">
-                                    {{ typeof tool.category === 'object' ? tool.category.name : tool.category }}
-                                </span>
-                                <span v-else class="text-xs text-gray-400">{{ t('—') }}</span>
-                            </td>
-                            <td class="px-4 py-4 text-center">
-                                <button
-                                    type="button"
-                                    :class="tool.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                    class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                    @click="toggleTool(tool.id)"
-                                >
-                                    <span
-                                        :class="tool.is_active ? 'translate-x-4' : 'translate-x-0'"
-                                        class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
+            <div class="overflow-hidden rounded-b-2xl">
+                <div class="overflow-x-auto">
+                    <table class="min-w-[760px] w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
+                                <th class="w-4 px-4 py-3.5 text-left">
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                        :checked="isAllSelected"
+                                        @change="toggleAll"
                                     />
-                                </button>
-                            </td>
-                            <td class="px-4 py-4 text-center font-medium text-gray-600 dark:text-gray-400">
-                                {{ formatNumber(Number(tool.usage_count || 0)) }}
-                            </td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="flex items-center justify-end gap-2">
-                                    <Tooltip :content="t('Edit tool')" placement="top">
-                                        <Link :href="route('admin.ai.tools.edit', tool.id)" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-surface-800">
-                                            <i class="ti ti-edit text-base"></i>
-                                        </Link>
-                                    </Tooltip>
-                                    <Tooltip :content="t('Delete tool')" placement="top">
-                                        <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" @click="confirmDelete(tool.id)">
-                                            <i class="ti ti-trash text-base"></i>
-                                        </button>
-                                    </Tooltip>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr v-if="!tools.data?.length">
-                            <td colspan="6" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
-                                <i class="ti ti-table-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
-                                <p class="font-medium">{{ t('No tools found') }}</p>
-                                <button
-                                    v-if="hasActiveFilters"
-                                    type="button"
-                                    class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                    @click="resetFilters"
-                                >
-                                    {{ t('Clear filters') }}
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                                </th>
+                                <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
+                                <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
+                                <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
+                                <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Uses') }}</th>
+                                <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
+                            <tr v-for="tool in tools.data" :key="tool.id" class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30">
+                                <td class="w-4 px-4 py-4">
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                        :value="tool.id"
+                                        v-model="selectedIds"
+                                    />
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-xl dark:bg-surface-800" :style="{ color: tool.color || 'var(--color-primary-500)' }">
+                                            <i :class="tool.icon || 'ti ti-tool'"></i>
+                                        </div>
+                                        <div>
+                                            <Link :href="route('admin.ai.tools.edit', tool.id)" class="font-semibold text-gray-900 transition-colors hover:text-primary-600 dark:text-white dark:hover:text-primary-400">
+                                                {{ tool.name }}
+                                            </Link>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ tool.slug }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-4 text-center">
+                                    <span v-if="tool.category" class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-400">
+                                        {{ typeof tool.category === 'object' ? tool.category.name : tool.category }}
+                                    </span>
+                                    <span v-else class="text-xs text-gray-400">{{ t('—') }}</span>
+                                </td>
+                                <td class="px-4 py-4 text-center">
+                                    <button
+                                        type="button"
+                                        @click="toggleTool(tool.id)"
+                                        class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
+                                        :class="[tool.is_active ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700']"
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"
+                                            :class="[tool.is_active ? 'translate-x-4' : 'translate-x-0']"
+                                        />
+                                    </button>
+                                </td>
+                                <td class="px-4 py-4 text-center font-medium text-gray-600 dark:text-gray-400">
+                                    {{ formatNumber(Number(tool.usage_count || 0)) }}
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <Tooltip :content="t('Edit tool')" placement="top">
+                                            <Link :href="route('admin.ai.tools.edit', tool.id)" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20">
+                                                <i class="ti ti-edit text-base"></i>
+                                            </Link>
+                                        </Tooltip>
+                                        <Tooltip :content="t('Delete tool')" placement="top">
+                                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" @click="confirmDelete(tool.id)">
+                                                <i class="ti ti-trash text-base"></i>
+                                            </button>
+                                        </Tooltip>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="!tools.data?.length">
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-400 dark:text-gray-500">
+                                    <i class="ti ti-table-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
+                                    <p class="font-medium">{{ t('No tools found') }}</p>
+                                    <button
+                                        v-if="hasActiveFilters"
+                                        type="button"
+                                        class="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                                        @click="resetFilters"
+                                    >
+                                        {{ t('Clear filters') }}
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
-            <div v-if="tools.links && tools.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
-                <Pagination
-                    :links="tools.links"
-                    :from="tools.from"
-                    :to="tools.to"
-                    :total="tools.total"
-                    :current-page="tools.current_page"
-                    :last-page="tools.last_page"
-                />
+                <div v-if="tools.links && tools.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-surface-800">
+                    <Pagination
+                        :links="tools.links"
+                        :from="tools.from"
+                        :to="tools.to"
+                        :total="tools.total"
+                        :current-page="tools.current_page"
+                        :last-page="tools.last_page"
+                    />
+                </div>
             </div>
-        </section>
+        </div>
     </div>
 
     <ActionConfirmModal

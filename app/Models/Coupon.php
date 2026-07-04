@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 class Coupon extends Model
 {
     protected $fillable = [
-        'code', 'type', 'value', 'max_discount', 'max_uses',
+        'code', 'type', 'value', 'max_discount', 'max_uses', 'per_user_limit',
         'used_count', 'is_recurring', 'plan_id', 'user_limit', 'show_in_header',
         'starts_at', 'expires_at', 'is_active',
     ];
@@ -20,6 +20,7 @@ class Coupon extends Model
         return [
             'value' => 'decimal:2',
             'max_discount' => 'decimal:2',
+            'per_user_limit' => 'integer',
             'is_recurring' => 'boolean',
             'is_active' => 'boolean',
             'show_in_header' => 'boolean',
@@ -31,6 +32,32 @@ class Coupon extends Model
     public function plan()
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function redemptions()
+    {
+        return $this->hasMany(CouponRedemption::class);
+    }
+
+    /**
+     * How many times this user has already redeemed this coupon.
+     */
+    public function userRedemptionCount(User $user): int
+    {
+        return $this->redemptions()->where('user_id', $user->id)->count();
+    }
+
+    /**
+     * Whether the user has hit this coupon's per-user redemption limit.
+     * A NULL per_user_limit means unlimited redemptions per user.
+     */
+    public function hasReachedUserLimit(User $user): bool
+    {
+        if ($this->per_user_limit === null) {
+            return false;
+        }
+
+        return $this->userRedemptionCount($user) >= (int) $this->per_user_limit;
     }
 
     /**

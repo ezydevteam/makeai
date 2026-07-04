@@ -37,7 +37,12 @@ class TiptapHtmlSanitizer
     {
         $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html) ?? '';
         $html = preg_replace('/\son\w+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? '';
+        // Neutralize dangerous URI schemes in href/src. data:image/... is left
+        // intact (legitimate inline images); only data:text/html and script-y
+        // schemes are stripped.
         $html = preg_replace('/(href|src)\s*=\s*["\']\s*javascript:/i', '$1="#"', $html) ?? '';
+        $html = preg_replace('/(href|src)\s*=\s*["\']\s*vbscript:/i', '$1="#"', $html) ?? '';
+        $html = preg_replace('/(href|src)\s*=\s*["\']\s*data:\s*text\/html/i', '$1="#"', $html) ?? '';
 
         return strip_tags($html, $allowedTags);
     }

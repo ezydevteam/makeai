@@ -17,10 +17,46 @@ class LanguageController extends Controller
     /**
      * List all languages.
      */
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
+        $query = Language::query();
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('date_format', 'like', "%{$search}%")
+                    ->orWhere('time_format', 'like', "%{$search}%")
+                    ->orWhere('number_system', 'like', "%{$search}%")
+                    ->orWhere('currency_position', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status')) {
+            $status = $request->input('status');
+            switch ($status) {
+                case 'active':
+                    $query->where('is_active', true);
+                    break;
+                case 'inactive':
+                    $query->where('is_active', false);
+                    break;
+                case 'rtl':
+                    $query->where('is_rtl', true);
+                    break;
+                case 'default':
+                    $query->where('is_default', true);
+                    break;
+            }
+        }
+
         return Inertia::render('Admin/Localization/Languages', [
-            'languages' => Language::orderBy('is_default', 'desc')->get(),
+            'languages' => $query->orderBy('is_default', 'desc')->get(),
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'status' => $request->input('status', 'all'),
+            ],
         ]);
     }
 

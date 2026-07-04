@@ -8,7 +8,7 @@ import { useTheme } from '@/Composables/useTheme'
 import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import TagManager from './TagManager.vue'
-import type { useChat, ChatProject, Conversation, ChatProduct, ConversationTag } from '../Composables/useChat'
+import type { useChat, ChatProject, Conversation, ChatMode, ConversationTag } from '../Composables/useChat'
 
 const siteUrl = typeof window !== 'undefined' ? window.location.origin : ''
 
@@ -58,8 +58,8 @@ watch(moveMenuOpen, () => {
     activeSubmenu.value = null
 })
 
-const showProducts = ref(false)
-const productRef = ref<HTMLElement | null>(null)
+const showModes = ref(false)
+const modeRef = ref<HTMLElement | null>(null)
 
 const showTagManager = ref(false)
 const showTagFilter = ref(false)
@@ -112,7 +112,7 @@ onClickOutside(moveMenuRef, () => {
     moveMenuOpen.value = null
     activeSubmenu.value = null
 })
-onClickOutside(productRef, () => { showProducts.value = false })
+onClickOutside(modeRef, () => { showModes.value = false })
 onClickOutside(tagFilterRef, () => { showTagFilter.value = false })
 
 const resolveUserAvatarUrl = (path?: string | null): string | null => {
@@ -163,8 +163,8 @@ const saveCustomInstructions = async () => {
     }
 }
 
-const topProducts = computed(() => chat.products.value.slice(0, 2))
-const moreProducts = computed(() => chat.products.value.slice(2))
+const topModes = computed(() => chat.modes.value.slice(0, 2))
+const moreModes = computed(() => chat.modes.value.slice(2))
 const hasActiveChat = computed(() => !!chat.activeConversation.value)
 const latestConversation = computed(() => {
     return [...chat.conversations.value]
@@ -185,9 +185,9 @@ const filteredConversations = computed(() => {
 
     return source.filter(conv => {
         const title = (conv.title || '').toLowerCase()
-        const product = (conv.product_slug || '').toLowerCase()
+        const mode = (conv.mode_slug || '').toLowerCase()
         const model = (conv.model || '').toLowerCase()
-        return title.includes(query) || product.includes(query) || model.includes(query) || conv.ulid.toLowerCase().includes(query)
+        return title.includes(query) || mode.includes(query) || model.includes(query) || conv.ulid.toLowerCase().includes(query)
     })
 })
 
@@ -219,6 +219,27 @@ const grouped = computed(() => {
     }
 
     return groups
+})
+
+const allSections = computed(() => {
+    const list = []
+    if (pinnedConversations.value.length) {
+        list.push({
+            key: 'pinned',
+            title: t('Pinned'),
+            conversations: pinnedConversations.value
+        })
+    }
+    for (const [group, convs] of Object.entries(grouped.value)) {
+        if (convs.length) {
+            list.push({
+                key: group,
+                title: t({ today: 'Today', yesterday: 'Yesterday', last_7_days: 'Last 7 Days', older: 'Older' }[group] || group),
+                conversations: convs
+            })
+        }
+    }
+    return list
 })
 
 const doCreateProject = async () => {
@@ -315,14 +336,14 @@ const onDeselectProject = () => {
     chat.loadConversations()
 }
 
-const openSidebarSection = async (section: 'projects' | 'products') => {
+const openSidebarSection = async (section: 'projects' | 'modes') => {
     collapsed.value = false
     await nextTick()
     if (section === 'projects') {
         showProjects.value = true
-        showProducts.value = false
+        showModes.value = false
     } else {
-        showProducts.value = true
+        showModes.value = true
         showProjects.value = false
     }
 }
@@ -333,7 +354,7 @@ const openRecentChats = async () => {
 
     collapsed.value = false
     showProjects.value = false
-    showProducts.value = false
+    showModes.value = false
     await nextTick()
     chat.selectProject(null)
     chat.selectConversation(latest)
@@ -343,15 +364,15 @@ const onSelectConversation = (conv: Conversation) => {
     chat.selectConversation(conv)
 }
 
-const onSelectProduct = (p: ChatProduct) => {
-    chat.selectedProduct.value = p
-    chat.selectedModel.value = p.default_model
-    showProducts.value = false
+const onSelectMode = (m: ChatMode) => {
+    chat.selectedMode.value = m
+    chat.selectedModel.value = m.default_model
+    showModes.value = false
 }
 
-const getProductMenuIcon = (product: ChatProduct) => {
-    const slug = product.slug.toLowerCase()
-    const name = product.name.toLowerCase()
+const getModeMenuIcon = (mode: ChatMode) => {
+    const slug = mode.slug.toLowerCase()
+    const name = mode.name.toLowerCase()
 
     if (slug.includes('research') || name.includes('research')) return 'ti ti-search'
     if (slug.includes('code') || name.includes('code')) return 'ti ti-code'
@@ -549,11 +570,11 @@ const otherProjects = computed(() => {
                         </svg>
                     </button>
                 </Tooltip>
-                <Tooltip v-if="hasActiveChat" :content="t('Products')" placement="right">
+                <Tooltip v-if="hasActiveChat" :content="t('Modes')" placement="right">
                     <button
                         class="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-[#6e6a65] transition-colors hover:bg-black/10 dark:bg-white/10 dark:text-white/50 dark:hover:bg-white/15"
-                        :class="{ 'bg-black/10 text-[#1a1a1a] dark:bg-white/15 dark:text-white': showProducts }"
-                        @click="openSidebarSection('products')"
+                        :class="{ 'bg-black/10 text-[#1a1a1a] dark:bg-white/15 dark:text-white': showModes }"
+                        @click="openSidebarSection('modes')"
                     >
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
@@ -620,25 +641,25 @@ const otherProjects = computed(() => {
                 </div>
             </template>
 
-            <!-- Products section -->
-            <div v-if="hasActiveChat && !isCompactSidebar" ref="productRef" class="relative mb-1">
-                <div class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-[#6e6a65] dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="showProducts = !showProducts">
+            <!-- Modes section -->
+            <div v-if="hasActiveChat && !isCompactSidebar" ref="modeRef" class="relative mb-1">
+                <div class="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-[#6e6a65] dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="showModes = !showModes">
                     <i class="ti ti-layout-grid text-[15px]"></i>
-                    {{ t('Products') }}
-                    <i class="ti ti-chevron-right ml-auto text-[14px] transition-transform" :class="{ 'rotate-90': showProducts }"></i>
+                    {{ t('Modes') }}
+                    <i class="ti ti-chevron-right ml-auto text-[14px] transition-transform" :class="{ 'rotate-90': showModes }"></i>
                 </div>
-                <div v-if="showProducts" class="px-1 space-y-0.5">
+                <div v-if="showModes" class="px-1 space-y-0.5">
                     <button
-                        v-for="p in chat.products.value"
-                        :key="p.slug"
+                        v-for="m in chat.modes.value"
+                        :key="m.slug"
                         class="flex items-center gap-2.5 w-full px-3 py-1.5 rounded-lg text-sm transition-colors text-left"
-                        :class="chat.selectedProduct.value?.slug === p.slug
+                        :class="chat.selectedMode.value?.slug === m.slug
                             ? 'bg-black/5 dark:bg-white/10 font-medium text-[#1a1a1a] dark:text-white/90'
                             : 'hover:bg-black/5 dark:hover:bg-white/5'"
-                        @click="onSelectProduct(p)"
+                        @click="onSelectMode(m)"
                     >
-                        <i :class="[getProductMenuIcon(p), 'text-[14px]', 'w-4', 'text-center', 'text-[#6e6a65]', 'dark:text-white/40']"></i>
-                        <span class="flex-1 truncate capitalize">{{ p.name }}</span>
+                        <i :class="[getModeMenuIcon(m), 'text-[14px]', 'w-4', 'text-center', 'text-[#6e6a65]', 'dark:text-white/40']"></i>
+                        <span class="flex-1 truncate capitalize">{{ m.name }}</span>
                     </button>
                 </div>
             </div>
@@ -698,13 +719,14 @@ const otherProjects = computed(() => {
             </div>
 
             <!-- Conversations -->
-            <template v-for="(convs, group) in grouped" :key="group">
-                <div v-if="convs.length && !isCompactSidebar">
-                    <div class="px-3 py-1.5 text-[11px] font-medium text-[#b0aca8] dark:text-white/30 tracking-wide">
-                        {{ t({ today: 'Today', yesterday: 'Yesterday', last_7_days: 'Last 7 Days', older: 'Older' }[group] || group) }}
+            <template v-for="section in allSections" :key="section.key">
+                <div v-if="section.conversations.length && !isCompactSidebar">
+                    <div class="px-3 py-1.5 text-[11px] font-medium text-[#b0aca8] dark:text-white/30 tracking-wide flex items-center gap-1.5">
+                        <svg v-if="section.key === 'pinned'" class="w-3.5 h-3.5 text-[#b0aca8] dark:text-white/40 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+                        <span>{{ section.title }}</span>
                     </div>
                     <div
-                        v-for="conv in convs"
+                        v-for="conv in section.conversations"
                         :key="conv.ulid"
                         class="group flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-lg text-sm cursor-pointer transition-colors"
                         :class="renamingConversationUlid === conv.ulid
@@ -792,7 +814,7 @@ const otherProjects = computed(() => {
                                 </div>
                                 <button class="flex items-center gap-2 w-full px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click.stop="chat.togglePin(conv.ulid); moveMenuOpen = null">
                                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z" /></svg>
-                                    <span>{{ t('Pin') }}</span>
+                                    <span>{{ conv.is_pinned ? t('Unpin') : t('Pin') }}</span>
                                 </button>
                                 <button
                                     v-if="conv.share_token"
@@ -870,7 +892,7 @@ const otherProjects = computed(() => {
                 </div>
             </template>
 
-            <div v-if="!isCompactSidebar && !Object.values(grouped).some(g => g.length)" class="px-3 py-8 text-center text-sm text-[#b0aca8] dark:text-white/20">
+            <div v-if="!isCompactSidebar && !allSections.length" class="px-3 py-8 text-center text-sm text-[#b0aca8] dark:text-white/20">
                 {{ chat.selectedProject.value ? t('No conversations in this project yet') : t('No conversations yet') }}
             </div>
         </div>
@@ -891,20 +913,28 @@ const otherProjects = computed(() => {
             </button>
 
             <div v-if="menuOpen" class="absolute bottom-full left-3 right-3 mb-1 bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1.5 z-50">
-                <button class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="openSettings">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    <span>{{ t('Settings') }}</span>
-                </button>
+                <template v-if="user">
+                    <button class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="openSettings">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <span>{{ t('Settings') }}</span>
+                    </button>
 
-                <Link v-if="!isPro" :href="route('pricing')" class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                    <span>{{ t('Upgrade to Pro') }}</span>
-                </Link>
+                    <Link v-if="!isPro" :href="route('pricing')" class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                        <span>{{ t('Upgrade to Pro') }}</span>
+                    </Link>
 
-                <Link v-if="isPro" :href="route('user.dashboard')" class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:!text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg>
-                    <span>{{ t('Billing') }}</span>
-                </Link>
+                    <Link v-if="isPro" :href="route('user.dashboard')" class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:!text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">
+                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" /></svg>
+                        <span>{{ t('Billing') }}</span>
+                    </Link>
+                </template>
+                <template v-else>
+                    <Link :href="route('login')" class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:!text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">
+                        <i class="ti ti-login-2 text-[16px] text-[#b0aca8] dark:text-white/70"></i>
+                        <span>{{ t('Sign In') }}</span>
+                    </Link>
+                </template>
 
                 <button class="flex items-center gap-2.5 w-full px-3.5 py-2 text-sm text-[#1a1a1a] dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="router.visit('/contact'); menuOpen = false">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -936,18 +966,18 @@ const otherProjects = computed(() => {
                         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="transition-transform" :class="{ 'rotate-180': learnMoreOpen }"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                     </button>
                     <div v-if="learnMoreOpen" class="learn-more-flyout min-w-[180px] bg-white dark:bg-[#252525] border border-black/5 dark:border-white/10 rounded-xl shadow-xl py-1.5">
-                        <Link href="/privacy-policy" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Privacy Policy') }}</Link>
-                        <Link href="/terms-of-use" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Terms of Use') }}</Link>
-                        <Link href="/usage-policy" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Usage Policy') }}</Link>
-                        <Link href="/ai-tools" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('AI Tools') }}</Link>
-                        <div class="px-3.5 py-1.5 text-[11px] text-[#b0aca8] dark:text-white/20">
+                        <Link href="/privacy-policy" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:!text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Privacy Policy') }}</Link>
+                        <Link href="/terms-of-use" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:!text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Terms of Use') }}</Link>
+                        <Link href="/usage-policy" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:!text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('Usage Policy') }}</Link>
+                        <Link href="/ai-tools" class="flex items-center gap-2 px-3.5 py-1.5 text-xs text-[#6e6a65] dark:!text-white/50 hover:bg-black/5 dark:hover:bg-white/5 transition-colors no-underline" @click="menuOpen = false">{{ t('AI Tools') }}</Link>
+                        <div class="px-3.5 py-1.5 text-[11px] text-[#b0aca8] dark:!text-white/30">
                             <div class="font-medium text-[#6e6a65] dark:text-white/40 mb-1">{{ t('Keyboard Shortcuts') }}</div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Ctrl+Shift+O</kbd><span>{{ t('New Chat') }}</span></div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Ctrl+K</kbd><span>{{ t('Command palette') }}</span></div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Ctrl+B</kbd><span>{{ t('Toggle sidebar') }}</span></div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Esc</kbd><span>{{ t('Close menus') }}</span></div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Enter</kbd><span>{{ t('Send') }}</span></div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">Shift+Enter</kbd><span>{{ t('Newline') }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Ctrl+Shift+O</kbd><span>{{ t('New Chat') }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Ctrl+K</kbd><span>{{ t('Command palette') }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Ctrl+B</kbd><span>{{ t('Toggle sidebar') }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Esc</kbd><span>{{ t('Close menus') }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Enter</kbd><span>{{ t('Send') }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Shift+Enter</kbd><span>{{ t('Newline') }}</span></div>
                         </div>
                     </div>
                 </div>

@@ -12,6 +12,10 @@ class VideoCreatorSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('vc_projects')) {
+            return;
+        }
+
         if (VcProject::count() > 0) {
             return;
         }

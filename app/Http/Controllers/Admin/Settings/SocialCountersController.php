@@ -79,5 +79,10 @@ class SocialCountersController extends Controller
 
     private function authorizeSocialSettings(): void
     {
+        // Defense-in-depth: enforce the permission in-controller too, in case this
+        // is ever reached without the settings.manage route middleware.
+        if (! auth('admin')->user()?->hasPermission('settings.manage')) {
+            abort(403, translate('Unauthorized.'));
+        }
     }
 }

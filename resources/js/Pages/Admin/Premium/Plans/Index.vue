@@ -51,6 +51,8 @@ interface Plan {
     features: string[] | null
     trial_days: number | null
     trial_all_countries: boolean
+    stripe_price_monthly_id: string | null
+    stripe_price_yearly_id: string | null
     is_featured: boolean
     is_active: boolean
     country_prices: CountryPrice[]
@@ -121,6 +123,8 @@ const form = useForm({
     features: [] as string[],
     trial_days: 0,
     trial_all_countries: false,
+    stripe_price_monthly_id: '',
+    stripe_price_yearly_id: '',
     is_featured: false,
     is_active: true,
     country_prices: [] as CountryPrice[],
@@ -189,6 +193,8 @@ const resetForm = () => {
         features: normalizeFeatures(selectedPlan.value.features),
         trial_days: selectedPlan.value.trial_days ?? 0,
         trial_all_countries: selectedPlan.value.trial_all_countries,
+        stripe_price_monthly_id: selectedPlan.value.stripe_price_monthly_id ?? '',
+        stripe_price_yearly_id: selectedPlan.value.stripe_price_yearly_id ?? '',
         is_featured: selectedPlan.value.is_featured,
         is_active: selectedPlan.value.is_active,
         country_prices: selectedPlan.value.country_prices.map((row) => ({
@@ -397,9 +403,8 @@ const submit = () => {
     <Head :title="t('Plans')" />
 
     <AdminLayout>
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8">
-                <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+                <div class="mb-5 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                             {{ t('Plans') }}
@@ -420,12 +425,12 @@ const submit = () => {
                 </div>
 
                 <div v-if="plans.length === 0" class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                    <div class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                    <div class="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                         {{ t('No plans found.') }}
                     </div>
                 </div>
 
-                <div v-else class="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+                <div v-else class="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
                     <section
                         class="self-start border border-gray-100 bg-white shadow-sm sm:rounded-lg lg:sticky lg:overflow-hidden dark:border-gray-800 dark:bg-gray-800"
                         :style="{ top: topOffset, maxHeight: sidebarMaxHeight }"
@@ -473,7 +478,7 @@ const submit = () => {
 
                     <form class="space-y-6" @submit.prevent="submit">
                         <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                                 <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                     <div>
                                         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ selectedPlan?.name }}</h2>
@@ -491,7 +496,7 @@ const submit = () => {
                                 </div>
                             </div>
 
-                            <div class="grid gap-6 p-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+                            <div class="grid gap-5 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                                 <div class="grid gap-4 md:grid-cols-2">
                                     <label class="block md:col-span-2">
                                         <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Plan name') }}</span>
@@ -531,6 +536,20 @@ const submit = () => {
                                     <label class="block">
                                         <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('VAT %') }}</span>
                                         <input v-model="form.vat_percentage" type="number" min="0" max="100" step="0.01" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Stripe monthly price ID') }}</span>
+                                        <input v-model="form.stripe_price_monthly_id" type="text" placeholder="price_..." class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+                                        <span v-if="form.errors.stripe_price_monthly_id" class="mt-1 block text-xs text-red-500">{{ form.errors.stripe_price_monthly_id }}</span>
+                                        <span v-else class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Optional. Enables automatic recurring billing via Stripe for the monthly cycle.') }}</span>
+                                    </label>
+
+                                    <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Stripe yearly price ID') }}</span>
+                                        <input v-model="form.stripe_price_yearly_id" type="text" placeholder="price_..." class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
+                                        <span v-if="form.errors.stripe_price_yearly_id" class="mt-1 block text-xs text-red-500">{{ form.errors.stripe_price_yearly_id }}</span>
+                                        <span v-else class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Optional. Enables automatic recurring billing via Stripe for the yearly cycle.') }}</span>
                                     </label>
                                 </div>
 
@@ -585,7 +604,7 @@ const submit = () => {
                         </section>
 
                         <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                                 <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                                     <div>
                                         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Default Pricing') }}</h2>
@@ -603,7 +622,7 @@ const submit = () => {
                                 </div>
                             </div>
 
-                            <div class="grid gap-4 p-6 lg:grid-cols-3">
+                            <div class="grid gap-4 p-5 lg:grid-cols-3">
                                 <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Monthly') }}</h3>
                                     <div class="mt-4 space-y-3">
@@ -649,7 +668,7 @@ const submit = () => {
                         </section>
 
                         <section class="border border-gray-100 bg-white shadow-sm sm:rounded-lg dark:border-gray-800 dark:bg-gray-800">
-                            <div class="border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+                            <div class="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
                                 <div class="flex items-center justify-between gap-4">
                                     <div>
                                         <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Plan Features') }}</h2>
@@ -663,7 +682,7 @@ const submit = () => {
                                 </div>
                             </div>
 
-                            <div class="p-6">
+                            <div class="p-5">
                                 <div v-if="form.features.length === 0" class="rounded-lg border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
                                     {{ t('No features added.') }}
                                 </div>
@@ -681,7 +700,6 @@ const submit = () => {
 
                     </form>
                 </div>
-            </div>
         </div>
 
         <Teleport to="body">
@@ -695,7 +713,7 @@ const submit = () => {
             >
                 <div v-if="countryPricingModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="countryPricingModalOpen = false">
                     <div class="flex max-h-[90vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
-                        <div class="rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-800">
+                        <div class="rounded-t-2xl border-b border-gray-100 px-5 py-3 dark:border-gray-800">
                             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                                 <div>
                                     <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Country Pricing') }}</h2>
@@ -719,12 +737,12 @@ const submit = () => {
                             </div>
                         </div>
 
-                        <div class="flex-1 overflow-y-auto bg-gray-50/70 p-6 dark:bg-gray-950/30">
-                            <div v-if="visibleCountryPrices.length === 0" class="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
+                        <div class="flex-1 overflow-y-auto bg-gray-50/70 p-5 dark:bg-gray-950/30">
+                            <div v-if="visibleCountryPrices.length === 0" class="rounded-xl border border-dashed border-gray-300 bg-white px-5 py-12 text-center text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400">
                                 {{ t('No country pricing yet.') }}
                             </div>
 
-                            <div v-else class="space-y-5">
+                            <div v-else class="space-y-4">
                                 <section
                                     v-for="(row, index) in visibleCountryPrices"
                                     :key="row.id ?? index"
@@ -807,7 +825,7 @@ const submit = () => {
                                         </div>
                                     </div>
 
-                                    <div v-show="!isCountryPriceCollapsed(row, index)" class="grid gap-4 p-5 xl:grid-cols-3">
+                                    <div v-show="!isCountryPriceCollapsed(row, index)" class="grid gap-4 p-4 xl:grid-cols-3">
                                         <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-800/50">
                                             <div class="mb-4">
                                                 <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Monthly pricing') }}</h4>
@@ -911,7 +929,7 @@ const submit = () => {
             >
                 <div v-if="pricingSettingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="pricingSettingsModalOpen = false">
                     <div class="w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900">
-                        <div class="rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
+                        <div class="rounded-t-2xl border-b border-gray-100 px-5 py-3 dark:border-surface-800">
                             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                                 <div>
                                     <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Pricing Settings') }}</h2>
@@ -928,7 +946,7 @@ const submit = () => {
                             </div>
                         </div>
 
-                        <div class="max-h-[calc(90vh-140px)] overflow-y-auto p-6">
+                        <div class="max-h-[calc(90vh-140px)] overflow-y-auto p-5">
                             <form class="space-y-6" @submit.prevent="submitPricingSettings">
                                 <div class="grid gap-4 md:grid-cols-3">
                                     <label class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
@@ -1005,7 +1023,7 @@ const submit = () => {
                                     </label>
                                 </div>
 
-                                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-gray-900/40">
+                                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-5 py-3 dark:border-surface-800 dark:bg-gray-900/40">
                                     <button type="button" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700" @click="pricingSettingsModalOpen = false">
                                         {{ t('Cancel') }}
                                     </button>

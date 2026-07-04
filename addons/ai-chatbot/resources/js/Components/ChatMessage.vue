@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, onUnmounted, ref, watch } from 'vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
 import javascript from 'highlight.js/lib/languages/javascript'
 import typescript from 'highlight.js/lib/languages/typescript'
@@ -279,7 +280,14 @@ const rendered = computed(() => {
         return `<div class="code-block-wrapper"><div class="code-block-header"><span class="code-lang">${lang || 'auto'}</span><button class="code-copy-btn" data-code="${btoa(unescape(encodeURIComponent(decoded)))}">Copy</button></div><pre class="!bg-[#1e1e1e] !rounded-t-none !rounded-b-lg !p-4 !overflow-x-auto"><code class="!bg-transparent !p-0 !text-sm">${highlighted}</code></pre></div>`
     })
 
-    return html
+    // Sanitize before v-html — model output can echo back HTML from user text.
+    // Keep the code-copy <button> + its data-code attribute; DOMPurify still
+    // strips scripts, event handlers and javascript: URLs.
+    return DOMPurify.sanitize(html, {
+        ADD_ATTR: ['data-code', 'target', 'rel'],
+        FORBID_TAGS: ['style', 'form', 'input'],
+        FORBID_ATTR: ['style'],
+    })
 })
 
 const showTokens = computed(() => {

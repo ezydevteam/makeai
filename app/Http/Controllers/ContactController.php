@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Mail\ContactMessageMail;
 use App\Models\ContactMessage;
+use App\Services\CaptchaService;
 use App\Services\InAppNotificationService;
 use App\Services\RateLimiterService;
 use Illuminate\Http\Request;
@@ -33,6 +34,10 @@ class ContactController extends Controller
         if (filled($request->input('website'))) {
             return back()->with('success', settings('contact_success_message', translate('Your message has been sent successfully. We will get back to you soon!')));
         }
+
+        // No-op when captcha is disabled; throws a validation error on captcha_token
+        // when enabled and the token is missing/invalid.
+        CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
 
         $subjectOptions = $this->subjectOptions();
         $subjectRules = settings('contact_subject_mode', 'text') === 'dropdown' && $subjectOptions !== []

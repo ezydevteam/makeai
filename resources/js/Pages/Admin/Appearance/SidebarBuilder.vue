@@ -308,7 +308,7 @@ const importConfig = () => {
                                 <i class="ti ti-adjustments text-base"></i>
                                 {{ t('Settings') }}
                             </button>
-                            <button type="button" @click="openAddBlockModal" class="inline-flex items-center gap-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-gray-700 dark:bg-gray-800">
+                            <button type="button" @click="openAddBlockModal" class="inline-flex items-center gap-2 rounded-lg bg-primary-100 px-3 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40">
                                 <i class="ti ti-plus text-base"></i>
                                 {{ t('Add Widget') }}
                             </button>
@@ -325,9 +325,9 @@ const importConfig = () => {
                         </div>
 
                         <VueDraggable v-else v-model="form.blocks" handle=".drag-handle" ghostClass="opacity-50" :animation="150" class="space-y-3">
-                            <article v-for="(block, index) in form.blocks" :key="block.id" class="group flex items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 transition hover:border-primary-300 hover:bg-primary-50/40 dark:border-surface-700 dark:bg-surface-800/60 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10">
-                                <button type="button" class="drag-handle inline-flex h-10 w-10 shrink-0 cursor-grab items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 transition hover:text-primary-600 active:cursor-grabbing dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300">
-                                    <i class="ti ti-grip-vertical text-lg"></i>
+                            <article v-for="(block, index) in form.blocks" :key="block.id" class="group flex items-center gap-4 rounded-2xl border border-gray-200 bg-gray-50/70 px-4 py-2 transition hover:border-primary-300 hover:bg-primary-50/40 dark:border-surface-700 dark:bg-surface-800/60 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10">
+                                <button type="button" class="drag-handle inline-flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 transition hover:text-primary-600 active:cursor-grabbing dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300">
+                                    <i class="ti ti-menu"></i>
                                 </button>
 
                                 <div class="min-w-0 flex-1">
@@ -381,8 +381,10 @@ const importConfig = () => {
             </div>
         </div>
 
-        <div v-if="settingsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
-            <div class="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
+        <div v-if="settingsModalOpen" class="fixed inset-0 z-50">
+            <button type="button" class="absolute inset-0 h-full w-full bg-black/45 backdrop-blur-sm" :aria-label="t('Close sidebar settings modal')" @click="settingsModalOpen = false"></button>
+            <div class="relative z-10 flex h-full items-center justify-center p-4 pointer-events-none">
+            <div class="pointer-events-auto flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                     <div>
                         <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Sidebar Settings') }}</h3>
@@ -444,6 +446,7 @@ const importConfig = () => {
                 <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-800 dark:bg-surface-950">
                     <button type="button" @click="settingsModalOpen = false" class="btn-primary">{{ t('Done') }}</button>
                 </div>
+            </div>
             </div>
         </div>
 
