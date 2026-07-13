@@ -14,7 +14,7 @@ class ToolReview extends Model
     protected $fillable = [
         'tool_slug', 'user_id',
         'rating', 'comment', 'admin_reply',
-        'is_approved', 'is_featured', 'helpful_count',
+        'is_approved', 'helpful_count',
     ];
 
     protected function casts(): array
@@ -22,7 +22,6 @@ class ToolReview extends Model
         return [
             'rating' => 'integer',
             'is_approved' => 'boolean',
-            'is_featured' => 'boolean',
         ];
     }
 
@@ -44,11 +43,6 @@ class ToolReview extends Model
     public function scopeApproved($query)
     {
         return $query->where('is_approved', true);
-    }
-
-    public function scopeFeatured($query)
-    {
-        return $query->where('is_featured', true);
     }
 
     public function shouldAutoApprove(): bool

@@ -30,6 +30,12 @@ class AiToolCategorySeeder extends Seeder
             ['Customer Support', 'customer-support', 'ti ti-headset', '#22c55e', 'Ticket replies, help docs, onboarding, scripts, and support workflows.'],
             ['Legal & Finance', 'legal-finance', 'ti ti-scale', '#94a3b8', 'Legal summaries, policies, disclaimers, finance, and fundraising copy.'],
             ['Productivity', 'productivity', 'ti ti-checklist', '#fb923c', 'Planning, goals, decisions, action plans, guides, and prompts.'],
+            ['Sales', 'sales', 'ti ti-businessplan', '#0d9488', 'Cold outreach, proposals, objection handling, follow-ups, and closing.'],
+            ['HR & Recruiting', 'hr-recruiting', 'ti ti-users-group', '#7c3aed', 'Job ads, interviews, offers, onboarding, reviews, and people ops.'],
+            ['Podcast & Audio', 'podcast', 'ti ti-microphone-2', '#db2777', 'Episode outlines, show notes, titles, descriptions, and interview questions.'],
+            ['AI Prompts', 'ai-prompts', 'ti ti-sparkles', '#2563eb', 'Prompts for image models, ChatGPT, and AI agents.'],
+            ['Video', 'video', 'ti ti-video', '#e11d48', 'Scripts, storyboards, shot lists, briefs, and video production planning.'],
+            ['Image & Design', 'image-design', 'ti ti-photo', '#7c3aed', 'Captions, design briefs, moodboards, palettes, and image metadata.'],
         ];
 
         foreach ($categories as $index => [$name, $slug, $icon, $color, $description]) {

@@ -37,6 +37,13 @@ if (! function_exists('settings')) {
     function settings(string $key, mixed $default = null): mixed
     {
         try {
+            if (str_starts_with($key, 'global_tools_') || $key === 'show_tool_credit_costs') {
+                $themeSettings = app(\App\Services\ThemeSettingsService::class)->getResolvedFrontendToolPage();
+                if (array_key_exists($key, $themeSettings)) {
+                    return $themeSettings[$key];
+                }
+            }
+
             $value = Setting::getValue($key, $default);
 
             return $value ?? $default;
@@ -54,6 +61,14 @@ if (! function_exists('settings_set')) {
      */
     function settings_set(string $key, mixed $value, string $type = 'string', ?string $group = null): void
     {
+        if (str_starts_with($key, 'global_tools_') || $key === 'show_tool_credit_costs') {
+            $themeSettingsService = app(\App\Services\ThemeSettingsService::class);
+            $themeSettings = $themeSettingsService->getStoredToolPageSettings();
+            $themeSettings[$key] = $value;
+            $themeSettingsService->saveToolPageSettings($themeSettings);
+            return;
+        }
+
         Setting::setValue($key, $value, $type, $group);
     }
 }
@@ -129,26 +144,35 @@ if (! function_exists('translate')) {
 |--------------------------------------------------------------------------
 */
 
+if (! function_exists('base_currency')) {
+    /**
+     * The store's single base currency code — the ONE source of truth.
+     *
+     * Set in Admin → Settings (General) as `default_currency`. Everything the admin
+     * enters (plans, top-ups, credit price, coupons, commissions) is denominated in
+     * this currency; provider AI cost is USD and converted into it. Falls back to the
+     * legacy `pricing_currency_code`, then USD, so it is always safe to call.
+     */
+    function base_currency(): string
+    {
+        $code = settings('default_currency') ?: settings('pricing_currency_code') ?: 'USD';
+
+        return strtoupper((string) $code);
+    }
+}
+
 if (! function_exists('format_currency')) {
     /**
-     * Format a number as currency using the active currency.
+     * Format a number as currency using the store base currency (or an explicit one).
      *
      * @example format_currency(29.99) → '$29.99'
      */
     function format_currency(float $amount, ?string $currency = null): string
     {
         try {
-            if ($currency) {
-                return CountryCatalog::formatMoney($amount, $currency);
-            }
+            $code = $currency ?: (Currency::getDefault()?->code ?: base_currency());
 
-            $curr = Currency::getDefault();
-
-            if (! $curr) {
-                return '$'.number_format($amount, 2);
-            }
-
-            return CountryCatalog::formatMoney($amount, $curr->code);
+            return CountryCatalog::formatMoney($amount, $code);
         } catch (Exception $e) {
             return '$'.number_format($amount, 2);
         }
@@ -166,8 +190,15 @@ if (! function_exists('convert_currency')) {
         }
 
         try {
-            $fromRate = Currency::where('code', $from)->value('exchange_rate') ?? 1;
-            $toRate = Currency::where('code', $to)->value('exchange_rate') ?? 1;
+            $fromRate = (float) (Currency::where('code', $from)->value('exchange_rate') ?? 1);
+            $toRate = (float) (Currency::where('code', $to)->value('exchange_rate') ?? 1);
+
+            // A zero/negative rate (bad tick, unsynced currency) would divide by zero —
+            // PHP returns INF/NAN with only a warning, not an exception, so the catch
+            // never fires and callers would render garbage. Fall back to the input.
+            if ($fromRate <= 0 || $toRate <= 0) {
+                return $amount;
+            }
 
             // Convert: from → USD → to
             $usdAmount = $amount / $fromRate;
@@ -209,14 +240,17 @@ if (! function_exists('deduct_credits')) {
     function deduct_credits(int $userId, float $amount, string $reason): bool
     {
         $user = User::find($userId);
-        if (! $user || $user->credits < $amount) {
+        if (! $user) {
             return false;
         }
 
-        $user->deductCredits($amount, $reason);
+        // Mode-correct (used by addons too): in metered mode this enforces the wallet
+        // balance and drains it (returns false when short); in quota mode (Regular
+        // license) it meters the resetting allowance and never fails on balance.
+        $charged = $user->chargeCredits($amount, $reason);
         Cache::forget("user_credits:{$userId}");
 
-        return true;
+        return $charged;
     }
 }
 
@@ -373,6 +407,124 @@ if (! function_exists('addon_setting_set')) {
     function addon_setting_set(string $addonSlug, string $key, mixed $value, string $type = 'string'): void
     {
         settings_set("addon_{$addonSlug}_{$key}", $value, $type, 'addon');
+    }
+}
+
+if (! function_exists('media_url')) {
+    /**
+     * Resolve a stored media path to a browser-usable URL, correct for the active
+     * storage driver (local server or any S3-compatible bucket selected in
+     * Settings → Storage).
+     *
+     * - Absolute URLs and data URIs are returned unchanged.
+     * - A legacy stored value that already includes the `/storage/` prefix is
+     *   normalised so it is not doubled up.
+     * - Local driver: returns a root-relative `/storage/...` URL. This is deliberate —
+     *   it avoids mixed-content breakage when APP_URL has drifted from the real host
+     *   (a very common shared-hosting misconfiguration) and matches the historical
+     *   behaviour of the app.
+     * - Cloud driver: returns the disk's fully-qualified URL (bucket/CDN/custom domain).
+     *
+     * Returns '' for a null/blank path so it is safe to interpolate into `src`/`href`.
+     */
+    function media_url(?string $path): string
+    {
+        if (blank($path)) {
+            return '';
+        }
+
+        $path = ltrim($path);
+
+        if (preg_match('#^(https?:)?//#i', $path) || str_starts_with($path, 'data:')) {
+            return $path;
+        }
+
+        // Normalise a legacy value that already carries the public prefix.
+        $relative = ltrim($path, '/');
+        if (str_starts_with($relative, 'storage/')) {
+            $relative = substr($relative, strlen('storage/'));
+        }
+
+        if (config('filesystems.disks.public.driver', 'local') === 'local') {
+            return '/storage/'.$relative;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($relative);
+    }
+}
+
+if (! function_exists('media_path')) {
+    /**
+     * Inverse of {@see media_url()}: reduce a stored value (which may be a relative
+     * key, a `/storage/...` root-relative URL, or a fully-qualified disk/CDN URL) back
+     * to the bare disk key used by Storage::disk('public'). Used by delete paths and
+     * the one-time normalisation migration so the database holds relative keys only.
+     *
+     * Returns '' for blank input. An off-disk absolute URL (not under the public disk)
+     * is returned unchanged since it has no local key.
+     */
+    function media_path(?string $value): string
+    {
+        if (blank($value)) {
+            return '';
+        }
+
+        $value = trim($value);
+
+        // Strip a fully-qualified public-disk / CDN origin if present.
+        $base = rtrim(\Illuminate\Support\Facades\Storage::disk('public')->url(''), '/');
+        if ($base !== '' && str_starts_with($value, $base)) {
+            $value = ltrim(substr($value, strlen($base)), '/');
+        }
+
+        // Untouched absolute URL that isn't ours — nothing to reduce.
+        if (preg_match('#^(https?:)?//#i', $value)) {
+            return $value;
+        }
+
+        $value = ltrim($value, '/');
+        if (str_starts_with($value, 'storage/')) {
+            $value = substr($value, strlen('storage/'));
+        }
+
+        return $value;
+    }
+}
+
+if (! function_exists('store_public_upload')) {
+    /**
+     * Store an uploaded file on the public disk, failing loudly if the write does not
+     * succeed. Returns the stored RELATIVE key (never a URL).
+     *
+     * The public disk runs with `throw => false` (so a transient cloud error degrades
+     * rather than 500-ing the site), which means store()/storeAs() return `false` on
+     * failure. Callers that assign that result blindly would persist a broken path and
+     * flash "saved". This helper turns a false return into a {@see \App\Exceptions\StorageWriteException}.
+     *
+     * When $replacing is given, the previous file is deleted ONLY AFTER the new write
+     * succeeds — so a failed upload never destroys the existing file (no data loss).
+     *
+     * @param  \Illuminate\Http\UploadedFile|\Symfony\Component\HttpFoundation\File\UploadedFile  $file
+     */
+    function store_public_upload($file, string $directory, ?string $replacing = null, ?string $name = null): string
+    {
+        $path = $name !== null
+            ? $file->storeAs($directory, $name, 'public')
+            : $file->store($directory, 'public');
+
+        if ($path === false || $path === '' || $path === null) {
+            throw \App\Exceptions\StorageWriteException::forUpload();
+        }
+
+        if ($replacing !== null) {
+            $oldKey = media_path($replacing);
+            if ($oldKey !== '' && $oldKey !== $path
+                && \Illuminate\Support\Facades\Storage::disk('public')->exists($oldKey)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldKey);
+            }
+        }
+
+        return $path;
     }
 }
 

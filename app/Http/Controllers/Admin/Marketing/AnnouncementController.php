@@ -15,16 +15,24 @@ class AnnouncementController extends Controller
     {
         $this->authorizeAnnouncements();
 
-        $query = Announcement::query()->orderBy('created_at', 'desc');
+        $query = Announcement::query()->with('creator:id,name')->orderBy('created_at', 'desc');
 
         if ($request->filled('search')) {
             $search = trim($request->string('search')->toString());
             $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")->orWhere('content', 'like', "%{$search}%"));
         }
 
+        if ($request->filled('audience') && $request->input('audience') !== 'all') {
+            $query->where('target_audience', $request->input('audience'));
+        }
+
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $query->where('is_active', $request->input('status') === 'active');
+        }
+
         return Inertia::render('Admin/Marketing/Announcements', [
             'announcements' => $query->paginate(12)->withQueryString(),
-            'filters' => $request->only(['search']),
+            'filters' => $request->only(['search', 'audience', 'status']),
             'totalCount' => Announcement::count(),
             'activeCount' => Announcement::where('is_active', true)->count(),
             'topbarCount' => Announcement::where('type', 'topbar')->count(),

@@ -1,11 +1,13 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import IconClassSelect from '@/Components/IconClassSelect.vue'
-import MenuTreeDraggable from '@/Components/MenuTreeDraggable.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import IconClassSelect from '@/Components/Admin/IconClassSelect.vue'
+import MenuTreeDraggable from '@/Components/Admin/MenuTreeDraggable.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
@@ -368,6 +370,33 @@ const addCategoryShortcut = (category: CategoryOption, source: 'blog' | 'ai') =>
     })
 }
 
+const addPageShortcut = (page: PageOption) => {
+    if (!selectedMenu.value) {
+        toast.warning(t('Please select or create a menu first.'))
+        return
+    }
+
+    itemForm.label = page.title
+    itemForm.type = 'page'
+    itemForm.url = ''
+    itemForm.page_id = String(page.id)
+    itemForm.route_name = ''
+    itemForm.parent_id = ''
+    itemForm.target = '_self'
+    itemForm.icon = 'ti ti-file-text'
+    itemForm.badge_text = ''
+    itemForm.badge_color = ''
+    itemForm.is_active = true
+    itemForm.requires_auth = 'none'
+    itemForm.mega_menu = false
+    itemForm.mega_menu_content = ''
+    itemForm.sort_order = selectedMenu.value.items.length
+    itemForm.post(route('admin.menus.item.store', selectedMenu.value.id), {
+        preserveScroll: true,
+        onSuccess: resetItemForm,
+    })
+}
+
 const requestDeleteMenu = (menu: Menu) => {
     deleteTarget.value = { type: 'menu', id: menu.id, label: menu.name }
 }
@@ -474,18 +503,16 @@ const importMenu = () => {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Menu Builder') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Structure public navigation menus for headers, footers, mobile drawers, and sidebars.') }}</p>
             </div>
-            <div class="flex flex-wrap items-center gap-3">
-                <Tooltip v-if="selectedMenu" :content="t('Export JSON')" placement="top">
-                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Export JSON')" @click="exportMenu">
-                        <i class="ti ti-file-export text-base"></i>
-                    </button>
-                </Tooltip>
-                <Tooltip v-if="selectedMenu" :content="t('Import JSON')" placement="top">
-                    <button type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-primary-900/20" :aria-label="t('Import JSON')" @click="showImportModal = true">
-                        <i class="ti ti-file-import text-base"></i>
-                    </button>
-                </Tooltip>
-                <button type="button" :disabled="reorderForm.processing || !selectedMenu" class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60" @click="saveChanges">
+            <div class="shrink-0 flex items-center gap-3">
+                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Export JSON')" @click="exportMenu">
+                    <i class="ti ti-file-export text-base"></i>
+                    {{ t('Export') }}
+                </button>
+                <button type="button" class="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 font-semibold border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300" :aria-label="t('Import JSON')" @click="showImportModal = true">
+                    <i class="ti ti-file-import text-base"></i>
+                    {{ t('Import') }}
+                </button>
+                <button type="button" :disabled="reorderForm.processing || !selectedMenu" class="inline-flex items-center gap-2 btn-primary-admin disabled:cursor-not-allowed disabled:opacity-60" @click="saveChanges">
                     <svg v-if="reorderForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     <i v-else class="ti ti-device-floppy text-sm"></i>
                     <span>{{ reorderForm.processing ? t('Saving...') : t('Save Changes') }}</span>
@@ -495,7 +522,7 @@ const importMenu = () => {
 
         <div :class="props.embed ? 'grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]' : 'mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[320px_minmax(0,1fr)]'">
             <aside class="space-y-6">
-                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Navigation Menus') }}</h2>
@@ -530,38 +557,24 @@ const importMenu = () => {
                     </div>
                 </section>
 
-                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900">
                     <h3 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Quick Add Shortcuts') }}</h3>
 
                     <div class="mt-5 space-y-5">
                         <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
-                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Featured Pages') }}</h4>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
-                                    @click="addQuickShortcut({ label: t('AI Templates'), url: '/ai-tools', icon: 'ti ti-layout-grid' })"
-                                >
-                                    {{ t('AI Templates') }}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
-                                    @click="addQuickShortcut({ label: t('Chat'), url: '/chat', icon: 'ti ti-message-circle' })"
-                                >
-                                    {{ t('Chat') }}
-                                </button>
-                            </div>
-                        </section>
-
-                        <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
-                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Blog Categories') }}</h4>
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Pages') }}</h4>
                             <div class="mt-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-                                <button v-for="category in blogCategories" :key="category.id" type="button" class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="addCategoryShortcut(category, 'blog')">
-                                    {{ category.name }}
+                                <button
+                                    v-for="page in pages"
+                                    :key="page.id"
+                                    type="button"
+                                    class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300"
+                                    @click="addPageShortcut(page)"
+                                >
+                                    {{ page.title }}
                                 </button>
                             </div>
-                            <p v-if="!blogCategories.length" class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ t('No active blog categories found.') }}</p>
+                            <p v-if="!pages.length" class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ t('No active pages found.') }}</p>
                         </section>
 
                         <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
@@ -573,12 +586,22 @@ const importMenu = () => {
                             </div>
                             <p v-if="!aiCategories.length" class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ t('No active AI categories found.') }}</p>
                         </section>
+
+                        <section class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/70">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Blog Categories') }}</h4>
+                            <div class="mt-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+                                <button v-for="category in blogCategories" :key="category.id" type="button" class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300" @click="addCategoryShortcut(category, 'blog')">
+                                    {{ category.name }}
+                                </button>
+                            </div>
+                            <p v-if="!blogCategories.length" class="mt-3 text-sm text-gray-500 dark:text-gray-400">{{ t('No active blog categories found.') }}</p>
+                        </section>
                     </div>
                 </section>
             </aside>
 
             <section class="min-w-0">
-                <div v-if="selectedMenu" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div v-if="selectedMenu" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-900">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                             <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ selectedMenu.name }}</h2>
@@ -586,16 +609,16 @@ const importMenu = () => {
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <Tooltip :content="t('Edit Menu')" placement="top">
-                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800" :aria-label="t('Edit Menu')" @click="openEditMenu(selectedMenu)">
+                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 transition hover:border-primary-200 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800" :aria-label="t('Edit Menu')" @click="openEditMenu(selectedMenu)">
                                     <i class="ti ti-edit text-base"></i>
                                 </button>
                             </Tooltip>
                             <Tooltip :content="t('Delete')" placement="top">
-                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300" :aria-label="t('Delete')" @click="requestDeleteMenu(selectedMenu)">
+                                <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300" :aria-label="t('Delete')" @click="requestDeleteMenu(selectedMenu)">
                                     <i class="ti ti-trash text-base"></i>
                                 </button>
                             </Tooltip>
-                            <button type="button" class="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-100 px-4 text-sm font-semibold text-primary-700 transition hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40" @click="openCreateItem">
+                            <button type="button" class="inline-flex h-10 items-center gap-2 rounded-xl bg-primary-100 px-4 text-sm font-semibold text-primary-700 transition hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/40" @click="openCreateItem">
                                 <i class="ti ti-plus text-sm"></i>
                                 {{ t('Add Link') }}
                             </button>
@@ -624,10 +647,10 @@ const importMenu = () => {
                     </div>
                 </div>
 
-                <div v-else class="rounded-2xl border border-dashed border-gray-200 bg-white py-16 text-center shadow-card dark:border-surface-700 dark:bg-surface-900">
+                <div v-else class="rounded-2xl border border-dashed border-gray-200 bg-white py-16 text-center shadow-sm dark:border-surface-700 dark:bg-surface-900">
                     <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Create your first menu') }}</h2>
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ t('Menus can be assigned later in the header, footer, mobile drawer, and sidebar builders.') }}</p>
-                    <button type="button" class="mt-5 inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2.5 text-sm font-semibold" @click="openCreateMenu">
+                    <button type="button" class="mt-5 inline-flex items-center gap-2 rounded-lg btn-primary-admin px-4 py-2.5 text-sm font-semibold" @click="openCreateMenu">
                         <i class="ti ti-plus text-sm"></i>
                         {{ t('New Menu') }}
                     </button>
@@ -635,137 +658,123 @@ const importMenu = () => {
             </section>
         </div>
 
-        <Teleport to="body">
-            <div v-if="showMenuModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showMenuModal = false">
-                <div class="w-full max-w-md overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                        <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ editingMenuId ? t('Edit Menu') : t('New Menu') }}</h2>
-                        <Tooltip :content="t('Close')" placement="top">
-                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showMenuModal = false">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                            </button>
-                        </Tooltip>
-                    </div>
-                    <form class="space-y-4 p-6" @submit.prevent="submitMenu">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {{ t('Menu Name') }}
-                            <input v-model="menuForm.name" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Footer Links')" required @input="syncMenuSlug">
-                            <span v-if="menuForm.errors.name" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.name }}</span>
-                        </label>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {{ t('Slug') }}
-                            <input v-model="menuForm.slug" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('footer_links')" required @input="menuSlugTouched = true" @blur="markMenuSlugTouched">
-                            <span v-if="menuForm.errors.slug" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.slug }}</span>
-                        </label>
-                    </form>
-                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-950/60">
-                        <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showMenuModal = false">{{ t('Cancel') }}</button>
-                        <button type="button" :disabled="menuForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" @click="submitMenu">
-                            {{ menuForm.processing ? t('Saving...') : t('Save Menu') }}
-                        </button>
-                    </div>
-                </div>
+        <AppModal
+            :open="showMenuModal"
+            max-width="max-w-md"
+            :title="editingMenuId ? t('Edit Menu') : t('New Menu')"
+            has-form
+            @close="showMenuModal = false"
+            @submit="submitMenu"
+        >
+            <div class="space-y-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Menu Name') }}
+                    <input v-model="menuForm.name" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Footer Links')" required @input="syncMenuSlug">
+                    <span v-if="menuForm.errors.name" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.name }}</span>
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Slug') }}
+                    <input v-model="menuForm.slug" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('footer_links')" required @input="menuSlugTouched = true" @blur="markMenuSlugTouched">
+                    <span v-if="menuForm.errors.slug" class="mt-1 block text-xs text-danger-600">{{ menuForm.errors.slug }}</span>
+                </label>
             </div>
-        </Teleport>
+            <template #footer>
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showMenuModal = false">{{ t('Cancel') }}</button>
+                    <button type="submit" :disabled="menuForm.processing" class="btn-primary-admin rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60">
+                        {{ menuForm.processing ? t('Saving...') : t('Save Menu') }}
+                    </button>
+                </div>
+            </template>
+        </AppModal>
 
-        <Teleport to="body">
-            <div v-if="showItemModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showItemModal = false">
-                <div class="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                        <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ editingItemId ? t('Edit Menu Item') : t('Add Menu Item') }}</h2>
-                        <Tooltip :content="t('Close')" placement="top">
-                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showItemModal = false">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                            </button>
-                        </Tooltip>
+        <AppModal
+            :open="showItemModal"
+            max-width="max-w-3xl"
+            :title="editingItemId ? t('Edit Menu Item') : t('Add Menu Item')"
+            has-form
+            :confirm-text="t('Save Item')"
+            :confirm-loading="itemForm.processing"
+            confirm-variant="admin"
+            @close="showItemModal = false"
+            @submit="submitItem"
+        >
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Label') }}
+                    <input v-model="itemForm.label" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('About Us')" required>
+                    <span v-if="itemForm.errors.label" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.label }}</span>
+                </label>
+                <AppSelect v-model="itemForm.type" :label="t('Link Type')" :options="linkTypeOptions" />
+                <label v-if="itemForm.type === 'url'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
+                    {{ t('URL') }}
+                    <input v-model="itemForm.url" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('https://example.com or /menu-name')">
+                    <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Use /menu-name for internal links and a full URL like https://example.com for external links.') }}</span>
+                    <span v-if="itemForm.errors.url" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.url }}</span>
+                </label>
+                <div v-if="itemForm.type === 'page'" class="block md:col-span-2">
+                    <AppSelect v-model="itemForm.page_id" :label="t('Select Page')" :options="pageOptions" :placeholder="t('Choose a page')" live-search />
+                    <span v-if="itemForm.errors.page_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.page_id }}</span>
+                </div>
+                <div v-if="itemForm.type === 'route'" class="block md:col-span-2">
+                    <AppSelect v-model="itemForm.route_name" :label="t('Named Route')" :options="routeSelectOptions" :placeholder="t('Choose a route')" live-search />
+                    <span v-if="itemForm.errors.route_name" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.route_name }}</span>
+                </div>
+                <div class="block">
+                    <AppSelect v-model="itemForm.parent_id" :label="t('Parent Item')" :options="parentSelectOptions" :placeholder="t('Top level')" live-search />
+                    <span v-if="itemForm.errors.parent_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.parent_id }}</span>
+                </div>
+                <AppSelect v-model="itemForm.target" :label="t('Target')" :options="targetOptions" />
+                <IconClassSelect
+                    v-model="itemForm.icon"
+                    :label="t('Icon')"
+                    :placeholder="t('Choose an icon')"
+                    :error="itemForm.errors.icon"
+                    class="md:col-span-2"
+                />
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Badge Text') }}
+                    <input v-model="itemForm.badge_text" type="text" maxlength="50" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('New')">
+                    <span v-if="itemForm.errors.badge_text" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_text }}</span>
+                </label>
+                <div class="block">
+                    <AppSelect v-model="itemForm.badge_color" :label="t('Badge Color')" :options="badgeColorOptions" :placeholder="t('No badge color')" />
+                    <span v-if="itemForm.errors.badge_color" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_color }}</span>
+                </div>
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                    <div class="flex items-center justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Status') }}</span>
+                            <span class="mt-1 block text-xs text-gray-500">{{ itemForm.is_active ? t('This menu item is visible.') : t('This menu item is currently hidden.') }}</span>
+                        </span>
+                        <AppSwitch v-model="itemForm.is_active" />
                     </div>
-                    <form class="grid max-h-[calc(92vh-132px)] grid-cols-1 gap-4 overflow-y-auto p-6 md:grid-cols-2" @submit.prevent="submitItem">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {{ t('Label') }}
-                            <input v-model="itemForm.label" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('About Us')" required>
-                            <span v-if="itemForm.errors.label" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.label }}</span>
-                        </label>
-                        <AppSelect v-model="itemForm.type" :label="t('Link Type')" :options="linkTypeOptions" />
-                        <label v-if="itemForm.type === 'url'" class="block text-sm font-medium text-gray-700 dark:text-gray-300 md:col-span-2">
-                            {{ t('URL') }}
-                            <input v-model="itemForm.url" type="text" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('https://example.com or /menu-name')">
-                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Use /menu-name for internal links and a full URL like https://example.com for external links.') }}</span>
-                            <span v-if="itemForm.errors.url" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.url }}</span>
-                        </label>
-                        <div v-if="itemForm.type === 'page'" class="block md:col-span-2">
-                            <AppSelect v-model="itemForm.page_id" :label="t('Select Page')" :options="pageOptions" :placeholder="t('Choose a page')" live-search />
-                            <span v-if="itemForm.errors.page_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.page_id }}</span>
-                        </div>
-                        <div v-if="itemForm.type === 'route'" class="block md:col-span-2">
-                            <AppSelect v-model="itemForm.route_name" :label="t('Named Route')" :options="routeSelectOptions" :placeholder="t('Choose a route')" live-search />
-                            <span v-if="itemForm.errors.route_name" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.route_name }}</span>
-                        </div>
-                        <div class="block">
-                            <AppSelect v-model="itemForm.parent_id" :label="t('Parent Item')" :options="parentSelectOptions" :placeholder="t('Top level')" live-search />
-                            <span v-if="itemForm.errors.parent_id" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.parent_id }}</span>
-                        </div>
-                        <AppSelect v-model="itemForm.target" :label="t('Target')" :options="targetOptions" />
-                        <IconClassSelect
-                            v-model="itemForm.icon"
-                            :label="t('Icon')"
-                            :placeholder="t('Choose an icon')"
-                            :error="itemForm.errors.icon"
-                        />
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {{ t('Badge Text') }}
-                            <input v-model="itemForm.badge_text" type="text" maxlength="50" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('New')">
-                            <span v-if="itemForm.errors.badge_text" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_text }}</span>
-                        </label>
-                        <div class="block">
-                            <AppSelect v-model="itemForm.badge_color" :label="t('Badge Color')" :options="badgeColorOptions" :placeholder="t('No badge color')" />
-                            <span v-if="itemForm.errors.badge_color" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.badge_color }}</span>
-                        </div>
-                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
-                            <div class="flex items-center justify-between gap-4">
-                                <span>
-                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Status') }}</span>
-                                    <span class="mt-1 block text-xs text-gray-500">{{ itemForm.is_active ? t('This menu item is visible.') : t('This menu item is currently hidden.') }}</span>
-                                </span>
-                                <button type="button" role="switch" :aria-checked="itemForm.is_active" class="relative inline-flex h-6 w-11 rounded-full transition" :class="itemForm.is_active ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="itemForm.is_active = !itemForm.is_active">
-                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="itemForm.is_active ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                </button>
-                            </div>
-                            <span v-if="itemForm.errors.is_active" class="mt-2 block text-xs text-danger-600">{{ itemForm.errors.is_active }}</span>
-                        </div>
-                        <div class="block">
-                            <AppSelect v-model="itemForm.requires_auth" :label="t('Visibility')" :options="visibilitySelectOptions" />
-                            <span v-if="itemForm.errors.requires_auth" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.requires_auth }}</span>
-                        </div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                            {{ t('Sort Order') }}
-                            <input v-model.number="itemForm.sort_order" type="number" min="0" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                        </label>
-                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800 md:col-span-2">
-                            <label class="flex items-center justify-between gap-4">
-                                <span>
-                                    <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Mega Menu') }}</span>
-                                    <span class="mt-1 block text-xs text-gray-500">{{ t('Enable a larger dropdown panel for this menu item.') }}</span>
-                                </span>
-                                <button type="button" role="switch" :aria-checked="itemForm.mega_menu" class="relative inline-flex h-6 w-11 rounded-full transition" :class="itemForm.mega_menu ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="itemForm.mega_menu = !itemForm.mega_menu">
-                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="itemForm.mega_menu ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                </button>
-                            </label>
-                            <label v-if="itemForm.mega_menu" class="mt-4 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {{ t('Mega Menu Content') }}
-                                <textarea v-model="itemForm.mega_menu_content" rows="5" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" :placeholder="t('Optional HTML or structured content for the theme renderer.')"></textarea>
-                                <span v-if="itemForm.errors.mega_menu_content" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.mega_menu_content }}</span>
-                            </label>
-                        </div>
-                    </form>
-                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-950/60">
-                        <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showItemModal = false">{{ t('Cancel') }}</button>
-                        <button type="button" :disabled="itemForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" @click="submitItem">
-                            {{ itemForm.processing ? t('Saving...') : t('Save Item') }}
-                        </button>
-                    </div>
+                    <span v-if="itemForm.errors.is_active" class="mt-2 block text-xs text-danger-600">{{ itemForm.errors.is_active }}</span>
+                </div>
+                <div class="block">
+                    <AppSelect v-model="itemForm.requires_auth" :label="t('Visibility')" :options="visibilitySelectOptions" />
+                    <span v-if="itemForm.errors.requires_auth" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.requires_auth }}</span>
+                </div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Sort Order') }}
+                    <input v-model.number="itemForm.sort_order" type="number" min="0" class="mt-2 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
+                </label>
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800 md:col-span-2">
+                    <label class="flex items-center justify-between gap-4">
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-800 dark:text-gray-100">{{ t('Mega Menu') }}</span>
+                            <span class="mt-1 block text-xs text-gray-500">{{ t('Enable a larger dropdown panel for this menu item.') }}</span>
+                        </span>
+                        <AppSwitch v-model="itemForm.mega_menu" />
+                    </label>
+                    <label v-if="itemForm.mega_menu" class="mt-4 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Mega Menu Content') }}
+                        <textarea v-model="itemForm.mega_menu_content" rows="5" class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white" :placeholder="t('Optional HTML or structured content for the theme renderer.')"></textarea>
+                        <span v-if="itemForm.errors.mega_menu_content" class="mt-1 block text-xs text-danger-600">{{ itemForm.errors.mega_menu_content }}</span>
+                    </label>
                 </div>
             </div>
-        </Teleport>
+        </AppModal>
 
         <ActionConfirmModal
             :open="Boolean(deleteTarget)"
@@ -779,28 +788,17 @@ const importMenu = () => {
         />
 
         <!-- Import Modal -->
-        <Teleport to="body">
-            <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="showImportModal = false">
-                <div class="w-full max-w-lg overflow-hidden rounded-[20px] border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                    <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                        <h2 class="font-heading text-lg font-bold text-gray-900 dark:text-white">{{ t('Import Menu Items') }}</h2>
-                        <Tooltip :content="t('Close')" placement="top">
-                            <button type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800" :aria-label="t('Close')" @click="showImportModal = false">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                            </button>
-                        </Tooltip>
-                    </div>
-                    <div class="p-6 space-y-4">
-                        <textarea v-model="importJsonText" rows="10" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Paste exported menu JSON here...')"></textarea>
-                    </div>
-                    <div class="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-950/60">
-                        <button type="button" class="text-sm font-medium text-gray-600 transition hover:text-gray-900 dark:text-gray-300 dark:hover:text-white" @click="showImportModal = false">{{ t('Cancel') }}</button>
-                        <button type="button" :disabled="importForm.processing" class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60" @click="importMenu">
-                            {{ importForm.processing ? t('Importing...') : t('Import') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
+        <AppModal
+            :open="showImportModal"
+            max-width="max-w-lg"
+            :title="t('Import Menu Items')"
+            :confirm-text="t('Import')"
+            :confirm-loading="importForm.processing"
+            confirm-variant="admin"
+            @close="showImportModal = false"
+            @confirm="importMenu"
+        >
+            <textarea v-model="importJsonText" rows="10" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-xs dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Paste exported menu JSON here...')"></textarea>
+        </AppModal>
     </div>
 </template>

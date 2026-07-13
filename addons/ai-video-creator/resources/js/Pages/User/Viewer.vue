@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'

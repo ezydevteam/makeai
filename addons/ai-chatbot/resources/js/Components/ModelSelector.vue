@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, watchEffect } from 'vue'
 import { onClickOutside } from '@vueuse/core'
 import { usePage } from '@inertiajs/vue3'
 import type { useChat } from '../Composables/useChat'
@@ -104,51 +104,54 @@ const providerGroups = computed(() => {
     return groups
 })
 
-function resolveModel(): string {
-    const selected = chat.selectedModel.value
+// Is the current selection a valid/known model given the enabled model sources?
+function selectionIsValid(selected: string | null): boolean {
+    if (showCustomModels.value && selected && customModels.value.some(cm => cm.id === selected)) return true
+    if (showProviderModels.value && selected && availableModels.value.includes(selected)) return true
+    return false
+}
 
-    if (showCustomModels.value && customModels.value.length) {
-        const custom = customModels.value.find(cm => cm.id === selected)
-        if (custom) return custom.name
-    }
-
-    if (showProviderModels.value && selected && availableModels.value.includes(selected)) {
-        return friendlyName(selected)
-    }
-
+// The model that SHOULD be selected by default when nothing valid is chosen. Pure — no
+// mutation. Returns null when there is genuinely nothing to select.
+function computeDefaultSelection(): string | null {
     const preferred = chat.selectedMode.value?.preferred_models
     if (preferred && preferred.length) {
         for (const m of preferred) {
-            if (showCustomModels.value && customModels.value.some(cm => cm.id === m)) {
-                chat.selectedModel.value = m
-                return friendlyName(m)
-            }
-            if (showProviderModels.value && availableModels.value.includes(m)) {
-                chat.selectedModel.value = m
-                return friendlyName(m)
-            }
+            if (showCustomModels.value && customModels.value.some(cm => cm.id === m)) return m
+            if (showProviderModels.value && availableModels.value.includes(m)) return m
         }
     }
-
-    if (showProviderModels.value && defaultModel.value && availableModels.value.includes(defaultModel.value)) {
-        chat.selectedModel.value = defaultModel.value
-        return friendlyName(defaultModel.value)
-    }
-
-    if (showCustomModels.value && customModels.value.length > 0) {
-        chat.selectedModel.value = customModels.value[0].id
-        return customModels.value[0].name
-    }
-
-    if (showProviderModels.value && availableModels.value.length > 0) {
-        chat.selectedModel.value = availableModels.value[0]
-        return friendlyName(availableModels.value[0])
-    }
-
-    return 'No model'
+    if (showProviderModels.value && defaultModel.value && availableModels.value.includes(defaultModel.value)) return defaultModel.value
+    if (showCustomModels.value && customModels.value.length > 0) return customModels.value[0].id
+    if (showProviderModels.value && availableModels.value.length > 0) return availableModels.value[0]
+    return null
 }
 
-const displayModel = computed(() => resolveModel())
+function labelFor(model: string): string {
+    const custom = customModels.value.find(cm => cm.id === model)
+    return custom ? custom.name : friendlyName(model)
+}
+
+// Side-effect lives in a watcher, NOT a computed getter. Previously the display computed
+// mutated chat.selectedModel as a side effect (recursive-render / "computed side effect"
+// anti-pattern). Here we adopt a sensible default reactively whenever the selection is
+// missing or no longer valid (e.g. after switching mode).
+watchEffect(() => {
+    if (!selectionIsValid(chat.selectedModel.value)) {
+        const def = computeDefaultSelection()
+        if (def && def !== chat.selectedModel.value) {
+            chat.selectedModel.value = def
+        }
+    }
+})
+
+// Pure display label — derives from state, never writes it.
+const displayModel = computed(() => {
+    const selected = chat.selectedModel.value
+    if (selectionIsValid(selected)) return labelFor(selected as string)
+    const def = computeDefaultSelection()
+    return def ? labelFor(def) : 'No model'
+})
 
 const selectModel = (model: string) => {
     chat.selectedModel.value = model

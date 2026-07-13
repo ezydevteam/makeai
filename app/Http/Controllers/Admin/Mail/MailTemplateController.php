@@ -25,8 +25,16 @@ class MailTemplateController extends Controller
             app(MailTemplateSeeder::class)->run();
         }
 
+        $affiliateAvailable = app(\App\Services\AffiliateService::class)->isEnabled();
+
         $templates = MailTemplate::query()
+            ->with('editor:id,name')
             ->when(! isProAvailable(), fn ($query) => $query->where('requires_pro', false))
+            // Affiliate is a monetization feature gated by the Extended License +
+            // its own toggle — hide its templates when it isn't available.
+            ->when(! $affiliateAvailable, fn ($query) => $query
+                ->where('category', '!=', 'affiliate')
+                ->where('slug', '!=', 'referral_earned'))
             ->latest()
             ->get();
 
@@ -38,6 +46,7 @@ class MailTemplateController extends Controller
     public function edit(MailTemplate $template)
     {
         abort_if($template->requires_pro && ! isProAvailable(), 404);
+        abort_if($this->isAffiliateTemplate($template) && ! app(\App\Services\AffiliateService::class)->isEnabled(), 404);
 
         return Inertia::render('Admin/Mail/Templates/Editor', [
             'template' => $template,
@@ -77,6 +86,7 @@ class MailTemplateController extends Controller
     public function update(MailTemplateRequest $request, MailTemplate $template)
     {
         abort_if($template->requires_pro && ! isProAvailable(), 404);
+        abort_if($this->isAffiliateTemplate($template) && ! app(\App\Services\AffiliateService::class)->isEnabled(), 404);
 
         $template->update(array_merge($request->validated(), [
             'last_edited_by' => auth('admin')->id(),
@@ -85,6 +95,11 @@ class MailTemplateController extends Controller
         return redirect()
             ->route('admin.mail.templates.index')
             ->with('success', translate('Mail template updated successfully.'));
+    }
+
+    private function isAffiliateTemplate(MailTemplate $template): bool
+    {
+        return $template->category === 'affiliate' || $template->slug === 'referral_earned';
     }
 
     public function aiAssist(MailTemplateAiAssistRequest $request, AiService $aiService): JsonResponse
@@ -103,15 +118,7 @@ class MailTemplateController extends Controller
             ], 422);
         }
 
-        $user = User::firstOrCreate(
-            ['email' => User::internalAiEmail()],
-            [
-                'name' => User::internalAiName(),
-                'password' => bcrypt(Str::random(32)),
-                'is_active' => true,
-                'is_banned' => false,
-            ]
-        );
+        $user = User::internalAi();
 
         $result = $aiService->complete(
             $user,

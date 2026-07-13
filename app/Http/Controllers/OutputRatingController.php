@@ -13,7 +13,6 @@ class OutputRatingController extends Controller
     {
         $validated = $request->validate([
             'tool_slug' => 'required|string|max:100',
-            'document_id' => 'nullable|integer',
             'generation_history_id' => 'nullable|integer',
             'rating' => 'required|in:0,1',
             'feedback_text' => 'nullable|string|max:500',
@@ -36,7 +35,6 @@ class OutputRatingController extends Controller
         AiOutputRating::create([
             'user_id' => $user->id,
             'tool_slug' => $validated['tool_slug'],
-            'document_id' => $validated['document_id'] ?? null,
             'generation_history_id' => $validated['generation_history_id'] ?? null,
             'rating' => $validated['rating'],
             'feedback_text' => $validated['feedback_text'] ?? null,

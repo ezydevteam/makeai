@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import RichEditor from '@/Components/RichEditor.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import RichEditor from '@/Components/UI/RichEditor.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -128,7 +128,7 @@ function save(status: 'draft' | 'published') {
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary disabled:opacity-60"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary-admin disabled:opacity-60"
                     :disabled="form.processing"
                     @click="save('published')"
                 >

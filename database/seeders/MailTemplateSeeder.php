@@ -26,6 +26,7 @@ class MailTemplateSeeder extends Seeder
         'subscription_expiring_soon',
         'subscription_expired',
         'subscription_canceled',
+        'subscription_ended',
         'subscription_upgraded',
         'subscription_downgraded',
         'subscription_payment_failed',
@@ -36,6 +37,10 @@ class MailTemplateSeeder extends Seeder
         'newsletter_confirm',
         'newsletter_unsubscribed',
         'newsletter_campaign',
+        'affiliate_commission_earned',
+        'affiliate_commission_rejected',
+        'affiliate_payout_paid',
+        'affiliate_payout_rejected',
     ];
 
     public function run(): void
@@ -202,6 +207,14 @@ class MailTemplateSeeder extends Seeder
                 'requires_pro' => true,
             ],
             [
+                'slug' => 'subscription_ended',
+                'name' => 'Subscription Ended by Administrator',
+                'subject' => 'Your subscription has been ended',
+                'content' => '<h1>Subscription Ended</h1><p>Hi {user_name},</p><p>Your {plan_name} subscription was ended by an administrator and your access has been removed. {reason}</p><p>If you have any questions, please contact our support team.</p>',
+                'category' => 'subscription',
+                'requires_pro' => true,
+            ],
+            [
                 'slug' => 'subscription_upgraded',
                 'name' => 'Plan Upgraded',
                 'subject' => 'Your plan was upgraded',
@@ -279,6 +292,38 @@ class MailTemplateSeeder extends Seeder
                 'subject' => '{campaign_subject}',
                 'content' => '<h1>{campaign_title}</h1><p>{campaign_content}</p><p><a href="{unsubscribe_url}">Unsubscribe</a></p>',
                 'category' => 'newsletter',
+                'requires_pro' => false,
+            ],
+            [
+                'slug' => 'affiliate_commission_earned',
+                'name' => 'Affiliate — Commission Earned',
+                'subject' => 'You earned a commission of {amount}',
+                'content' => '<h1>Commission Earned 🎉</h1><p>Hi {user_name},</p><p>Great news — you just earned a commission of <strong>{amount}</strong> on {site_name}.</p><p><a href="{site_url}">View your affiliate dashboard</a></p>',
+                'category' => 'affiliate',
+                'requires_pro' => false,
+            ],
+            [
+                'slug' => 'affiliate_commission_rejected',
+                'name' => 'Affiliate — Commission Rejected',
+                'subject' => 'A commission of {amount} was reversed',
+                'content' => '<h1>Commission Reversed</h1><p>Hi {user_name},</p><p>A commission of <strong>{amount}</strong> on {site_name} has been reversed (for example, the referred purchase was refunded or did not qualify).</p><p><a href="{site_url}">View your affiliate dashboard</a></p>',
+                'category' => 'affiliate',
+                'requires_pro' => false,
+            ],
+            [
+                'slug' => 'affiliate_payout_paid',
+                'name' => 'Affiliate — Payout Sent',
+                'subject' => 'Your payout of {amount} has been sent',
+                'content' => '<h1>Payout Sent 💸</h1><p>Hi {user_name},</p><p>Your affiliate payout of <strong>{amount}</strong> has been sent via {method}.</p><p><a href="{site_url}">View your affiliate dashboard</a></p>',
+                'category' => 'affiliate',
+                'requires_pro' => false,
+            ],
+            [
+                'slug' => 'affiliate_payout_rejected',
+                'name' => 'Affiliate — Payout Rejected',
+                'subject' => 'Your payout request of {amount} was declined',
+                'content' => '<h1>Payout Request Declined</h1><p>Hi {user_name},</p><p>Your affiliate payout request of <strong>{amount}</strong> on {site_name} was declined. Please review your payout details or contact support.</p><p><a href="{site_url}">View your affiliate dashboard</a></p>',
+                'category' => 'affiliate',
                 'requires_pro' => false,
             ],
         ];

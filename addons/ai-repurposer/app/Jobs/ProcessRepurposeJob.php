@@ -117,11 +117,22 @@ class ProcessRepurposeJob implements ShouldQueue
     protected function refundCredits(RpJob $job): void
     {
         if ($job->credits_deducted > 0 && $job->status !== 'completed') {
-            $refunded = User::where('id', $job->user_id)->increment('credits', $job->credits_deducted);
+            $user = User::find($job->user_id);
 
-            if ($refunded === 0) {
+            if (! $user) {
                 Log::warning("Failed to refund credits for repurpose job {$job->id} — user {$job->user_id} may not exist.");
+
+                return;
             }
+
+            // Mode-correct: metered mode returns wallet credits; quota mode (Regular
+            // license) winds back the consumed daily/monthly allowance instead —
+            // mirrors the mode-aware charge in deduct_credits().
+            $user->refundCredits(
+                (float) $job->credits_deducted,
+                "Content repurpose failed — refund: {$job->id}",
+                ['rp_job_id' => $job->id],
+            );
         }
     }
 

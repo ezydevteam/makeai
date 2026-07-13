@@ -14,9 +14,7 @@ class PaymentGateway extends Model
         'is_test_mode',
         'processing_fee_type',
         'processing_fee_value',
-        'processing_fee_currency',
         'credentials',
-        'settings',
         'sort_order',
     ];
 
@@ -27,7 +25,6 @@ class PaymentGateway extends Model
             'is_test_mode' => 'boolean',
             'processing_fee_value' => 'decimal:2',
             'credentials' => 'array',
-            'settings' => 'array',
             'sort_order' => 'integer',
         ];
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\InAppNotificationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -51,16 +52,31 @@ class NotificationController extends Controller
         $user = $request->user();
         $preferences = $user->getNotificationPreferences();
 
-        $groups = collect(self::NOTIFICATION_GROUPS)->map(function ($meta, $key) use ($preferences) {
-            return [
-                'key' => $key,
-                'icon' => $meta['icon'],
-                'label' => translate($meta['label']),
-                'description' => translate($meta['description']),
-                'in_app' => $preferences['in_app'][$key] ?? true,
-                'email' => $preferences['email'][$key] ?? true,
-            ];
-        })->values()->all();
+        // Hide preference groups for features this install doesn't offer, so the
+        // toggles match reality: no "Billing & Credits" without subscriptions, and
+        // no "Affiliate & Rewards" when the affiliate program is disabled. Affiliate
+        // has its own toggle (it can be on while subscriptions are off), so it is
+        // gated independently rather than by isProAvailable().
+        $hiddenGroups = [];
+        if (! isProAvailable()) {
+            $hiddenGroups[] = 'billing';
+        }
+        if (! (is_extended_license() && (bool) settings('affiliate_enabled', false))) {
+            $hiddenGroups[] = 'affiliate';
+        }
+
+        $groups = collect(self::NOTIFICATION_GROUPS)
+            ->except($hiddenGroups)
+            ->map(function ($meta, $key) use ($preferences) {
+                return [
+                    'key' => $key,
+                    'icon' => $meta['icon'],
+                    'label' => translate($meta['label']),
+                    'description' => translate($meta['description']),
+                    'in_app' => $preferences['in_app'][$key] ?? true,
+                    'email' => $preferences['email'][$key] ?? true,
+                ];
+            })->values()->all();
 
         return Inertia::render('User/Notifications', [
             'notifications' => $notifications->paginate($user, $status),
@@ -111,6 +127,29 @@ class NotificationController extends Controller
             'data' => null,
             'message' => translate('All notifications marked as read.'),
         ]);
+    }
+
+    public function updatePreferences(Request $request): RedirectResponse
+    {
+        $this->authorizeNotifications();
+        $user = $request->user();
+
+        $rules = [];
+        foreach (array_keys(self::NOTIFICATION_GROUPS) as $group) {
+            $rules["in_app.{$group}"] = ['boolean'];
+            $rules["email.{$group}"] = ['boolean'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $preferences = [
+            'in_app' => $validated['in_app'] ?? [],
+            'email' => $validated['email'] ?? [],
+        ];
+
+        $user->update(['notification_preferences' => $preferences]);
+
+        return back()->with('success', translate('Notification preferences updated.'));
     }
 
     private function authorizeNotifications(): void

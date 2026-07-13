@@ -40,15 +40,13 @@ return new class extends Migration
 
     private function addIndexIfNotExists(string $table, array $columns): void
     {
-        $indexName = $table . '_' . implode('_', $columns) . '_index';
-        
-        $exists = \DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
-        
-        if (empty($exists)) {
-            Schema::table($table, function (Blueprint $table) use ($columns) {
-                $table->index($columns);
-            });
+        if (! Schema::hasTable($table) || $this->indexExists($table, $columns)) {
+            return;
         }
+
+        Schema::table($table, function (Blueprint $table) use ($columns) {
+            $table->index($columns);
+        });
     }
 
     public function down(): void
@@ -85,14 +83,24 @@ return new class extends Migration
 
     private function dropIndexIfExists(string $table, array $columns): void
     {
-        $indexName = $table . '_' . implode('_', $columns) . '_index';
-        
-        $exists = \DB::select("SHOW INDEX FROM `{$table}` WHERE Key_name = ?", [$indexName]);
-        
-        if (!empty($exists)) {
-            Schema::table($table, function (Blueprint $table) use ($columns) {
-                $table->dropIndex($columns);
-            });
+        if (! Schema::hasTable($table) || ! $this->indexExists($table, $columns)) {
+            return;
         }
+
+        Schema::table($table, function (Blueprint $table) use ($columns) {
+            $table->dropIndex($columns);
+        });
+    }
+
+    /**
+     * Driver-agnostic index check (replaces the MySQL-only `SHOW INDEX`, which
+     * is a syntax error on SQLite and broke fresh migrates / the test suite).
+     */
+    private function indexExists(string $table, array $columns): bool
+    {
+        $indexName = $table.'_'.implode('_', $columns).'_index';
+
+        return collect(Schema::getIndexes($table))
+            ->contains(fn ($index) => ($index['name'] ?? null) === $indexName);
     }
 };

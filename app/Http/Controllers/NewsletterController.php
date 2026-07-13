@@ -121,10 +121,20 @@ class NewsletterController extends Controller
     {
         $subscriber = NewsletterSubscriber::where('token', $token)->firstOrFail();
 
+        $wasSubscribed = $subscriber->status !== 'unsubscribed';
+
         $subscriber->update([
             'status' => 'unsubscribed',
             'unsubscribed_at' => now(),
         ]);
+
+        // Confirm the unsubscribe once (not on repeat visits to the link).
+        if ($wasSubscribed) {
+            app(MailService::class)->send('newsletter_unsubscribed', $subscriber->email, [
+                'user_name' => $subscriber->name ?: $subscriber->email,
+                'user_email' => $subscriber->email,
+            ]);
+        }
 
         $driver = settings('newsletter_driver', 'internal');
         if (in_array($driver, ['mailchimp', 'both'])) {

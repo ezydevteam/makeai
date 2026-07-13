@@ -87,7 +87,6 @@ class MigrateLegacyFrontendThemeSettings extends Command
             'heading_weight',
             'line_height',
             'letter_spacing',
-            'border_radius',
             'container_width',
         ]));
 
@@ -150,9 +149,7 @@ class MigrateLegacyFrontendThemeSettings extends Command
             'show_social_icons' => $this->hasBlockType($blocks, 'social_icons'),
             'show_payment_icons' => (bool) data_get($legacy, 'bottom_bar.show_payment_icons', true),
             'show_back_to_top' => (bool) data_get($legacy, 'bottom_bar.show_back_to_top', true),
-            'menu_column_1' => data_get($menuBlocks, '0.config.menu_slug', 'footer-company'),
-            'menu_column_2' => data_get($menuBlocks, '1.config.menu_slug', 'footer-support'),
-            'menu_column_3' => data_get($menuBlocks, '2.config.menu_slug', 'footer-legal'),
+            'menu_column' => data_get($menuBlocks, '0.config.menu_slug', 'footer-company'),
         ];
     }
 

@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\LanguageUpdateRequest;
 use App\Models\Language;
 use App\Models\Translation;
 use App\Services\TranslationService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -115,6 +116,7 @@ class LanguageController extends Controller
         $this->authorizeLanguages();
         Language::where('is_default', true)->update(['is_default' => false]);
         $language->update(['is_default' => true, 'is_active' => true]);
+        Cache::forget(Language::DEFAULT_CODE_CACHE_KEY);
         session([
             'locale' => $language->code,
             'locale_manually_selected' => false,
@@ -152,7 +154,7 @@ class LanguageController extends Controller
 
         $extension = strtolower($file->getClientOriginalExtension());
         $filename = Str::slug((string) $request->input('code')).'-'.Str::ulid().'.'.$extension;
-        $path = $file->storeAs('language-flags', $filename, 'public');
+        $path = store_public_upload($file, 'language-flags', null, $filename);
 
         return Storage::url($path);
     }

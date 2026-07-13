@@ -14,7 +14,7 @@ class BlogCategoryController extends Controller
     {
         $this->authorizeBlog();
 
-        return Inertia::render('Admin/CMS/Blog/Categories/Index', [
+        return Inertia::render('Admin/CMS/Blog/Categories', [
             'categories' => BlogCategory::with('parent:id,name')->orderBy('sort_order')->paginate(25),
             'parents' => BlogCategory::orderBy('name')->get(['id', 'name']),
         ]);

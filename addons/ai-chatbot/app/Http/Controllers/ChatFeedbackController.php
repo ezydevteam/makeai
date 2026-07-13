@@ -17,6 +17,11 @@ class ChatFeedbackController extends Controller
     public function store(Request $request): JsonResponse
     {
         $user = Auth::user();
+        // Behind ChatGuestAccess, a guest ($user === null) can reach this; feedback is a
+        // signed-in-only feature, so respond 403 instead of dereferencing null (500).
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Sign in to give feedback.'], 403);
+        }
 
         $validated = $request->validate([
             'conversation_ulid' => 'required|string|exists:conversations,ulid',
@@ -69,6 +74,9 @@ class ChatFeedbackController extends Controller
     public function index(Request $request, string $conversationUlid): JsonResponse
     {
         $user = Auth::user();
+        if (! $user) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
 
         $conversation = Conversation::where('ulid', $conversationUlid)
             ->where('user_id', $user->id)

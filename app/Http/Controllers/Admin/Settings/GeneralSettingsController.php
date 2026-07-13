@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\GeneralSettingsRequest;
 use App\Models\Currency;
 use App\Models\Language;
+use App\Support\CurrencyCatalog;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class GeneralSettingsController extends Controller
@@ -25,7 +27,7 @@ class GeneralSettingsController extends Controller
                 'site_privacy_url'   => settings('site_privacy_url', ''),
 
                 'site_url'          => settings('site_url', url('/')),
-                'default_language'  => settings('default_language', 'en'),
+                'default_language'  => Language::defaultCode(),
                 'default_currency'  => settings('default_currency', 'USD'),
                 'currency_symbol'   => settings('currency_symbol', '$'),
                 'currency_position' => settings('currency_position', 'before'),
@@ -38,11 +40,9 @@ class GeneralSettingsController extends Controller
                 ->orderByDesc('is_default')
                 ->orderBy('name')
                 ->get(['code', 'name']),
-            'currencies' => Currency::query()
-                ->where('is_active', true)
-                ->orderByDesc('is_default')
-                ->orderBy('code')
-                ->get(['code', 'name', 'symbol']),
+            // Full popular-currency list from the static catalog (not just the few
+            // rows seeded in the DB), so the picker always offers every currency.
+            'currencies' => CurrencyCatalog::options(),
             'timezones' => timezone_identifiers_list(),
         ]);
     }
@@ -50,6 +50,12 @@ class GeneralSettingsController extends Controller
     public function update(GeneralSettingsRequest $request)
     {
         $validated = $request->validated();
+
+        // The default language is NOT a settings key — it lives in the
+        // languages.is_default column (single source of truth). Pull it out
+        // before the KV loop and apply it as a column flip below.
+        $defaultLanguage = $validated['default_language'] ?? null;
+        unset($validated['default_language']);
 
         foreach ($validated as $key => $value) {
             $type = match (true) {
@@ -66,6 +72,47 @@ class GeneralSettingsController extends Controller
 
             $group = in_array($key, $brandingKeys) ? 'branding' : 'general';
             settings_set($key, $value, $type, $group);
+        }
+
+        // Currency is controlled from ONE place (here). Keep the legacy pricing key
+        // and the currencies table's default flag in lockstep so nothing drifts.
+        if (! empty($validated['default_currency'])) {
+            $base = strtoupper((string) $validated['default_currency']);
+            settings_set('pricing_currency_code', $base, 'string', 'pricing');
+
+            // Ensure a currencies row exists for the chosen code and is the sole
+            // default — seeding symbol/position/decimals from the catalog so a
+            // currency the buyer never manually added still formats correctly.
+            if ($meta = CurrencyCatalog::get($base)) {
+                Currency::query()->updateOrCreate(
+                    ['code' => $base],
+                    [
+                        'name' => $meta['name'],
+                        'symbol' => $meta['symbol'],
+                        'decimal_places' => $meta['decimals'],
+                        'is_active' => true,
+                    ]
+                );
+            }
+
+            Currency::query()->where('is_default', true)->update(['is_default' => false]);
+            Currency::query()->where('code', $base)->update(['is_default' => true]);
+
+            // Keep the default (undetected-visitor) pricing country aligned with the
+            // base currency, so the storefront's default view shows the base currency
+            // rather than auto-localizing it away. Real GeoIP-detected visitors still
+            // localize; the admin can re-point this later if they want a different default.
+            if ($country = CurrencyCatalog::country($base)) {
+                settings_set('default_pricing_country', $country, 'string', 'pricing');
+            }
+        }
+
+        // Apply the default-language picker as a languages.is_default column flip
+        // (the authoritative store), mirroring LanguageController::setDefault.
+        if ($defaultLanguage && ($target = Language::where('code', $defaultLanguage)->first()) && ! $target->is_default) {
+            Language::where('is_default', true)->update(['is_default' => false]);
+            $target->update(['is_default' => true, 'is_active' => true]);
+            Cache::forget(Language::DEFAULT_CODE_CACHE_KEY);
         }
 
         return back()->with('success', translate('General settings saved.'));

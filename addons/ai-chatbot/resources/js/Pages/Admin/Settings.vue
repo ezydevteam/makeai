@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Head, Link, useForm } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -77,6 +77,18 @@ const initialFormValues = Object.fromEntries(
             }
             if (typeof val !== 'object' || val === null) {
                 val = {}
+            }
+        }
+        if (setting.key === 'enabled_modes') {
+            if (typeof val === 'string') {
+                try {
+                    val = JSON.parse(val)
+                } catch {
+                    val = []
+                }
+            }
+            if (!Array.isArray(val)) {
+                val = []
             }
         }
         return [setting.key, val as FormValue]
@@ -166,12 +178,27 @@ const groupMeta = (groupKey: string): { title: string; description: string } => 
     }
 }
 
+// The Knowledge Base toggle is meaningless without the separate Knowledge Base addon,
+// so hide it unless that addon is installed and active. Hiding it here only affects the
+// UI — the stored value still rides along in the form payload (see initialFormValues),
+// so it is preserved rather than wiped on save.
+const kbAddonInstalled = computed(() => {
+    const chatbot = usePage().props.chatbot as { kbAddonInstalled?: boolean } | undefined
+    return chatbot?.kbAddonInstalled ?? false
+})
+
 // Group all settings EXCEPT custom_models and mode_default_models, which are managed by our custom UI builders
 const groupedSettings = computed<SettingGroup[]>(() => {
     const groups = new Map<string, Setting[]>()
 
     for (const setting of props.settings) {
-        if (setting.key === 'custom_models' || setting.key === 'mode_default_models') {
+        // chat_logo is handled by its own dedicated upload card (separate multipart
+        // form) so it never renders as a generic text input and never rides along in
+        // the main JSON submit.
+        if (setting.key === 'custom_models' || setting.key === 'mode_default_models' || setting.key === 'enabled_modes' || setting.key === 'chat_logo') {
+            continue
+        }
+        if (setting.key === 'enable_knowledge_base' && !kbAddonInstalled.value) {
             continue
         }
         const rawKey = setting.group || 'general'
@@ -266,7 +293,7 @@ const removeCustomModel = (index: number) => {
 // Mode Specific Models computed options and actions
 const modeModelOptions = computed(() => {
     const list: Array<{ value: string; label: string }> = []
-    
+
     // Custom models first
     const cmList = (form.custom_models as CustomModel[]) || []
     for (const cm of cmList) {
@@ -303,42 +330,109 @@ const setModeModel = (modeSlug: string, modelValue: unknown): void => {
     form.mode_default_models = current
 }
 
+// Available Modes multiselect. Semantics: an empty list means "all modes available"
+// (also lets modes added later appear automatically), so the UI shows every mode as
+// enabled when the stored list is empty.
+const enabledModes = computed<string[]>(() => (form.enabled_modes as string[]) || [])
+
+const isModeEnabled = (slug: string): boolean => {
+    const list = enabledModes.value
+    return list.length === 0 || list.includes(slug)
+}
+
+const toggleMode = (slug: string): void => {
+    const all = (props.modes ?? []).map((m) => m.slug)
+    let list = enabledModes.value.length === 0 ? [...all] : [...enabledModes.value]
+
+    list = list.includes(slug) ? list.filter((s) => s !== slug) : [...list, slug]
+
+    // Collapse "everything selected" back to empty (= all, future-proof).
+    if (all.length > 0 && all.every((s) => list.includes(s))) {
+        list = []
+    }
+    form.enabled_modes = list
+}
+
 const save = () => {
     form.post(route('admin.addons.settings.save', { slug: props.addon.slug }), {
         preserveScroll: true,
     })
 }
+
+// ─── Chat Logo (dedicated upload, kept out of the main JSON form) ─────────────
+// Bundling a File into `form` above would switch the whole submit to multipart,
+// which drops empty JSON arrays (enabled_modes/custom_models) from the payload.
+// A separate form that carries ONLY chat_logo avoids touching those fields.
+const logoSetting = computed(() => props.settings.find((s) => s.key === 'chat_logo'))
+const storedLogoPath = computed(() => {
+    const val = logoSetting.value?.value ?? logoSetting.value?.default ?? null
+    return typeof val === 'string' && val !== '' ? val : null
+})
+
+// Resolve the stored relative path (public disk) to a URL for preview.
+const storedLogoUrl = computed(() => {
+    const p = storedLogoPath.value
+    if (!p) return null
+    if (/^https?:\/\//.test(p) || p.startsWith('/storage/')) return p
+    return '/storage/' + p.replace(/^\//, '')
+})
+
+const logoForm = useForm<{ chat_logo: string | File | null }>({
+    chat_logo: storedLogoPath.value,
+})
+
+const logoInput = ref<HTMLInputElement | null>(null)
+const logoPreview = ref<string | null>(null)
+
+const saveLogo = () => {
+    logoForm.post(route('admin.addons.settings.save', { slug: props.addon.slug }), {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            logoPreview.value = null
+            if (logoInput.value) logoInput.value.value = ''
+        },
+    })
+}
+
+// No manual save button — persist immediately on pick / remove.
+const onLogoSelected = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    logoForm.chat_logo = file
+    logoPreview.value = URL.createObjectURL(file)
+    saveLogo()
+}
+
+const removeLogo = () => {
+    logoForm.chat_logo = null
+    logoPreview.value = null
+    if (logoInput.value) logoInput.value.value = ''
+    saveLogo()
+}
 </script>
 
 <template>
-    <Head :title="`${addon.name} ${t('Settings')} — Admin`" />
+    <Head :title="`${addon.name} ${t('Settings')} - Admin`" />
 
-    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ addon.name }}</h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
                     {{ addon.description || t('Configure chatbot options, model selection, limits, plans, and customized system models.') }}
                 </p>
             </div>
 
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route('admin.addons')"
-                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                >
-                    {{ t('Back to Addons') }}
-                </Link>
-                <button
-                    type="button"
-                    :disabled="form.processing"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
-                    @click="save"
-                >
-                    <i class="ti ti-device-floppy text-base"></i>
-                    {{ form.processing ? t('Saving...') : t('Save Settings') }}
-                </button>
-            </div>
+            <button
+                type="button"
+                :disabled="form.processing"
+                class="inline-flex items-center gap-2 btn-primary-admin disabled:opacity-60"
+                @click="save"
+            >
+                <i class="ti ti-device-floppy text-base"></i>
+                {{ form.processing ? t('Saving...') : t('Save Settings') }}
+            </button>
         </div>
 
         <form class="space-y-6" @submit.prevent="save">
@@ -498,9 +592,9 @@ const save = () => {
                         <div v-if="customModels.length === 0" class="rounded-xl border border-dashed border-gray-200 dark:border-surface-800 p-8 text-center text-sm text-gray-400">
                             {{ t('No custom models defined yet. Click "Add Custom Model" to create one.') }}
                         </div>
-                        
-                        <div 
-                            v-for="(model, index) in customModels" 
+
+                        <div
+                            v-for="(model, index) in customModels"
                             :key="model.id"
                             class="relative rounded-xl border border-gray-100 bg-gray-50/50 p-5 dark:border-surface-800 dark:bg-surface-800/40 space-y-4"
                         >
@@ -517,7 +611,7 @@ const save = () => {
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">{{ t('Model Name') }}</label>
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ t('Model Name') }}</label>
                                     <input
                                         v-model="model.name"
                                         type="text"
@@ -527,7 +621,7 @@ const save = () => {
                                     >
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">{{ t('Base AI Model') }}</label>
+                                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ t('Base AI Model') }}</label>
                                     <AppSelect
                                         v-model="model.model"
                                         :options="aiModels ?? []"
@@ -538,7 +632,7 @@ const save = () => {
                             </div>
 
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">{{ t('Short Description') }}</label>
+                                <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ t('Short Description') }}</label>
                                 <input
                                     v-model="model.description"
                                     type="text"
@@ -549,7 +643,7 @@ const save = () => {
                             </div>
 
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">{{ t('System Prompt (Prepend Instructions)') }}</label>
+                                <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ t('System Prompt (Prepend Instructions)') }}</label>
                                 <textarea
                                     v-model="model.system_prompt"
                                     rows="3"
@@ -572,7 +666,85 @@ const save = () => {
                         </button>
                     </div>
                 </div>
+
+                <!-- Chatbot Logo (lives in the General card; own multipart form, auto-saves) -->
+                <div v-if="group.key === 'general'" class="mt-8 border-t border-gray-100 dark:border-surface-800 pt-6">
+                    <h3 class="text-md font-bold text-gray-900 dark:text-white">{{ t('Chatbot Logo') }}</h3>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('Upload your chatbot logo. Transparent PNG or SVG recommended.') }}
+                    </p>
+
+                    <div class="mt-4 flex flex-wrap items-start gap-4">
+                        <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50 dark:border-surface-800 dark:bg-surface-800/60">
+                            <img v-if="logoPreview || storedLogoUrl" :src="logoPreview || storedLogoUrl!" alt="Chatbot logo" class="h-full w-full object-contain" />
+                            <i v-else class="ti ti-photo text-xl text-gray-300 dark:text-gray-600"></i>
+                        </div>
+
+                        <div class="flex flex-col items-start gap-2">
+                            <input
+                                ref="logoInput"
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                :disabled="logoForm.processing"
+                                class="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-60 dark:text-gray-300"
+                                @change="onLogoSelected"
+                            >
+
+                            <span v-if="logoForm.processing" class="inline-flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                <svg class="animate-spin h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                                {{ t('Saving...') }}
+                            </span>
+
+                            <button
+                                v-else-if="logoPreview || storedLogoUrl"
+                                type="button"
+                                class="inline-flex items-center gap-1.5 text-xs font-medium text-danger-600 hover:text-danger-700"
+                                @click="removeLogo"
+                            >
+                                <i class="ti ti-trash text-sm"></i>
+                                {{ t('Remove logo') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <p v-if="(logoForm.errors as Record<string, string | undefined>).chat_logo" class="mt-2 text-xs text-danger-600">
+                        {{ (logoForm.errors as Record<string, string | undefined>).chat_logo }}
+                    </p>
+                </div>
             </section>
+
+            <!-- Available Modes multiselect -->
+            <div v-if="group.key === 'ai' && modes && modes.length" class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="mb-4">
+                    <h3 class="text-md font-bold text-gray-900 dark:text-white">{{ t('Available Modes') }}</h3>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('Select which conversation modes users can choose. If none are selected, all modes are available.') }}
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    <button
+                        v-for="mode in modes"
+                        :key="mode.slug"
+                        type="button"
+                        role="switch"
+                        :aria-checked="isModeEnabled(mode.slug)"
+                        class="flex items-center justify-between gap-3 rounded-xl border p-4 text-left transition-colors"
+                        :class="isModeEnabled(mode.slug)
+                            ? 'border-primary-300 bg-primary-50/60 dark:border-primary-500/40 dark:bg-primary-500/10'
+                            : 'border-gray-100 bg-gray-50/70 dark:border-surface-800 dark:bg-surface-800/50'"
+                        @click="toggleMode(mode.slug)"
+                    >
+                        <span class="text-sm font-medium text-gray-800 dark:text-white">{{ mode.name }}</span>
+                        <span
+                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition"
+                            :class="isModeEnabled(mode.slug) ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
+                        >
+                            <span class="inline-block h-4 w-4 translate-y-0.5 rounded-full bg-white transition" :class="isModeEnabled(mode.slug) ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                        </span>
+                    </button>
+                </div>
+            </div>
 
             <!-- Mode Specific Models Card -->
             <div v-if="group.key === 'ai' && modes && modes.length" class="mb-6 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
@@ -593,9 +765,9 @@ const save = () => {
                             <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider block mb-1">{{ t('Mode') }}</span>
                             <h4 class="text-sm font-bold text-gray-800 dark:text-white mb-3">{{ mode.name }}</h4>
                         </div>
-                        
+
                         <div>
-                            <label class="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{{ t('Active Model') }}</label>
+                            <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">{{ t('Active Model') }}</label>
                             <AppSelect
                                 :model-value="String((form.mode_default_models as Record<string, string>)[mode.slug] ?? '')"
                                 :options="modeModelOptions"

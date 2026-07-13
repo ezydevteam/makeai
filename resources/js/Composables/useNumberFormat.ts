@@ -109,5 +109,10 @@ export function useNumberFormat() {
 
     const formatCredits = (value: number): string => formatNumber(value, 2)
 
-    return { formatNumber, formatCurrency, formatCompact, formatCredits }
+    // Raw active-currency symbol/code — for places that build their own strings
+    // (e.g. chart axis/tooltip callbacks) and can't call formatCurrency directly.
+    const currencySymbol = computed(() => currency.value.symbol)
+    const currencyCode = computed(() => currency.value.code)
+
+    return { formatNumber, formatCurrency, formatCompact, formatCredits, currencySymbol, currencyCode }
 }

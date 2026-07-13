@@ -46,9 +46,11 @@ class PromptBuilder
         // 5. Resolve API key (user personal → admin pool)
         $apiKey = $this->resolveApiKey($model, $user);
 
-        // 6. Max tokens
+        // 6. Max tokens — tool override or global default, then clamped to the
+        // model's own output ceiling (admin-editable per-model Max Tokens; 0 = no cap).
         $maxTokens = $template->max_tokens_override
             ?? (int) settings('default_max_tokens', 2000);
+        $maxTokens = $this->clampToModelMaxTokens($maxTokens, $model);
 
         // 3. Apply dynamic length instruction based on max tokens
         $system .= $this->getLengthInstruction($fields['length'] ?? 'medium', $maxTokens);
@@ -150,7 +152,7 @@ class PromptBuilder
 
         $provider = $this->resolveProvider($model);
 
-        $key = $user->apiKeys()->where('provider', $provider)->active()->first();
+        $key = $user->byok()->where('provider', $provider)->active()->first();
         if ($key) {
             return $key->api_key;
         }
@@ -223,7 +225,7 @@ class PromptBuilder
      * Uses the same credits_per_1k formula as TokenGuard so the estimate
      * shown to the user matches what is actually deducted.
      */
-    public function estimateCost(AiTool $template, string $model, ?string $outputLength = null): array
+    public function estimateCost(AiTool $template, string $model, ?string $outputLength = null, ?User $user = null): array
     {
         $estimatedTokens = $template->avg_output_tokens ?? 400;
 
@@ -236,26 +238,55 @@ class PromptBuilder
         $estimatedInputTokens = 200; // rough prompt overhead
         $totalTokens = $estimatedInputTokens + $estimatedTokens;
 
-        $dbModel = AiModel::where('slug', $model)->first();
+        $dbModel = AiModel::resolveForPricing($model);
 
         if (! $dbModel) {
-            return [
+            $estimate = [
                 'estimated_credits' => round($totalTokens / 1000, 2),
                 'estimated_tokens' => $estimatedTokens,
             ];
+        } else {
+            // Mirror TokenGuard::calculateCredits — credits_per_1k across all tokens
+            $credits = round($totalTokens * ((float) $dbModel->credits_per_1k / 1000), 2);
+
+            $totalUsd = ($estimatedInputTokens / 1000) * (float) $dbModel->cost_input_1k
+                + ($estimatedTokens / 1000) * (float) $dbModel->cost_output_1k;
+
+            $estimate = [
+                'estimated_credits' => $credits,
+                'estimated_tokens' => $estimatedTokens,
+                'estimated_usd' => round($totalUsd, 6),
+            ];
         }
 
-        // Mirror TokenGuard::calculateCredits — credits_per_1k across all tokens
-        $credits = round($totalTokens * ((float) $dbModel->credits_per_1k / 1000), 2);
+        // A user generating with their own API key (BYOK) is never charged platform
+        // credits (TokenGuard::after deducts only when there is no personal key), so the
+        // estimate must show $0 rather than overstating a cost that never lands.
+        if ($user && $this->resolveApiKey($model, $user) !== null) {
+            $estimate['estimated_credits'] = 0.0;
+            $estimate['byok'] = true;
+        }
 
-        $totalUsd = ($estimatedInputTokens / 1000) * (float) $dbModel->cost_input_1k
-            + ($estimatedTokens / 1000) * (float) $dbModel->cost_output_1k;
+        return $estimate;
+    }
 
-        return [
-            'estimated_credits' => $credits,
-            'estimated_tokens' => $estimatedTokens,
-            'estimated_usd' => round($totalUsd, 6),
-        ];
+    /**
+     * Clamp a desired output-token budget to the model's own Max Tokens ceiling.
+     *
+     * The per-model Max Tokens (admin-editable) is a hard upper bound on output;
+     * a tool override or the global default must never exceed it. A model row that
+     * is unknown, or configured with max_tokens = 0 (e.g. media/embedding), imposes
+     * no cap.
+     */
+    private function clampToModelMaxTokens(int $maxTokens, string $model): int
+    {
+        $dbModel = AiModel::resolveForPricing($model);
+
+        if ($dbModel && (int) $dbModel->max_tokens > 0) {
+            return min($maxTokens, (int) $dbModel->max_tokens);
+        }
+
+        return $maxTokens;
     }
 
     /**
@@ -274,6 +305,7 @@ class PromptBuilder
 
         $maxTokens = $template->max_tokens_override
             ?? (int) settings('default_max_tokens', 2000);
+        $maxTokens = $this->clampToModelMaxTokens($maxTokens, $model);
 
         return new CompletionRequest(
             model: $model,

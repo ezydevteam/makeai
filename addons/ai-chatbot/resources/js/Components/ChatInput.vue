@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { inject, nextTick, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch, type Ref } from 'vue'
+import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import type { useChat, ChatAttachment } from '../Composables/useChat'
 import { useSpeechRecognition } from '@/Composables/useSpeechRecognition'
 import ModelSelector from './ModelSelector.vue'
 
 const { t } = useTranslate()
+const page = usePage()
 const chat = inject<ReturnType<typeof useChat>>('chat')!
 const sidebarMobileOpen = inject<Ref<boolean>>('sidebarMobileOpen', ref(false))
+
+// Admin feature toggles (shared globally as `chatbot.*`).
+const enableFileUpload = computed(() => ((page.props.chatbot as any)?.enableFileUpload as boolean) ?? true)
+const enableVoice = computed(() => ((page.props.chatbot as any)?.enableVoice as boolean) ?? true)
 
 const inputText = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -73,8 +79,11 @@ const stop = () => {
 const onKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
-        if (chat.isStreaming.value) stop()
-        else void send()
+        // Ignore Enter while streaming — previously it aborted the in-progress reply,
+        // so a user typing their next thought and hitting Enter lost the response.
+        // Cancelling now requires the explicit Stop button.
+        if (chat.isStreaming.value) return
+        void send()
     }
     if (e.key === 'Escape') {
         uploadedAttachments.value = []
@@ -227,8 +236,10 @@ watch(
                 <div class="flex items-center justify-between gap-3 dark:border-white/10">
                     <div class="flex items-center gap-2">
                         <button
+                            v-if="enableFileUpload"
                             class="flex h-9 items-center justify-center gap-2 rounded-xl px-3 text-gray-500 transition-colors hover:bg-black/5 hover:text-gray-700 dark:text-white/40 dark:hover:bg-white/5 dark:hover:text-white/70 disabled:opacity-40"
-                            title="Attach file"
+                            :title="t('Attach file')"
+                            :aria-label="t('Attach file')"
                             :disabled="uploading"
                             @click="fileInputRef?.click()"
                         >
@@ -236,7 +247,7 @@ watch(
                             <svg v-else class="animate-spin" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                             <span class="text-sm font-medium">{{ uploading ? t('Uploading...') : t('Attach') }}</span>
                         </button>
-                        <input ref="fileInputRef" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,.md,.docx" @change="onFileSelect" />
+                        <input v-if="enableFileUpload" ref="fileInputRef" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.csv,.txt,.md,.docx" @change="onFileSelect" />
 
                         <button
                             v-if="chat.kbAvailable"
@@ -252,7 +263,7 @@ watch(
                         </button>
 
                         <button
-                            v-if="speechSupported"
+                            v-if="speechSupported && enableVoice"
                             class="flex h-9 items-center justify-center gap-2 rounded-xl px-3 transition-colors"
                             :class="isRecording
                                 ? 'bg-red-500/10 text-red-600 dark:bg-red-500/15 dark:text-red-400 animate-pulse'
@@ -271,7 +282,7 @@ watch(
                         <ModelSelector />
 
                         <template v-if="chat.isStreaming.value">
-                            <button class="flex h-9 min-w-9 items-center justify-center rounded-xl bg-red-500/10 px-3 text-red-600 transition-colors hover:bg-red-500/15 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25" title="Stop" @click="stop">
+                            <button class="flex h-9 min-w-9 items-center justify-center rounded-xl bg-red-500/10 px-3 text-red-600 transition-colors hover:bg-red-500/15 dark:bg-red-500/15 dark:text-red-400 dark:hover:bg-red-500/25" :title="t('Stop')" :aria-label="t('Stop')" @click="stop">
                                 <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
                             </button>
                         </template>

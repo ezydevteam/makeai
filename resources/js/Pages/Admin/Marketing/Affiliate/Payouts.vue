@@ -1,9 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -16,6 +17,7 @@ interface PayoutItem {
     payout_details: Record<string, string> | null
     admin_note: string | null
     processed_at: string | null
+    processed_by: { id: number; name: string } | null
     created_at: string | null
     user: { ulid?: string; name?: string; email?: string } | null
 }
@@ -37,6 +39,7 @@ const { formatCurrency } = useNumberFormat()
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const statusFilter = ref('')
+const searchFocused = ref(false)
 const processing = ref<Record<number, boolean>>({})
 const reviewModal = ref({
     open: false,
@@ -128,17 +131,19 @@ const handleSearchShortcuts = (event: KeyboardEvent) => {
     }
 }
 
-const formatDetails = (payout: PayoutItem): string => {
+const formatDetails = (payout: PayoutItem | null): string => {
+    if (!payout) return 'â€”'
     const details = payout.payout_details
-    if (!details) return payout.method === 'credits' ? t('Account credits') : '—'
+    if (!details) return payout.method === 'credits' ? t('Account credits') : 'â€”'
     if (payout.method === 'paypal' && details.paypal_email) return details.paypal_email
     if (payout.method === 'bank_transfer' && details.bank_account) return details.bank_account
     if (payout.method === 'credits') return t('Account credits')
     const values = Object.values(details).filter(Boolean)
-    return values.length ? values.join(' · ') : '—'
+    return values.length ? values.join(' Â· ') : 'â€”'
 }
 
-const detailEntries = (payout: PayoutItem) => {
+const detailEntries = (payout: PayoutItem | null) => {
+    if (!payout) return []
     const details = payout.payout_details
 
     if (!details || Object.keys(details).length === 0) {
@@ -241,25 +246,25 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                    <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                            <div class="relative flex-1">
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[240px] sm:max-w-md">
+                            <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500"><i class="ti ti-search text-base"></i></span>
                                 <input
                                     ref="searchInput"
                                     v-model="searchQuery"
                                     type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                                     :placeholder="t('Search user name or email...')"
+                                    @focus="searchFocused = true"
+                                    @blur="searchFocused = false"
                                 />
                                 <span
-                                    v-if="!searchQuery"
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"
-                                >
-                                    <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-gray-200 bg-white px-1.5 text-[11px] font-medium text-gray-400 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500">/</span>
-                                </span>
+                                    v-if="!searchQuery && !searchFocused"
+                                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                                >/</span>
                                 <button
                                     v-if="searchQuery"
                                     type="button"
@@ -270,15 +275,20 @@ onBeforeUnmount(() => {
                                     <i class="ti ti-x text-base"></i>
                                 </button>
                             </div>
-                            <div class="w-full sm:w-48"><AppSelect v-model="statusFilter" :options="statusOptions" :placeholder="t('Status')" /></div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <div class="w-full sm:w-48 sm:flex-none">
+                                <AppSelect v-model="statusFilter" :options="statusOptions" :placeholder="t('Status')" />
+                            </div>
                             <button
                                 v-if="hasActiveFilters"
                                 type="button"
-                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 transition hover:border-gray-300 hover:text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500 dark:hover:text-gray-300"
-                                :aria-label="t('Clear filters')"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 w-full sm:w-auto"
                                 @click="clearFilters"
                             >
-                                <i class="ti ti-x text-base"></i>
+                                <i class="ti ti-rotate-clockwise text-base"></i>
+                                {{ t('Reset') }}
                             </button>
                         </div>
                     </div>
@@ -299,9 +309,9 @@ onBeforeUnmount(() => {
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <tr v-for="p in filteredPayouts" :key="p.id" class="bg-white transition hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700/30">
                                 <td class="px-6 py-4">
-                                    <Link v-if="p.user?.ulid" :href="route('admin.affiliate.affiliates.show', p.user.ulid)" class="text-sm font-medium text-gray-900 hover:text-primary-600 dark:text-white">{{ p.user?.name || '—' }}</Link>
-                                    <span v-else class="text-sm text-gray-400">—</span>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ p.user?.email || '—' }}</p>
+                                    <Link v-if="p.user?.ulid" :href="route('admin.affiliate.affiliates.show', p.user.ulid)" class="text-sm font-medium text-gray-900 hover:text-primary-600 dark:text-white">{{ p.user?.name || 'â€”' }}</Link>
+                                    <span v-else class="text-sm text-gray-400">â€”</span>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ p.user?.email || 'â€”' }}</p>
                                 </td>
                                 <td class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ t(p.method) }}</td>
@@ -338,95 +348,93 @@ onBeforeUnmount(() => {
         </div>
     
 
-        <div v-if="reviewModal.open && reviewModal.payout" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm" @click.self="closeReviewModal">
-            <div class="w-full max-w-2xl rounded-2xl bg-white shadow-xl dark:bg-gray-800">
-                <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-700">
-                    <div class="flex items-start justify-between gap-4">
+        <AppModal
+            :open="Boolean(reviewModal.open && reviewModal.payout)"
+            max-width="max-w-2xl"
+            :title="t('Payout details')"
+            :subtitle="t('Review the payout request and update its status.')"
+            has-form
+            @close="closeReviewModal"
+        >
+            <div v-if="reviewModal.payout" class="space-y-6">
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div class="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Affiliate') }}</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ reviewModal.payout.user?.name || 'â€”' }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ reviewModal.payout.user?.email || 'â€”' }}</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Amount') }}</p>
+                        <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ formatCurrency(reviewModal.payout.amount) }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(reviewModal.payout.method) }}</p>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2">
+                    <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Requested') }}</p>
+                        <p class="mt-1 text-sm text-gray-700 dark:text-gray-200">{{ reviewModal.payout.created_at ? formatDateTime(reviewModal.payout.created_at) : 'â€”' }}</p>
+                    </div>
+                    <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Current status') }}</p>
+                        <div class="mt-1">
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium" :class="badgeClass(reviewModal.payout.status)">{{ t(reviewModal.payout.status) }}</span>
+                        </div>
+                        <p v-if="reviewModal.payout.processed_at" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            {{ formatDateTime(reviewModal.payout.processed_at) }}
+                            <span v-if="reviewModal.payout.processed_by"> Â· {{ t('by :name', { name: reviewModal.payout.processed_by.name }) }}</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900/30">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Payout details') }}</p>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2">
+                        <div v-for="entry in detailEntries(reviewModal.payout)" :key="`${entry.label}-${entry.value}`" class="min-w-0">
+                            <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ entry.label }}</p>
+                            <p class="mt-1 break-all text-sm text-gray-700 dark:text-gray-200">{{ entry.value }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900/30">
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Admin action') }}</p>
+                        <span v-if="isFinalized(reviewModal.payout.status)" class="text-xs font-medium text-gray-400 dark:text-gray-500">{{ t('This payout is finalized.') }}</span>
+                    </div>
+
+                    <div class="mt-3 space-y-4">
                         <div>
-                            <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Payout details') }}</h2>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Review the payout request and update its status.') }}</p>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Action status') }}</label>
+                            <AppSelect v-model="reviewModal.status" :options="actionStatusOptions" :disabled="isFinalized(reviewModal.payout.status)" />
                         </div>
-                        <button type="button" class="rounded-full w-8 h-8 flex items-center justify-center text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300" :aria-label="t('Close modal')" @click="closeReviewModal">
-                            <i class="ti ti-x text-base"></i>
-                        </button>
+
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Admin note') }}</label>
+                            <textarea
+                                v-model="reviewModal.note"
+                                rows="3"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                :disabled="isFinalized(reviewModal.payout.status)"
+                                :placeholder="t('Optional note for the affiliate')"
+                            />
+                        </div>
+
+                        <p v-if="reviewModal.payout.admin_note && isFinalized(reviewModal.payout.status)" class="text-sm text-gray-500 dark:text-gray-400">
+                            {{ t('Saved note') }}: {{ reviewModal.payout.admin_note }}
+                        </p>
                     </div>
                 </div>
+            </div>
 
-                <div class="space-y-6 px-6 py-5">
-                    <div class="grid gap-3 md:grid-cols-2">
-                        <div class="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Affiliate') }}</p>
-                            <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ reviewModal.payout.user?.name || '—' }}</p>
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ reviewModal.payout.user?.email || '—' }}</p>
-                        </div>
-                        <div class="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Amount') }}</p>
-                            <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ formatCurrency(reviewModal.payout.amount) }}</p>
-                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t(reviewModal.payout.method) }}</p>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-3 md:grid-cols-2">
-                        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Requested') }}</p>
-                            <p class="mt-1 text-sm text-gray-700 dark:text-gray-200">{{ reviewModal.payout.created_at ? formatDateTime(reviewModal.payout.created_at) : '—' }}</p>
-                        </div>
-                        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Current status') }}</p>
-                            <div class="mt-1">
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium" :class="badgeClass(reviewModal.payout.status)">{{ t(reviewModal.payout.status) }}</span>
-                            </div>
-                            <p v-if="reviewModal.payout.processed_at" class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ formatDateTime(reviewModal.payout.processed_at) }}</p>
-                        </div>
-                    </div>
-
-                    <div class="rounded-xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900/30">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Payout details') }}</p>
-                        <div class="mt-3 grid gap-3 md:grid-cols-2">
-                            <div v-for="entry in detailEntries(reviewModal.payout)" :key="`${entry.label}-${entry.value}`" class="min-w-0">
-                                <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ entry.label }}</p>
-                                <p class="mt-1 break-all text-sm text-gray-700 dark:text-gray-200">{{ entry.value }}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="rounded-xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-900/30">
-                        <div class="flex items-center justify-between gap-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('Admin action') }}</p>
-                            <span v-if="isFinalized(reviewModal.payout.status)" class="text-xs font-medium text-gray-400 dark:text-gray-500">{{ t('This payout is finalized.') }}</span>
-                        </div>
-
-                        <div class="mt-3 space-y-4">
-                            <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Action status') }}</label>
-                                <AppSelect v-model="reviewModal.status" :options="actionStatusOptions" :disabled="isFinalized(reviewModal.payout.status)" />
-                            </div>
-
-                            <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Admin note') }}</label>
-                                <textarea
-                                    v-model="reviewModal.note"
-                                    rows="3"
-                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :disabled="isFinalized(reviewModal.payout.status)"
-                                    :placeholder="t('Optional note for the affiliate')"
-                                />
-                            </div>
-
-                            <p v-if="reviewModal.payout.admin_note && isFinalized(reviewModal.payout.status)" class="text-sm text-gray-500 dark:text-gray-400">
-                                {{ t('Saved note') }}: {{ reviewModal.payout.admin_note }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-900/60">
+            <template #footer>
+                <div v-if="reviewModal.payout" class="flex items-center justify-end gap-3">
                     <button type="button" class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700" :disabled="reviewModal.processing" @click="closeReviewModal">{{ isFinalized(reviewModal.payout.status) ? t('Close') : t('Cancel') }}</button>
-                    <button v-if="!isFinalized(reviewModal.payout.status)" type="button" :disabled="reviewModal.processing" class="rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50" :class="reviewModal.status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'btn-primary'" @click="submitReview">
+                    <button v-if="!isFinalized(reviewModal.payout.status)" type="button" :disabled="reviewModal.processing" class="rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-50" :class="reviewModal.status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'btn-primary-admin'" @click="submitReview">
                         {{ reviewModal.processing ? t('Saving...') : t('Update payout') }}
                     </button>
                 </div>
-            </div>
-        </div>
+            </template>
+        </AppModal>
     </AdminLayout>
 </template>

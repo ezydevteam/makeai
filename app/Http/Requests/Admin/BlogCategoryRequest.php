@@ -25,7 +25,6 @@ class BlogCategoryRequest extends FormRequest
             'color' => ['nullable', 'string', 'max:20'],
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string'],
-            'og_image' => ['nullable', 'string', 'max:500'],
             'is_active' => ['required', 'boolean'],
             'sort_order' => ['required', 'integer', 'min:0'],
         ];

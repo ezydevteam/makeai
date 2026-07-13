@@ -28,7 +28,7 @@ class Admin extends Authenticatable
 
     protected $fillable = [
         'name', 'email', 'password', 'password_changed_at', 'avatar', 'role_id',
-        'is_active', 'must_change_password',
+        'is_active',
         'two_factor_secret', 'two_factor_enabled',
         'two_factor_confirmed_at', 'two_factor_recovery_codes',
         'otp_secret', 'otp_expires_at',
@@ -217,9 +217,14 @@ class Admin extends Authenticatable
             'last_login_ip' => $ip,
         ]);
 
+        // Best-effort geo (no-op unless an IPInfo token is configured).
+        $geo = \App\Services\IpGeolocationService::fromSettings()->lookupLocation($ip);
+
         $this->loginHistory()->create([
             'ip' => $ip,
             'user_agent' => $userAgent,
+            'country' => $geo['country'],
+            'city' => $geo['city'],
             'success' => true,
         ]);
     }

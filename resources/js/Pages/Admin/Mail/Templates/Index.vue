@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
+import { useDateFormat } from '@/Composables/useDateFormat'
 
 defineOptions({ layout: AdminLayout })
 
@@ -19,7 +20,9 @@ interface MailTemplate {
     category: string
     is_active: boolean
     is_system: boolean
-    access_level: string
+    requires_pro: boolean
+    updated_at: string
+    editor?: { id: number; name: string } | null
 }
 
 interface SelectOption {
@@ -32,6 +35,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useTranslate()
+const { formatDate } = useDateFormat()
 
 const search = ref('')
 const searchFocused = ref(false)
@@ -76,7 +80,7 @@ const filteredTemplates = computed(() => {
             (type.value === 'custom' && !template.is_system) ||
             (type.value === 'active' && template.is_active) ||
             (type.value === 'disabled' && !template.is_active) ||
-            (type.value === 'pro' && (template.access_level === 'premium' || template.access_level?.startsWith('plan:')))
+            (type.value === 'pro' && template.requires_pro)
         )
 
         return matchesSearch && matchesCategory && matchesType
@@ -170,7 +174,7 @@ onBeforeUnmount(() => {
     <Head :title="t('Mail Templates')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Mail Templates') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage system notifications and custom email communications from one place.') }}</p>
@@ -178,7 +182,7 @@ onBeforeUnmount(() => {
 
                 <Link
                     :href="route('admin.mail.templates.create')"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold"
+                    class="shrink-0 btn-primary-admin inline-flex items-center justify-center gap-2"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('New Template') }}
@@ -188,7 +192,7 @@ onBeforeUnmount(() => {
             <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-gray-900">
                 <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                        <div class="flex-1 min-w-[240px]">
+                        <div class="flex-1 min-w-[220px] md:max-w-sm">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -198,7 +202,7 @@ onBeforeUnmount(() => {
                                     v-model="search"
                                     type="text"
                                     class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    :placeholder="t('Filter this table by template, slug, subject, or category...')"
+                                    :placeholder="t('Search mail templates...')"
                                     @focus="searchFocused = true"
                                     @blur="searchFocused = false"
                                 >
@@ -263,13 +267,16 @@ onBeforeUnmount(() => {
                                                 {{ template.is_system ? t('System') : t('Custom') }}
                                             </span>
                                             <span
-                                                v-if="template.access_level === 'premium' || template.access_level?.startsWith('plan:')"
+                                                v-if="template.requires_pro"
                                                 class="inline-flex rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-900/20 dark:text-violet-300"
                                             >
                                                 {{ t('Pro') }}
                                             </span>
                                         </div>
                                         <p class="mt-1 font-mono text-xs text-gray-500 dark:text-gray-400">{{ template.slug }}</p>
+                                        <p v-if="template.editor" class="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                            {{ t('Edited by :name', { name: template.editor.name }) }} · {{ formatDate(template.updated_at) }}
+                                        </p>
                                     </div>
                                 </td>
                                 <td class="px-6 py-5 align-top">

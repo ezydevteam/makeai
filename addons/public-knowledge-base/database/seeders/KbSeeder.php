@@ -96,10 +96,6 @@ class KbSeeder extends Seeder
                     \Addons\PublicKnowledgeBase\Jobs\IngestKbArticle::dispatch($article->id)
                         ->onQueue('embeddings');
                 }
-
-                $category->update([
-                    'articles_count' => $category->articles()->published()->count(),
-                ]);
             }
         }
     }

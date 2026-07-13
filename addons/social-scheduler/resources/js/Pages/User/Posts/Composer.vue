@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
-import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useRateLimit } from '@/Composables/useRateLimit'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, computed, onUnmounted } from 'vue'

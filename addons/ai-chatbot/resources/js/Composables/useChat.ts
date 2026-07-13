@@ -136,13 +136,25 @@ export function useChat() {
     const isStreaming = ref(false)
     const loading = ref(false)
     const error = ref('')
+    // Load-state for the two async surfaces that previously swallowed errors and fell
+    // back to an empty state (looked like "no conversations" / a blank message panel).
+    const conversationsLoading = ref(false)
+    const conversationsError = ref('')
+    const messagesLoading = ref(false)
+    const messagesError = ref('')
     const selectedModel = ref<string | null>(allowModelSelect.value ? null : defaultChatModel.value)
     const abortController = ref<AbortController | null>(null)
     const pendingConversationUlid = ref<string | null>(null)
     const hasMoreMessages = ref(false)
     const loadingOlder = ref(false)
     const useKnowledgeBase = ref(false)
-    const kbAvailable = (usePage().props.kb_available as boolean) ?? false
+    // Mirrors the server-side gate (Addons\AiChatbot\Support\KnowledgeBase::available):
+    // the KB addon must be present, installed AND activated, and the chatbot's own
+    // KB toggle must be on. Defaults to false so a missing share never opens the door.
+    const kbAvailable = (() => {
+        const chatbot = usePage().props.chatbot as any
+        return (chatbot?.kbAvailable as boolean) ?? false
+    })()
     const availableModels = computed(() => {
         const chatbot = usePage().props.chatbot as any
         const models = (usePage().props.available_models || usePage().props.available_chat_models) as string[] | undefined
@@ -154,6 +166,8 @@ export function useChat() {
         try { const data = await apiGet<{ success: boolean; data: ChatMode[] }>('/api/v1/chat/modes'); modes.value = data.data } catch {}
     }
     async function loadConversations(projectId?: number | null) {
+        conversationsLoading.value = true
+        conversationsError.value = ''
         try {
             const params = new URLSearchParams()
             if (projectId) params.append('project_id', projectId.toString())
@@ -161,7 +175,11 @@ export function useChat() {
             const url = params.toString() ? `/api/v1/chat?${params}` : '/api/v1/chat'
             const data = await apiGet<{ success: boolean; data: Conversation[] }>(url)
             conversations.value = data.data
-        } catch {}
+        } catch (e) {
+            conversationsError.value = sanitizeErrorMessage(e instanceof Error ? e.message : 'Failed to load conversations')
+        } finally {
+            conversationsLoading.value = false
+        }
     }
     async function loadProjects() {
         try { const data = await apiGet<{ success: boolean; data: ChatProject[] }>('/api/v1/chat/projects'); projects.value = data.data } catch {}
@@ -203,11 +221,24 @@ export function useChat() {
     }
 
     async function loadMessages(ulid: string) {
+        messagesLoading.value = true
+        messagesError.value = ''
         try {
             const data = await apiGet<{ success: boolean; data: { messages: ChatMessage[]; has_more: boolean } }>(`/api/v1/chat/${ulid}`)
             messages.value = data.data.messages || []
             hasMoreMessages.value = data.data.has_more || false
-        } catch {}
+        } catch (e) {
+            messagesError.value = sanitizeErrorMessage(e instanceof Error ? e.message : 'Failed to load messages')
+        } finally {
+            messagesLoading.value = false
+        }
+    }
+
+    // Retry helper for the message panel error state.
+    async function retryLoadMessages() {
+        if (activeConversation.value) {
+            await loadMessages(activeConversation.value.ulid)
+        }
     }
 
     async function loadOlderMessages(ulid: string) {
@@ -347,19 +378,33 @@ export function useChat() {
             await loadConversations(selectedProject.value?.id ?? null)
             await loadMessages(activeConversation.value.ulid)
 
-        } catch (e) {
-            if (e instanceof Error && e.message === 'Aborted') {
-                // user cancelled, leave partial message
-            } else if (e instanceof Error && e.message === 'Unauthorized') {
-                error.value = 'Please sign in to use the chatbot.'
+        } catch (e: any) {
+            // A user-initiated stop rejects with a DOMException named 'AbortError'
+            // (message "The operation was aborted"), NOT the string 'Aborted' — and a
+            // DOMException is not `instanceof Error`. Detect the abort robustly so
+            // stopping keeps the partial reply instead of showing "Failed to send message".
+            const aborted = e?.name === 'AbortError' || !!abortController.value?.signal.aborted
+            if (aborted) {
+                // Keep whatever streamed in; drop an empty assistant bubble so a stop
+                // before the first token doesn't leave a blank message behind.
+                const msgs = [...messages.value]
+                const last = msgs[msgs.length - 1]
+                if (last && last.role === 'assistant' && !last.content) {
+                    msgs.pop()
+                    messages.value = msgs
+                }
             } else {
-                error.value = sanitizeErrorMessage(e instanceof Error ? e.message : 'Failed to send message')
-            }
-            const msgs = [...messages.value]
-            const last = msgs[msgs.length - 1]
-            if (last.role === 'assistant' && !last.content) {
-                msgs[msgs.length - 1] = { ...last, content: 'Error: ' + error.value }
-                messages.value = msgs
+                if (e instanceof Error && e.message === 'Unauthorized') {
+                    error.value = 'Please sign in to use the chatbot.'
+                } else {
+                    error.value = sanitizeErrorMessage(e instanceof Error ? e.message : 'Failed to send message')
+                }
+                const msgs = [...messages.value]
+                const last = msgs[msgs.length - 1]
+                if (last && last.role === 'assistant' && !last.content) {
+                    msgs[msgs.length - 1] = { ...last, content: 'Error: ' + error.value }
+                    messages.value = msgs
+                }
             }
         } finally {
             isStreaming.value = false
@@ -592,6 +637,7 @@ export function useChat() {
         modes, conversations, groupedConversations, projects, tags, selectedTag,
         selectedMode, activeConversation, selectedProject, messages,
         isStreaming, loading, error, selectedModel,
+        conversationsLoading, conversationsError, messagesLoading, messagesError, retryLoadMessages,
         useKnowledgeBase, kbAvailable,
         newChat, selectConversation, selectProject, sendMessage, stopStreaming,
         loadConversations, loadProjects, loadTags, loadOlderMessages, hasMoreMessages, loadingOlder,

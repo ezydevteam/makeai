@@ -7,14 +7,17 @@ namespace Addons\AiChatbot\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Addons\AiChatbot\Models\ChatbotMode;
 use Addons\AiChatbot\Models\Conversation;
+use Addons\AiChatbot\Support\KnowledgeBase;
 use App\Services\AI\AiService;
 use App\Services\AI\ProviderRegistry;
 use App\Services\AI\TokenGuard;
+use App\Services\ContentModerationService;
 use App\Services\ExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ChatController extends Controller
@@ -55,7 +58,10 @@ class ChatController extends Controller
         $validated = $request->validate([
             'mode_slug' => 'nullable|string|exists:chatbot_modes,slug',
             'model' => 'nullable|string|max:150',
-            'project_id' => 'nullable|integer|exists:chat_projects,id',
+            // Scope project ownership to the caller — validating only `exists` lets a
+            // user attach their conversation to another user's project (IDOR). A guest
+            // ($user === null) has no projects, so this rejects any project_id from them.
+            'project_id' => ['nullable', 'integer', Rule::exists('chat_projects', 'id')->where('user_id', $user?->id)],
         ]);
 
         $conversation = Conversation::create([
@@ -114,7 +120,8 @@ class ChatController extends Controller
 
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
-            'project_id' => 'nullable|integer|exists:chat_projects,id',
+            // Owner-scoped: prevent moving a conversation into someone else's project (IDOR).
+            'project_id' => ['nullable', 'integer', Rule::exists('chat_projects', 'id')->where('user_id', Auth::id())],
             'model' => 'nullable|string|max:150',
         ]);
 
@@ -188,7 +195,10 @@ class ChatController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'title' => $conversation->title,
+                // The auto-generated title is the first 60 chars of the user's first
+                // message. This view deliberately hides user prompts (assistant messages
+                // only), so exposing the raw title would leak them — return a neutral label.
+                'title' => (string) translate('Shared Conversation'),
                 'model' => $conversation->model,
                 'messages' => $messages,
             ],
@@ -254,6 +264,12 @@ class ChatController extends Controller
     public function editMessage(Request $request, string $ulid, int $messageId): JsonResponse
     {
         $user = Auth::user();
+        // Editing is signed-in-only; a guest reaching this (via ChatGuestAccess) would
+        // otherwise dereference null. Respond 403 instead of 500.
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Sign in to edit messages.'], 403);
+        }
+
         $conversation = Conversation::where('ulid', $ulid)
             ->where('user_id', $user->id)
             ->firstOrFail();
@@ -527,7 +543,7 @@ class ChatController extends Controller
         $creditsPerMessage = $this->getPlanSetting('credits_per_message', null);
         if ($user && $creditsPerMessage !== null && $creditsPerMessage !== '') {
             $requiredCredits = (float) $creditsPerMessage;
-            if ($user->credits < $requiredCredits) {
+            if (! credit_quota_mode() && $user->credits < $requiredCredits) {
                 return response()->stream(function () use ($requiredCredits, $user) {
                     echo 'data: '.json_encode(['type' => 'error', 'message' => "Insufficient credits. You need at least {$requiredCredits} credits to send a message, but you only have " . round((float)$user->credits, 2) . " credits."])."\n\n";
                     echo 'data: '.json_encode(['type' => 'done'])."\n\n";
@@ -553,6 +569,20 @@ class ChatController extends Controller
             'attachments.*.text_content' => 'nullable|string|max:20000',
             'use_knowledge_base' => 'nullable|boolean',
         ]);
+
+        // Content safety gate — reject unsafe prompts before any credits are
+        // charged or the AI provider is called. No-op unless the Content
+        // Moderation extension is enabled in `block` mode.
+        if (ContentModerationService::fromSettings()->textViolates($validated['content'], 'chatbot')) {
+            return response()->stream(function () {
+                echo 'data: '.json_encode(['type' => 'error', 'message' => translate('This message was blocked by content safety filters.')])."\n\n";
+                echo 'data: '.json_encode(['type' => 'done'])."\n\n";
+            }, 200, [
+                'Content-Type' => 'text/event-stream',
+                'X-Accel-Buffering' => 'no',
+                'Cache-Control' => 'no-cache',
+            ]);
+        }
 
         // Security: `storage_path` is client-supplied. Ensure every attachment
         // points inside THIS caller's own upload directory — otherwise a crafted
@@ -627,9 +657,11 @@ class ChatController extends Controller
             $systemPrompt = ($systemPrompt ?? '') . $customInstructions;
         }
 
-        // Inject knowledge base context if requested
+        // Inject knowledge base context if requested. KnowledgeBase::available()
+        // also covers the case where the KB addon ships with the build but is not
+        // installed/activated — its tables would not exist.
         $kbSources = [];
-        if (!empty($validated['use_knowledge_base']) && class_exists(\Addons\PublicKnowledgeBase\Services\KbSearchService::class)) {
+        if (!empty($validated['use_knowledge_base']) && KnowledgeBase::available()) {
             try {
                 $kbService = app(\Addons\PublicKnowledgeBase\Services\KbSearchService::class);
                 $kbResult = $kbService->getRelevantContext($validated['content']);
@@ -746,20 +778,36 @@ class ChatController extends Controller
             ]);
         }
 
+        // Reserve the flat per-message credits BEFORE streaming. The old code charged
+        // after generation, so N concurrent requests each passed the pre-flight balance
+        // check (none had debited yet), got N full generations, and only ~1 actually
+        // charged — the rest silently failed to deduct but kept the output. chargeCredits()
+        // locks the row and refuses to go negative, so reserving up front serializes the
+        // concurrent requests on the wallet. Refunded inside the stream on cancel/failure.
+        $reservedCredits = 0.0;
+        $creditsPerMessage = $this->getPlanSetting('credits_per_message', null);
+        if ($user && $creditsPerMessage !== null && $creditsPerMessage !== '') {
+            $reservedCredits = (float) $creditsPerMessage;
+            if ($reservedCredits > 0 && ! $user->chargeCredits($reservedCredits, "AI Chatbot message: {$model}", [
+                'provider' => $provider,
+                'model' => $model,
+            ])) {
+                return response()->stream(function () use ($reservedCredits, $user) {
+                    echo 'data: '.json_encode(['type' => 'error', 'message' => "Insufficient credits. You need at least {$reservedCredits} credits to send a message, but you only have " . round((float) $user->credits, 2) . " credits."])."\n\n";
+                    echo 'data: '.json_encode(['type' => 'done'])."\n\n";
+                }, 200, [
+                    'Content-Type' => 'text/event-stream',
+                    'X-Accel-Buffering' => 'no',
+                    'Cache-Control' => 'no-cache',
+                ]);
+            }
+        }
+
         return response()->stream(function () use (
-            $conversation, $user, $model, $provider, $messages, $kbSources
+            $conversation, $user, $model, $provider, $messages, $kbSources, $reservedCredits
 
         ) {
             $fullContent = '';
-
-            // Emit KB sources before streaming tokens
-            if (!empty($kbSources)) {
-                echo 'data: '.json_encode(['type' => 'kb_sources', 'sources' => $kbSources])."\n\n";
-                if (ob_get_level() > 0) {
-                    ob_flush();
-                }
-                flush();
-            }
 
             try {
                 $adapter = ProviderRegistry::resolve($provider);
@@ -802,6 +850,21 @@ class ChatController extends Controller
                     }
                 }
 
+                // Knowledge Base citations are emitted AFTER the answer, never before it.
+                //
+                // They used to be sent before the first token, so the chat rendered
+                // "Sources: …" under a message that was still showing the typing indicator —
+                // references to an answer that did not exist yet, and which (on a provider
+                // error) might never arrive at all. Emitting them here ties a citation to a
+                // completed answer.
+                if (! empty($kbSources) && $fullContent !== '') {
+                    echo 'data: '.json_encode(['type' => 'kb_sources', 'sources' => $kbSources])."\n\n";
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+                    flush();
+                }
+
                 $responseTime = (int) ((microtime(true) - $startTime) * 1000);
                 $success = ! connection_aborted();
 
@@ -816,14 +879,15 @@ class ChatController extends Controller
 
                 $creditsPerMessage = $this->getPlanSetting('credits_per_message', null);
                 if ($user && $creditsPerMessage !== null && $creditsPerMessage !== '') {
-                    $credits = (float) $creditsPerMessage;
-                    if ($success) {
-                        $user->deductCredits($credits, "AI Chatbot message: {$model}", [
+                    // Flat credits were reserved (charged) up front. Refund if the
+                    // generation was cancelled/failed so the user isn't billed for nothing.
+                    $credits = $reservedCredits;
+                    if (! $success && $reservedCredits > 0) {
+                        $user->refundCredits($reservedCredits, "Refund — cancelled AI Chatbot message: {$model}", [
                             'provider' => $provider,
                             'model' => $model,
-                            'input_tokens' => $inputTokens,
-                            'output_tokens' => $outputTokens,
                         ]);
+                        $credits = 0.0;
                     }
 
                     TokenGuard::after(
@@ -834,7 +898,7 @@ class ChatController extends Controller
                         $provider,
                         'chat',
                         ['conversation_ulid' => $conversation->ulid],
-                        false, // don't charge since we did
+                        false, // don't charge since we reserved up front
                         $success,
                         $responseTime
                     );
@@ -860,6 +924,16 @@ class ChatController extends Controller
                         $responseTime
                     );
                 }
+
+                // Persist the usage on the assistant message row. Without this the
+                // per-message usage line (ChatMessage.vue) is blank after a page reload
+                // and any per-message reporting reads zeros — only the live SSE `usage`
+                // event carried these numbers before.
+                $assistantMsg->update([
+                    'input_tokens' => $inputTokens,
+                    'output_tokens' => $outputTokens,
+                    'credits_charged' => $credits,
+                ]);
 
                 $conversation->increment('message_count', 2);
                 $conversation->increment('total_tokens', $inputTokens + $outputTokens);
@@ -927,7 +1001,10 @@ class ChatController extends Controller
             $text .= ($msg['content'] ?? '').' ';
         }
 
-        return max(1, (int) (str_word_count($text, 0) * 1.3));
+        // str_word_count counts ~0 for CJK/Arabic/emoji-heavy text, which systematically
+        // undercharges non-Latin usage. Take the max of the word-based estimate and a
+        // char-based floor (~4 chars/token) so scripts without spaces are still counted.
+        return max(1, (int) max(str_word_count($text, 0) * 1.3, mb_strlen($text) / 4));
     }
 
     private function sanitizeError(string $message): string
@@ -965,7 +1042,11 @@ class ChatController extends Controller
             return (string) translate('Something went wrong. Please try again or contact support.');
         }
 
-        return $message;
+        // Default: never pass an unmatched raw provider/internal message to the client
+        // (it can leak endpoints, config hints, or stack details). Log it server-side.
+        \Log::warning('AI Chatbot generation error', ['message' => $message]);
+
+        return (string) translate('Something went wrong. Please try again or contact support.');
     }
 
     private function getPlanSetting(string $key, $default = null)

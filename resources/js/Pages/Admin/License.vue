@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import { computed, ref } from 'vue'
 import { applyPurchaseCodeMask } from '@/lib/purchaseCode'
 
@@ -24,7 +24,6 @@ type LicenseStatus = {
 
 const props = defineProps<{
     status: LicenseStatus
-    item_id: string | null
 }>()
 
 const page = usePage()
@@ -48,7 +47,7 @@ const isVerifying = computed(() => activateForm.processing || reverifyForm.proce
 const showDeactivateConfirm = ref(false)
 
 function formatDate(dateStr: string): string {
-    if (!dateStr) return '—'
+    if (!dateStr) return 'â€”'
     return new Date(dateStr).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
@@ -153,7 +152,7 @@ function onPurchaseCodeInput(e: Event) {
                     <span class="text-xs font-medium uppercase text-gray-500">{{ t('License Type') }}</span>
                     <p class="mt-1">
                         <span :class="['inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-semibold', typeBadgeClass]">
-                            {{ status.type === 2 ? '👑 ' : '✅ ' }}
+                            {{ status.type === 2 ? 'ðŸ‘‘ ' : 'âœ… ' }}
                             {{ status.type_label }}
                         </span>
                     </p>
@@ -161,7 +160,7 @@ function onPurchaseCodeInput(e: Event) {
 
                 <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
                     <span class="text-xs font-medium uppercase text-gray-500">{{ t('Buyer') }}</span>
-                    <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ status.buyer || '—' }}</p>
+                    <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ status.buyer || 'â€”' }}</p>
                 </div>
 
                 <div class="rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
@@ -178,7 +177,7 @@ function onPurchaseCodeInput(e: Event) {
                     :class="status.domain_ok ? 'border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/10' : 'border-red-200 bg-red-50 dark:border-red-700 dark:bg-red-900/10'">
                     <span class="text-xs font-medium uppercase text-gray-500">{{ t('Domain Binding') }}</span>
                     <p class="mt-1 text-sm font-semibold" :class="status.domain_ok ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'">
-                        {{ status.domain_ok ? t('Domain matches') : t('Domain mismatch — license was activated on a different domain') }}
+                        {{ status.domain_ok ? t('Domain matches') : t('Domain mismatch â€” license was activated on a different domain') }}
                     </p>
                 </div>
             </div>
@@ -189,7 +188,7 @@ function onPurchaseCodeInput(e: Event) {
                     type="button"
                     :disabled="reverifyForm.processing"
                     @click="reverifyForm.post(route('admin.license.reverify'), { preserveScroll: true })"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary shadow-sm transition-colors disabled:opacity-60"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary-admin shadow-sm transition-colors disabled:opacity-60"
                 >
                     <svg v-if="reverifyForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -240,15 +239,11 @@ function onPurchaseCodeInput(e: Event) {
                     <span v-if="activateForm.errors.purchase_code" class="mt-1 block text-xs text-danger-600">{{ activateForm.errors.purchase_code }}</span>
                 </div>
 
-                <div v-if="item_id" class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 dark:border-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-                    {{ t('Item ID') }}: <strong>{{ item_id }}</strong> — {{ t('Verify your purchase code belongs to this product.') }}
-                </div>
-
                 <div class="flex justify-end">
                     <button
                         type="submit"
                         :disabled="activateForm.processing"
-                        class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary shadow-lg transition-colors disabled:opacity-60"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg btn-primary-admin shadow-lg transition-colors disabled:opacity-60"
                     >
                         <svg v-if="activateForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -287,7 +282,7 @@ function onPurchaseCodeInput(e: Event) {
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="rounded-lg border border-blue-100 bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/10">
                     <h3 class="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
-                        <span class="text-base">✅</span> {{ t('Regular License') }}
+                        <span class="text-base">âœ…</span> {{ t('Regular License') }}
                     </h3>
                     <p class="mt-2 text-sm text-blue-700 dark:text-blue-300">
                         {{ t('Single end product, end users not charged. Enables all core AI features.') }}
@@ -296,7 +291,7 @@ function onPurchaseCodeInput(e: Event) {
 
                 <div class="rounded-lg border border-purple-100 bg-purple-50 p-4 dark:border-purple-700 dark:bg-purple-900/10">
                     <h3 class="flex items-center gap-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
-                        <span class="text-base">👑</span> {{ t('Extended License') }}
+                        <span class="text-base">ðŸ‘‘</span> {{ t('Extended License') }}
                     </h3>
                     <p class="mt-2 text-sm text-purple-700 dark:text-purple-300">
                         {{ t('End users can be charged. Unlocks subscription plans, billing, affiliate program, and all Pro features.') }}

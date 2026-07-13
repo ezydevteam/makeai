@@ -24,7 +24,6 @@ class Page extends Model
         'meta_description',
         'meta_keywords',
         'og_image',
-        'template',
         'featured_image',
         'show_title',
         'center_title',

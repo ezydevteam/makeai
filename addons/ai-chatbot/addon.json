@@ -15,7 +15,7 @@
             "route": "admin.ai-chatbot.analytics",
             "route_pattern": "admin.ai-chatbot.analytics",
             "icon": "ti ti-chart-bar",
-            "permission": "reports.view"
+            "permission": "reports.usage"
         },
         {
             "parent": "AI Tools",
@@ -35,6 +35,11 @@
         { "key": "custom_models",                   "type": "json",      "label": "Custom Models",                          "default": [],               "group": "ai" },
         { "key": "mode_default_models",             "type": "json",      "label": "Mode Specific Models",                   "default": {},               "group": "ai" },
         { "key": "default_chat_model",              "type": "string",    "label": "Default AI Model",                       "default": "gpt-4o-mini",    "group": "ai" },
+        { "key": "enable_knowledge_base",           "type": "boolean",   "label": "Enable Knowledge Base",                  "default": true,             "group": "general" },
+        { "key": "enable_file_upload",              "type": "boolean",   "label": "Enable File Upload",                     "default": true,             "group": "general" },
+        { "key": "enable_voice",                    "type": "boolean",   "label": "Enable Voice (mic input & read-aloud)",  "default": true,             "group": "general" },
+        { "key": "chat_logo",                       "type": "file",      "label": "Chat Logo",                              "default": null,             "group": "general" },
+        { "key": "enabled_modes",                   "type": "json",      "label": "Available Modes",                        "default": [],               "group": "ai" },
         { "key": "allow_guest_messages",            "type": "boolean",   "label": "Allow Guests to Chat",                   "default": false,            "group": "guests" },
         { "key": "guest_max_messages",              "type": "integer",   "label": "Max Guest Messages",                     "default": 10,               "group": "guests" },
         { "key": "guest_max_tokens",                "type": "integer",   "label": "Max Guest Tokens per Request",           "default": 1000,             "group": "guests" },

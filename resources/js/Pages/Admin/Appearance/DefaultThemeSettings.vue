@@ -3,16 +3,18 @@ import { computed, ref, watch, onMounted, onBeforeUnmount, defineAsyncComponent 
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import { VueDraggable } from 'vue-draggable-plus'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppColorPicker from '@/Components/AppColorPicker.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import IconClassSelect from '@/Components/IconClassSelect.vue'
+import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import IconClassSelect from '@/Components/Admin/IconClassSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { FONT_FAMILY_SELECT_OPTIONS } from '@/config/fontFamilies'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 
 defineOptions({ layout: AdminLayout })
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 interface ThemeConfig {
     name: string
@@ -33,6 +35,7 @@ type HeaderDesktopSettings = {
     notification_button_style?: string
     show_social_icons?: boolean
     social_icon_style?: string
+    social_button_text?: string
     show_language_switcher?: boolean
     language_switcher_style?: string
     show_dark_mode_toggle?: boolean
@@ -63,6 +66,7 @@ type HeaderDesktopSettings = {
     menu_hover_color?: string
     show_border?: boolean
     show_shadow?: boolean
+    menu_transform?: string
 }
 
 type HeaderMobileTopSettings = {
@@ -106,6 +110,7 @@ type HeaderPresetSettings = {
 
 type FooterPresetSettings = {
     layout?: string
+    logo_mode?: string
     style_columns?: Record<string, Record<string, string | string[]>>
     brand_title?: string
     brand_description?: string
@@ -121,27 +126,20 @@ type FooterPresetSettings = {
     contact_phone?: string
     contact_address?: string
     contact_details?: string
-    menu_title_1?: string
-    menu_column_1?: string
-    menu_title_2?: string
-    menu_column_2?: string
-    menu_title_3?: string
-    menu_column_3?: string
-    custom_title_1?: string
-    custom_text_1?: string
-    custom_title_2?: string
-    custom_text_2?: string
-    tool_categories_title_1?: string
-    tool_categories_items_1?: string[]
-    tool_categories_title_2?: string
-    tool_categories_items_2?: string[]
+    menu_title?: string
+    menu_column?: string
+    custom_title?: string
+    custom_text?: string
+    tool_categories_title?: string
+    tool_categories_items?: string[]
     footer_bg_color?: string
     footer_text_color?: string
     footer_heading_color?: string
     footer_heading_text_case?: string
     container_width?: string
-    disable_logo_about?: boolean
-    disable_card_style?: boolean
+    show_logo_about?: boolean
+    enable_card_style?: boolean
+    hide_categories_count?: boolean
     footer_vertical_padding?: number
     show_payment_icons?: boolean
     payment_icons?: string
@@ -195,9 +193,9 @@ interface ThemePresetSettings {
     theme_allow_user_toggle?: boolean
     page_loading_animation?: string
     container_width?: string
-    border_radius?: string
     smooth_scroll?: boolean
     show_back_to_top?: boolean
+    hide_scroll_top_mobile?: boolean
     primary_color?: string
     secondary_color?: string
     accent_color?: string
@@ -324,31 +322,29 @@ const headerButtonStyleOptions = computed(() => [
     { value: 'success', label: t('Success') },
     { value: 'warning', label: t('Warning') },
     { value: 'purple', label: t('Purple') },
-    { value: 'gradient_sunset', label: t('Gradient Sunset') },
-    { value: 'gradient_ocean', label: t('Gradient Ocean') },
-    { value: 'gradient_royal', label: t('Gradient Royal') },
     { value: 'outline', label: t('Outline') },
     { value: 'ghost', label: t('Ghost') },
+    { value: 'gradient_sunset', label: t('Gradient Sunset') },
+    { value: 'gradient_ocean', label: t('Gradient Ocean') },
+    { value: 'gradient_royal', label: t('Gradient Royal') }
 ])
 const headerButtonShapeOptions = computed(() => [
-    { value: 'sharp', label: t('Sharp') },
+    { value: 'sharp', label: t('Square') },
     { value: 'rounded', label: t('Rounded') },
-    { value: 'rounded_xl', label: t('Rounded XL') },
+    { value: 'rounded_xl', label: t('Rounded-xl') },
     { value: 'pill', label: t('Pill') },
 ])
 const headerShadowStyleOptions = computed(() => [
     { value: 'none', label: t('None') },
-    { value: 'small', label: t('Small Shadow') },
-    { value: 'medium', label: t('Medium Shadow') },
-    { value: 'large', label: t('Large Shadow') },
-    { value: 'border_small', label: t('Border Small (1px)') },
-    { value: 'border_large', label: t('Border Large (2px)') },
+    { value: 'small', label: t('Shadow Small') },
+    { value: 'medium', label: t('Shadow Medium') },
+    { value: 'large', label: t('Shadow Large') },
 ])
 const mobileTopShadowOptions = computed(() => [
     { value: 'none', label: t('None') },
-    { value: 'small', label: t('Small Shadow') },
-    { value: 'large', label: t('Large Shadow') },
-    { value: 'border_small', label: t('Border (1px)') },
+    { value: 'small', label: t('Shadow Small') },
+    { value: 'large', label: t('Shadow Large') },
+    { value: 'border_small', label: t('Border Small') },
 ])
 const headerStickyBehaviorOptions = computed(() => [
     { value: 'none', label: t('None') },
@@ -359,38 +355,38 @@ const headerStickyBehaviorOptions = computed(() => [
 const headerActionItemStyleOptions = computed(() => [
     { value: 'hide', label: t('Hide') },
     { value: 'icon_only', label: t('Icon Only') },
-    { value: 'rounded_soft_bg', label: t('Rounded Soft BG') },
-    { value: 'circular_soft_bg', label: t('Circular Soft BG') },
-    { value: 'light_bg', label: t('Light BG') },
+    { value: 'rounded_soft_bg', label: t('Rounded') },
+    { value: 'circular_soft_bg', label: t('Circular') },
+    { value: 'light_bg', label: t('Light') },
 ])
 const headerLanguageSwitcherStyleOptions = computed(() => [
     ...headerActionItemStyleOptions.value,
-    { value: 'icon_with_label', label: t('Icon With Label (Active Lang)') },
+    { value: 'icon_with_label', label: t('Icon With Label') },
 ])
 const headerCommandPaletteStyleOptions = computed(() => [
     { value: 'hidden', label: t('Hide') },
     { value: 'icon_only', label: t('Icon Only') },
-    { value: 'rounded_soft_bg', label: t('Rounded Soft BG') },
-    { value: 'circular_soft_bg', label: t('Circular Soft BG') },
-    { value: 'search_transparent', label: t('Search Box (Transparent BG)') },
-    { value: 'search_light', label: t('Search Box (Light BG)') },
+    { value: 'rounded_soft_bg', label: t('Rounded Icon') },
+    { value: 'circular_soft_bg', label: t('Circular Icon') },
+    { value: 'search_transparent', label: t('Searchbox Pill') },
+    { value: 'search_light', label: t('Searchbox Light') },
 ])
 const headerAccountAvatarStyleOptions = computed(() => [
-    { value: 'avatar_only_rounded', label: t('Only Avatar (Rounded)') },
-    { value: 'avatar_only_circle', label: t('Only Avatar (Circle)') },
+    { value: 'avatar_only_rounded', label: t('Avatar Only') },
+    { value: 'avatar_only_circle', label: t('Avatar Circle') },
     { value: 'avatar_name', label: t('Avatar + Username') },
-    { value: 'avatar_name_arrow', label: t('Avatar + Username + Dropdown Icon') },
+    { value: 'avatar_name_arrow', label: t('Avatar + Username + Dropdown') },
 ])
 const accessLevelOptions = computed(() => {
     const options = [
         { value: 'all', label: t('Everyone') },
         { value: 'guest', label: t('Guests Only') },
         { value: 'auth', label: t('Logged In Users') },
-        { value: 'not_pro', label: t('Not Premium Users') },
     ]
 
     if (isProAvailable.value) {
         options.push({ value: 'pro', label: t('Premium Users') })
+        options.push({ value: 'not_pro', label: t('Not Premium Users') })
     }
 
     return options
@@ -408,10 +404,16 @@ const headerMenuPositionOptions = computed(() => [
     { value: 'right', label: t('Right') },
 ])
 const headerMenuHoverStyleOptions = computed(() => [
-    { value: 'bottom_border', label: t('Bottom Border') },
-    { value: 'rounded_soft_bg', label: t('Rounded Soft BG') },
-    { value: 'pill_soft_bg', label: t('Pill Soft BG') },
-    { value: 'simple', label: t('Simple') },
+    { value: 'bottom_border', label: t('Underline') },
+    { value: 'rounded_soft_bg', label: t('Rounded') },
+    { value: 'pill_soft_bg', label: t('Pill') },
+    { value: 'simple', label: t('Minimal') },
+])
+const menuTransformOptions = computed(() => [
+    { value: 'default', label: t('Default') },
+    { value: 'capitalize', label: t('Capitalize') },
+    { value: 'uppercase', label: t('Uppercase') },
+    { value: 'lowercase', label: t('Lowercase') },
 ])
 const footerStylePreview = (style: string) => {
     const previews: Record<string, string> = {
@@ -737,25 +739,23 @@ const footerLayoutOptions = computed(() => [
 
 const footerContentItemOptions = computed(() => [
     { value: 'about_text', label: t('About Text') },
-    { value: 'logo_light', label: t('Logo Light') },
-    { value: 'logo_dark', label: t('Logo Dark') },
-    { value: 'menu_links_1', label: t('Menu Links 1') },
-    { value: 'menu_links_2', label: t('Menu Links 2') },
-    { value: 'menu_links_3', label: t('Menu Links 3') },
+    { value: 'logo', label: t('Logo') },
+    { value: 'menu', label: t('Menu') },
     { value: 'contact_info', label: t('Contact Info') },
-    { value: 'custom_text_1', label: t('Custom Text 1') },
-    { value: 'custom_text_2', label: t('Custom Text 2') },
-    { value: 'tool_categories_1', label: t('Tool Categories 1') },
-    { value: 'tool_categories_2', label: t('Tool Categories 2') },
+    { value: 'custom_text', label: t('Custom Text') },
+    { value: 'categories', label: t('Categories') },
     { value: 'newsletter', label: t('Newsletter') },
 ])
 
 const activeFooterContentItemOptions = computed(() => {
-    if (['floating_panel', 'card_grid', 'spotlight'].includes(footerForm.settings.layout)) {
-        return footerContentItemOptions.value.filter((option) => option.value !== 'newsletter')
+    const layout = footerForm.settings.layout || 'default'
+    let options = footerContentItemOptions.value
+
+    if (['floating_panel', 'card_grid', 'spotlight'].includes(layout)) {
+        options = options.filter((option) => option.value !== 'newsletter')
     }
 
-    return footerContentItemOptions.value
+    return options
 })
 
 const footerStyleColumnDefinitions = computed<Record<string, Array<{ key: string; label: string }>>>(() => ({
@@ -798,12 +798,12 @@ const footerStyleColumnDefinitions = computed<Record<string, Array<{ key: string
 }))
 
 const defaultFooterStyleColumns: Record<string, Record<string, string[]>> = {
-    default: { col_1: ['about_text'], col_2: ['menu_links_1'], col_3: ['contact_info'], col_4: ['custom_text_1'] },
-    centered: { col_1: ['about_text'], col_2: ['menu_links_1'], col_3: ['contact_info'] },
-    spotlight: { col_1: ['menu_links_1'], col_2: ['menu_links_2'], col_3: ['contact_info'], col_4: ['tool_categories_1'] },
-    card_grid: { col_1: ['about_text'], col_2: ['menu_links_1'], col_3: ['menu_links_2'], col_4: ['contact_info'], col_5: ['tool_categories_1'] },
-    split_band: { col_1: ['menu_links_1'], col_2: ['contact_info'], col_3: ['custom_text_1'], col_4: ['tool_categories_1'] },
-    floating_panel: { col_1: ['menu_links_1'], col_2: ['contact_info'], col_3: ['custom_text_1'], col_4: ['tool_categories_1'] },
+    default: { col_1: ['about_text'], col_2: ['menu'], col_3: ['contact_info'], col_4: ['custom_text'] },
+    centered: { col_1: ['about_text'], col_2: ['menu'], col_3: ['contact_info'] },
+    spotlight: { col_1: ['menu'], col_2: ['custom_text'], col_3: ['contact_info'], col_4: ['categories'] },
+    card_grid: { col_1: ['about_text'], col_2: ['menu'], col_3: ['custom_text'], col_4: ['contact_info'], col_5: ['categories'] },
+    split_band: { col_1: ['menu'], col_2: ['contact_info'], col_3: ['custom_text'], col_4: ['categories'] },
+    floating_panel: { col_1: ['menu'], col_2: ['contact_info'], col_3: ['custom_text'], col_4: ['categories'] },
 }
 
 const fontSizeOptions = ['12px', '13px', '14px', '15px', '16px', '18px', '20px'].map((value) => ({ value, label: value }))
@@ -815,14 +815,6 @@ const letterSpacingOptions = [
     { value: 'normal', label: 'Normal' },
     { value: 'wide', label: 'Wide' },
     { value: 'wider', label: 'Wider' },
-]
-const borderRadiusOptions = [
-    { value: '0px', label: 'Sharp' },
-    { value: '8px', label: 'Subtle' },
-    { value: '12px', label: 'Balanced' },
-    { value: '16px', label: 'Soft' },
-    { value: '20px', label: 'Rounded' },
-    { value: '999px', label: 'Pill' },
 ]
 const containerWidthOptions = [
     { value: '1280px', label: 'Default' },
@@ -938,6 +930,21 @@ const toolPageForm = useForm({
         hide_rating: resolvedToolPageDefaults.value.hide_rating ?? false,
         hide_share: resolvedToolPageDefaults.value.hide_share ?? false,
         hide_favorite: resolvedToolPageDefaults.value.hide_favorite ?? false,
+        hide_category: resolvedToolPageDefaults.value.hide_category ?? false,
+        hide_labels: resolvedToolPageDefaults.value.hide_labels ?? false,
+        hide_usage_count: resolvedToolPageDefaults.value.hide_usage_count ?? false,
+        global_tools_brand_voice_enabled: resolvedToolPageDefaults.value.global_tools_brand_voice_enabled !== false,
+        global_tools_variations_enabled: resolvedToolPageDefaults.value.global_tools_variations_enabled !== false,
+        global_tools_regenerate_enabled: resolvedToolPageDefaults.value.global_tools_regenerate_enabled !== false,
+        global_tools_improve_enabled: resolvedToolPageDefaults.value.global_tools_improve_enabled !== false,
+        global_tools_editor_enabled: resolvedToolPageDefaults.value.global_tools_editor_enabled !== false,
+        global_tools_show_about_enabled: resolvedToolPageDefaults.value.global_tools_show_about_enabled !== false,
+        global_tools_show_how_it_works_enabled: resolvedToolPageDefaults.value.global_tools_show_how_it_works_enabled !== false,
+        global_tools_show_usage_examples_enabled: resolvedToolPageDefaults.value.global_tools_show_usage_examples_enabled !== false,
+        global_tools_show_faqs_enabled: resolvedToolPageDefaults.value.global_tools_show_faqs_enabled !== false,
+        global_tools_show_reviews_enabled: resolvedToolPageDefaults.value.global_tools_show_reviews_enabled !== false,
+        global_tools_embeddable_enabled: resolvedToolPageDefaults.value.global_tools_embeddable_enabled !== false,
+        show_tool_credit_costs: resolvedToolPageDefaults.value.show_tool_credit_costs !== false,
         archive_layout: resolvedToolPageDefaults.value.archive_layout ?? 'default',
         archive_show_breadcrumbs: resolvedToolPageDefaults.value.archive_show_breadcrumbs !== false,
         archive_show_stats: resolvedToolPageDefaults.value.archive_show_stats !== false,
@@ -978,6 +985,7 @@ const themeForm = useForm({
         page_loading_animation: resolvedThemeDefaults.value.page_loading_animation ?? currentSettingString('page_loading_animation', 'none'),
         smooth_scroll: normalizeBooleanValue(resolvedThemeDefaults.value.smooth_scroll, true),
         show_back_to_top: normalizeBooleanValue(resolvedThemeDefaults.value.show_back_to_top, true),
+        hide_scroll_top_mobile: normalizeBooleanValue(resolvedThemeDefaults.value.hide_scroll_top_mobile, false),
         primary_color: resolvedThemeDefaults.value.primary_color ?? currentSettingString('primary_color', '#10b981'),
         secondary_color: resolvedThemeDefaults.value.secondary_color ?? currentSettingString('secondary_color', '#3b82f6'),
         accent_color: resolvedThemeDefaults.value.accent_color ?? currentSettingString('accent_color', '#8b5cf6'),
@@ -994,7 +1002,6 @@ const themeForm = useForm({
         heading_weight: resolvedThemeDefaults.value.heading_weight ?? currentSettingString('heading_weight', '700'),
         line_height: resolvedThemeDefaults.value.line_height ?? currentSettingString('line_height', '1.5'),
         letter_spacing: resolvedThemeDefaults.value.letter_spacing ?? currentSettingString('letter_spacing', 'normal'),
-        border_radius: resolvedThemeDefaults.value.border_radius ?? currentSettingString('border_radius', '12px'),
         container_width: resolvedThemeDefaults.value.container_width ?? currentSettingString('container_width', '1280px'),
     },
 })
@@ -1016,6 +1023,11 @@ const headerForm = useForm({
             social_icon_style: normalizeBooleanValue(resolvedHeaderDefaults.value.desktop?.show_social_icons, false) === false
                 ? 'hide'
                 : (resolvedHeaderDefaults.value.desktop?.social_icon_style ?? 'rounded_soft_bg'),
+            social_button_text: resolvedHeaderDefaults.value.desktop
+                ? ('social_button_text' in resolvedHeaderDefaults.value.desktop
+                    ? (resolvedHeaderDefaults.value.desktop.social_button_text ?? '')
+                    : 'Follow Us')
+                : 'Follow Us',
             show_language_switcher: normalizeBooleanValue(resolvedHeaderDefaults.value.desktop?.show_language_switcher, true),
             language_switcher_style: normalizeBooleanValue(resolvedHeaderDefaults.value.desktop?.show_language_switcher, true) === false
                 ? 'hide'
@@ -1050,6 +1062,7 @@ const headerForm = useForm({
             menu_hover_color: resolvedHeaderDefaults.value.desktop?.menu_hover_color ?? '',
             show_border: normalizeBooleanValue(resolvedHeaderDefaults.value.desktop?.show_border, true),
             show_shadow: normalizeBooleanValue(resolvedHeaderDefaults.value.desktop?.show_shadow, false),
+            menu_transform: resolvedHeaderDefaults.value.desktop?.menu_transform ?? 'default',
         },
         mobile_top: {
             enabled: normalizeBooleanValue(resolvedHeaderDefaults.value.mobile_top?.enabled, true),
@@ -1089,6 +1102,7 @@ const footerForm = useForm({
     settings: {
         layout: resolvedFooterDefaults.value.layout ?? 'default',
         style_columns: resolvedFooterStyleColumns.value,
+        logo_mode: resolvedFooterDefaults.value.logo_mode ?? 'light',
         brand_title: resolvedFooterDefaults.value.brand_title ?? '',
         brand_description: resolvedFooterDefaults.value.brand_description ?? '',
         show_newsletter: normalizeBooleanValue(resolvedFooterDefaults.value.show_newsletter, true),
@@ -1103,27 +1117,20 @@ const footerForm = useForm({
         contact_phone: resolvedFooterDefaults.value.contact_phone ?? '',
         contact_address: resolvedFooterDefaults.value.contact_address ?? '',
         contact_details: resolvedFooterDefaults.value.contact_details ?? '',
-        menu_title_1: resolvedFooterDefaults.value.menu_title_1 ?? '',
-        menu_column_1: resolvedFooterDefaults.value.menu_column_1 ?? 'footer-company',
-        menu_title_2: resolvedFooterDefaults.value.menu_title_2 ?? '',
-        menu_column_2: resolvedFooterDefaults.value.menu_column_2 ?? 'footer-support',
-        menu_title_3: resolvedFooterDefaults.value.menu_title_3 ?? '',
-        menu_column_3: resolvedFooterDefaults.value.menu_column_3 ?? 'footer-legal',
-        custom_title_1: resolvedFooterDefaults.value.custom_title_1 ?? '',
-        custom_text_1: resolvedFooterDefaults.value.custom_text_1 ?? '',
-        custom_title_2: resolvedFooterDefaults.value.custom_title_2 ?? '',
-        custom_text_2: resolvedFooterDefaults.value.custom_text_2 ?? '',
-        tool_categories_title_1: resolvedFooterDefaults.value.tool_categories_title_1 ?? '',
-        tool_categories_items_1: resolvedFooterDefaults.value.tool_categories_items_1 ?? [],
-        tool_categories_title_2: resolvedFooterDefaults.value.tool_categories_title_2 ?? '',
-        tool_categories_items_2: resolvedFooterDefaults.value.tool_categories_items_2 ?? [],
+        menu_title: resolvedFooterDefaults.value.menu_title ?? '',
+        menu_column: resolvedFooterDefaults.value.menu_column ?? 'footer-company',
+        custom_title: resolvedFooterDefaults.value.custom_title ?? '',
+        custom_text: resolvedFooterDefaults.value.custom_text ?? '',
+        tool_categories_title: resolvedFooterDefaults.value.tool_categories_title ?? '',
+        tool_categories_items: resolvedFooterDefaults.value.tool_categories_items ?? [],
         footer_bg_color: resolvedFooterDefaults.value.footer_bg_color ?? '',
         footer_text_color: resolvedFooterDefaults.value.footer_text_color ?? '',
         footer_heading_color: resolvedFooterDefaults.value.footer_heading_color ?? '',
         footer_heading_text_case: resolvedFooterDefaults.value.footer_heading_text_case ?? 'capitalize',
         container_width: resolvedFooterDefaults.value.container_width ?? '1280px',
-        disable_logo_about: normalizeBooleanValue(resolvedFooterDefaults.value.disable_logo_about, false),
-        disable_card_style: normalizeBooleanValue(resolvedFooterDefaults.value.disable_card_style, false),
+        show_logo_about: normalizeBooleanValue(resolvedFooterDefaults.value.show_logo_about, true),
+        enable_card_style: normalizeBooleanValue(resolvedFooterDefaults.value.enable_card_style, true),
+        hide_categories_count: normalizeBooleanValue(resolvedFooterDefaults.value.hide_categories_count, false),
         footer_vertical_padding: resolvedFooterDefaults.value.footer_vertical_padding ?? 56,
         show_payment_icons: normalizeBooleanValue(resolvedFooterDefaults.value.show_payment_icons, true),
         payment_icons: normalizePaymentIcon(resolvedFooterDefaults.value.payment_icons),
@@ -1146,19 +1153,25 @@ const footerForm = useForm({
 })
 
 const activeFooterStyleColumns = computed(() => footerStyleColumnDefinitions.value[footerForm.settings.layout] ?? footerStyleColumnDefinitions.value.default)
-const footerLogoVisibilityToggle = computed<boolean>({
-    get: () => footerForm.settings.layout === 'spotlight'
-        ? !footerForm.settings.disable_logo_about
-        : footerForm.settings.disable_logo_about,
-    set: (value: boolean) => {
-        footerForm.settings.disable_logo_about = footerForm.settings.layout === 'spotlight'
-            ? !value
-            : value
-    },
-})
 const footerLogoVisibilityLabel = computed(() => footerForm.settings.layout === 'spotlight'
     ? t('Show Logo')
-    : t('Disable Logo & About Text'))
+    : t('Show Logo & About Text'))
+
+const isLogoAboutEnabled = computed(() => {
+    const layout = footerForm.settings.layout
+    if (layout === 'default' || layout === 'card_grid') {
+        return true
+    }
+    return footerForm.settings.show_logo_about
+})
+
+const showLogoAboutSettingsCard = computed(() => {
+    const layout = footerForm.settings.layout
+    if (layout === 'default' || layout === 'card_grid' || layout === 'spotlight') {
+        return false
+    }
+    return footerForm.settings.show_logo_about
+})
 
 watch(() => headerForm.settings.desktop.notification_button_style, (value) => {
     headerForm.settings.desktop.show_notification_bell = value !== 'hide'
@@ -1272,7 +1285,7 @@ interface SectionConfig {
     title_color?: string
     card_bg_style?: string
     vertical_padding?: string
-    disable_card_style?: boolean
+    enable_card_style?: boolean
     newsletter_style?: string
     button_style?: string
     headline?: string
@@ -1355,7 +1368,7 @@ const secCfg = (type: string): any => {
         if (cfg.show_search === undefined) cfg.show_search = false
     }
     if (type === 'features') {
-        if (cfg.disable_card_style === undefined) cfg.disable_card_style = false
+        if (cfg.enable_card_style === undefined) cfg.enable_card_style = true
         if (!Array.isArray(cfg.items)) cfg.items = []
     }
     if (type === 'how_it_works') {
@@ -2022,6 +2035,71 @@ const tabSectionMap: Record<string, string> = {
 
 const isRestoreModalOpen = ref(false)
 const sectionToRestore = ref('')
+
+const isAddItemModalOpen = ref(false)
+const activeAddItemColumnKey = ref('')
+const isSettingsModalOpen = ref(false)
+const activeSettingsItem = ref('')
+const isRemoveItemModalOpen = ref(false)
+const removeItemData = ref({ columnKey: '', index: -1, itemName: '' })
+
+const activeSettingsItemLabel = computed(() => {
+    const option = footerContentItemOptions.value.find(o => o.value === activeSettingsItem.value)
+    return option ? option.label : activeSettingsItem.value
+})
+
+function openAddItemModal(columnKey: string): void {
+    activeAddItemColumnKey.value = columnKey
+    isAddItemModalOpen.value = true
+}
+
+function addItemToColumn(itemValue: string): void {
+    const layout = footerForm.settings.layout || 'default'
+    const colKey = activeAddItemColumnKey.value
+
+    if (!footerForm.settings.style_columns) {
+        footerForm.settings.style_columns = {}
+    }
+    if (!footerForm.settings.style_columns[layout]) {
+        footerForm.settings.style_columns[layout] = {}
+    }
+    if (!footerForm.settings.style_columns[layout][colKey]) {
+        footerForm.settings.style_columns[layout][colKey] = []
+    }
+
+    footerForm.settings.style_columns[layout][colKey].push(itemValue)
+    isAddItemModalOpen.value = false
+}
+
+function openSettingsModal(itemValue: string): void {
+    activeSettingsItem.value = itemValue
+    isSettingsModalOpen.value = true
+}
+
+function removeItem(columnKey: string, index: number): void {
+    const layout = footerForm.settings.layout || 'default'
+    if (footerForm.settings.style_columns?.[layout]?.[columnKey]) {
+        footerForm.settings.style_columns[layout][columnKey].splice(index, 1)
+    }
+}
+
+function confirmRemoveItem(columnKey: string, index: number): void {
+    const layout = footerForm.settings.layout || 'default'
+    const item = footerForm.settings.style_columns?.[layout]?.[columnKey]?.[index]
+    const option = footerContentItemOptions.value.find(o => o.value === item)
+    const itemName = option ? option.label : (item || '')
+
+    removeItemData.value = { columnKey, index, itemName }
+    isRemoveItemModalOpen.value = true
+}
+
+function handleConfirmRemoveItem(): void {
+    isRemoveItemModalOpen.value = false
+    const { columnKey, index } = removeItemData.value
+    if (columnKey && index > -1) {
+        removeItem(columnKey, index)
+    }
+}
 const activeTabLabel = computed(() => {
     const currentTab = tabs.find(tab => tab.id === activeTab.value)
     return currentTab ? t(currentTab.label) : ''
@@ -2150,14 +2228,14 @@ watch(() => [
             <div class="flex items-center gap-3 self-start">
                 <Link
                     :href="route('admin.themes')"
-                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-900"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
-                    <i class="ti ti-arrow-left mr-1"></i>
+                    <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-danger-200 bg-white px-4 py-2 text-sm font-medium text-danger-600 transition-colors hover:bg-danger-50 dark:border-danger-800 dark:bg-danger-950/20 dark:text-danger-400 dark:hover:bg-danger-950/40"
+                    class="inline-flex items-center gap-2 rounded-xl border border-danger-200 bg-white px-4 py-2 text-sm font-medium text-danger-600 transition hover:bg-danger-50 dark:border-danger-800 dark:bg-danger-950/20 dark:text-danger-400 dark:hover:bg-danger-950/40"
                     @click="confirmRestoreDefaults"
                     :title="t('Restore defaults')"
                 >
@@ -2167,7 +2245,7 @@ watch(() => [
                 <button
                     type="button"
                     :disabled="isSaving"
-                    class="btn-primary inline-flex items-center gap-2 rounded-lg disabled:opacity-60"
+                    class="btn-primary-admin disabled:opacity-60"
                     @click="saveActiveTab"
                 >
                     <i class="ti ti-device-floppy text-base"></i>
@@ -2206,7 +2284,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_logo_light)" alt="Light logo" class="h-10 max-w-[160px] object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_logo_light = ''; logoLightFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onLogoLightInput" />
+                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onLogoLightInput" />
                             </div>
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Logo Dark') }}</h3>
@@ -2214,7 +2292,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_logo_dark)" alt="Dark logo" class="h-10 max-w-[160px] object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_logo_dark = ''; logoDarkFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onLogoDarkInput" />
+                                <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onLogoDarkInput" />
                             </div>
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Favicon ICO') }}</h3>
@@ -2222,7 +2300,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_favicon_ico)" alt="Favicon ICO" class="h-8 w-8 object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_favicon_ico = ''; faviconIcoFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept=".ico,image/x-icon" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onFaviconIcoInput" />
+                                <input type="file" accept=".ico,image/x-icon" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onFaviconIcoInput" />
                             </div>
                             <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Favicon PNG') }}</h3>
@@ -2230,7 +2308,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_favicon_png)" alt="Favicon PNG" class="h-8 w-8 object-contain" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_favicon_png = ''; faviconPngFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onFaviconPngInput" />
+                                <input type="file" accept="image/png" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onFaviconPngInput" />
                             </div>
                         </div>
                         <div class="mt-5 grid gap-5">
@@ -2240,7 +2318,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.site_og_image)" alt="OG Image" class="h-12 max-w-[200px] rounded-lg object-cover" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.site_og_image = ''; ogImageFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onOgImageInput" />
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onOgImageInput" />
                             </div>
                         </div>
                     </section>
@@ -2270,22 +2348,17 @@ watch(() => [
                                 :label="t('Container width')"
                                 :options="containerWidthOptions"
                             />
-                            <AppSelect
-                                v-model="themeForm.settings.border_radius"
-                                :label="t('Card border radius')"
-                                :options="borderRadiusOptions"
-                            />
                             <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                <button type="button" role="switch" :aria-checked="themeForm.settings.smooth_scroll" class="app-switch" @click="themeForm.settings.smooth_scroll = !themeForm.settings.smooth_scroll">
-                                    <span class="app-switch__thumb"></span>
-                                </button>
-                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Smooth scroll') }}</span>
+                                <AppSwitch v-model="themeForm.settings.smooth_scroll" />
+                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Enable Smooth scroll') }}</span>
                             </div>
                             <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                <button type="button" role="switch" :aria-checked="themeForm.settings.show_back_to_top" class="app-switch" @click="themeForm.settings.show_back_to_top = !themeForm.settings.show_back_to_top">
-                                    <span class="app-switch__thumb"></span>
-                                </button>
+                                <AppSwitch v-model="themeForm.settings.show_back_to_top" />
                                 <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show back to top') }}</span>
+                            </div>
+                            <div v-if="themeForm.settings.show_back_to_top" class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                <AppSwitch v-model="themeForm.settings.hide_scroll_top_mobile" />
+                                <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Hide scroll to top in mobile') }}</span>
                             </div>
                         </div>
                     </section>
@@ -2314,9 +2387,7 @@ watch(() => [
                                     <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Use background image') }}</p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Enable to use a custom background image on frontend pages.') }}</p>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="themeForm.settings.bg_image_enabled" class="app-switch shrink-0" @click="themeForm.settings.bg_image_enabled = !themeForm.settings.bg_image_enabled">
-                                    <span class="app-switch__thumb"></span>
-                                </button>
+                                <AppSwitch v-model="themeForm.settings.bg_image_enabled" class="shrink-0" />
                             </div>
 
                             <div v-if="themeForm.settings.bg_image_enabled" class="space-y-4">
@@ -2324,7 +2395,7 @@ watch(() => [
                                     <img :src="fileUrl(themeForm.settings.bg_image)" :alt="t('Body background preview')" class="h-12 w-full rounded-lg object-cover" />
                                     <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="themeForm.settings.bg_image = ''; bodyBgImageFile = null">{{ t('Remove') }}</button>
                                 </div>
-                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="w-full rounded-lg border border-gray-200/60 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onBodyBgImageInput" />
+                                <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" class="w-full rounded-lg border border-gray-200/60 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onBodyBgImageInput" />
                             </div>
                         </div>
                     </section>
@@ -2359,34 +2430,51 @@ watch(() => [
                                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Choose the menu placement, hover behavior, and overall header sizing.') }}</p>
                                 </div>
                                 <div class="grid gap-5 sm:grid-cols-2">
-                                    <AppSelect v-model="headerForm.settings.desktop.menu_position" :label="t('Menu Position')" :options="headerMenuPositionOptions" />
-                                    <AppSelect v-model="headerForm.settings.desktop.menu_hover_style" :label="t('Menu Hover Style')" :options="headerMenuHoverStyleOptions" />
+                                    <!-- Header Options -->
+                                    <div class="sm:col-span-2">
+                                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ t('Header Options') }}</h4>
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <AppSelect v-model="headerForm.settings.desktop.container_width" :label="t('Container Width')" :options="containerWidthOptions.map((option) => ({ value: option.value, label: t(option.label) }))" />
+                                    </div>
                                     <AppSelect v-model="headerForm.settings.desktop.sticky_behavior" :label="t('Sticky Behavior')" :options="stickyBehaviorOptions" />
-                                    <AppSelect v-model="headerForm.settings.desktop.menu_source" :label="t('Menu Source')" :options="menuOptions" />
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {{ t('Header Height') }}
                                         <input v-model.number="headerForm.settings.desktop.height" type="number" min="48" max="140" step="1" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
                                     </label>
-                                    <AppSelect v-model="headerForm.settings.desktop.shadow_style" :label="t('Header Shadow')" :options="headerShadowStyleOptions" />
-                                    <div class="sm:col-span-2">
-                                        <AppSelect v-model="headerForm.settings.desktop.container_width" :label="t('Container Width')" :options="containerWidthOptions.map((option) => ({ value: option.value, label: t(option.label) }))" />
+
+                                    <!-- Menu Options -->
+                                    <div class="sm:col-span-2 border-t border-gray-100 dark:border-surface-800 pt-4 mt-2">
+                                        <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">{{ t('Menu Options') }}</h4>
                                     </div>
+                                    <AppSelect v-model="headerForm.settings.desktop.menu_position" :label="t('Menu Position')" :options="headerMenuPositionOptions" />
+                                    <AppSelect v-model="headerForm.settings.desktop.menu_hover_style" :label="t('Menu Hover Style')" :options="headerMenuHoverStyleOptions" />
+                                    <AppSelect v-model="headerForm.settings.desktop.menu_source" :label="t('Menu Source')" :options="menuOptions" />
+                                    <AppSelect v-model="headerForm.settings.desktop.menu_transform" :label="t('Menu Text Transform')" :options="menuTransformOptions" />
                                 </div>
                             </section>
 
                             <section class="rounded-2xl border border-gray-100 p-5 dark:border-surface-800">
                                 <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Colors') }}</h3>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('These colors affect only the main desktop header area.') }}</p>
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Colors & Styling') }}</h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Configure background options, shadow, border and element colors.') }}</p>
                                 </div>
                                 <div class="mb-5 flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
                                     <div>
                                         <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Transparent Over Hero') }}</p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Keep the header transparent while the homepage hero is visible, then restore this background color after scrolling past it.') }}</p>
                                     </div>
-                                    <button type="button" role="switch" :aria-checked="headerForm.settings.desktop.transparent_on_hero" class="app-switch shrink-0" @click="headerForm.settings.desktop.transparent_on_hero = !headerForm.settings.desktop.transparent_on_hero">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="headerForm.settings.desktop.transparent_on_hero" class="shrink-0" />
+                                </div>
+                                <div class="mb-5 grid gap-5 sm:grid-cols-2">
+                                    <div class="sm:col-span-2 flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <div>
+                                            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Bottom Border') }}</p>
+                                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display a thin border at the bottom of the header.') }}</p>
+                                        </div>
+                                        <AppSwitch v-model="headerForm.settings.desktop.show_border" class="shrink-0" />
+                                    </div>
+                                    <AppSelect v-model="headerForm.settings.desktop.shadow_style" :label="t('Header Shadow')" :options="headerShadowStyleOptions" />
                                 </div>
                                 <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                                     <AppColorPicker v-model="headerForm.settings.desktop.bg_color" :label="t('Background Color')" />
@@ -2406,8 +2494,14 @@ watch(() => [
                                     <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
                                         <AppSelect v-model="headerForm.settings.desktop.notification_button_style" :label="t('Notification Bell')" :options="headerActionItemStyleOptions" />
                                     </div>
-                                    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+    <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
                                         <AppSelect v-model="headerForm.settings.desktop.social_icon_style" :label="t('Social Icons')" :options="headerActionItemStyleOptions" />
+                                        <div v-if="headerForm.settings.desktop.social_icon_style !== 'hide'" class="mt-4">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {{ t('Social Button Text') }}
+                                                <input v-model="headerForm.settings.desktop.social_button_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" />
+                                            </label>
+                                        </div>
                                     </div>
                                     <div class="rounded-xl border border-gray-100 p-4 dark:border-surface-800">
                                         <AppSelect v-model="headerForm.settings.desktop.language_switcher_style" :label="t('Language Switcher')" :options="headerLanguageSwitcherStyleOptions" />
@@ -2434,21 +2528,21 @@ watch(() => [
                                     <div class="sm:col-span-2">
                                         <AppSelect
                                             v-model="headerForm.settings.desktop.auth_mode"
-                                            :label="t('Account Area')"
+                                            :label="t('Auth Buttons')"
                                             :options="[
-                                                { value: 'none', label: t('None') },
-                                                { value: 'login_register', label: t('Login / Register') },
-                                                { value: 'user_menu', label: t('User Menu') },
+                                                { value: 'none', label: t('Hide Auth Buttons') },
+                                                { value: 'login_register', label: t('Login + Register') },
+                                                { value: 'user_menu', label: t('Login Only') },
                                             ]"
                                         />
                                     </div>
                                     <template v-if="headerForm.settings.desktop.auth_mode !== 'none'">
-                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Login Button Text') }}<input v-model="headerForm.settings.desktop.guest_login_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
+                                        <label class="sm:col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Login Button Text') }}<input v-model="headerForm.settings.desktop.guest_login_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
                                         <IconClassSelect v-model="headerForm.settings.desktop.guest_login_icon_class" :label="t('Login Button Icon')" />
                                         <AppSelect v-model="headerForm.settings.desktop.guest_login_style" :label="t('Login Button Style')" :options="headerButtonStyleOptions" />
                                         <label
                                             v-if="headerForm.settings.desktop.auth_mode === 'login_register'"
-                                            class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+                                            class="sm:col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
                                         >{{ t('Register Button Text') }}<input v-model="headerForm.settings.desktop.guest_register_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
                                         <IconClassSelect
                                             v-if="headerForm.settings.desktop.auth_mode === 'login_register'"
@@ -2461,8 +2555,8 @@ watch(() => [
                                             :label="t('Register Button Style')"
                                             :options="headerButtonStyleOptions"
                                         />
-                                        <AppSelect v-model="headerForm.settings.desktop.guest_button_shape" :label="t('Guest Button Shape')" :options="headerButtonShapeOptions" />
-                                        <AppSelect v-model="headerForm.settings.desktop.account_avatar_style" :label="t('Avatar Button Style')" :options="headerAccountAvatarStyleOptions" />
+                                        <AppSelect v-model="headerForm.settings.desktop.guest_button_shape" :label="t('Guest Button Style')" :options="headerButtonShapeOptions" />
+                                        <AppSelect v-model="headerForm.settings.desktop.account_avatar_style" :label="t('Logged-in User Button')" :options="headerAccountAvatarStyleOptions" />
                                     </template>
                                 </div>
                             </section>
@@ -2474,9 +2568,7 @@ watch(() => [
                                     <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Custom Button') }}</h3>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Highlight one main action such as register, contact, or pricing.') }}</p>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="headerForm.settings.desktop.show_cta_button" class="app-switch" @click="headerForm.settings.desktop.show_cta_button = !headerForm.settings.desktop.show_cta_button">
-                                    <span class="app-switch__thumb"></span>
-                                </button>
+                                <AppSwitch v-model="headerForm.settings.desktop.show_cta_button" />
                             </div>
                             <div v-if="headerForm.settings.desktop.show_cta_button" class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Custom Text') }}<input v-model="headerForm.settings.desktop.cta_text" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" /></label>
@@ -2517,14 +2609,14 @@ watch(() => [
                             <div class="sm:col-span-2 border-t border-gray-100 pt-4 dark:border-surface-800">
                                 <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Top Header Elements') }}</h3>
                             </div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Logo') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_logo" class="app-switch" @click="headerForm.settings.mobile_top.show_logo = !headerForm.settings.mobile_top.show_logo"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_hamburger" class="app-switch" @click="headerForm.settings.mobile_top.show_hamburger = !headerForm.settings.mobile_top.show_hamburger"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Dark Mode Toggle') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_dark_mode_toggle" class="app-switch" @click="headerForm.settings.mobile_top.show_dark_mode_toggle = !headerForm.settings.mobile_top.show_dark_mode_toggle"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_notification_bell" class="app-switch" @click="headerForm.settings.mobile_top.show_notification_bell = !headerForm.settings.mobile_top.show_notification_bell"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_search_icon" class="app-switch" @click="headerForm.settings.mobile_top.show_search_icon = !headerForm.settings.mobile_top.show_search_icon"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Language Switcher') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_language_switcher" class="app-switch" @click="headerForm.settings.mobile_top.show_language_switcher = !headerForm.settings.mobile_top.show_language_switcher"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Login Button') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_login" class="app-switch" @click="headerForm.settings.mobile_top.show_login = !headerForm.settings.mobile_top.show_login"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show CTA Button') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_top.show_cta_button" class="app-switch" @click="headerForm.settings.mobile_top.show_cta_button = !headerForm.settings.mobile_top.show_cta_button"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Logo') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_logo" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_hamburger" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Dark Mode Toggle') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_dark_mode_toggle" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_notification_bell" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_search_icon" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Language Switcher') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_language_switcher" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Login Button') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_login" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show CTA Button') }}</span><AppSwitch v-model="headerForm.settings.mobile_top.show_cta_button" /></div>
                         </div>
                     </section>
 
@@ -2541,20 +2633,20 @@ watch(() => [
                                     { value: 'tabs', label: t('Tabs') },
                                 ]"
                             />
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Enable Mobile Bottom Header') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.enabled" class="app-switch" @click="headerForm.settings.mobile_bottom.enabled = !headerForm.settings.mobile_bottom.enabled"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Hide Menu Labels') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.hide_menu_labels" class="app-switch" @click="headerForm.settings.mobile_bottom.hide_menu_labels = !headerForm.settings.mobile_bottom.hide_menu_labels"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Glassmorphism Effect') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_glassmorphism" class="app-switch" @click="headerForm.settings.mobile_bottom.show_glassmorphism = !headerForm.settings.mobile_bottom.show_glassmorphism"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Enable Mobile Bottom Header') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.enabled" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Hide Menu Labels') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.hide_menu_labels" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Glassmorphism Effect') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_glassmorphism" /></div>
 
                             <div class="sm:col-span-2 border-t border-gray-100 pt-4 dark:border-surface-800">
                                 <h3 class="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Bottom Header Elements') }}</h3>
                             </div>
 
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Home') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_home" class="app-switch" @click="headerForm.settings.mobile_bottom.show_home = !headerForm.settings.mobile_bottom.show_home"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_search_icon" class="app-switch" @click="headerForm.settings.mobile_bottom.show_search_icon = !headerForm.settings.mobile_bottom.show_search_icon"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Tools') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_tools" class="app-switch" @click="headerForm.settings.mobile_bottom.show_tools = !headerForm.settings.mobile_bottom.show_tools"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_notification_bell" class="app-switch" @click="headerForm.settings.mobile_bottom.show_notification_bell = !headerForm.settings.mobile_bottom.show_notification_bell"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_hamburger" class="app-switch" @click="headerForm.settings.mobile_bottom.show_hamburger = !headerForm.settings.mobile_bottom.show_hamburger"><span class="app-switch__thumb"></span></button></div>
-                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Login/Dashboard') }}</span><button type="button" role="switch" :aria-checked="headerForm.settings.mobile_bottom.show_profile" class="app-switch" @click="headerForm.settings.mobile_bottom.show_profile = !headerForm.settings.mobile_bottom.show_profile"><span class="app-switch__thumb"></span></button></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Home') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_home" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Search Icon') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_search_icon" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Tools') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_tools" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Notification Bell') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_notification_bell" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Hamburger') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_hamburger" /></div>
+                            <div class="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800"><span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Login/Dashboard') }}</span><AppSwitch v-model="headerForm.settings.mobile_bottom.show_profile" /></div>
                         </div>
                     </section>
                 </div>
@@ -2595,28 +2687,20 @@ watch(() => [
                         <div class="mt-6 grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
                             <div class="space-y-4">
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.show_newsletter" class="app-switch" @click="footerForm.settings.show_newsletter = !footerForm.settings.show_newsletter">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.show_newsletter" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Newsletter Section') }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.show_social_icons" class="app-switch" @click="footerForm.settings.show_social_icons = !footerForm.settings.show_social_icons">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.show_social_icons" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Social Links') }}</span>
                                 </div>
-                                <div v-if="footerForm.settings.layout !== 'default' && footerForm.settings.layout !== 'floating_panel' && footerForm.settings.layout !== 'card_grid'" class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerLogoVisibilityToggle" class="app-switch" @click="footerLogoVisibilityToggle = !footerLogoVisibilityToggle">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                <div v-if="footerForm.settings.layout !== 'default' && footerForm.settings.layout !== 'card_grid'" class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                    <AppSwitch v-model="footerForm.settings.show_logo_about" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ footerLogoVisibilityLabel }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.disable_card_style" class="app-switch" @click="footerForm.settings.disable_card_style = !footerForm.settings.disable_card_style">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
-                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Disable Card Style') }}</span>
+                                    <AppSwitch v-model="footerForm.settings.enable_card_style" />
+                                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Enable Card Style') }}</span>
                                 </div>
                             </div>
                             <div class="grid gap-5 sm:grid-cols-2">
@@ -2647,223 +2731,135 @@ watch(() => [
                         </div>
                     </section>
 
+                    <!-- Newsletter Settings Section (visible when enabled) -->
+                    <section v-if="footerForm.settings.show_newsletter" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="mb-6 space-y-1">
+                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">{{ t('Newsletter Section Settings') }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the titles, labels, placeholder text, and buttons for your email subscription form.') }}</p>
+                        </div>
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Newsletter Heading') }}
+                                <input v-model="footerForm.settings.newsletter_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Join our newsletter')" />
+                            </label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Email Field Placeholder') }}
+                                <input v-model="footerForm.settings.newsletter_placeholder" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Enter your work email')" />
+                            </label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
+                                {{ t('Newsletter Text') }}
+                                <textarea v-model="footerForm.settings.newsletter_description" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Offer updates, promotions, or feature releases to encourage signups.')"></textarea>
+                            </label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {{ t('Button Text') }}
+                                <input v-model="footerForm.settings.newsletter_button_label" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Subscribe Now')" />
+                            </label>
+                            <AppSelect v-model="footerForm.settings.newsletter_button_style" :label="t('Button Style')" :options="headerButtonStyleOptions" />
+                        </div>
+                    </section>
+
+                    <!-- Logo & About Text Settings Section -->
+                    <section v-if="showLogoAboutSettingsCard" class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                        <div class="mb-6 space-y-1">
+                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-indigo-700 dark:text-indigo-300">{{ t('Logo & About Text Settings') }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the logo display and brand summary text rendered in your footer.') }}</p>
+                        </div>
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <AppSelect
+                                v-model="footerForm.settings.logo_mode"
+                                :label="t('Logo Mode')"
+                                :options="[
+                                    { value: 'light', label: t('Logo Light') },
+                                    { value: 'dark', label: t('Logo Dark') },
+                                    { value: 'favicon', label: t('Favicon') }
+                                ]"
+                            />
+                            <div class="rounded-xl bg-gray-50 dark:bg-surface-850 p-4 text-xs text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-surface-800 flex items-center">
+                                {{ t('This selection controls which brand asset is rendered. You can upload and configure assets in the Branding tab.') }}
+                            </div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
+                                {{ t('About Heading') }}
+                                <input v-model="footerForm.settings.brand_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Trusted AI platform for content, chat, and automation')" />
+                            </label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
+                                {{ t('About Text') }}
+                                <textarea v-model="footerForm.settings.brand_description" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Help visitors understand what your platform does and why they should trust it.')"></textarea>
+                            </label>
+                        </div>
+                    </section>
+
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
-                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">{{ t('Style Column Items') }}</h2>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('For the selected footer style, choose which reusable content block should appear in each column or card.') }}</p>
+                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-sky-700 dark:text-sky-300">{{ t('Footer Column Items') }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('For the selected footer style, arrange and configure which reusable content blocks should appear in each column or card.') }}</p>
                         </div>
                         <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                            <div v-for="column in activeFooterStyleColumns" :key="column.key" class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <AppSelect
+                            <div v-for="column in activeFooterStyleColumns" :key="column.key" class="flex flex-col rounded-2xl border border-gray-100 p-5 dark:border-surface-700 bg-gray-50/30 dark:bg-surface-800/10">
+                                <div class="mb-3 flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ column.label }}</h3>
+                                    <span class="text-xs font-medium text-gray-400">
+                                        {{ footerForm.settings.style_columns?.[footerForm.settings.layout]?.[column.key]?.length || 0 }} {{ t('items') }}
+                                    </span>
+                                </div>
+
+                                <VueDraggable
+                                    v-slot:default
                                     v-model="footerForm.settings.style_columns[footerForm.settings.layout][column.key]"
-                                    :label="column.label"
-                                    :options="activeFooterContentItemOptions"
-                                    :multiple="true"
-                                    :compact-multiple="true"
-                                    :live-search="true"
-                                />
-                                <p class="mt-3 text-xs leading-6 text-gray-400">{{ t('Choose one or more content blocks to stack in this area for the selected footer style.') }}</p>
+                                    :animation="150"
+                                    handle=".drag-handle"
+                                    ghost-class="opacity-40"
+                                    class="space-y-2 min-h-[80px] border border-dashed border-gray-200 dark:border-surface-800 p-2.5 rounded-xl bg-white dark:bg-surface-900/50 flex-1 mb-4"
+                                >
+                                    <div
+                                        v-for="(item, idx) in footerForm.settings.style_columns[footerForm.settings.layout][column.key]"
+                                        :key="`${item}-${idx}`"
+                                        class="group flex items-center justify-between p-2.5 border border-gray-200 dark:border-surface-700/80 bg-white dark:bg-surface-850 hover:border-gray-300 dark:hover:border-surface-650 rounded-lg shadow-xs transition"
+                                    >
+                                        <div class="flex items-center gap-2 overflow-hidden">
+                                            <span class="drag-handle cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-355">
+                                                <i class="ti ti-grip-vertical text-base"></i>
+                                            </span>
+                                            <span class="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
+                                                {{ footerContentItemOptions.find(o => o.value === item)?.label || item }}
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                class="text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 p-1 rounded-md hover:bg-gray-50 dark:hover:bg-surface-750 transition"
+                                                :title="t('Settings')"
+                                                @click="openSettingsModal(item)"
+                                            >
+                                                <i class="ti ti-settings text-sm"></i>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="text-gray-400 hover:text-red-600 dark:hover:text-red-400 p-1 rounded-md hover:bg-gray-50 dark:hover:bg-surface-750 transition"
+                                                :title="t('Remove')"
+                                                @click="confirmRemoveItem(column.key, idx)"
+                                            >
+                                                <i class="ti ti-trash text-sm"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div v-if="!footerForm.settings.style_columns?.[footerForm.settings.layout]?.[column.key]?.length" class="h-full flex items-center justify-center text-center py-5">
+                                        <p class="text-xs text-gray-400 max-w-[150px]">{{ t('Drag or add items here to stack them in this area.') }}</p>
+                                    </div>
+                                </VueDraggable>
+
+                                <button
+                                    type="button"
+                                    class="w-full flex items-center justify-center gap-1.5 py-2 px-3 border border-dashed border-gray-300 dark:border-surface-700 hover:border-gray-400 dark:hover:border-surface-650 bg-white dark:bg-surface-800 rounded-xl text-xs font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-surface-750 transition shadow-xs"
+                                    @click="openAddItemModal(column.key)"
+                                >
+                                    <i class="ti ti-plus text-sm"></i>
+                                    {{ t('Add Item') }}
+                                </button>
                             </div>
                         </div>
                     </section>
 
-                    <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <div class="mb-6 space-y-1">
-                            <h2 class="text-xs font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">{{ t('Reusable Footer Content') }}</h2>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('These content cards are shared across all footer styles. Pick them in the style column section above wherever you want them to appear.') }}</p>
-                        </div>
-                        <div class="grid gap-6 xl:grid-cols-2">
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('About Text') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to the About Text block.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('About Heading') }}
-                                        <input v-model="footerForm.settings.brand_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Trusted AI platform for content, chat, and automation')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('About Text') }}
-                                        <textarea v-model="footerForm.settings.brand_description" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Help visitors understand what your platform does and why they should trust it.')"></textarea>
-                                    </label>
-                                </div>
-                            </div>
 
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Menu Links 1') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Menu Links 1.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <AppSelect v-model="footerForm.settings.menu_column_1" :label="t('Menu')" :options="menuOptions" />
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Menu Heading') }}
-                                        <input v-model="footerForm.settings.menu_title_1" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Explore')" />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Menu Links 2') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Menu Links 2.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <AppSelect v-model="footerForm.settings.menu_column_2" :label="t('Menu')" :options="menuOptions" />
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Menu Heading') }}
-                                        <input v-model="footerForm.settings.menu_title_2" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Resources')" />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Menu Links 3') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Menu Links 3.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <AppSelect v-model="footerForm.settings.menu_column_3" :label="t('Menu')" :options="menuOptions" />
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Menu Heading') }}
-                                        <input v-model="footerForm.settings.menu_title_3" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Company')" />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Contact Info') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Contact Info.') }}</p>
-                                </div>
-                                <div class="grid gap-4 sm:grid-cols-2">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Contact Heading') }}
-                                        <input v-model="footerForm.settings.contact_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Talk to our team')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Support Email') }}
-                                        <input v-model="footerForm.settings.contact_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('support@example.com')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Support Phone') }}
-                                        <input v-model="footerForm.settings.contact_phone" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('+1 (555) 123-4567')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
-                                        {{ t('Support Address') }}
-                                        <textarea v-model="footerForm.settings.contact_address" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Level 4, 245 Market Street, San Francisco, CA')" ></textarea>
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
-                                        {{ t('Support Note') }}
-                                        <textarea v-model="footerForm.settings.contact_details" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Response time, business hours, or onboarding help text.')"></textarea>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Newsletter') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a style shows the newsletter band or a column is assigned to Newsletter.') }}</p>
-                                </div>
-                                <div class="grid gap-4 sm:grid-cols-2">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Newsletter Heading') }}
-                                        <input v-model="footerForm.settings.newsletter_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Join our newsletter')" />
-                                    </label>
-                                    <AppSelect v-model="footerForm.settings.newsletter_button_style" :label="t('Button Style')" :options="headerButtonStyleOptions" />
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
-                                        {{ t('Newsletter Text') }}
-                                        <textarea v-model="footerForm.settings.newsletter_description" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Offer updates, promotions, or feature releases to encourage signups.')"></textarea>
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Email Field Placeholder') }}
-                                        <input v-model="footerForm.settings.newsletter_placeholder" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Enter your work email')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Button Text') }}
-                                        <input v-model="footerForm.settings.newsletter_button_label" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Subscribe Now')" />
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Custom Text 1') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Custom Text 1.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Custom Heading') }}
-                                        <input v-model="footerForm.settings.custom_title_1" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Why buyers choose us')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Custom Text') }}
-                                        <textarea v-model="footerForm.settings.custom_text_1" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Add a short trust-building message, offer summary, or extra product guidance for visitors.')"></textarea>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Custom Text 2') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Custom Text 2.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Custom Heading') }}
-                                        <input v-model="footerForm.settings.custom_title_2" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('More reasons to choose us')" />
-                                    </label>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Custom Text') }}
-                                        <textarea v-model="footerForm.settings.custom_text_2" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Add another trust-building note, support message, or product highlight.')"></textarea>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Tool Categories 1') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Tool Categories 1.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Block Heading') }}
-                                        <input v-model="footerForm.settings.tool_categories_title_1" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Popular tool categories')" />
-                                    </label>
-                                    <AppSelect
-                                        v-model="footerForm.settings.tool_categories_items_1"
-                                        :label="t('Categories')"
-                                        :options="aiCategoryOptions"
-                                        :multiple="true"
-                                        :compact-multiple="true"
-                                        :live-search="true"
-                                    />
-                                </div>
-                            </div>
-
-                            <div class="rounded-2xl border border-gray-100 p-5 dark:border-surface-700">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Tool Categories 2') }}</h3>
-                                    <p class="mt-1 text-xs leading-6 text-gray-400">{{ t('Used when a column is assigned to Tool Categories 2.') }}</p>
-                                </div>
-                                <div class="grid gap-4">
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        {{ t('Block Heading') }}
-                                        <input v-model="footerForm.settings.tool_categories_title_2" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Explore AI categories')" />
-                                    </label>
-                                    <AppSelect
-                                        v-model="footerForm.settings.tool_categories_items_2"
-                                        :label="t('Categories')"
-                                        :options="aiCategoryOptions"
-                                        :multiple="true"
-                                        :compact-multiple="true"
-                                        :live-search="true"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </section>
 
                     <section class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                         <div class="mb-6 space-y-1">
@@ -2873,39 +2869,27 @@ watch(() => [
                         <div class="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
                             <div class="space-y-4">
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.show_bottom_social_icons" class="app-switch" @click="footerForm.settings.show_bottom_social_icons = !footerForm.settings.show_bottom_social_icons">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.show_bottom_social_icons" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Social Icons') }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.show_bottom_language_selector" class="app-switch" @click="footerForm.settings.show_bottom_language_selector = !footerForm.settings.show_bottom_language_selector">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.show_bottom_language_selector" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Language Selector') }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.show_payment_icons" class="app-switch" @click="footerForm.settings.show_payment_icons = !footerForm.settings.show_payment_icons">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.show_payment_icons" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Payment Methods') }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.show_back_to_top" class="app-switch" @click="footerForm.settings.show_back_to_top = !footerForm.settings.show_back_to_top">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.show_back_to_top" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Scroll To Top') }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.bottom_bar_show_border" class="app-switch" @click="footerForm.settings.bottom_bar_show_border = !footerForm.settings.bottom_bar_show_border">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.bottom_bar_show_border" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Show Top Border') }}</span>
                                 </div>
                                 <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                    <button type="button" role="switch" :aria-checked="footerForm.settings.bottom_bar_centered" class="app-switch" @click="footerForm.settings.bottom_bar_centered = !footerForm.settings.bottom_bar_centered">
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
+                                    <AppSwitch v-model="footerForm.settings.bottom_bar_centered" />
                                     <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Center Align Bottom Bar') }}</span>
                                 </div>
                             </div>
@@ -2939,7 +2923,7 @@ watch(() => [
                                         <img v-if="paymentIconPreviewSrc()" :src="paymentIconPreviewSrc()" :alt="t('Payment method preview')" class="h-12 max-w-full object-contain" />
                                         <span v-else class="inline-flex h-12 w-full items-center justify-center rounded-lg bg-gray-50 px-3 text-xs font-semibold uppercase tracking-wide text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ footerForm.settings.payment_icons }}</span>
                                     </div>
-                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onPaymentIconsInput" />
+                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onPaymentIconsInput" />
                                     <div class="mt-2 flex items-center justify-between gap-3">
                                         <span class="block text-xs text-gray-400">{{ t('Upload one combined payment methods image with the brands you want to display.') }}</span>
                                         <button type="button" class="text-xs font-medium text-danger-500 hover:underline" @click="clearPaymentIconSelection">{{ t('Remove image') }}</button>
@@ -2978,7 +2962,7 @@ watch(() => [
                                 <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" @click="toggleCollapsed('hero')">
                                     <i :class="collapsedSections.has('hero') ? 'ti ti-chevron-right' : 'ti ti-chevron-down'" class="text-base"></i>
                                 </button>
-                                <button type="button" role="switch" :aria-checked="homepageForm.settings.show_hero" class="app-switch" @click="toggleHeroVisibility"><span class="app-switch__thumb"></span></button>
+                                <AppSwitch :model-value="homepageForm.settings.show_hero" @update:model-value="toggleHeroVisibility" />
                             </div>
                         </div>
                         <div v-if="!collapsedSections.has('hero')" class="p-5 space-y-4">
@@ -3029,7 +3013,7 @@ watch(() => [
                             <div class="border-t border-gray-100 pt-4 dark:border-surface-700">
                                 <div class="mb-3 flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Primary CTA Button') }}</h4>
-                                    <button type="button" role="switch" :aria-checked="secCfgBool('hero', 'show_primary_cta', true)" class="app-switch" @click="secCfg('hero').show_primary_cta = !secCfgBool('hero', 'show_primary_cta', true)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch v-model="secCfg('hero').show_primary_cta" />
                                 </div>
                                 <div v-if="secCfgBool('hero', 'show_primary_cta', true)">
                                     <div class="mb-4 grid gap-4 grid-cols-2">
@@ -3062,7 +3046,7 @@ watch(() => [
                             <div v-if="homepageForm.settings.hero_variant !== 'tools-grid'" class="border-t border-gray-100 pt-4 dark:border-surface-700">
                                 <div class="mb-3 flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Secondary CTA Button') }}</h4>
-                                    <button type="button" role="switch" :aria-checked="secCfgBool('hero', 'show_secondary_cta', true)" class="app-switch" @click="secCfg('hero').show_secondary_cta = !secCfgBool('hero', 'show_secondary_cta', true)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch v-model="secCfg('hero').show_secondary_cta" />
                                 </div>
                                 <div v-if="secCfgBool('hero', 'show_secondary_cta', true)">
                                     <div class="mb-4 grid gap-4 grid-cols-2">
@@ -3094,7 +3078,7 @@ watch(() => [
                             <div class="border-t border-gray-100 pt-4 dark:border-surface-700">
                                 <div class="flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Search Box') }}</h4>
-                                    <button type="button" role="switch" :aria-checked="secCfgBool('hero', 'show_search_box', true)" class="app-switch" @click="secCfg('hero').show_search_box = !secCfgBool('hero', 'show_search_box', true)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch v-model="secCfg('hero').show_search_box" />
                                 </div>
                                 <p class="text-xs text-gray-400">{{ t('Show a pill-style search button that opens the command palette.') }}</p>
                             </div>
@@ -3103,13 +3087,13 @@ watch(() => [
                             <div class="border-t border-gray-100 pt-4 dark:border-surface-700">
                                 <div class="mb-3 flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Background Image / Video') }}</h4>
-                                    <button type="button" role="switch" :aria-checked="secCfgBool('hero', 'show_hero_background', false)" class="app-switch" @click="secCfg('hero').show_hero_background = !secCfgBool('hero', 'show_hero_background', false)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch v-model="secCfg('hero').show_hero_background" />
                                 </div>
                                 <div v-if="secCfgBool('hero', 'show_hero_background', false)" class="grid gap-4 sm:grid-cols-2">
                                     <AppSelect v-model="secCfg('hero').hero_background_type" :label="t('Media Type')" :options="[{ value: 'image', label: t('Image') }, { value: 'video', label: t('Video') }]" />
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {{ t('Choose File') }}
-                                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/avif,video/mp4,video/webm,video/ogg" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onHeroBackgroundInput" />
+                                        <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/avif,video/mp4,video/webm,video/ogg" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onHeroBackgroundInput" />
                                     </label>
                                     <div v-if="secCfg('hero').hero_background_url" class="sm:col-span-2 flex items-center gap-2 rounded-lg border border-dashed border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700 dark:border-success-800 dark:bg-success-900/20 dark:text-success-300">
                                         <i class="ti ti-check"></i>
@@ -3123,7 +3107,7 @@ watch(() => [
                             <div class="border-t border-gray-100 pt-4 dark:border-surface-700">
                                 <div class="flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Gradient Colors') }}</h4>
-                                    <button type="button" role="switch" :aria-checked="secCfgBool('hero', 'hero_gradient_enabled', true)" class="app-switch" @click="secCfg('hero').hero_gradient_enabled = !secCfgBool('hero', 'hero_gradient_enabled', true)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch v-model="secCfg('hero').hero_gradient_enabled" />
                                 </div>
                                 <p class="mb-3 text-xs text-gray-400">{{ t('Applied to centered-gradient, tools-grid, split-gradient, app-showcase, enterprise, and featured layouts. Light gradients keep text dark, dark gradients use white text.') }}</p>
                                 <div v-if="secCfgBool('hero', 'hero_gradient_enabled', true)" class="grid gap-4 sm:grid-cols-2">
@@ -3141,7 +3125,7 @@ watch(() => [
                                 <div class="grid gap-4">
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                         {{ t('Choose Image') }}
-                                        <input type="file" accept="image/png,image/svg+xml" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onHeroSplitImageInput" />
+                                        <input type="file" accept="image/png,image/svg+xml" class="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onHeroSplitImageInput" />
                                     </label>
                                     <div v-if="secCfg('hero').hero_split_image_url" class="flex items-center gap-2 rounded-lg border border-dashed border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700 dark:border-success-800 dark:bg-success-900/20 dark:text-success-300">
                                         <i class="ti ti-check"></i>
@@ -3187,7 +3171,7 @@ watch(() => [
                             <div v-if="homepageForm.settings.hero_variant !== 'tools-grid'" class="border-t border-gray-100 pt-4 dark:border-surface-700">
                                 <div class="mb-3 flex items-center justify-between">
                                     <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Stats Cards') }}</h4>
-                                    <button type="button" role="switch" :aria-checked="secCfgBool('hero', 'show_stats', true)" class="app-switch" @click="secCfg('hero').show_stats = !secCfgBool('hero', 'show_stats', true)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch v-model="secCfg('hero').show_stats" />
                                 </div>
                                 <div v-if="secCfgBool('hero', 'show_stats', true)" class="space-y-3">
                                     <div v-for="(stat, idx) in heroStatsItems" :key="idx" class="flex items-start gap-3 rounded-xl border border-gray-100 p-3 dark:border-surface-700">
@@ -3261,7 +3245,7 @@ watch(() => [
                                     <button type="button" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" @click="toggleCollapsed(sec.type)">
                                         <i :class="collapsedSections.has(sec.type) ? 'ti ti-chevron-right' : 'ti ti-chevron-down'" class="text-base"></i>
                                     </button>
-                                    <button type="button" role="switch" :aria-checked="!!getHomepageSetting(sec.toggleKey)" class="app-switch" @click="toggleVisibility(sec)"><span class="app-switch__thumb"></span></button>
+                                    <AppSwitch :model-value="!!getHomepageSetting(sec.toggleKey)" @update:model-value="toggleVisibility(sec)" />
                                 </div>
                             </div>
 
@@ -3597,23 +3581,23 @@ watch(() => [
                                         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                                             <div class="flex items-center justify-between rounded-xl border border-gray-100 p-3 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50">
                                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Rating') }}</span>
-                                                <button type="button" role="switch" :aria-checked="secCfgBool('tools_showcase', 'show_rating', true)" class="app-switch" @click="secCfg('tools_showcase').show_rating = !secCfgBool('tools_showcase', 'show_rating', true)"><span class="app-switch__thumb"></span></button>
+                                                <AppSwitch v-model="secCfg('tools_showcase').show_rating" />
                                             </div>
                                             <div class="flex items-center justify-between rounded-xl border border-gray-100 p-3 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50">
                                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Favorite Button') }}</span>
-                                                <button type="button" role="switch" :aria-checked="secCfgBool('tools_showcase', 'show_favorite', true)" class="app-switch" @click="secCfg('tools_showcase').show_favorite = !secCfgBool('tools_showcase', 'show_favorite', true)"><span class="app-switch__thumb"></span></button>
+                                                <AppSwitch v-model="secCfg('tools_showcase').show_favorite" />
                                             </div>
                                             <div class="flex items-center justify-between rounded-xl border border-gray-100 p-3 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50">
                                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Tool Category') }}</span>
-                                                <button type="button" role="switch" :aria-checked="secCfgBool('tools_showcase', 'show_category', true)" class="app-switch" @click="secCfg('tools_showcase').show_category = !secCfgBool('tools_showcase', 'show_category', true)"><span class="app-switch__thumb"></span></button>
+                                                <AppSwitch v-model="secCfg('tools_showcase').show_category" />
                                             </div>
                                             <div class="flex items-center justify-between rounded-xl border border-gray-100 p-3 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50">
                                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Category Filter') }}</span>
-                                                <button type="button" role="switch" :aria-checked="secCfgBool('tools_showcase', 'show_category_filter', false)" class="app-switch" @click="secCfg('tools_showcase').show_category_filter = !secCfgBool('tools_showcase', 'show_category_filter', false)"><span class="app-switch__thumb"></span></button>
+                                                <AppSwitch v-model="secCfg('tools_showcase').show_category_filter" />
                                             </div>
                                             <div class="flex items-center justify-between rounded-xl border border-gray-100 p-3 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50">
                                                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Search Box') }}</span>
-                                                <button type="button" role="switch" :aria-checked="secCfgBool('tools_showcase', 'show_search', false)" class="app-switch" @click="secCfg('tools_showcase').show_search = !secCfgBool('tools_showcase', 'show_search', false)"><span class="app-switch__thumb"></span></button>
+                                                <AppSwitch v-model="secCfg('tools_showcase').show_search" />
                                             </div>
                                         </div>
                                     </div>
@@ -3677,8 +3661,8 @@ watch(() => [
                                     <div class="flex items-center justify-between">
                                         <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Feature Items') }}</h4>
                                         <div class="flex items-center gap-3">
-                                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Disable Card Style') }}</span>
-                                            <button type="button" role="switch" :aria-checked="!!secCfg('features').disable_card_style" class="app-switch" @click="secCfg('features').disable_card_style = !secCfg('features').disable_card_style"><span class="app-switch__thumb"></span></button>
+                                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Card Style') }}</span>
+                                            <AppSwitch v-model="secCfg('features').enable_card_style" />
                                         </div>
                                     </div>
 
@@ -3752,9 +3736,7 @@ watch(() => [
                                             <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Stats Settings') }}</h4>
                                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ t('Display numbers/stats on the social proof bar.') }}</p>
                                         </div>
-                                        <button type="button" role="switch" :aria-checked="secCfgBool('stats_bar', 'show_stats', true)" class="app-switch" @click="secCfg('stats_bar').show_stats = !secCfgBool('stats_bar', 'show_stats', true)">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="secCfg('stats_bar').show_stats" />
                                     </div>
 
                                     <!-- Stats List Editor (visible only if show_stats is enabled) -->
@@ -3789,9 +3771,7 @@ watch(() => [
                                             <h4 class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Brand Logos Settings') }}</h4>
                                             <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ t('Display logos of supported brands in a marquee scrolling style.') }}</p>
                                         </div>
-                                        <button type="button" role="switch" :aria-checked="secCfgBool('stats_bar', 'show_brands', false)" class="app-switch" @click="secCfg('stats_bar').show_brands = !secCfgBool('stats_bar', 'show_brands', false)">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="secCfg('stats_bar').show_brands" />
                                     </div>
 
                                     <!-- Brands List Editor (visible only if show_brands is enabled) -->
@@ -3807,7 +3787,7 @@ watch(() => [
                                                 </div>
                                                 <div class="sm:col-span-2">
                                                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ t('Upload Brand Logo') }}</label>
-                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onBrandLogoInput(Number(idx), $event)" />
+                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onBrandLogoInput(Number(idx), $event)" />
 
                                                     <!-- Logo Preview -->
                                                     <div v-if="brand.image || brandLogoPreviewUrls[Number(idx)]" class="mt-2 flex items-center gap-3">
@@ -3907,7 +3887,7 @@ watch(() => [
                                                 <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Show Description') }}</h4>
                                                 <p class="text-xs text-gray-400 mt-1">{{ t('Show the post excerpt/description on the card.') }}</p>
                                             </div>
-                                            <button type="button" role="switch" :aria-checked="secCfgBool('latest_posts', 'show_description', true)" class="app-switch" @click="secCfg('latest_posts').show_description = !secCfgBool('latest_posts', 'show_description', true)"><span class="app-switch__thumb"></span></button>
+                                            <AppSwitch v-model="secCfg('latest_posts').show_description" />
                                         </div>
 
                                         <div class="flex items-center justify-between">
@@ -3915,7 +3895,7 @@ watch(() => [
                                                 <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Show Read More Link') }}</h4>
                                                 <p class="text-xs text-gray-400 mt-1">{{ t('Show a "Read More" link on the blog post cards.') }}</p>
                                             </div>
-                                            <button type="button" role="switch" :aria-checked="secCfgBool('latest_posts', 'show_read_more_btn', true)" class="app-switch" @click="secCfg('latest_posts').show_read_more_btn = !secCfgBool('latest_posts', 'show_read_more_btn', true)"><span class="app-switch__thumb"></span></button>
+                                            <AppSwitch v-model="secCfg('latest_posts').show_read_more_btn" />
                                         </div>
 
                                         <div class="flex items-center justify-between">
@@ -3923,7 +3903,7 @@ watch(() => [
                                                 <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Show Visit Blog Button') }}</h4>
                                                 <p class="text-xs text-gray-400 mt-1">{{ t('Show the main CTA button at the bottom of the section.') }}</p>
                                             </div>
-                                            <button type="button" role="switch" :aria-checked="secCfgBool('latest_posts', 'show_button', true)" class="app-switch" @click="secCfg('latest_posts').show_button = !secCfgBool('latest_posts', 'show_button', true)"><span class="app-switch__thumb"></span></button>
+                                            <AppSwitch v-model="secCfg('latest_posts').show_button" />
                                         </div>
                                     </div>
 
@@ -4017,7 +3997,7 @@ watch(() => [
                                                 </div>
                                                 <div class="sm:col-span-3">
                                                     <label class="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">{{ t('Upload Image') }}</label>
-                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onCarouselItemImageInput(item, $event)" />
+                                                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/avif" class="w-full rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs dark:border-surface-700 dark:bg-surface-900 dark:text-white file:mr-3 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary-500 hover:file:bg-primary-100/80 dark:hover:file:bg-primary-900/80 dark:file:bg-primary-950/40 dark:file:text-primary-400" @input="onCarouselItemImageInput(item, $event)" />
 
                                                     <!-- Image Preview -->
                                                     <div v-if="item.image_url || carouselItemPreviewUrls[item._key || '']" class="mt-2 flex items-center gap-3">
@@ -4067,9 +4047,7 @@ watch(() => [
                                 <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Visibility Settings') }}</h3>
                                 <div class="grid gap-5 sm:grid-cols-2">
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_breadcrumbs" class="app-switch" @click="toolPageForm.settings.hide_breadcrumbs = !toolPageForm.settings.hide_breadcrumbs">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.hide_breadcrumbs" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Breadcrumbs') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display navigational breadcrumbs on the tool details page.') }}</span>
@@ -4077,9 +4055,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_rating" class="app-switch" @click="toolPageForm.settings.hide_rating = !toolPageForm.settings.hide_rating">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.hide_rating" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Rating') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display ratings and reviews on the tool page.') }}</span>
@@ -4087,9 +4063,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_share" class="app-switch" @click="toolPageForm.settings.hide_share = !toolPageForm.settings.hide_share">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.hide_share" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Share') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the share options button on the tool page.') }}</span>
@@ -4097,12 +4071,154 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.hide_favorite" class="app-switch" @click="toolPageForm.settings.hide_favorite = !toolPageForm.settings.hide_favorite">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.hide_favorite" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Favorite') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the add-to-favorites button on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.hide_category" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Category') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the tool category badge beside the title on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.hide_labels" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Tool Labels') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the tool access level labels (Free, Pro, Login, etc.) on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.hide_usage_count" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Hide Usage Count') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Do not display the tool usage count (runs/views) on the tool page.') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100 dark:border-surface-850" />
+
+                            <!-- Generation Features Section -->
+                            <div>
+                                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Generation Features') }}</h3>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_brand_voice_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Supports Brand Voice') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Allows users to target brand voices.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_variations_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Variations') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Allows generating multiple output variants simultaneously.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_regenerate_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Regenerate Button') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Show the option to regenerate output.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_improve_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Improve Button') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Show the option to automatically improve input prompts.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_editor_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Edit in Editor Button') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Allows opening generated content in full document editor.') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100 dark:border-surface-850" />
+
+                            <!-- Tool Details Content Section -->
+                            <div>
+                                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Tool Details Content') }}</h3>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_show_about_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show About') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display the tool description/about section.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_show_how_it_works_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show How It Works') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display instructions on how to use the tool.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_show_usage_examples_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Examples') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display usage examples.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_show_faqs_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show FAQs') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display FAQs for the tool.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_show_reviews_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Reviews') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display ratings and reviews section.') }}</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.show_tool_credit_costs" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Credit Costs') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display estimated cost, user balance, and the final credits used after generation.') }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="border-gray-100 dark:border-surface-850" />
+
+                            <!-- Sharing & Embedding Section -->
+                            <div>
+                                <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Sharing & Embedding') }}</h3>
+                                <div class="grid gap-5 sm:grid-cols-2">
+                                    <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                                        <AppSwitch v-model="toolPageForm.settings.global_tools_embeddable_enabled" />
+                                        <div>
+                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Embeddable') }}</span>
+                                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Allow tools to be embedded in external websites.') }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -4145,9 +4261,7 @@ watch(() => [
                                 <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Visibility Settings') }}</h3>
                                 <div class="grid gap-5 sm:grid-cols-2">
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_breadcrumbs" class="app-switch" @click="toolPageForm.settings.archive_show_breadcrumbs = !toolPageForm.settings.archive_show_breadcrumbs">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.archive_show_breadcrumbs" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Breadcrumbs') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display navigational breadcrumbs on the tools directory archive page.') }}</span>
@@ -4155,9 +4269,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_stats" class="app-switch" @click="toolPageForm.settings.archive_show_stats = !toolPageForm.settings.archive_show_stats">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.archive_show_stats" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Stats Cards') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display quick statistics summary cards on the directory page.') }}</span>
@@ -4165,9 +4277,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_featured" class="app-switch" @click="toolPageForm.settings.archive_show_featured = !toolPageForm.settings.archive_show_featured">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.archive_show_featured" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Featured Section') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display the highlighted/featured tools carousel or banner.') }}</span>
@@ -4175,9 +4285,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_grid_list" class="app-switch" @click="toolPageForm.settings.archive_show_grid_list = !toolPageForm.settings.archive_show_grid_list">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.archive_show_grid_list" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Grid/List Button') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display layout toggles for users to switch between grid and list layouts.') }}</span>
@@ -4185,9 +4293,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_recently_used" class="app-switch" @click="toolPageForm.settings.archive_show_recently_used = !toolPageForm.settings.archive_show_recently_used">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.archive_show_recently_used" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Recently Used Section') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display the list of recently used tools in the directory archive page.') }}</span>
@@ -4195,9 +4301,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.archive_show_open_button" class="app-switch" @click="toolPageForm.settings.archive_show_open_button = !toolPageForm.settings.archive_show_open_button">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.archive_show_open_button" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Open Tool Button') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display an open action button or link inside the tool list cards.') }}</span>
@@ -4234,9 +4338,7 @@ watch(() => [
                                 <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ t('Visibility & Style Settings') }}</h3>
                                 <div class="grid gap-5 sm:grid-cols-2">
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.category_show_breadcrumbs" class="app-switch" @click="toolPageForm.settings.category_show_breadcrumbs = !toolPageForm.settings.category_show_breadcrumbs">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.category_show_breadcrumbs" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Breadcrumbs') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Display navigational breadcrumbs on the category tool list page.') }}</span>
@@ -4244,9 +4346,7 @@ watch(() => [
                                     </div>
 
                                     <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
-                                        <button type="button" role="switch" :aria-checked="toolPageForm.settings.category_enable_gradient" class="app-switch" @click="toolPageForm.settings.category_enable_gradient = !toolPageForm.settings.category_enable_gradient">
-                                            <span class="app-switch__thumb"></span>
-                                        </button>
+                                        <AppSwitch v-model="toolPageForm.settings.category_enable_gradient" />
                                         <div>
                                             <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Gradient Scheme') }}</span>
                                             <span class="block text-xs text-gray-500 dark:text-gray-400">{{ t('Use a gradient theme for headers, tool titles, and action buttons.') }}</span>
@@ -4304,14 +4404,181 @@ watch(() => [
             </div>
         </Transition>
 
+        <!-- Add Content Item Modal -->
+        <AppModal
+            :open="isAddItemModalOpen"
+            max-width="max-w-lg"
+            :title="t('Add Footer Item')"
+            :cancel-text="null"
+            @close="isAddItemModalOpen = false"
+        >
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button
+                    v-for="option in activeFooterContentItemOptions"
+                    :key="option.value"
+                    type="button"
+                    class="flex items-center justify-between p-3 border border-gray-100 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-800 hover:bg-primary-50 dark:hover:bg-primary-900/60 hover:border-primary-100 dark:hover:border-primary-900/60 rounded-xl transition text-left"
+                    @click="addItemToColumn(option.value)"
+                >
+                    <span class="text-xs font-semibold text-gray-800 dark:text-gray-200">{{ option.label }}</span>
+                    <i class="ti ti-plus text-gray-400"></i>
+                </button>
+            </div>
+        </AppModal>
+
+        <!-- Item Settings Modal -->
+        <AppModal
+            :open="isSettingsModalOpen"
+            max-width="max-w-2xl"
+            :title="t(':itemLabel Settings', { itemLabel: activeSettingsItemLabel })"
+            :cancel-text="null"
+            @close="isSettingsModalOpen = false"
+        >
+            <!-- About Text -->
+            <div v-if="activeSettingsItem === 'about_text'" class="grid gap-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('About Heading') }}
+                    <input v-model="footerForm.settings.brand_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Trusted AI platform for content, chat, and automation')" />
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('About Text') }}
+                    <textarea v-model="footerForm.settings.brand_description" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Help visitors understand what your platform does and why they should trust it.')"></textarea>
+                </label>
+            </div>
+
+            <!-- Logo Settings -->
+            <div v-else-if="activeSettingsItem === 'logo' || activeSettingsItem === 'logo_light' || activeSettingsItem === 'logo_dark'" class="grid gap-4">
+                <AppSelect
+                    v-model="footerForm.settings.logo_mode"
+                    :label="t('Logo Mode')"
+                    :options="[
+                        { value: 'light', label: t('Logo Light') },
+                        { value: 'dark', label: t('Logo Dark') },
+                        { value: 'favicon', label: t('Favicon') }
+                    ]"
+                />
+                <div class="rounded-xl bg-gray-50 dark:bg-surface-850 p-4 text-xs text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-surface-800">
+                    {{ t('This content block renders your site logo or icon. You can customize the logos and favicon in the Branding tab of the Theme Settings page.') }}
+                </div>
+            </div>
+
+            <!-- Menu Links -->
+            <div v-else-if="activeSettingsItem === 'menu'" class="grid gap-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Menu Heading') }}
+                    <input v-model="footerForm.settings.menu_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Explore')" />
+                </label>
+                <AppSelect v-model="footerForm.settings.menu_column" :label="t('Menu')" :options="menuOptions" />
+            </div>
+
+            <!-- Contact Info -->
+            <div v-else-if="activeSettingsItem === 'contact_info'" class="grid gap-4 sm:grid-cols-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Contact Heading') }}
+                    <input v-model="footerForm.settings.contact_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Talk to our team')" />
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Support Email') }}
+                    <input v-model="footerForm.settings.contact_email" type="email" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('support@example.com')" />
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Support Phone') }}
+                    <input v-model="footerForm.settings.contact_phone" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('+1 (555) 123-4567')" />
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
+                    {{ t('Support Address') }}
+                    <textarea v-model="footerForm.settings.contact_address" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Level 4, 245 Market Street, San Francisco, CA')"></textarea>
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
+                    {{ t('Support Note') }}
+                    <textarea v-model="footerForm.settings.contact_details" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Response time, business hours, or onboarding help text.')"></textarea>
+                </label>
+            </div>
+
+            <!-- Newsletter -->
+            <div v-else-if="activeSettingsItem === 'newsletter'" class="grid gap-4 sm:grid-cols-2">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Newsletter Heading') }}
+                    <input v-model="footerForm.settings.newsletter_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Join our newsletter')" />
+                </label>
+                <AppSelect v-model="footerForm.settings.newsletter_button_style" :label="t('Button Style')" :options="headerButtonStyleOptions" />
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 sm:col-span-2">
+                    {{ t('Newsletter Text') }}
+                    <textarea v-model="footerForm.settings.newsletter_description" rows="2" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Offer updates, promotions, or feature releases to encourage signups.')"></textarea>
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Email Field Placeholder') }}
+                    <input v-model="footerForm.settings.newsletter_placeholder" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Enter your work email')" />
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Button Text') }}
+                    <input v-model="footerForm.settings.newsletter_button_label" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Subscribe Now')" />
+                </label>
+            </div>
+
+            <!-- Custom Text -->
+            <div v-else-if="activeSettingsItem === 'custom_text'" class="grid gap-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Custom Text Heading') }}
+                    <input v-model="footerForm.settings.custom_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Why buyers choose us')" />
+                </label>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Custom Text') }}
+                    <textarea v-model="footerForm.settings.custom_text" rows="3" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Add a short trust-building message, offer summary, or extra product guidance for visitors.')"></textarea>
+                </label>
+            </div>
+
+            <!-- Tool Categories -->
+            <div v-else-if="activeSettingsItem === 'categories'" class="grid gap-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Tool Categories Heading') }}
+                    <input v-model="footerForm.settings.tool_categories_title" type="text" class="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white" :placeholder="t('Popular tool categories')" />
+                </label>
+                <AppSelect
+                    v-model="footerForm.settings.tool_categories_items"
+                    :label="t('Tool Categories')"
+                    :options="aiCategoryOptions"
+                    :multiple="true"
+                    :compact-multiple="true"
+                    :live-search="true"
+                />
+                <div class="flex items-center gap-3 rounded-xl border border-gray-100 p-4 dark:border-surface-800">
+                    <AppSwitch v-model="footerForm.settings.hide_categories_count" />
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Hide Category Tools Count') }}</span>
+                </div>
+            </div>
+
+            <template v-slot:footer>
+                <div class="text-right">
+                    <button
+                        type="button"
+                        class="btn-primary-admin text-end"
+                        @click="isSettingsModalOpen = false"
+                    >
+                        {{ t('Done') }}
+                    </button>
+                </div>
+            </template>
+        </AppModal>
+
         <ActionConfirmModal
             :open="isRestoreModalOpen"
             :title="t('Restore default settings?')"
-            :message="t('Are you sure you want to restore the default settings for the \'{tab}\' tab? Any custom changes made to this section will be reset back to their factory default values and cannot be undone.', { tab: activeTabLabel })"
+            :message="t('Are you sure you want to restore the default settings for the \':tab\' tab? Any custom changes made to this section will be reset back to their factory default values and cannot be undone.', { tab: activeTabLabel })"
             :confirm-label="t('Restore defaults')"
             variant="danger"
             @confirm="handleConfirmRestore"
             @cancel="isRestoreModalOpen = false"
+        />
+
+        <ActionConfirmModal
+            :open="isRemoveItemModalOpen"
+            :title="t('Remove Content Item?')"
+            :message="t('Are you sure you want to remove the \':item\' block from this column?', { item: removeItemData.itemName })"
+            :confirm-label="t('Remove')"
+            variant="danger"
+            @confirm="handleConfirmRemoveItem"
+            @cancel="isRemoveItemModalOpen = false"
         />
     </div>
 </template>

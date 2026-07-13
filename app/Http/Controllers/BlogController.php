@@ -137,12 +137,38 @@ class BlogController extends Controller
                 'poll_seconds' => (int) settings('comments_poll_seconds', 60),
             ],
             'schema' => $this->schema($post),
-            'meta' => $this->meta(
-                $post->meta_title ?: $post->title,
-                $post->meta_description ?: $post->excerpt,
-                $post->no_index
-            ),
+            'meta' => $this->postMeta($post),
         ]);
+    }
+
+    /**
+     * Full SEO meta for a single post — wires up the per-post SEO fields the
+     * editor collects (og_title/og_description/canonical_url/meta_keywords) that
+     * were previously stored but never emitted. Each falls back sensibly so
+     * posts without explicit overrides still render complete tags.
+     */
+    private function postMeta(BlogPost $post): array
+    {
+        $title = $post->meta_title ?: $post->title;
+        $description = $post->meta_description ?: $post->excerpt;
+
+        // og:image should be an absolute URL; storage paths are stored relative.
+        $image = $post->og_image ?: $post->featured_image;
+        if ($image && ! str_starts_with($image, 'http')) {
+            $image = url($image);
+        }
+
+        return [
+            'title' => $title,
+            'description' => $description ?: '',
+            'keywords' => $post->meta_keywords ?: '',
+            'canonical' => $post->canonical_url ?: route('blog.show', $post->slug),
+            'og_title' => $post->og_title ?: $title,
+            'og_description' => $post->og_description ?: ($description ?: ''),
+            'og_image' => $image ?: null,
+            'no_index' => (bool) $post->no_index,
+            'rss' => route('blog.rss'),
+        ];
     }
 
     public function rss()

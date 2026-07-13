@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Controllers\AffiliateController;
-use App\Http\Controllers\AI\AiController;
-use App\Http\Controllers\AI\DocumentController;
-use App\Http\Controllers\AI\GenerateController;
-use App\Http\Controllers\AI\ToolCatalogController;
-use App\Http\Controllers\AI\ToolReviewController;
+use App\Http\Controllers\Api\V1\AiController;
+use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\GenerateController;
+use App\Http\Controllers\Api\V1\ToolCatalogController;
+use App\Http\Controllers\Api\V1\ToolReviewController;
+use App\Http\Controllers\User\AffiliateController;
 use Illuminate\Support\Facades\Route;
 
 /*

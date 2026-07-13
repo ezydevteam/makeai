@@ -1,5 +1,6 @@
-import { ref, nextTick } from 'vue'
+import { ref } from 'vue'
 import { sanitizeErrorMessage } from '@/Composables/useErrorSanitizer'
+import { t } from '@/Composables/useTranslate'
 
 function getCsrf(): string {
     const cookie = document.cookie.match('(^|;)\\s*XSRF-TOKEN\\s*=\\s*([^;]+)')
@@ -86,12 +87,12 @@ export function useRagChat(sessionId: string, mode: string = 'chat') {
             })
 
             if (!res.ok) {
-                const err = await res.json().catch(() => ({ message: 'Request failed' }))
+                const err = await res.json().catch(() => ({ message: t('Request failed') }))
                 throw new Error(err.message)
             }
 
             const reader = res.body?.getReader()
-            if (!reader) throw new Error('Streaming not supported')
+            if (!reader) throw new Error(t('Streaming not supported'))
 
             const decoder = new TextDecoder()
             let buffer = ''
@@ -138,12 +139,12 @@ export function useRagChat(sessionId: string, mode: string = 'chat') {
             })
         } catch (e: any) {
             if (e.name !== 'AbortError') {
-                error.value = sanitizeErrorMessage(e.message || 'Stream failed')
+                error.value = sanitizeErrorMessage(e.message || t('Stream failed'))
                 if (streamingContent.value) {
                     messages.value.push({
                         id: crypto.randomUUID(),
                         role: 'assistant',
-                        content: streamingContent.value + '\n\n*Error: ' + error.value + '*',
+                        content: streamingContent.value + '\n\n*' + t('Error') + ': ' + error.value + '*',
                         sources: streamingSources.value?.length ? [...streamingSources.value] : undefined,
                     })
                 }

@@ -15,12 +15,9 @@ class LocaleMiddleware
      */
     public function handle(Request $request, Closure $next)
     {
-        $defaultLocale = config('app.locale', 'en');
-        try {
-            $defaultLocale = settings('default_language', $defaultLocale);
-        } catch (\Throwable $e) {
-            // DB not ready/installed
-        }
+        // Default language lives in the languages.is_default column (single
+        // source of truth); defaultCode() is self-guarding when the DB isn't ready.
+        $defaultLocale = Language::defaultCode();
 
         $locale = Session::get('locale_manually_selected')
             ? Session::get('locale', $defaultLocale)

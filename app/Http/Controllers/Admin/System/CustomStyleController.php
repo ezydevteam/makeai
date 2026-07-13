@@ -37,7 +37,6 @@ class CustomStyleController extends Controller
             'bg_gradient',
         ];
 
-        $allowedBorderRadius = ['0px', '8px', '12px', '16px', '20px', '999px'];
         $allowedFontSizes = ['12px', '13px', '14px', '15px', '16px', '18px', '20px'];
         $allowedHeadingWeight = ['400', '500', '600', '700', '800'];
         $allowedLineHeight = ['1.25', '1.375', '1.5', '1.625', '1.75', '2'];
@@ -58,9 +57,7 @@ class CustomStyleController extends Controller
                 continue;
             }
 
-            if ($key === 'border_radius' && ! in_array($value, $allowedBorderRadius, true)) {
-                continue;
-            }
+
 
             if ($key === 'base_font_size' && ! in_array($value, $allowedFontSizes, true)) {
                 continue;

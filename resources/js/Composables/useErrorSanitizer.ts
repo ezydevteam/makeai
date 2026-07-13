@@ -1,3 +1,5 @@
+import { t } from '@/Composables/useTranslate'
+
 /**
  * Clean up provider-specific raw API error messages into friendly, translatable messages.
  * Never expose raw provider errors, stack traces, or internal details to end-users.
@@ -6,7 +8,7 @@
  */
 export function sanitizeErrorMessage(message: string | null | undefined): string {
     if (!message) {
-        return 'Something went wrong. Please try again.'
+        return t('Something went wrong. Please try again.')
     }
 
     const lower = message.toLowerCase()
@@ -27,7 +29,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('payment required') ||
         lower.includes('429') // HTTP status embedded in message
     ) {
-        return 'Rate limit reached. Please try again in a moment.'
+        return t('Rate limit reached. Please try again in a moment.')
     }
 
     // ── Content policy / Safety filters ──────────────────────
@@ -43,7 +45,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('responsible ai') ||
         lower.includes('content moderation')
     ) {
-        return 'Your request was flagged. Please modify your input and try again.'
+        return t('Your request was flagged. Please modify your input and try again.')
     }
 
     // ── Context / Token length ───────────────────────────────
@@ -58,7 +60,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         (lower.includes('exceed') && lower.includes('token')) ||
         (lower.includes('exceed') && lower.includes('context'))
     ) {
-        return 'Your input is too long. Please shorten it and try again.'
+        return t('Your input is too long. Please shorten it and try again.')
     }
 
     // ── Timeout ──────────────────────────────────────────────
@@ -68,7 +70,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('time_out') ||
         lower.includes('response_time')
     ) {
-        return 'Generation timed out. Try a shorter length or a different model.'
+        return t('Generation timed out. Try a shorter length or a different model.')
     }
 
     // ── Authentication / API key ─────────────────────────────
@@ -84,7 +86,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('not authorized') ||
         lower.includes('access denied') && (lower.includes('key') || lower.includes('credential'))
     ) {
-        return 'This AI provider is not configured. Please contact support.'
+        return t('This AI provider is not configured. Please contact support.')
     }
 
     // ── Model not found / unavailable ────────────────────────
@@ -98,7 +100,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('no such model') ||
         lower.includes('deprecated')
     ) {
-        return 'The selected model is unavailable. Please try a different one.'
+        return t('The selected model is unavailable. Please try a different one.')
     }
 
     // ── Network / Connection ─────────────────────────────────
@@ -114,7 +116,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('enotfound') ||
         lower.includes('etimedout')
     ) {
-        return 'Connection error. Please check your internet and try again.'
+        return t('Connection error. Please check your internet and try again.')
     }
 
     // ── Server errors ────────────────────────────────────────
@@ -129,7 +131,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('overloaded') ||
         lower.includes('500') || lower.includes('502') || lower.includes('503') || lower.includes('504')
     ) {
-        return 'The AI service is temporarily unavailable. Please try again later.'
+        return t('The AI service is temporarily unavailable. Please try again later.')
     }
 
     // ── Stream error from provider (catch-all for SSE errors) ─
@@ -139,7 +141,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('sse error') ||
         lower.includes('event stream')
     ) {
-        return 'Generation interrupted. Please try again.'
+        return t('Generation interrupted. Please try again.')
     }
 
     // ── Generic / unknown errors ─────────────────────────────
@@ -151,7 +153,7 @@ export function sanitizeErrorMessage(message: string | null | undefined): string
         lower.includes('nullpointerexception') ||
         lower.includes('runtimeexception')
     ) {
-        return 'Something went wrong. Please try again or contact support.'
+        return t('Something went wrong. Please try again or contact support.')
     }
 
     return message

@@ -41,7 +41,6 @@ class BlogPostRequest extends FormRequest
             'canonical_url' => ['nullable', 'url', 'max:500'],
             'schema_type' => ['required', Rule::in(['Article', 'BlogPosting', 'NewsArticle'])],
             'no_index' => ['required', 'boolean'],
-            'template' => ['required', Rule::in(['default', 'full_width', 'sidebar_left', 'sidebar_right', 'no_sidebar'])],
             'show_author' => ['required', 'boolean'],
             'show_date' => ['required', 'boolean'],
             'show_reading_time' => ['required', 'boolean'],

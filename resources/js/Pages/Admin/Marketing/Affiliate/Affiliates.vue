@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -40,6 +40,7 @@ const { formatCurrency } = useNumberFormat()
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchQuery = ref('')
 const statusFilter = ref('')
+const searchFocused = ref(false)
 const banning = ref<Record<number, boolean>>({})
 const confirmModal = ref({
     open: false,
@@ -191,25 +192,25 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-                <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                    <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-                            <div class="relative flex-1">
+            <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[240px] sm:max-w-md">
+                            <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500"><i class="ti ti-search text-base"></i></span>
                                 <input
                                     ref="searchInput"
                                     v-model="searchQuery"
                                     type="text"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                                     :placeholder="t('Search name, email, or referral code...')"
+                                    @focus="searchFocused = true"
+                                    @blur="searchFocused = false"
                                 />
                                 <span
-                                    v-if="!searchQuery"
-                                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"
-                                >
-                                    <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-gray-200 bg-white px-1.5 text-[11px] font-medium text-gray-400 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500">/</span>
-                                </span>
+                                    v-if="!searchQuery && !searchFocused"
+                                    class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                                >/</span>
                                 <button
                                     v-if="searchQuery"
                                     type="button"
@@ -220,15 +221,20 @@ onBeforeUnmount(() => {
                                     <i class="ti ti-x text-base"></i>
                                 </button>
                             </div>
-                            <div class="w-full sm:w-44"><AppSelect v-model="statusFilter" :options="statusOptions" :placeholder="t('Status')" /></div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                            <div class="w-full sm:w-48 sm:flex-none">
+                                <AppSelect v-model="statusFilter" :options="statusOptions" :placeholder="t('Status')" />
+                            </div>
                             <button
                                 v-if="hasActiveFilters"
                                 type="button"
-                                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-400 transition hover:border-gray-300 hover:text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-500 dark:hover:text-gray-300"
-                                :aria-label="t('Clear filters')"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 w-full sm:w-auto"
                                 @click="clearFilters"
                             >
-                                <i class="ti ti-x text-base"></i>
+                                <i class="ti ti-rotate-clockwise text-base"></i>
+                                {{ t('Reset') }}
                             </button>
                         </div>
                     </div>

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })

@@ -18,11 +18,16 @@ class Currency extends Model
     ];
 
     /**
-     * Get the default currency.
+     * Get the default (base) currency row.
+     *
+     * Follows the single source of truth — the `default_currency` setting (Admin →
+     * Settings) via base_currency() — so it can never drift from pricing. Falls back
+     * to the legacy is_default flag if no row matches the configured code.
      */
     public static function getDefault(): ?self
     {
-        return static::where('is_default', true)->first();
+        return static::where('code', base_currency())->first()
+            ?? static::where('is_default', true)->first();
     }
 
     /**

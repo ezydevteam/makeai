@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
+use App\Models\Plan;
+use App\Services\NotificationEventService;
 use App\Services\Payment\PaymentActivationService;
 use App\Services\Subscription\SubscriptionLifecycleService;
 use Illuminate\Bus\Queueable;
@@ -84,6 +86,47 @@ class ProcessPaymentWebhookJob implements ShouldQueue
     }
 
     /**
+     * Assert the gateway-reported paid amount covers what we expected to charge.
+     *
+     * Signatures prove the message is authentic but do not bind the amount — on
+     * gateways where the buyer can influence the price (2Checkout dynamic buy-link)
+     * or under/overpay (crypto), a valid-but-underpaid notification must not
+     * activate a plan. Overpayment is allowed; a 1-cent tolerance absorbs rounding.
+     * A zero/absent reported amount is treated as "unknown" and allowed through so
+     * we never block a legitimate activation on a missing field.
+     */
+    private function paidAmountCovers(Payment $payment, float $paidAmount, ?string $paidCurrency = null): bool
+    {
+        if ($paidAmount <= 0.0) {
+            return true;
+        }
+
+        if ($paidCurrency !== null && strtoupper($paidCurrency) !== strtoupper((string) $payment->currency)) {
+            Log::warning('Webhook rejected: paid currency mismatch', [
+                'gateway' => $this->gateway,
+                'payment_ulid' => $payment->ulid,
+                'expected_currency' => $payment->currency,
+                'paid_currency' => $paidCurrency,
+            ]);
+
+            return false;
+        }
+
+        if (($paidAmount + 0.01) < (float) $payment->amount) {
+            Log::warning('Webhook rejected: underpaid amount', [
+                'gateway' => $this->gateway,
+                'payment_ulid' => $payment->ulid,
+                'expected_amount' => (float) $payment->amount,
+                'paid_amount' => $paidAmount,
+            ]);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Activate a payment, routing to the appropriate method based on payment type.
      */
     private function activatePayment(Payment $payment, string $gatewayPaymentId, SubscriptionLifecycleService $lifecycle, PaymentActivationService $activation, ?string $gatewaySubscriptionId = null): void
@@ -116,24 +159,58 @@ class ProcessPaymentWebhookJob implements ShouldQueue
 
         if ($type === 'PAYMENT.CAPTURE.COMPLETED') {
             $paymentUlid = data_get($resource, 'custom_id') ?: data_get($resource, 'supplementary_data.related_ids.order_id');
-            $payment = Payment::where('ulid', $paymentUlid)->orWhere('gateway_payment_id', $paymentUlid)->first();
+            // Only resolve when we have a real reference — a null/empty ulid would turn
+            // the query into `WHERE ulid IS NULL OR gateway_payment_id IS NULL` and match
+            // an unrelated pending payment.
+            $payment = filled($paymentUlid)
+                ? Payment::where('ulid', $paymentUlid)->orWhere('gateway_payment_id', $paymentUlid)->first()
+                : null;
 
             if ($payment && $payment->status !== 'completed') {
                 $this->activatePayment($payment, (string) data_get($resource, 'id'), $lifecycle, $activation);
             }
         }
 
+        // Subscription approved & activated — the reliable server-side activation
+        // of the pending checkout payment (independent of the browser return).
+        if ($type === 'BILLING.SUBSCRIPTION.ACTIVATED') {
+            $subscriptionId = (string) data_get($resource, 'id');
+            $ulid = data_get($resource, 'custom_id');
+            $payment = $ulid ? Payment::where('ulid', $ulid)->first() : null;
+
+            if ($payment && $payment->status !== 'completed' && $subscriptionId) {
+                $this->activatePayment($payment, $subscriptionId, $lifecycle, $activation, $subscriptionId);
+            }
+        }
+
         if (in_array($type, ['BILLING.SUBSCRIPTION.PAYMENT.SUCCEEDED', 'PAYMENT.SALE.COMPLETED'], true)) {
             $subscriptionId = data_get($resource, 'billing_agreement_id') ?: data_get($resource, 'id');
             if ($subscriptionId) {
-                $lifecycle->renewFromGatewaySubscription(
-                    'paypal',
-                    (string) $subscriptionId,
-                    (string) data_get($resource, 'id'),
-                    (float) data_get($resource, 'amount.total', data_get($resource, 'amount.value', 0)),
-                    strtoupper((string) data_get($resource, 'amount.currency', data_get($resource, 'amount.currency_code', 'USD')))
-                );
+                // The first charge of a new subscription activates the pending
+                // checkout payment; every later charge is a renewal.
+                $pending = Payment::where('gateway', 'paypal')
+                    ->where('metadata->paypal_subscription_id', (string) $subscriptionId)
+                    ->where('status', 'pending')
+                    ->first();
+
+                if ($pending) {
+                    $this->activatePayment($pending, (string) $subscriptionId, $lifecycle, $activation, (string) $subscriptionId);
+                } else {
+                    $lifecycle->renewFromGatewaySubscription(
+                        'paypal',
+                        (string) $subscriptionId,
+                        (string) data_get($resource, 'id'),
+                        (float) data_get($resource, 'amount.total', data_get($resource, 'amount.value', 0)),
+                        strtoupper((string) data_get($resource, 'amount.currency', data_get($resource, 'amount.currency_code', 'USD')))
+                    );
+                }
             }
+        }
+
+        // Plan change approved on PayPal (e.g. an in-place upgrade the buyer
+        // approved) — sync the local plan to the new PayPal plan id.
+        if ($type === 'BILLING.SUBSCRIPTION.UPDATED') {
+            $this->syncPayPalPlanChange($resource);
         }
 
         if (in_array($type, ['BILLING.SUBSCRIPTION.CANCELLED', 'BILLING.SUBSCRIPTION.EXPIRED'], true)) {
@@ -146,7 +223,9 @@ class ProcessPaymentWebhookJob implements ShouldQueue
 
         if (in_array($type, ['PAYMENT.CAPTURE.DENIED', 'PAYMENT.CAPTURE.DECLINED', 'CHECKOUT.ORDER.VOIDED'], true)) {
             $paymentUlid = data_get($resource, 'custom_id') ?: data_get($resource, 'supplementary_data.related_ids.order_id');
-            $payment = Payment::where('ulid', $paymentUlid)->orWhere('gateway_payment_id', $paymentUlid)->first();
+            $payment = filled($paymentUlid)
+                ? Payment::where('ulid', $paymentUlid)->orWhere('gateway_payment_id', $paymentUlid)->first()
+                : null;
             if ($payment) {
                 $lifecycle->fail($payment, $type);
             }
@@ -166,6 +245,51 @@ class ProcessPaymentWebhookJob implements ShouldQueue
                 $lifecycle->refund($payment, $refundReference);
             }
         }
+    }
+
+    /**
+     * Reconcile a PayPal subscription's plan with the local plan after a revise
+     * takes effect (matches the new PayPal plan id back to a local Plan).
+     */
+    private function syncPayPalPlanChange(array $resource): void
+    {
+        $subscriptionId = (string) data_get($resource, 'id');
+        $newPayPalPlanId = (string) data_get($resource, 'plan_id');
+
+        if (! $subscriptionId || ! $newPayPalPlanId) {
+            return;
+        }
+
+        $subscription = GatewaySubscription::where('gateway', 'paypal')
+            ->where('gateway_subscription_id', $subscriptionId)
+            ->first();
+
+        if (! $subscription) {
+            return;
+        }
+
+        $target = Plan::where('paypal_plan_monthly_id', $newPayPalPlanId)
+            ->orWhere('paypal_plan_yearly_id', $newPayPalPlanId)
+            ->first();
+
+        if (! $target || $target->id === $subscription->plan_id) {
+            return;
+        }
+
+        $oldPlan = $subscription->plan;
+        $cycle = $target->paypal_plan_yearly_id === $newPayPalPlanId ? 'yearly' : 'monthly';
+
+        $subscription->update([
+            'plan_id' => $target->id,
+            'billing_cycle' => $cycle,
+            'scheduled_plan_id' => null,
+            'scheduled_billing_cycle' => null,
+            'scheduled_change_at' => null,
+        ]);
+
+        $subscription->user()->update(['plan_id' => $target->id]);
+
+        app(NotificationEventService::class)->planChanged($subscription->user, $oldPlan, $target, $subscription);
     }
 
     private function validPayPalSignature(PaymentGateway $gateway): bool
@@ -416,6 +540,15 @@ class ProcessPaymentWebhookJob implements ShouldQueue
         $coingateId = (string) ($this->payload['id'] ?? '');
 
         if ($status === 'paid' && $payment->status !== 'completed') {
+            // Crypto orders can settle under/over the requested amount — confirm the
+            // priced total in our order currency covers what we expected to charge.
+            $paidAmount = (float) ($this->payload['price_amount'] ?? 0);
+            $paidCurrency = (string) ($this->payload['price_currency'] ?? $payment->currency);
+
+            if (! $this->paidAmountCovers($payment, $paidAmount, $paidCurrency)) {
+                return;
+            }
+
             $this->activatePayment($payment, $coingateId, $lifecycle, $activation);
         }
 
@@ -517,6 +650,18 @@ class ProcessPaymentWebhookJob implements ShouldQueue
         if (($messageType === 'ORDER_CREATED' || $messageType === 'INVOICE_STATUS_CHANGED')
             && in_array($invoiceStatus, ['approved', 'deposited'], true)
             && $payment->status !== 'completed') {
+            // The INS hash (sale_id+vendor_id+invoice_id+secret) does NOT bind the
+            // amount, and the dynamic buy-link carries a buyer-editable price — so we
+            // must confirm the invoiced total matches what we expected to charge.
+            $paidAmount = (float) ($this->payload['invoice_list_amount']
+                ?? $this->payload['item_list_amount']
+                ?? $this->payload['total'] ?? 0);
+            $paidCurrency = (string) ($this->payload['list_currency'] ?? $this->payload['payout_currency'] ?? $payment->currency);
+
+            if (! $this->paidAmountCovers($payment, $paidAmount, $paidCurrency)) {
+                return;
+            }
+
             $this->activatePayment($payment, $saleId, $lifecycle, $activation);
         }
 
@@ -596,8 +741,19 @@ class ProcessPaymentWebhookJob implements ShouldQueue
             'format' => 'json',
         ]);
 
-        return $response->successful()
-            && in_array($response->json('status'), ['VALID', 'VALIDATED'], true)
-            && (string) $response->json('tran_id') === $payment->ulid;
+        if (! $response->successful()
+            || ! in_array($response->json('status'), ['VALID', 'VALIDATED'], true)
+            || (string) $response->json('tran_id') !== $payment->ulid) {
+            return false;
+        }
+
+        // Confirm the settled amount covers the expected charge. Prefer the
+        // transaction-currency fields (currency_amount/currency_type), which echo
+        // what we requested; `amount`/`currency` may be the post-conversion store
+        // currency on a multi-currency store, so only fall back to them.
+        $paidAmount = (float) ($response->json('currency_amount') ?: $response->json('amount'));
+        $paidCurrency = (string) ($response->json('currency_type') ?: $response->json('currency') ?: $payment->currency);
+
+        return $this->paidAmountCovers($payment, $paidAmount, $paidCurrency);
     }
 }

@@ -12,7 +12,6 @@ return new class extends Migration
             $table->id();
             $table->string('addon_slug', 100)->unique();
             $table->text('purchase_code')->comment('encrypted with APP_KEY'); // encrypted
-            $table->bigInteger('envato_item_id');
             $table->tinyInteger('license_type')->comment('1=Regular, 2=Extended');
             $table->string('buyer', 100)->nullable();
             $table->timestamp('purchased_at')->nullable();

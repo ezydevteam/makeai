@@ -2,29 +2,40 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Exports\Admin\AffiliateCommissionsExport;
-use App\Exports\Admin\AiUsageExport;
-use App\Exports\Admin\RevenueExport;
-use App\Exports\Admin\UsersExport;
+use App\Exports\Registry\Dataset;
+use App\Exports\Registry\DatasetRegistry;
+use App\Exports\Registry\GenericExcelExport;
 use App\Http\Controllers\Controller;
 use App\Models\AiTool;
-use App\Models\AiUsageLog;
-use App\Models\Payment;
-use App\Models\PaymentGateway;
+use App\Models\ExportPreset;
 use App\Models\Plan;
-use App\Models\User;
+use App\Models\ScheduledExport;
 use App\Services\ExportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
+/**
+ * Admin Export Center.
+ *
+ * Every export dataset — its label, license/feature gate, filters, columns and
+ * per-format rendering — is declared once as a Dataset and registered in
+ * DatasetRegistry. This controller is a thin driver over that registry, so
+ * gating lives in exactly one place and adding a dataset never touches the
+ * controller. See app/Exports/Registry.
+ */
 class ExportCenterController extends Controller
 {
-    public function __construct(private ExportService $exportService) {}
+    /** Rows above this stream/queue rather than build synchronously. */
+    private const SYNC_ROW_LIMIT = 5000;
+
+    public function __construct(
+        private ExportService $exportService,
+        private DatasetRegistry $registry,
+    ) {}
 
     public function index(): \Inertia\Response
     {
@@ -33,6 +44,7 @@ class ExportCenterController extends Controller
         $files = collect($disk->files('exports/' . auth('admin')->id()))
             ->map(function ($path) use ($disk) {
                 $filename = basename($path);
+
                 return [
                     'path' => $path,
                     'filename' => $filename,
@@ -47,11 +59,12 @@ class ExportCenterController extends Controller
 
         return Inertia::render('Admin/Reports', [
             'recentExports' => $files,
-            'exportTypes' => [
-                ['value' => 'users', 'label' => translate('Users')],
-                ['value' => 'ai-usage', 'label' => translate('AI Usage')],
-                ['value' => 'affiliates', 'label' => translate('Affiliate Commissions')],
-            ],
+            // Registry already filters by availability, so the picker (and its
+            // per-dataset column/filter metadata) reflects the current license.
+            'exportTypes' => array_values(array_map(
+                fn (Dataset $d) => $d->toMeta(),
+                $this->registry->available()
+            )),
             'isProAvailable' => isProAvailable(),
             'plans' => Plan::where('is_active', true)->select('id', 'name')->get()
                 ->map(fn ($p) => ['value' => (string) $p->id, 'label' => $p->name])->values()->all(),
@@ -69,95 +82,235 @@ class ExportCenterController extends Controller
                 ->map(fn ($t) => ['value' => $t->slug, 'label' => $t->name])
                 ->values()
                 ->all(),
+            // Saved presets for this admin, limited to datasets still available.
+            'presets' => ExportPreset::where('admin_id', auth('admin')->id())
+                ->whereIn('dataset', $this->registry->availableKeys())
+                ->latest()
+                ->get()
+                ->map(fn (ExportPreset $p) => [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'dataset' => $p->dataset,
+                    'format' => $p->format,
+                    'filters' => $p->filters ?? [],
+                    'columns' => $p->columns ?? [],
+                ])
+                ->all(),
+            'schedules' => ScheduledExport::where('admin_id', auth('admin')->id())
+                ->latest()
+                ->get()
+                ->map(fn (ScheduledExport $s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'dataset' => $s->dataset,
+                    'format' => $s->format,
+                    'frequency' => $s->frequency,
+                    'is_active' => $s->is_active,
+                    'last_run_at' => $s->last_run_at?->toIso8601String(),
+                    'next_run_at' => $s->next_run_at?->toIso8601String(),
+                    'available' => in_array($s->dataset, $this->registry->availableKeys(), true),
+                ])
+                ->all(),
         ]);
+    }
+
+    public function storePreset(Request $request): JsonResponse
+    {
+        $this->authorizeExports();
+        $validated = $request->validate([
+            'name' => 'required|string|max:80',
+            'dataset' => ['required', Rule::in($this->registry->availableKeys())],
+            'format' => 'required|in:xlsx,csv,pdf',
+            'filters' => 'nullable|array',
+            'columns' => 'nullable|array',
+            'columns.*' => 'string',
+        ]);
+
+        // Keep only column keys the dataset actually defines.
+        $dataset = $this->registry->resolve($validated['dataset']);
+        $columns = $this->sanitizeColumns($dataset, $validated['columns'] ?? null);
+
+        $preset = ExportPreset::create([
+            'admin_id' => auth('admin')->id(),
+            'name' => $validated['name'],
+            'dataset' => $validated['dataset'],
+            'format' => $validated['format'],
+            'filters' => $this->cleanFilters($validated['filters'] ?? []),
+            'columns' => $columns,
+        ]);
+
+        return response()->json([
+            'message' => translate('Preset saved.'),
+            'preset' => [
+                'id' => $preset->id,
+                'name' => $preset->name,
+                'dataset' => $preset->dataset,
+                'format' => $preset->format,
+                'filters' => $preset->filters ?? [],
+                'columns' => $preset->columns ?? [],
+            ],
+        ]);
+    }
+
+    public function destroyPreset(ExportPreset $preset): JsonResponse
+    {
+        $this->authorizeExports();
+
+        // Owner-scoped: an admin can only delete their own presets.
+        if ($preset->admin_id !== auth('admin')->id()) {
+            abort(403);
+        }
+
+        $preset->delete();
+
+        return response()->json(['message' => translate('Preset deleted.')]);
+    }
+
+    public function storeSchedule(Request $request): JsonResponse
+    {
+        $this->authorizeExports();
+        $validated = $request->validate([
+            'name' => 'required|string|max:80',
+            'dataset' => ['required', Rule::in($this->registry->availableKeys())],
+            'format' => 'required|in:xlsx,csv,pdf',
+            'frequency' => ['required', Rule::in(ScheduledExport::FREQUENCIES)],
+            'filters' => 'nullable|array',
+            'columns' => 'nullable|array',
+            'columns.*' => 'string',
+        ]);
+
+        $dataset = $this->registry->resolve($validated['dataset']);
+        $columns = $this->sanitizeColumns($dataset, $validated['columns'] ?? null);
+
+        $schedule = new ScheduledExport([
+            'admin_id' => auth('admin')->id(),
+            'name' => $validated['name'],
+            'dataset' => $validated['dataset'],
+            'format' => $validated['format'],
+            'frequency' => $validated['frequency'],
+            'filters' => $this->cleanFilters($validated['filters'] ?? []),
+            'columns' => $columns,
+            'is_active' => true,
+        ]);
+        // First run one interval out — never fire immediately on creation.
+        $schedule->next_run_at = $schedule->computeNextRun(now());
+        $schedule->save();
+
+        return response()->json([
+            'message' => translate('Schedule created.'),
+            'schedule' => $this->schedulePayload($schedule),
+        ]);
+    }
+
+    public function toggleSchedule(ScheduledExport $schedule): JsonResponse
+    {
+        $this->authorizeExports();
+        if ($schedule->admin_id !== auth('admin')->id()) {
+            abort(403);
+        }
+
+        $schedule->is_active = ! $schedule->is_active;
+        // Resuming a paused schedule re-arms its next run.
+        if ($schedule->is_active) {
+            $schedule->next_run_at = $schedule->computeNextRun(now());
+        }
+        $schedule->save();
+
+        return response()->json([
+            'message' => $schedule->is_active ? translate('Schedule resumed.') : translate('Schedule paused.'),
+            'schedule' => $this->schedulePayload($schedule),
+        ]);
+    }
+
+    public function destroySchedule(ScheduledExport $schedule): JsonResponse
+    {
+        $this->authorizeExports();
+        if ($schedule->admin_id !== auth('admin')->id()) {
+            abort(403);
+        }
+
+        $schedule->delete();
+
+        return response()->json(['message' => translate('Schedule deleted.')]);
+    }
+
+    /** @return array<string,mixed> */
+    private function schedulePayload(ScheduledExport $schedule): array
+    {
+        return [
+            'id' => $schedule->id,
+            'name' => $schedule->name,
+            'dataset' => $schedule->dataset,
+            'format' => $schedule->format,
+            'frequency' => $schedule->frequency,
+            'is_active' => $schedule->is_active,
+            'last_run_at' => $schedule->last_run_at?->toIso8601String(),
+            'next_run_at' => $schedule->next_run_at?->toIso8601String(),
+            'available' => in_array($schedule->dataset, $this->registry->availableKeys(), true),
+        ];
+    }
+
+    /**
+     * Whitelist only the filter keys datasets understand, dropping empties.
+     *
+     * @param  array<string,mixed>  $filters
+     * @return array<string,mixed>
+     */
+    private function cleanFilters(array $filters): array
+    {
+        $allowed = ['date_from', 'date_to', 'status', 'plan_id', 'user_id', 'provider', 'gateway', 'tool_slug'];
+
+        return collect($filters)
+            ->only($allowed)
+            ->reject(fn ($v) => $v === null || $v === '' || $v === [])
+            ->all();
     }
 
     public function export(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $this->authorizeExports();
-        $request->validate([
-            'type' => 'required|in:users,ai-usage,revenue,affiliates',
+        $request->validate($this->exportRules() + [
             'format' => 'required|in:xlsx,csv,pdf',
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date',
-            'provider' => 'nullable|array',
-            'provider.*' => 'string',
-            'gateway' => 'nullable|array',
-            'gateway.*' => 'string',
-            'tool_slug' => 'nullable|array',
-            'tool_slug.*' => 'string',
+            'columns' => 'nullable|array',
+            'columns.*' => 'string',
         ]);
 
-        $type = $request->type;
-        $format = $request->format;
-        $dateFrom = $request->date_from ?? now()->subDays(30)->toDateString();
-        $dateTo = $request->date_to ?? now()->toDateString();
-        $filename = $type . '-' . $dateFrom . '-to-' . $dateTo;
-        $provider = $request->provider;
-        $gateway = $request->gateway;
-        $toolSlug = $request->tool_slug;
+        // Availability is enforced by exportRules() (Rule::in available keys);
+        // resolve() re-checks as defence-in-depth.
+        $dataset = $this->registry->resolve($request->type);
+        $filters = $this->collectFilters($request);
+        $columns = $this->sanitizeColumns($dataset, $request->input('columns'));
+        $filename = $request->type . '-' . $filters['date_from'] . '-to-' . $filters['date_to'];
 
-        if ($type === 'revenue' && ! isProAvailable()) {
-            return response()->json(['message' => translate('Revenue export is only available with Pro')], 422);
-        }
-
-        return match ([$type, $format]) {
-            ['users', 'xlsx'] => $this->smartExcel(
-                new UsersExport(
-                    status: $request->status,
-                    planId: $request->plan_id,
-                    dateFrom: $dateFrom,
-                    dateTo: $dateTo,
-                ),
+        return match ($request->format) {
+            'xlsx' => $this->smartExcel(
+                new GenericExcelExport($dataset->key(), $filters, $columns),
                 $filename
             ),
-            ['ai-usage', 'xlsx'] => $this->smartExcel(
-                new AiUsageExport(
-                    userId: $request->user_id,
-                    toolSlug: $toolSlug,
-                    provider: $provider,
-                    dateFrom: $dateFrom,
-                    dateTo: $dateTo,
-                ),
+            'csv' => $this->exportService->streamCsv(
+                $filename,
+                $dataset->headings($columns),
+                $dataset->query($filters)->lazy(),
+                fn ($row) => $dataset->row($row, $columns)
+            ),
+            'pdf' => $this->exportService->downloadPdf(
+                'admin.reports.pdf.dataset',
+                $this->pdfData($dataset, $filters, $columns),
                 $filename
             ),
-            ['revenue', 'xlsx'] => $this->smartExcel(
-                new RevenueExport($dateFrom, $dateTo, $gateway, $request->status),
-                $filename
-            ),
-            ['affiliates', 'xlsx'] => $this->exportService->downloadExcel(
-                new AffiliateCommissionsExport,
-                $filename
-            ),
-
-            ['users', 'csv'] => $this->csvUsers($filename, $dateFrom, $dateTo, $request),
-            ['ai-usage', 'csv'] => $this->csvAiUsage($filename, $dateFrom, $dateTo, $request),
-            ['revenue', 'csv'] => $this->csvRevenue($filename, $dateFrom, $dateTo, $request),
-            ['affiliates', 'csv'] => $this->csvAffiliates($filename),
-
-            ['users', 'pdf'] => $this->exportService->downloadPdf(
-                'admin.reports.pdf.users',
-                $this->getUsersPdfData($dateFrom, $dateTo, $request),
-                $filename
-            ),
-            ['ai-usage', 'pdf'] => $this->exportService->downloadPdf(
-                'admin.reports.pdf.ai-usage',
-                $this->getAiUsagePdfData($dateFrom, $dateTo, $request),
-                $filename
-            ),
-            ['revenue', 'pdf'] => $this->exportService->downloadPdf(
-                'admin.reports.pdf.revenue',
-                $this->getRevenuePdfData($dateFrom, $dateTo, $request),
-                $filename
-            ),
-            ['affiliates', 'pdf'] => $this->exportService->downloadPdf(
-                'admin.reports.pdf.affiliates',
-                $this->getAffiliatesPdfData($dateFrom, $dateTo),
-                $filename
-            ),
-
             default => response()->json(['message' => translate('Unsupported export type/format')], 422),
         };
+    }
+
+    public function estimate(Request $request): JsonResponse
+    {
+        $this->authorizeExports();
+        $request->validate($this->exportRules());
+
+        $dataset = $this->registry->resolve($request->type);
+        $count = $dataset->query($this->collectFilters($request))->count();
+
+        return response()->json(['count' => $count]);
     }
 
     public function download(string $file): BinaryFileResponse
@@ -186,21 +339,94 @@ class ExportCenterController extends Controller
         return response()->json(['message' => translate('File deleted')]);
     }
 
-    private function smartExcel(object $exportClass, string $filename): mixed
+    /**
+     * Shared validation rules for export + estimate. The `type` rule is the
+     * single gate: only currently-available dataset keys are accepted.
+     *
+     * @return array<string,mixed>
+     */
+    private function exportRules(): array
     {
-        if (! method_exists($exportClass, 'query')) {
-            return $this->exportService->downloadExcel($exportClass, $filename);
+        return [
+            'type' => ['required', Rule::in($this->registry->availableKeys())],
+            'date_from' => 'nullable|date',
+            'date_to' => 'nullable|date',
+            'status' => 'nullable|string',
+            'plan_id' => 'nullable',
+            'user_id' => 'nullable',
+            'provider' => 'nullable|array',
+            'provider.*' => 'string',
+            'gateway' => 'nullable|array',
+            'gateway.*' => 'string',
+            'tool_slug' => 'nullable|array',
+            'tool_slug.*' => 'string',
+        ];
+    }
+
+    /**
+     * Normalise request input into the filter array every Dataset::query reads.
+     *
+     * @return array<string,mixed>
+     */
+    private function collectFilters(Request $request): array
+    {
+        return [
+            'date_from' => $request->date_from ?: now()->subDays(30)->toDateString(),
+            'date_to' => $request->date_to ?: now()->toDateString(),
+            'status' => $request->status,
+            'plan_id' => $request->plan_id,
+            'user_id' => $request->user_id,
+            'provider' => $request->provider,
+            'gateway' => $request->gateway,
+            'tool_slug' => $request->tool_slug,
+        ];
+    }
+
+    /**
+     * Keep only column keys the dataset actually defines; null = all columns.
+     *
+     * @param  mixed  $requested
+     * @return string[]|null
+     */
+    private function sanitizeColumns(Dataset $dataset, $requested): ?array
+    {
+        if (! is_array($requested) || empty($requested)) {
+            return null;
         }
 
-        $query = $exportClass->query();
-        $estimatedRows = $query->count();
+        $valid = array_map(fn ($c) => $c->key, $dataset->columns());
+        $filtered = array_values(array_intersect($requested, $valid));
 
-        if ($estimatedRows > 5000) {
-            $this->exportService->queueExcel(
-                $exportClass,
-                $filename,
-                auth('admin')->id()
-            );
+        return $filtered ?: null;
+    }
+
+    /**
+     * @param  array<string,mixed>  $filters
+     * @param  string[]|null  $columns
+     * @return array<string,mixed>
+     */
+    private function pdfData(Dataset $dataset, array $filters, ?array $columns): array
+    {
+        $rows = $dataset->query($filters)->limit(self::SYNC_ROW_LIMIT)->get();
+
+        return [
+            'appName' => settings('app_name', translate('Application')),
+            'adminName' => auth('admin')->user()->name,
+            'title' => $dataset->label(),
+            'dateFrom' => $filters['date_from'],
+            'dateTo' => $filters['date_to'],
+            'stats' => $dataset->stats($filters),
+            'headers' => $dataset->headings($columns),
+            'rows' => $rows->map(fn ($r) => $dataset->row($r, $columns))->all(),
+        ];
+    }
+
+    private function smartExcel(GenericExcelExport $export, string $filename): mixed
+    {
+        $estimatedRows = $export->query()->count();
+
+        if ($estimatedRows > self::SYNC_ROW_LIMIT) {
+            $this->exportService->queueExcel($export, $filename, auth('admin')->id());
 
             return response()->json([
                 'message' => translate('Export queued. You will be notified when it\'s ready.'),
@@ -208,246 +434,32 @@ class ExportCenterController extends Controller
             ]);
         }
 
-        return $this->exportService->downloadExcel($exportClass, $filename);
-    }
-
-    private function getUsersPdfData(string $dateFrom, string $dateTo, Request $request): array
-    {
-        $query = User::query()
-            ->with('plan')
-            ->when($request->status, fn ($q) => $q->where('is_active', $request->status === 'active'))
-            ->when($request->plan_id, fn ($q) => $q->where('plan_id', $request->plan_id))
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        $total = User::count();
-        $rows = $query->latest()->limit(5000)->get();
-
-        return [
-            'appName' => settings('app_name', translate('Application')),
-            'adminName' => auth('admin')->user()->name,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'rows' => $rows,
-            'stats' => [
-                'total' => $total,
-                'new' => User::whereBetween('created_at', [$dateFrom, $dateTo])->count(),
-                'active' => User::where('is_active', true)->count(),
-                'pro' => User::whereHas('plan')->count(),
-            ],
-        ];
-    }
-
-    private function getAiUsagePdfData(string $dateFrom, string $dateTo, Request $request): array
-    {
-        $query = AiUsageLog::query()
-            ->with('user:id,name,email')
-            ->when($request->tool_slug, fn ($q) => $q->whereIn('tool_slug', (array) $request->tool_slug))
-            ->when($request->provider, fn ($q) => $q->whereIn('provider', (array) $request->provider))
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        $rows = $query->latest()->limit(5000)->get();
-
-        return [
-            'appName' => settings('app_name', translate('Application')),
-            'adminName' => auth('admin')->user()->name,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'totalRows' => $rows->count(),
-            'rows' => $rows,
-            'stats' => [
-                'total_requests' => $query->count(),
-                'total_tokens' => $query->sum(\DB::raw('COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)')),
-                'total_cost' => (float) $query->sum('cost_usd'),
-                'unique_users' => $query->distinct('user_id')->count('user_id'),
-            ],
-        ];
-    }
-
-    private function getRevenuePdfData(string $dateFrom, string $dateTo, Request $request): array
-    {
-        $query = Payment::query()
-            ->with('user:id,name,email', 'plan:id,name')
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->when($request->gateway, fn ($q) => $q->whereIn('gateway', (array) $request->gateway))
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        $rows = $query->latest()->limit(5000)->get();
-        $revenue = (float) $rows->sum('amount');
-        $count = $rows->count();
-
-        return [
-            'appName' => settings('app_name', translate('Application')),
-            'adminName' => auth('admin')->user()->name,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'rows' => $rows,
-            'stats' => [
-                'total_revenue' => $revenue,
-                'transaction_count' => $count,
-                'avg_transaction' => $count > 0 ? $revenue / $count : 0,
-                'total_refunds' => (float) Payment::where('status', 'refunded')
-                    ->whereBetween('created_at', [$dateFrom, $dateTo])->sum('amount'),
-            ],
-        ];
-    }
-
-    private function getAffiliatesPdfData(string $dateFrom, string $dateTo): array
-    {
-        $query = \App\Models\AffiliateCommission::query()
-            ->with('referrer:id,name,email', 'referred:id,name,email')
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        $rows = $query->latest()->limit(5000)->get();
-        $total = (float) $rows->sum('amount');
-        $count = $rows->count();
-
-        return [
-            'appName' => settings('app_name', translate('Application')),
-            'adminName' => auth('admin')->user()->name,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
-            'rows' => $rows,
-            'stats' => [
-                'total_commissions' => $total,
-                'transaction_count' => $count,
-                'unique_referrers' => $rows->pluck('referrer_id')->unique()->count(),
-                'avg_commission' => $count > 0 ? $total / $count : 0,
-            ],
-        ];
-    }
-
-    private function csvUsers(string $filename, string $dateFrom, string $dateTo, Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
-    {
-        $query = User::query()
-            ->when($request->status, fn ($q) => $q->where('is_active', $request->status === 'active'))
-            ->when($request->plan_id, fn ($q) => $q->where('plan_id', $request->plan_id))
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        return $this->exportService->streamCsv(
-            $filename,
-            [translate('Name'), translate('Email'), translate('Active'), translate('Plan'), translate('Credits'), translate('Joined')],
-            $query->lazy(),
-            fn ($u) => [$u->name, $u->email, $u->is_active ? translate('Yes') : translate('No'), $u->plan?->name ?? translate('Free'), $u->credits, $u->created_at->format('Y-m-d')]
-        );
-    }
-
-    private function csvAiUsage(string $filename, string $dateFrom, string $dateTo, Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
-    {
-        $query = AiUsageLog::query()
-            ->with('user:id,name,email')
-            ->when($request->tool_slug, fn ($q) => $q->whereIn('tool_slug', (array) $request->tool_slug))
-            ->when($request->provider, fn ($q) => $q->whereIn('provider', (array) $request->provider))
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        return $this->exportService->streamCsv(
-            $filename,
-            [translate('Date'), translate('User'), translate('Tool'), translate('Model'), translate('Provider'), translate('Input Tokens'), translate('Output Tokens'), translate('Cost (USD)'), translate('Credits Used'), translate('Status')],
-            $query->lazy(),
-            fn ($l) => [
-                $l->created_at->format('Y-m-d H:i'),
-                $l->user?->name ?? translate('Deleted'),
-                $l->tool_slug,
-                $l->model,
-                $l->provider,
-                $l->input_tokens,
-                $l->output_tokens,
-                $l->cost_usd,
-                $l->credits_used,
-                $l->status,
-            ]
-        );
-    }
-
-    private function csvRevenue(string $filename, string $dateFrom, string $dateTo, Request $request): \Symfony\Component\HttpFoundation\StreamedResponse
-    {
-        $query = Payment::query()
-            ->with('user:id,name,email')
-            ->when($request->gateway, fn ($q) => $q->whereIn('gateway', (array) $request->gateway))
-            ->when($request->status, fn ($q) => $q->where('status', $request->status))
-            ->whereBetween('created_at', [$dateFrom, $dateTo]);
-
-        return $this->exportService->streamCsv(
-            $filename,
-            [translate('Date'), translate('Transaction ID'), translate('User'), translate('Amount'), translate('Currency'), translate('Gateway'), translate('Status')],
-            $query->lazy(),
-            fn ($p) => [
-                $p->created_at->format('Y-m-d H:i'),
-                $p->ulid,
-                $p->user?->name ?? translate('N/A'),
-                $p->amount,
-                $p->currency,
-                $p->gateway,
-                $p->status,
-            ]
-        );
-    }
-
-    private function csvAffiliates(string $filename): \Symfony\Component\HttpFoundation\StreamedResponse
-    {
-        return $this->exportService->streamCsv(
-            $filename,
-            [translate('Date'), translate('Referrer'), translate('Referred User'), translate('Amount'), translate('Status'), translate('Approved At'), translate('Paid At')],
-            \App\Models\AffiliateCommission::with('referrer:id,name,email', 'referred:id,name,email')->lazy(),
-            fn ($c) => [
-                $c->created_at->format('Y-m-d'),
-                $c->referrer?->name . ' (' . $c->referrer?->email . ')',
-                $c->referred?->name,
-                $c->amount,
-                $c->status,
-                $c->approved_at?->format('Y-m-d') ?? translate('N/A'),
-                $c->paid_at?->format('Y-m-d') ?? translate('N/A'),
-            ]
-        );
-    }
-
-    public function estimate(Request $request): JsonResponse
-    {
-        $this->authorizeExports();
-        $request->validate([
-            'type' => 'required|in:users,ai-usage,revenue,affiliates',
-            'date_from' => 'nullable|date',
-            'date_to' => 'nullable|date',
-        ]);
-
-        $from = $request->date_from ?? now()->subDays(30)->toDateString();
-        $to = $request->date_to ?? now()->toDateString();
-
-        $count = match ($request->type) {
-            'users' => User::query()
-                ->when($request->status, fn ($q) => $q->where('is_active', $request->status === 'active'))
-                ->when($request->plan_id, fn ($q) => $q->where('plan_id', $request->plan_id))
-                ->whereBetween('created_at', [$from, $to])->count(),
-            'ai-usage' => AiUsageLog::query()
-                ->when($request->tool_slug, fn ($q) => $q->whereIn('tool_slug', (array) $request->tool_slug))
-                ->when($request->provider, fn ($q) => $q->whereIn('provider', (array) $request->provider))
-                ->whereBetween('created_at', [$from, $to])->count(),
-            'revenue' => Payment::query()
-                ->when($request->status, fn ($q) => $q->where('status', $request->status))
-                ->when($request->gateway, fn ($q) => $q->whereIn('gateway', (array) $request->gateway))
-                ->whereBetween('created_at', [$from, $to])->count(),
-            'affiliates' => \App\Models\AffiliateCommission::query()
-                ->whereBetween('created_at', [$from, $to])->count(),
-            default => 0,
-        };
-
-        return response()->json(['count' => $count]);
+        return $this->exportService->downloadExcel($export, $filename);
     }
 
     private function guessExportType(string $filename): string
     {
-        foreach (['users', 'ai-usage', 'revenue', 'affiliates'] as $type) {
-            if (str_starts_with($filename, $type . '-')) {
-                return $type;
+        foreach ($this->registry->all() as $key => $dataset) {
+            if (str_starts_with($filename, $key . '-')) {
+                return $key;
             }
         }
+
         return 'unknown';
     }
 
     private function guessExportFormat(string $filename): string
     {
-        if (str_ends_with($filename, '.xlsx')) return 'xlsx';
-        if (str_ends_with($filename, '.csv')) return 'csv';
-        if (str_ends_with($filename, '.pdf')) return 'pdf';
+        if (str_ends_with($filename, '.xlsx')) {
+            return 'xlsx';
+        }
+        if (str_ends_with($filename, '.csv')) {
+            return 'csv';
+        }
+        if (str_ends_with($filename, '.pdf')) {
+            return 'pdf';
+        }
+
         return 'unknown';
     }
 

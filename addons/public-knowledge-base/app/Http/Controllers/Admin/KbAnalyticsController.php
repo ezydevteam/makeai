@@ -31,9 +31,14 @@ class KbAnalyticsController extends Controller
         $answered7dPrevious = KbSearch::where('created_at', '>=', $fourteenDaysAgo)->where('created_at', '<', $sevenDaysAgo)->where('was_answered', true)->count();
         $answerRatePrevious = $searches7dPrevious > 0 ? (int) round(($answered7dPrevious / $searches7dPrevious) * 100) : 0;
 
-        // 4. Published Articles
+        // 4. Published Articles — value is the all-time total; the comparison is a true
+        // week-over-week on newly-published articles (by published_at), not the old
+        // "total vs total-created-before-7d" ratio which was a cumulative growth rate
+        // mislabeled as a period delta.
         $publishedCurrent = KbArticle::published()->count();
-        $publishedPrevious = KbArticle::published()->where('created_at', '<', $sevenDaysAgo)->count();
+        $publishedThisWeek = KbArticle::published()->where('published_at', '>=', $sevenDaysAgo)->count();
+        $publishedLastWeek = KbArticle::published()
+            ->whereBetween('published_at', [$fourteenDaysAgo, $sevenDaysAgo])->count();
 
         $unanswered = KbSearch::where('was_answered', false)
             ->latest()
@@ -72,7 +77,7 @@ class KbAnalyticsController extends Controller
             ],
             'published_count' => [
                 'value' => $publishedCurrent,
-                'comparison' => $this->calculateComparison($publishedCurrent, $publishedPrevious),
+                'comparison' => $this->calculateComparison($publishedThisWeek, $publishedLastWeek),
             ],
             'unanswered' => $unanswered,
             'top_queries' => $topQueries,

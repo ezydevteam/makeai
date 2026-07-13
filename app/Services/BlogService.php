@@ -96,7 +96,6 @@ class BlogService
                 'scheduled_at',
                 'meta_title',
                 'meta_description',
-                'template',
             ]),
         ]);
 

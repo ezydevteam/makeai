@@ -2,7 +2,7 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref } from 'vue'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 

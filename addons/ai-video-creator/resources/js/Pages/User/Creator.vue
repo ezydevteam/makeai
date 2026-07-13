@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserDashboardLayout })

@@ -1,15 +1,17 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 declare const route: (name: string, params?: Record<string, string | number>) => string
 
@@ -27,7 +29,6 @@ interface Faq {
 interface FaqCategory {
     id: number
     name: string
-    slug: string
     sort_order: number
     faqs: Faq[]
 }
@@ -272,20 +273,18 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
     <Head :title="t('FAQs - Admin')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="space-y-2">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('FAQs') }}</h1>
-                    <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Organize public-facing questions into clean categories and manage homepage-ready answers from one admin workspace.') }}
-                    </p>
-                </div>
+        <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="flex-1">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('FAQs') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Organize public-facing questions into clean categories and manage homepage-ready answers from one admin workspace.') }}
+                </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-3 shrink-0">
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl transition px-4 py-2 text-sm font-semibold border border-gray-200 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                     @click="openCreateCat"
                 >
                     <i class="ti ti-folder-plus text-base"></i>
@@ -293,7 +292,7 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                 </button>
                 <button
                     type="button"
-                    class="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:border-violet-800 dark:hover:bg-violet-900/30 dark:hover:text-violet-300"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 dark:border-violet-900/20 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
                     @click="showAiForm = true"
                 >
                     <i class="ti ti-sparkles text-base"></i>
@@ -301,18 +300,18 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                 </button>
                 <button
                     type="button"
-                    class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
+                    class="btn-primary-admin grow inline-flex items-center justify-center gap-2"
                     @click="openCreateFaq()"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('Add FAQ') }}
                 </button>
             </div>
-        </section>
+        </div>
 
         <div v-if="totalFaqs === 0 && categoryCount === 0" class="rounded-2xl border-2 border-dashed border-gray-200 bg-white px-6 py-16 text-center shadow-sm dark:border-surface-700 dark:bg-surface-900">
             <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 text-2xl dark:bg-emerald-900/20">
-                <span>❓</span>
+                <span>â“</span>
             </div>
             <h3 class="font-heading text-xl font-semibold text-gray-900 dark:text-white">{{ t('No FAQs yet') }}</h3>
             <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
@@ -320,7 +319,7 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
             </p>
             <button
                 type="button"
-                class="btn-primary mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                class="btn-primary-admin mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
                 @click="openCreateFaq()"
             >
                 <i class="ti ti-plus text-base"></i>
@@ -368,7 +367,7 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                             <template #default="{ close }">
                                 <button
                                     type="button"
-                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                     @click="openEditCat(category); close()"
                                 >
                                     <i class="ti ti-edit text-base"></i>
@@ -413,22 +412,15 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                             </div>
 
                             <div class="flex items-center gap-2 lg:shrink-0">
-                                <button
-                                    type="button"
-                                    class="relative inline-flex h-6 w-11 rounded-full transition-colors"
-                                    :class="faq.is_active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-surface-600'"
-                                    @click="toggleFaqActive(faq.id)"
-                                >
-                                    <span
-                                        class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-                                        :class="faq.is_active ? 'translate-x-5' : 'translate-x-0.5'"
-                                    ></span>
-                                </button>
+                                <AppSwitch
+                                    :model-value="faq.is_active"
+                                    @update:model-value="toggleFaqActive(faq.id)"
+                                />
                                 <TableActionMenu>
                                     <template #default="{ close }">
                                         <button
                                             type="button"
-                                            class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                            class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                             @click="openEditFaq(faq); close()"
                                         >
                                             <i class="ti ti-edit text-base"></i>
@@ -495,22 +487,15 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                             </div>
 
                             <div class="flex items-center gap-3 lg:shrink-0">
-                                <button
-                                    type="button"
-                                    class="relative inline-flex h-6 w-11 rounded-full transition-colors"
-                                    :class="faq.is_active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-surface-600'"
-                                    @click="toggleFaqActive(faq.id)"
-                                >
-                                    <span
-                                        class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-                                        :class="faq.is_active ? 'translate-x-5' : 'translate-x-0.5'"
-                                    ></span>
-                                </button>
+                                <AppSwitch
+                                    :model-value="faq.is_active"
+                                    @update:model-value="toggleFaqActive(faq.id)"
+                                />
                                 <TableActionMenu>
                                     <template #default="{ close }">
                                         <button
                                             type="button"
-                                            class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                            class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                             @click="openEditFaq(faq); close()"
                                         >
                                             <i class="ti ti-edit text-base"></i>
@@ -533,121 +518,95 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                 </div>
         </div>
 
-        <div v-if="showFaqForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeFaqForm">
-            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                                {{ editingFaqId ? t('Edit FAQ') : t('Create FAQ') }}
-                            </h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                {{ t('Write clear questions and polished answers that fit both homepage accordions and dedicated FAQ pages.') }}
-                            </p>
+        <AppModal
+            :open="showFaqForm"
+            max-width="max-w-5xl"
+            :title="editingFaqId ? t('Edit FAQ') : t('Create FAQ')"
+            :subtitle="t('Write clear questions and polished answers that fit both homepage accordions and dedicated FAQ pages.')"
+            has-form
+            @close="closeFaqForm"
+        >
+            <div class="space-y-6">
+                    <div>
+                        <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Question Setup') }}</h4>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Define the question, assign the right category, control list order, and set publishing status.') }}</p>
+                    </div>
+
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <div class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Question') }} *</label>
+                            <input
+                                v-model="faqForm.question"
+                                type="text"
+                                :placeholder="t('e.g. How do credits work in MakeAI?')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                            <p v-if="faqForm.errors.question" class="mt-2 text-xs text-red-500">{{ faqForm.errors.question }}</p>
                         </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Category') }}</label>
+                            <AppSelect
+                                v-model="faqForm.category_id"
+                                :options="categoryOptions"
+                                :placeholder="t('Select category')"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
+                            <input
+                                v-model.number="faqForm.sort_order"
+                                type="number"
+                                min="0"
+                                :placeholder="t('e.g. 1')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Answer Content') }}</h4>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use rich formatting when needed, but keep answers direct and readable.') }}</p>
+                    </div>
+
+                    <RichEditor v-model="faqForm.answer" variant="minimal" />
+                    <p v-if="faqForm.errors.answer" class="text-xs text-red-500">{{ faqForm.errors.answer }}</p>
+
+                    <div class="border-t border-gray-200 pt-5 dark:border-surface-700">
+                        <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Publishing') }}</h4>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose whether this FAQ is available to the frontend right now.') }}</p>
+
                         <button
                             type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                            :aria-label="t('Close modal')"
-                            @click="closeFaqForm"
+                            class="mt-4 flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10"
+                            @click="faqForm.is_active = !faqForm.is_active"
                         >
-                            <i class="ti ti-x text-base"></i>
+                            <div>
+                                <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Active') }}</div>
+                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show this FAQ on public pages and homepage sections that read active entries.') }}</div>
+                            </div>
+                            <AppSwitch :model-value="faqForm.is_active" />
                         </button>
                     </div>
                 </div>
 
-                <div class="flex-1 overflow-y-auto p-6">
-                    <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                        <div class="space-y-6">
-                            <div>
-                                <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Question Setup') }}</h4>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Define the question, assign the right category, control list order, and set publishing status.') }}</p>
-                            </div>
-
-                            <div class="grid gap-5 md:grid-cols-2">
-                                <div class="md:col-span-2">
-                                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Question') }} *</label>
-                                    <input
-                                        v-model="faqForm.question"
-                                        type="text"
-                                        :placeholder="t('e.g. How do credits work in MakeAI?')"
-                                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                    <p v-if="faqForm.errors.question" class="mt-2 text-xs text-red-500">{{ faqForm.errors.question }}</p>
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Category') }}</label>
-                                    <AppSelect
-                                        v-model="faqForm.category_id"
-                                        :options="categoryOptions"
-                                        :placeholder="t('Select category')"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
-                                    <input
-                                        v-model.number="faqForm.sort_order"
-                                        type="number"
-                                        min="0"
-                                        :placeholder="t('e.g. 1')"
-                                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                </div>
-                            </div>
-
-                            <div>
-                                <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Answer Content') }}</h4>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use rich formatting when needed, but keep answers direct and readable.') }}</p>
-                            </div>
-
-                            <RichEditor v-model="faqForm.answer" variant="minimal" />
-                            <p v-if="faqForm.errors.answer" class="text-xs text-red-500">{{ faqForm.errors.answer }}</p>
-
-                            <div class="border-t border-gray-200 pt-5 dark:border-surface-700">
-                                <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Publishing') }}</h4>
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose whether this FAQ is available to the frontend right now.') }}</p>
-
-                                <button
-                                    type="button"
-                                    class="mt-4 flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10"
-                                    @click="faqForm.is_active = !faqForm.is_active"
-                                >
-                                    <div>
-                                        <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Active') }}</div>
-                                        <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show this FAQ on public pages and homepage sections that read active entries.') }}</div>
-                                    </div>
-                                    <span
-                                        class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors"
-                                        :class="faqForm.is_active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-surface-600'"
-                                    >
-                                        <span
-                                            class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-                                            :class="faqForm.is_active ? 'translate-x-5' : 'translate-x-0.5'"
-                                        ></span>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
+            <template #footer>
+                <div class="flex items-center justify-between gap-3 w-full">
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Required fields are marked with *') }}
                     </div>
                     <div class="flex items-center gap-3">
                         <button
                             type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
+                            class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
                             @click="closeFaqForm"
                         >
                             {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
-                            class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="faqForm.processing"
                             @click="submitFaq"
                         >
@@ -656,158 +615,99 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </AppModal>
 
-        <div v-if="showCatForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeCatForm">
-            <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                                {{ editingCatId ? t('Edit Category') : t('Create Category') }}
-                            </h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                {{ t('Group related questions together for cleaner public FAQ navigation.') }}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                            :aria-label="t('Close modal')"
-                            @click="closeCatForm"
-                        >
-                            <i class="ti ti-x text-base"></i>
-                        </button>
-                    </div>
+        <AppModal
+            :open="showCatForm"
+            max-width="max-w-xl"
+            :title="editingCatId ? t('Edit Category') : t('Create Category')"
+            :subtitle="t('Group related questions together for cleaner public FAQ navigation.')"
+            has-form
+            :confirm-text="catForm.processing ? t('Saving...') : editingCatId ? t('Save Category') : t('Create Category')"
+            :confirm-loading="catForm.processing"
+            @close="closeCatForm"
+            @submit="submitCat"
+        >
+            <div class="space-y-5">
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Name') }} *</label>
+                    <input
+                        v-model="catForm.name"
+                        type="text"
+                        :placeholder="t('e.g. Billing & Credits')"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    >
+                    <p v-if="catForm.errors.name" class="mt-2 text-xs text-red-500">{{ catForm.errors.name }}</p>
                 </div>
 
-                <div class="space-y-5 p-6">
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Name') }} *</label>
-                        <input
-                            v-model="catForm.name"
-                            type="text"
-                            :placeholder="t('e.g. Billing & Credits')"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                        <p v-if="catForm.errors.name" class="mt-2 text-xs text-red-500">{{ catForm.errors.name }}</p>
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
-                        <input
-                            v-model.number="catForm.sort_order"
-                            type="number"
-                            min="0"
-                            :placeholder="t('e.g. 1')"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
-                    <button
-                        type="button"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
-                        @click="closeCatForm"
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
+                    <input
+                        v-model.number="catForm.sort_order"
+                        type="number"
+                        min="0"
+                        :placeholder="t('e.g. 1')"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                     >
-                        {{ t('Cancel') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="catForm.processing"
-                        @click="submitCat"
-                    >
-                        <i class="ti ti-device-floppy text-base"></i>
-                        {{ catForm.processing ? t('Saving...') : editingCatId ? t('Save Category') : t('Create Category') }}
-                    </button>
                 </div>
             </div>
-        </div>
+        </AppModal>
 
-        <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="showAiForm = false">
-            <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('AI Generate FAQs') }}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Create a first draft FAQ set for your product or category in one step.') }}</p>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                            :aria-label="t('Close modal')"
-                            @click="showAiForm = false"
-                        >
-                            <i class="ti ti-x text-base"></i>
-                        </button>
-                    </div>
+        <AppModal
+            :open="showAiForm"
+            max-width="max-w-2xl"
+            :title="t('AI Generate FAQs')"
+            :subtitle="t('Create a first draft FAQ set for your product or category in one step.')"
+            has-form
+            :confirm-text="t('Generate FAQs')"
+            :confirm-loading="aiGenerating"
+            confirm-loading-text="Generating..."
+            @close="showAiForm = false"
+            @submit="generateFaqs"
+        >
+            <div class="grid gap-5 md:grid-cols-2">
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Topic or Product') }}</label>
+                    <input
+                        v-model="aiForm.topic"
+                        type="text"
+                        :placeholder="t('topic SaaS for marketers')"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    >
                 </div>
 
-                <div class="grid gap-5 p-6 md:grid-cols-2">
-                    <div class="md:col-span-2">
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Topic or Product') }}</label>
-                        <input
-                            v-model="aiForm.topic"
-                            type="text"
-                            :placeholder="t('e.g. AI writing SaaS for marketers')"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Count') }}</label>
-                        <input
-                            v-model.number="aiForm.count"
-                            type="number"
-                            min="1"
-                            max="20"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Category') }}</label>
-                        <AppSelect
-                            v-model="aiForm.category_id"
-                            :options="aiCategoryOptions"
-                            :placeholder="t('Select category')"
-                        />
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Prompt') }}</label>
-                        <textarea
-                            v-model="aiForm.prompt"
-                            rows="4"
-                            :placeholder="t('Mention buyer concerns, answer style, topics to include, or wording to avoid...')"
-                            class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        ></textarea>
-                    </div>
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Count') }}</label>
+                    <input
+                        v-model.number="aiForm.count"
+                        type="number"
+                        min="1"
+                        max="20"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    >
                 </div>
 
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
-                    <button
-                        type="button"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
-                        @click="showAiForm = false"
-                    >
-                        {{ t('Cancel') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="aiGenerating"
-                        @click="generateFaqs"
-                    >
-                        <i class="ti ti-sparkles text-base"></i>
-                        {{ aiGenerating ? t('Generating...') : t('Generate FAQs') }}
-                    </button>
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Category') }}</label>
+                    <AppSelect
+                        v-model="aiForm.category_id"
+                        :options="aiCategoryOptions"
+                        :placeholder="t('Select category')"
+                    />
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Prompt') }}</label>
+                    <textarea
+                        v-model="aiForm.prompt"
+                        rows="4"
+                        :placeholder="t('Mention buyer concerns, answer style, topics to include, or wording to avoid...')"
+                        class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    ></textarea>
                 </div>
             </div>
-        </div>
+        </AppModal>
 
         <ActionConfirmModal
             :open="deleteFaqId !== null"

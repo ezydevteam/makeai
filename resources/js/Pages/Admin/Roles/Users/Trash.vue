@@ -1,10 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -104,7 +104,7 @@ const planOptions = computed(() => [
 
 const bulkActionOptions = computed(() => [
     { value: 'restore', label: t('Restore Users') },
-    // Permanent deletion is irreversible — Super Admins only.
+    // Permanent deletion is irreversible â€” Super Admins only.
     ...(isSuperAdmin.value ? [{ value: 'force_delete', label: t('Permanently Delete Users') }] : []),
 ])
 
@@ -315,10 +315,10 @@ const forceDeleteUser = (user: UserItem) => {
                     </p>
                 </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="flex gap-3 shrink-0">
                     <Link
                         :href="route('admin.users.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                     >
                         <i class="ti ti-arrow-left text-base"></i>
                         {{ t('Back to Users') }}
@@ -388,7 +388,7 @@ const forceDeleteUser = (user: UserItem) => {
                                 <div :title="applyDisabledReason" class="w-full sm:w-auto">
                                     <button
                                         type="button"
-                                        class="btn-primary w-full sm:w-auto rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                        class="btn-primary-admin w-full sm:w-auto rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                         :disabled="isApplyDisabled"
                                         @click="applyBulkAction"
                                     >
@@ -448,9 +448,9 @@ const forceDeleteUser = (user: UserItem) => {
                                                 <p class="truncate font-medium text-gray-900 dark:text-white">{{ user.name }}</p>
                                                 <div class="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500 dark:text-gray-400">
                                                     <span class="truncate">{{ user.email }}</span>
-                                                    <span v-if="user.profession" class="text-gray-300 dark:text-gray-600">•</span>
+                                                    <span v-if="user.profession" class="text-gray-300 dark:text-gray-600">â€¢</span>
                                                     <span v-if="user.profession" class="truncate text-gray-400 dark:text-gray-500">{{ user.profession }}</span>
-                                                    <span v-if="user.country" class="text-gray-300 dark:text-gray-600">•</span>
+                                                    <span v-if="user.country" class="text-gray-300 dark:text-gray-600">â€¢</span>
                                                     <span v-if="user.country" class="font-semibold text-gray-400 dark:text-gray-500">{{ user.country }}</span>
                                                 </div>
                                             </div>

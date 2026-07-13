@@ -60,20 +60,20 @@ class IngestKbArticle implements ShouldQueue
             return;
         }
 
-        $provider = addon_setting('public-knowledge-base', 'provider');
-        if (empty($provider)) {
-            $provider = settings('default_ai_provider', 'openai');
-        }
-
+        // Embeddings MUST use the platform's global embedding provider — the SAME one
+        // the query is embedded with at search time (KbSearchService calls embedText()
+        // with no provider). Passing the KB *chat* provider here previously embedded
+        // articles in a different vector space than queries, silently breaking cosine
+        // similarity whenever the KB provider differed from the embedding provider.
+        // The KB `provider`/`ai_model` settings are for ANSWER generation only.
         $rows = [];
         foreach ($chunks as $index => $chunkText) {
-            $result = $ai->embedText($chunkText, $provider);
+            $result = $ai->embedText($chunkText);
             $rows[] = [
                 'kb_article_id' => $article->id,
                 'chunk_index' => $index,
                 'chunk_text' => $chunkText,
                 'embedding' => json_encode($result->vector),
-                'token_count' => (int) (strlen($chunkText) / 4),
                 'created_at' => now(),
                 'updated_at' => now(),
             ];

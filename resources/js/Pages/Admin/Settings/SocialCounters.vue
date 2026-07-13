@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -74,8 +75,8 @@ const submit = () => {
 <template>
     <Head :title="pageTitle" />
 
-        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ pageTitle }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
@@ -85,7 +86,7 @@ const submit = () => {
             <button
                 type="button"
                 :disabled="form.processing"
-                class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                class="shrink-0 btn-primary-admin inline-flex items-center justify-center gap-2 disabled:opacity-60"
                 @click="submit"
             >
                 <svg
@@ -102,7 +103,7 @@ const submit = () => {
             </button>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="grid gap-4 md:grid-cols-2">
                 <div>
                     <AppSelect v-model="form.settings.social_follow_display_mode" :options="followDisplayModeOptions" :label="t('Default display mode')" />
@@ -119,22 +120,20 @@ const submit = () => {
             </div>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="mb-5">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Follow counters') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Use manual counts for reliable marketplace demos. Enable API fetching only after provider keys are added.') }}</p>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2">
-                <div v-for="(profile, index) in form.profiles" :key="profile.platform" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/50">
+                <div v-for="(profile, index) in form.profiles" :key="profile.platform" class="rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/50">
                     <div class="mb-4">
                         <div class="font-semibold text-gray-900 dark:text-white">{{ t(profile.label) }}</div>
                         <div class="mt-1 text-xs text-gray-500">{{ t(profile.unit) }}</div>
                         <div class="mt-4 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-surface-700 dark:bg-surface-800">
                             <span class="text-sm text-gray-600 dark:text-gray-300">{{ t('Show publicly') }}</span>
-                            <button type="button" :aria-pressed="profile.is_active" :class="profile.is_active ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200" @click="profile.is_active = !profile.is_active">
-                                <span :class="profile.is_active ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
-                            </button>
+                            <AppSwitch v-model="profile.is_active" />
                         </div>
                     </div>
 
@@ -167,9 +166,7 @@ const submit = () => {
                         <template v-if="profile.count_source === 'api'">
                             <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-surface-700 dark:bg-surface-800">
                                 <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('Allow API refresh') }}</span>
-                                <button type="button" :aria-pressed="profile.fetch_enabled" :class="profile.fetch_enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200" @click="profile.fetch_enabled = !profile.fetch_enabled">
-                                    <span :class="profile.fetch_enabled ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
-                                </button>
+                                <AppSwitch v-model="profile.fetch_enabled" />
                             </div>
 
                             <label class="block">

@@ -1,10 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
 import { defineAsyncComponent, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -116,9 +117,9 @@ const healthTabs: Record<string, string> = {
 }
 
 const statusIcon: Record<string, string> = {
-    pass: '✅',
-    warn: '⚠️',
-    fail: '❌',
+    pass: 'âœ…',
+    warn: 'âš ï¸',
+    fail: 'âŒ',
 }
 
 const statusBadgeClass: Record<string, string> = {
@@ -195,7 +196,7 @@ const removeBackground = () => {
             </div>
             <button
                 type="button"
-                :class="status.is_maintenance ? 'btn-primary' : 'bg-danger-600 hover:bg-danger-700 hover:-translate-y-px active:translate-y-0'"
+                :class="status.is_maintenance ? 'btn-primary-admin' : 'bg-danger-600 hover:bg-danger-700 hover:-translate-y-px active:translate-y-0'"
                 class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-all disabled:opacity-60"
                 :disabled="toggleForm.processing"
                 @click="confirmOpen = true"
@@ -242,7 +243,7 @@ const removeBackground = () => {
                                 </div>
                                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{{ check.detail }}</p>
                                 <p v-if="check.suggestion" class="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                                    💡 {{ t(check.suggestion) }}
+                                    ðŸ’¡ {{ t(check.suggestion) }}
                                 </p>
                             </div>
                         </div>
@@ -257,7 +258,7 @@ const removeBackground = () => {
                             <p class="mt-1 text-sm text-gray-500">{{ t('Check for the latest version from Envato Marketplace.') }}</p>
                         </div>
                         <button type="button" :disabled="checkUpdatesForm.processing"
-                            class="inline-flex items-center gap-2 rounded-lg btn-primary text-sm disabled:opacity-60"
+                            class="inline-flex items-center gap-2 rounded-lg btn-primary-admin text-sm disabled:opacity-60"
                             @click="checkUpdatesForm.post(route('admin.system.check-updates'), { preserveScroll: true })">
                             <svg v-if="checkUpdatesForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -274,7 +275,7 @@ const removeBackground = () => {
                         </div>
                         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Latest version') }}</div>
-                            <div class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ update.latest_version || '—' }}</div>
+                            <div class="mt-1 font-mono text-sm font-semibold text-gray-900 dark:text-white">{{ update.latest_version || 'â€”' }}</div>
                         </div>
                         <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                             <div class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ t('Last checked') }}</div>
@@ -284,11 +285,11 @@ const removeBackground = () => {
 
                     <div v-if="update.update_available" class="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-700 dark:bg-blue-900/20">
                         <div class="flex items-start gap-3">
-                            <span class="text-lg">🎉</span>
+                            <span class="text-lg">ðŸŽ‰</span>
                             <div>
                                 <p class="text-sm font-semibold text-blue-800 dark:text-blue-200">{{ t('Update Available') }}</p>
                                 <p class="mt-1 text-sm text-blue-700 dark:text-blue-300">
-                                    {{ t('Version :version is available. Go to License → Update to download and install.', { version: update.latest_version ?? '' }) }}
+                                    {{ t('Version :version is available. Go to License â†’ Update to download and install.', { version: update.latest_version ?? '' }) }}
                                 </p>
                             </div>
                         </div>
@@ -328,7 +329,7 @@ const removeBackground = () => {
                                 <h3 class="text-sm font-semibold">{{ t('Required Cron Entry') }}</h3>
                                 <p class="mt-1 text-xs text-gray-400">{{ t('Add this command in hosting cron jobs and run it every minute.') }}</p>
                             </div>
-                            <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary transition-colors" @click="copyCronEntry">
+                            <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary-admin transition-colors" @click="copyCronEntry">
                                 {{ cronCopied ? t('Copied') : t('Copy Command') }}
                             </button>
                         </div>
@@ -425,7 +426,7 @@ const removeBackground = () => {
                         <span v-if="maintenanceForm.errors.maintenance_background_image" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_background_image }}</span>
                     </div>
 
-                    <button type="button" :disabled="maintenanceForm.processing" class="mt-6 inline-flex items-center gap-2 rounded-lg btn-primary disabled:opacity-60" @click="saveMaintenance">
+                    <button type="button" :disabled="maintenanceForm.processing" class="mt-6 inline-flex items-center gap-2 rounded-lg btn-primary-admin disabled:opacity-60" @click="saveMaintenance">
                         <svg v-if="maintenanceForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
@@ -486,20 +487,14 @@ const removeBackground = () => {
         </div>
     </div>
 
-    <Teleport to="body">
-        <div v-if="confirmOpen" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="confirmOpen = false">
-            <div class="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="p-6">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ status.is_maintenance ? t('Disable maintenance mode?') : t('Enable maintenance mode?') }}</h2>
-                    <p class="mt-2 text-sm text-gray-500">{{ status.is_maintenance ? t('Visitors will be able to access the platform again.') : t('Visitors will see the maintenance page while the admin panel remains available.') }}</p>
-                </div>
-                <div class="flex items-center justify-end gap-3 rounded-b-xl border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
-                    <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700" @click="confirmOpen = false">{{ t('Cancel') }}</button>
-                    <button type="button" :disabled="toggleForm.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="toggleMaintenance">
-                        {{ status.is_maintenance ? t('Go Live') : t('Enter Maintenance') }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </Teleport>
+    <AppModal
+        :open="confirmOpen"
+        :title="status.is_maintenance ? t('Disable maintenance mode?') : t('Enable maintenance mode?')"
+        :subtitle="status.is_maintenance ? t('Visitors will be able to access the platform again.') : t('Visitors will see the maintenance page while the admin panel remains available.')"
+        :confirm-text="status.is_maintenance ? t('Go Live') : t('Enter Maintenance')"
+        :confirm-loading="toggleForm.processing"
+        confirm-variant="admin"
+        @close="confirmOpen = false"
+        @confirm="toggleMaintenance"
+    />
 </template>

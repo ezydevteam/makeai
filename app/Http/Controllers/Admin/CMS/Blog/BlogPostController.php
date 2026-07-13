@@ -48,15 +48,15 @@ class BlogPostController extends Controller
 
         $now = now();
         $sevenDaysAgo = $now->copy()->subDays(7);
-        $fourteenDaysAgo = $now->copy()->subDays(14);
 
         // 1. Total Posts
         $totalCurrent = BlogPost::count();
         $totalPrevious = BlogPost::where('created_at', '<', $sevenDaysAgo)->count();
 
-        // 2. Published Posts
+        // 2. Published Posts — currently published vs those already published a week ago
+        //    (published_at drives the flow, not when the row was created).
         $publishedCurrent = BlogPost::where('status', 'published')->count();
-        $publishedPrevious = BlogPost::where('status', 'published')->where('created_at', '<', $sevenDaysAgo)->count();
+        $publishedPrevious = BlogPost::whereNotNull('published_at')->where('published_at', '<', $sevenDaysAgo)->count();
 
         // 3. Total Comments
         $commentsCurrent = Comment::where('commentable_type', BlogPost::class)->count();
@@ -251,18 +251,9 @@ class BlogPostController extends Controller
             ], 422);
         }
 
-        // Use a dedicated system user for internal admin AI operations to prevent blocking admins 
-        // who don't have a matching frontend user account, and to isolate AI quota usage.
-        $user = User::firstOrCreate(
-            ['email' => User::internalAiEmail()],
-            [
-                'name' => User::internalAiName(),
-                'password' => bcrypt(Str::random(32)),
-                'is_active' => true,
-                'plan_id' => null,
-                'subscription_status' => 'active',
-            ]
-        );
+        // A dedicated system user backs internal admin AI operations: admins have no frontend
+        // account to bill, and this keeps admin AI spend isolated and attributable.
+        $user = User::internalAi();
 
         $prompt = $this->aiAssistPrompt($action, $title, $content, $selectedText);
         $result = $aiService->complete(
@@ -554,7 +545,7 @@ class BlogPostController extends Controller
             return $validated;
         }
 
-        $path = $request->file('featured_image_file')->store('blog', 'public');
+        $path = store_public_upload($request->file('featured_image_file'), 'blog');
         $validated['featured_image'] = Storage::url($path);
 
         return $validated;

@@ -95,15 +95,7 @@ class TestimonialController extends Controller
 
     public function generate(TestimonialGenerateRequest $request, AiService $aiService): JsonResponse
     {
-        $user = User::firstOrCreate(
-            ['email' => User::internalAiEmail()],
-            [
-                'name' => User::internalAiName(),
-                'password' => bcrypt(Str::random(32)),
-                'is_active' => true,
-                'is_banned' => false,
-            ]
-        );
+        $user = User::internalAi();
 
         $validated = $request->validated();
         $extraPrompt = trim((string) ($validated['prompt'] ?? ''));
@@ -154,11 +146,13 @@ class TestimonialController extends Controller
         unset($validated['avatar_file']);
 
         if ($request->hasFile('avatar_file')) {
-            if ($testimonial) {
-                $this->deleteStoredAvatar($testimonial->avatar);
-            }
-
-            $validated['avatar'] = $request->file('avatar_file')->store('testimonials', 'public');
+            // Store first, then delete the previous avatar only on success (external
+            // URLs are left untouched by media_path inside the helper).
+            $validated['avatar'] = store_public_upload(
+                $request->file('avatar_file'),
+                'testimonials',
+                $testimonial?->avatar,
+            );
         }
 
         return $validated;

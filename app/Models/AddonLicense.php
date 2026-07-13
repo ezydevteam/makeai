@@ -9,14 +9,13 @@ class AddonLicense extends Model
     protected $table = 'addon_licenses';
 
     protected $fillable = [
-        'addon_slug', 'purchase_code', 'envato_item_id',
+        'addon_slug', 'purchase_code',
         'license_type', 'buyer', 'purchased_at', 'supported_until',
         'domain', 'verified_at', 'status', 'grace_started_at',
         'signed_payload', 'signature',
     ];
 
     protected $casts = [
-        'envato_item_id' => 'integer',
         'license_type' => 'integer',
         'purchased_at' => 'datetime',
         'supported_until' => 'datetime',

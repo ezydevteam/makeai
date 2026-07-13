@@ -37,7 +37,7 @@ class CommentModerationController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return Inertia::render('Admin/CMS/Blog/Comments/Index', [
+        return Inertia::render('Admin/CMS/Blog/Comments', [
             'comments' => $comments,
             'filters' => [
                 'status' => $status,
@@ -51,7 +51,6 @@ class CommentModerationController extends Controller
                 'comments_require_approval' => (bool) settings('comments_require_approval', false),
                 'comments_notify_admin' => (bool) settings('comments_notify_admin', false),
                 'comments_poll_seconds' => (int) settings('comments_poll_seconds', 60),
-                'comments_akismet_configured' => filled(settings('comments_akismet_key')),
             ],
         ]);
     }
@@ -101,12 +100,8 @@ class CommentModerationController extends Controller
 
     public function updateSettings(CommentSettingsRequest $request): RedirectResponse
     {
-        foreach ($request->safe()->except('comments_akismet_key') as $key => $value) {
+        foreach ($request->safe()->all() as $key => $value) {
             settings_set($key, $value, is_bool($value) ? 'boolean' : 'integer', 'comments');
-        }
-
-        if ($request->filled('comments_akismet_key')) {
-            settings_set('comments_akismet_key', $request->validated('comments_akismet_key'), 'encrypted', 'comments');
         }
 
         return back()->with('success', translate('Comment settings saved.'));

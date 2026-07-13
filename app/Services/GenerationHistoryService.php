@@ -43,7 +43,10 @@ class GenerationHistoryService
             $query->where('tool_slug', $toolSlug);
         }
 
-        return $query->paginate($perPage);
+        // Model & provider are internal/admin details — never expose them in the
+        // user-facing history payload (they'd otherwise be visible in the JSON).
+        return $query->paginate($perPage)
+            ->through(fn (GenerationHistory $h) => $h->makeHidden(['model', 'provider']));
     }
 
     public function restore(GenerationHistory $history): array

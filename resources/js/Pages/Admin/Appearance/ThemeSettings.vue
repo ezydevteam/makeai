@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 
@@ -26,7 +26,7 @@ const save = () => {
 </script>
 
 <template>
-    <Head :title="`${theme.name} Settings — Admin`" />
+    <Head :title="`${theme.name} Settings â€” Admin`" />
 
     <div class="max-w-3xl mx-auto px-6">
         <div class="flex items-center gap-3 mb-8">
@@ -35,7 +35,7 @@ const save = () => {
             </Link>
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">{{ theme.name }} Settings</h1>
-                <p class="text-sm text-gray-500">v{{ theme.version }} · Customize theme options</p>
+                <p class="text-sm text-gray-500">v{{ theme.version }} Â· Customize theme options</p>
             </div>
         </div>
 
@@ -77,7 +77,7 @@ const save = () => {
 
             <div class="flex justify-end gap-3 pt-4">
                 <Link :href="route('admin.themes')" class="px-5 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors text-sm">Cancel</Link>
-                <button type="submit" :disabled="form.processing" class="px-5 py-2.5 btn-primary rounded-lg transition-colors text-sm font-medium disabled:opacity-50">
+                <button type="submit" :disabled="form.processing" class="px-5 py-2.5 btn-primary-admin rounded-lg transition-colors text-sm font-medium disabled:opacity-50">
                     {{ form.processing ? 'Saving...' : 'Save Settings' }}
                 </button>
             </div>

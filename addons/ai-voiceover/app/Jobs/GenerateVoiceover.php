@@ -102,16 +102,17 @@ class GenerateVoiceover implements ShouldQueue
                 'error_message' => Str::limit($e->getMessage(), 500),
             ]);
 
-            // Refund credits
-            if ($episode->credits_deducted > 0) {
-                $refunded = \App\Models\User::where('id', $episode->user_id)->increment('credits', $episode->credits_deducted);
-                if ($refunded === 0) {
-                    Log::warning('Failed to refund credits for voiceover failure', [
-                        'episode_id' => $episode->id,
-                        'user_id' => $episode->user_id,
-                        'amount' => $episode->credits_deducted,
-                    ]);
-                }
+            // Refund credits — mode-correct: metered mode returns wallet credits; quota
+            // mode (Regular license) winds back the consumed daily/monthly allowance
+            // instead, matching the mode-aware charge in deduct_credits(). A raw wallet
+            // increment would hand a quota-mode user free balance and keep their
+            // allowance spent.
+            if ($episode->credits_deducted > 0 && $episode->user) {
+                $episode->user->refundCredits(
+                    (float) $episode->credits_deducted,
+                    'Voiceover failed — refund: ' . $episode->id,
+                    ['episode_id' => $episode->id],
+                );
             }
 
             throw $e;
@@ -130,15 +131,13 @@ class GenerateVoiceover implements ShouldQueue
             'error_message' => Str::limit($e->getMessage(), 500),
         ]);
 
-        if ($episode->credits_deducted > 0) {
-            $refunded = \App\Models\User::where('id', $episode->user_id)->increment('credits', $episode->credits_deducted);
-            if ($refunded === 0) {
-                Log::warning('Failed to refund credits on job failure', [
-                    'episode_id' => $episode->id,
-                    'user_id' => $episode->user_id,
-                    'amount' => $episode->credits_deducted,
-                ]);
-            }
+        // Mode-aware refund (see the catch block in handle()) — never raw-increment the wallet.
+        if ($episode->credits_deducted > 0 && $episode->user) {
+            $episode->user->refundCredits(
+                (float) $episode->credits_deducted,
+                'Voiceover failed — refund: ' . $episode->id,
+                ['episode_id' => $episode->id],
+            );
         }
     }
 

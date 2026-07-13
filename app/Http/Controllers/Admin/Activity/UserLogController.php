@@ -9,6 +9,7 @@ use App\Models\AiTool;
 use App\Models\AiUsageLog;
 use App\Models\Payment;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -16,17 +17,63 @@ use Inertia\Inertia;
 
 class UserLogController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $now = now();
         $start = $now->copy()->subDays(29)->startOfDay();
+        $search = trim((string) $request->query('search', ''));
+
         $activities = $this->getRecentActivityCollection($start, $now);
+
+        if ($search !== '') {
+            $activities = $this->filterActivities($activities, $search);
+        }
+
         $paginated = $this->paginateActivityCollection($activities, 20);
 
         return Inertia::render('Admin/Activity/UserLog', [
             'activity' => $paginated,
             'rangeLabel' => translate('Last 30 days'),
+            'filters' => ['search' => $search],
         ]);
+    }
+
+    /**
+     * Server-side search across every displayed field (user name, email, the
+     * activity detail, IP, and the activity type/its label) so a query matches
+     * anything the admin can actually see in the table — and the pagination
+     * totals reflect the filtered set.
+     */
+    private function filterActivities(Collection $activities, string $search): Collection
+    {
+        $needle = mb_strtolower($search);
+
+        $typeLabels = [
+            'user_registered' => translate('User Registered'),
+            'payment' => translate('Payment'),
+            'subscription' => translate('Pro Subscription'),
+            'ai_request' => translate('AI Request'),
+            'referral' => translate('Referral'),
+        ];
+
+        return $activities->filter(function (array $item) use ($needle, $typeLabels) {
+            $fields = [
+                $item['title'] ?? '',
+                $item['user_email'] ?? '',
+                $item['detail'] ?? '',
+                $item['ip_address'] ?? '',
+                $item['type'] ?? '',
+                $typeLabels[$item['type'] ?? ''] ?? '',
+            ];
+
+            foreach ($fields as $field) {
+                if ($field !== '' && str_contains(mb_strtolower((string) $field), $needle)) {
+                    return true;
+                }
+            }
+
+            return false;
+        })->values();
     }
 
     private function getRecentActivityCollection($start = null, $end = null): Collection

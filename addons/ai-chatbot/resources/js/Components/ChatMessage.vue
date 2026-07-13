@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, onUnmounted, ref, watch } from 'vue'
+import { usePage } from '@inertiajs/vue3'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
@@ -125,6 +126,10 @@ watch(() => props.isStreaming, (streaming) => {
 
 onUnmounted(() => {
     if (reasoningInterval) clearInterval(reasoningInterval)
+    // Stop read-aloud if this message is torn down mid-speech (e.g. navigation).
+    if (currentTextId.value === String(props.message.id)) {
+        stop()
+    }
 })
 
 const copied = ref(false)
@@ -290,13 +295,55 @@ const rendered = computed(() => {
     })
 })
 
+// Admin display toggles (shared globally via Inertia as `chatbot.*`). Previously these
+// two settings were dead — declared in the admin UI but read nowhere. Now they gate
+// what the end user sees in the usage line.
+const chatbotConfig = computed(() => (usePage().props.chatbot as { showTokenUsage?: boolean; showCreditsCharged?: boolean; enableVoice?: boolean; kbArticleBase?: string } | undefined) ?? {})
+const showTokenUsage = computed(() => chatbotConfig.value.showTokenUsage ?? false)
+const showCreditsCharged = computed(() => chatbotConfig.value.showCreditsCharged ?? true)
+const enableVoice = computed(() => chatbotConfig.value.enableVoice ?? true)
+// The KB addon's public prefix is admin-configurable, so citation links must not
+// hardcode a path. Falls back to the KB addon's own default slug.
+const kbArticleBase = computed(() => chatbotConfig.value.kbArticleBase ?? '/help/article')
+
+// Read-aloud (TTS) state for THIS message.
+const isThisSpeaking = computed(() => currentTextId.value === String(props.message.id))
+const isThisPlaying = computed(() => isThisSpeaking.value && isSpeaking.value && !isPaused.value)
+
+const hasUsageData = computed(() => props.message.input_tokens > 0 || props.message.output_tokens > 0)
+
+// Show the usage line if there is data AND the operator enabled at least one of the two
+// detail types (tokens / credits).
 const showTokens = computed(() => {
     if (props.isStreaming) return false
-    return props.message.input_tokens > 0 || props.message.output_tokens > 0
+    if (!hasUsageData.value) return false
+    return showTokenUsage.value || showCreditsCharged.value
+})
+
+// The "remaining" figure must match the license mode. In METERED mode (Extended +
+// billing) credits are a spend-down wallet, so `userCredits` is the right number. In
+// QUOTA mode (Regular license) the wallet is never drained — usage meters against a
+// resetting daily allowance — so the wallet balance is meaningless here; the real
+// "remaining" is the daily allowance left (core shares it as userDailyCreditLimit /
+// creditsUsedToday). With no daily cap the allowance is unlimited, so we show nothing.
+const pageProps = computed(() => usePage().props as Record<string, unknown>)
+const isQuotaMode = computed(() => pageProps.value.isProAvailable === false)
+const dailyCreditLimit = computed(() => Number(pageProps.value.userDailyCreditLimit ?? 0))
+const creditsUsedToday = computed(() => Number(pageProps.value.creditsUsedToday ?? 0))
+
+const creditsRemaining = computed<number | null>(() => {
+    if (isQuotaMode.value) {
+        if (dailyCreditLimit.value <= 0) return null // unlimited daily allowance — nothing to show
+        return Math.max(0, dailyCreditLimit.value - creditsUsedToday.value)
+    }
+    return props.userCredits // metered: spend-down wallet balance
 })
 
 const showCreditsRemaining = computed(() => {
-    return props.userCredits > 0 && props.userCredits < props.creditThreshold
+    return showCreditsCharged.value
+        && creditsRemaining.value !== null
+        && creditsRemaining.value > 0
+        && creditsRemaining.value < props.creditThreshold
 })
 </script>
 
@@ -331,29 +378,15 @@ const showCreditsRemaining = computed(() => {
                 </div>
                 <div class="flex items-center justify-end gap-2 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <span v-if="messageDate" class="text-xs text-[#b0aca8] dark:text-white/30">{{ messageDate }}</span>
-                    <Tooltip :content="copied ? 'Copied!' : 'Copy'" placement="top">
-                        <button class="action-btn" :class="{ 'active': copied }" @click="copyMessage">
+                    <Tooltip :content="copied ? t('Copied!') : t('Copy')" placement="top">
+                        <button class="action-btn" :class="{ 'active': copied }" :aria-label="t('Copy')" @click="copyMessage">
                             <i class="ti" :class="!copied ? 'ti-copy' : 'ti-check'"></i>
                         </button>
                     </Tooltip>
-                    <Tooltip :content="'Share'" placement="top">
-                        <button class="action-btn" @click="shareMessage">
+                    <Tooltip :content="t('Share')" placement="top">
+                        <button class="action-btn" :aria-label="t('Share')" @click="shareMessage">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
-                            </svg>
-                        </button>
-                    </Tooltip>
-                    <Tooltip :content="'Regenerate'" placement="top">
-                        <button class="action-btn" @click="repeatMessage">
-                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.985 4.356v4.992" />
-                            </svg>
-                        </button>
-                    </Tooltip>
-                    <Tooltip :content="'Branch from here'" placement="top">
-                        <button class="action-btn" @click="branchFromHere">
-                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                         </button>
                     </Tooltip>
@@ -390,23 +423,31 @@ const showCreditsRemaining = computed(() => {
                 <div v-if="showTokens" class="mt-1.5">
                     <button class="text-[11px] text-[#b0aca8] dark:text-white/30 hover:text-[#6e6a65] dark:hover:text-white/50 transition-colors inline-flex items-center gap-1" @click="tokenOpen = !tokenOpen">
                         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        {{ (message.input_tokens + message.output_tokens).toLocaleString() }} tokens &middot; {{ message.credits_charged }} credits
+                        <span v-if="showTokenUsage">{{ (message.input_tokens + message.output_tokens).toLocaleString() }} {{ t('tokens') }}</span>
+                        <span v-if="showTokenUsage && showCreditsCharged">&middot;</span>
+                        <span v-if="showCreditsCharged">{{ message.credits_charged }} {{ t('credits') }}</span>
                         <span v-if="message.model">&middot; {{ message.model }}</span>
-                        <span v-if="showCreditsRemaining" class="!text-amber-600 dark:!text-amber-400">&middot; {{ userCredits }} left</span>
+                        <span v-if="showCreditsRemaining" class="!text-amber-600 dark:!text-amber-400">&middot; {{ creditsRemaining }} {{ t('left') }}</span>
                         <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="transition-transform" :class="{ 'rotate-180': tokenOpen }"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                     </button>
                     <div v-if="tokenOpen" class="mt-1.5 p-2.5 rounded-lg bg-black/[0.02] dark:bg-white/[0.02] border border-black/5 dark:border-white/5 text-[11px] text-[#6e6a65] dark:text-white/40 space-y-1">
-                        <div>Input: {{ message.input_tokens.toLocaleString() }} tokens</div>
-                        <div>Output: {{ message.output_tokens.toLocaleString() }} tokens</div>
-                        <div>Total: {{ (message.input_tokens + message.output_tokens).toLocaleString() }} tokens</div>
-                        <div v-if="message.model">Model: {{ message.model }}</div>
-                        <div>Credits used: {{ message.credits_charged }}</div>
-                        <div v-if="userCredits > 0">Credits remaining: {{ userCredits }}</div>
+                        <template v-if="showTokenUsage">
+                            <div>{{ t('Input') }}: {{ message.input_tokens.toLocaleString() }} {{ t('tokens') }}</div>
+                            <div>{{ t('Output') }}: {{ message.output_tokens.toLocaleString() }} {{ t('tokens') }}</div>
+                            <div>{{ t('Total') }}: {{ (message.input_tokens + message.output_tokens).toLocaleString() }} {{ t('tokens') }}</div>
+                        </template>
+                        <div v-if="message.model">{{ t('Model') }}: {{ message.model }}</div>
+                        <template v-if="showCreditsCharged">
+                            <div>{{ t('Credits used') }}: {{ message.credits_charged }}</div>
+                            <div v-if="creditsRemaining !== null && creditsRemaining > 0">{{ t('Credits remaining') }}: {{ creditsRemaining }}</div>
+                        </template>
                     </div>
                 </div>
 
-                <!-- KB Sources -->
-                <div v-if="message.kb_sources?.length" class="mt-2 flex flex-wrap items-center gap-1.5">
+                <!-- KB Sources. Gated on `message.content` so citations can never render under a
+                     message that is still streaming — the server now sends them only once the
+                     answer is complete, and this holds regardless of frame order. -->
+                <div v-if="message.kb_sources?.length && message.content" class="mt-2 flex flex-wrap items-center gap-1.5">
                     <span class="text-[11px] text-[#6e6a65] dark:text-white/40 flex items-center gap-1">
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" /></svg>
                         {{ t('Sources:') }}
@@ -414,7 +455,7 @@ const showCreditsRemaining = computed(() => {
                     <a
                         v-for="source in message.kb_sources"
                         :key="source.ulid"
-                        :href="`/kb/article/${source.slug}`"
+                        :href="`${kbArticleBase}/${source.slug}`"
                         target="_blank"
                         class="inline-flex items-center gap-1 rounded-md bg-primary-500/10 px-2 py-0.5 text-[11px] text-primary-600 dark:text-primary-400 hover:bg-primary-500/20 transition-colors"
                     >
@@ -426,15 +467,15 @@ const showCreditsRemaining = computed(() => {
                 <div v-if="!isStreaming && message.content" class="flex items-center gap-1 mt-3">
                     <span v-if="messageDate" class="text-xs text-[#b0aca8] dark:text-white/30 mr-1">{{ messageDate }}</span>
                     <!-- Copy -->
-                    <Tooltip :content="copied ? 'Copied!' : 'Copy'" placement="top">
-                        <button class="action-btn" :class="{ 'active': copied }" @click="copyMessage">
+                    <Tooltip :content="copied ? t('Copied!') : t('Copy')" placement="top">
+                        <button class="action-btn" :class="{ 'active': copied }" :aria-label="t('Copy')" @click="copyMessage">
                             <i class="ti" :class="!copied ? 'ti-copy' : 'ti-check'"></i>
                         </button>
                     </Tooltip>
 
                     <!-- Share -->
-                    <Tooltip :content="'Share'" placement="top">
-                        <button class="action-btn" @click="shareMessage">
+                    <Tooltip :content="t('Share')" placement="top">
+                        <button class="action-btn" :aria-label="t('Share')" @click="shareMessage">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
                             </svg>
@@ -442,8 +483,8 @@ const showCreditsRemaining = computed(() => {
                     </Tooltip>
 
                     <!-- Like (thumbs up) -->
-                    <Tooltip :content="'Like'" placement="top">
-                        <button class="action-btn" :class="{ 'active': liked }" @click="toggleLike">
+                    <Tooltip :content="t('Like')" placement="top">
+                        <button class="action-btn" :class="{ 'active': liked }" :aria-label="t('Like')" @click="toggleLike">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
                             </svg>
@@ -452,7 +493,7 @@ const showCreditsRemaining = computed(() => {
 
                     <!-- Dislike (thumbs down) -->
                     <Tooltip :content="t('Dislike')" placement="top">
-                        <button class="action-btn" :class="{ 'active': disliked }" @click="toggleDislike">
+                        <button class="action-btn" :class="{ 'active': disliked }" :aria-label="t('Dislike')" @click="toggleDislike">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
                             </svg>
@@ -460,10 +501,32 @@ const showCreditsRemaining = computed(() => {
                     </Tooltip>
 
                     <!-- Repeat -->
-                    <Tooltip :content="'Regenerate'" placement="top">
-                        <button class="action-btn" @click="repeatMessage">
+                    <Tooltip :content="t('Regenerate')" placement="top">
+                        <button class="action-btn" :aria-label="t('Regenerate')" @click="repeatMessage">
                             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.985 4.356v4.992" />
+                            </svg>
+                        </button>
+                    </Tooltip>
+
+                    <!-- Read aloud (TTS) -->
+                    <Tooltip v-if="enableVoice && speechSupported" :content="isThisPlaying ? t('Pause') : (isThisSpeaking ? t('Resume') : t('Read aloud'))" placement="top">
+                        <button class="action-btn" :class="{ 'active': isThisSpeaking }" :aria-label="t('Read aloud')" @click="toggleSpeak">
+                            <!-- Pause icon while actively speaking -->
+                            <svg v-if="isThisPlaying" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                            </svg>
+                            <!-- Speaker icon when idle or paused -->
+                            <svg v-else width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                            </svg>
+                        </button>
+                    </Tooltip>
+                    <!-- Stop read-aloud (only while this message is active) -->
+                    <Tooltip v-if="enableVoice && speechSupported && isThisSpeaking" :content="t('Stop')" placement="top">
+                        <button class="action-btn" :aria-label="t('Stop read aloud')" @click="stop">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
                             </svg>
                         </button>
                     </Tooltip>

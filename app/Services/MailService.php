@@ -16,8 +16,11 @@ class MailService
     private const AUTH_SLUGS = [
         'email_verify_otp',
         'reset_password_otp',
+        'login_otp',
         'password_changed',
-        'two_factor_otp',
+        // Security alert sent to the previous address on an email change — must
+        // never be suppressible by notification preferences.
+        'email_changed',
     ];
 
     /**
@@ -52,6 +55,12 @@ class MailService
         $template = MailTemplate::where('slug', $slug)->where('is_active', true)->first();
 
         if (! $template) {
+            // Surface the gap instead of silently dropping the email — a dispatched
+            // slug with no active template means a broken/disabled notification.
+            \Illuminate\Support\Facades\Log::warning("MailService: no active mail template for slug '{$slug}' — email not sent.", [
+                'recipient' => $to,
+            ]);
+
             return;
         }
 

@@ -1,0 +1,134 @@
+{
+    "slug": "ai-image-pro",
+    "name": "AI Image Pro",
+    "version": "1.0.0",
+    "description": "Complete AI image suite: text-to-image generation, variations, prompt editing, background removal/replace, upscaling, inpainting, outpainting, object removal, style transfer, plus a free local toolbox (resize, crop, compress, convert, watermark, text, color). Every provider, credit cost, access level and limit is admin-controlled.",
+    "author": "MakeAI",
+    "author_url": "https://makeai.dev",
+    "min_makeai_version": "1.0.0",
+    "php_min": "8.3",
+    "envato_item_id": null,
+    "requires_license": 1,
+    "requires_pro": false,
+    "dependencies": [],
+    "conflicts": ["ai-image-editor"],
+    "admin_menu": [
+        {
+            "parent": "AI Tools",
+            "label": "Overview",
+            "route": "addon.aip.admin.overview",
+            "route_pattern": "addon.aip.admin.overview",
+            "icon": "ti ti-sparkles",
+            "permission": "addon.aip.manage"
+        },
+        {
+            "parent": "Settings",
+            "label": "Settings",
+            "route": "addon.aip.admin.settings",
+            "route_pattern": "addon.aip.admin.settings",
+            "icon": "ti ti-photo-ai",
+            "permission": "addon.aip.settings"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",                  "type": "boolean", "label": "Enable AI Image Pro",                 "default": true,    "group": "general" },
+        { "key": "studio_access",            "type": "select",  "label": "Studio Access Level",                 "default": "guest", "group": "general", "options": ["guest", "login", "premium"], "description": "Who can open the public Studio page at /ai-image. Guests get the free daily allowance below before being asked to sign up. Plan-specific levels appear automatically when plans exist." },
+        { "key": "library_access",           "type": "select",  "label": "Library Access Level",                "default": "login", "group": "general", "options": ["login", "premium"] },
+        { "key": "operations",               "type": "json",    "label": "Per-Operation Configuration",         "default": null,    "group": "operations", "description": "Per-operation enabled flag, access level, provider and credit cost. Managed from the Operations tab." },
+
+        { "key": "generation_models",        "type": "json",    "label": "Enabled Image Models",                "default": null,    "group": "generation", "description": "Model slugs users may pick. Empty = every active image model." },
+        { "key": "default_model",            "type": "string",  "label": "Default Image Model",                 "default": null,    "group": "generation" },
+        { "key": "allow_user_model_choice",  "type": "boolean", "label": "Let Users Choose the Model",          "default": true,    "group": "generation" },
+        { "key": "max_batch_size",           "type": "integer", "label": "Max Variants per Generation",         "default": 4,       "group": "generation" },
+        { "key": "aspect_ratios",            "type": "json",    "label": "Aspect Ratios",                       "default": null,    "group": "generation", "description": "Selectable aspect ratios. Empty = built-in defaults." },
+        { "key": "enable_prompt_enhancer",   "type": "boolean", "label": "Enable Prompt Enhancer",              "default": true,    "group": "generation" },
+        { "key": "credits_prompt_enhancer",  "type": "integer", "label": "Credits: Prompt Enhancer",            "default": 1,       "group": "generation" },
+        { "key": "enable_negative_prompt",   "type": "boolean", "label": "Enable Negative Prompt Field",        "default": true,    "group": "generation" },
+        { "key": "enable_seed",              "type": "boolean", "label": "Enable Seed Field",                   "default": true,    "group": "generation" },
+
+        { "key": "stability_api_key",        "type": "encrypted", "label": "Stability AI API Key",              "default": null,    "group": "providers" },
+        { "key": "replicate_api_key",        "type": "encrypted", "label": "Replicate API Key",                 "default": null,    "group": "providers" },
+        { "key": "remove_bg_api_key",        "type": "encrypted", "label": "Remove.bg API Key",                 "default": null,    "group": "providers" },
+        { "key": "clipdrop_api_key",         "type": "encrypted", "label": "Clipdrop API Key",                  "default": null,    "group": "providers" },
+        { "key": "fal_api_key",              "type": "encrypted", "label": "fal.ai API Key",                    "default": null,    "group": "providers" },
+        { "key": "ideogram_api_key",         "type": "encrypted", "label": "Ideogram API Key",                  "default": null,    "group": "providers" },
+
+        { "key": "max_input_size_mb",        "type": "integer", "label": "Max Upload Size (MB)",                "default": 10,      "group": "limits" },
+        { "key": "max_input_dimension",      "type": "integer", "label": "Max Input Dimension (px, longest edge)", "default": 8000, "group": "limits", "description": "Applies to the longest edge (width OR height), not width×height. An upload whose longer side exceeds this is rejected before decoding — GD needs ~4 bytes per pixel." },
+        { "key": "max_output_dimension",     "type": "integer", "label": "Max Output Dimension (px, longest edge)", "default": 4096, "group": "limits", "description": "Caps the longest edge (width OR height) of a generated or edited image." },
+        { "key": "guest_daily_limit",        "type": "integer", "label": "Guest Daily Operation Limit",         "default": 5,       "group": "limits", "description": "0 disables guest operations entirely." },
+        { "key": "user_daily_limit",         "type": "integer", "label": "Logged-in Daily Operation Limit",     "default": 0,       "group": "limits", "description": "0 = unlimited (credits still apply). Fallback for any signed-in user without a plan-specific limit below." },
+        { "key": "plan_daily_limits",        "type": "json",    "label": "Per-plan Daily Operation Limits",     "default": null,    "group": "limits", "description": "Overrides the logged-in limit for users on a specific plan. Keyed by plan slug; 0 = unlimited." },
+        { "key": "max_storage_mb_per_user",  "type": "integer", "label": "Max Library Storage per User (MB)",   "default": 0,       "group": "storage", "description": "Counted from stored bytes, not file count. 0 = unlimited." },
+
+        { "key": "retention_days_guest",     "type": "integer", "label": "Auto-delete Images (Guests, Days)",      "default": 1,     "group": "storage", "description": "Anonymous visitors, tracked by IP. 0 = keep forever." },
+        { "key": "retention_days_free",      "type": "integer", "label": "Auto-delete Images (Free Users, Days)", "default": 0,     "group": "storage", "description": "Signed-in users without a paid plan. 0 = keep forever." },
+        { "key": "retention_days_paid",      "type": "integer", "label": "Auto-delete Images (Premium Users, Days)", "default": 0,  "group": "storage", "description": "Signed-in users on an active paid plan. Requires subscriptions. 0 = keep forever." },
+        { "key": "auto_save_to_library",     "type": "boolean", "label": "Auto-save Results to Library",        "default": true,    "group": "storage" },
+        { "key": "mirror_to_documents",      "type": "boolean", "label": "Mirror Results to Documents",         "default": false,   "group": "storage", "description": "Also list generated images in the core Documents library." },
+        { "key": "thumbnail_width",          "type": "integer", "label": "Thumbnail Width (px)",                "default": 512,     "group": "storage" },
+
+        { "key": "watermark_enabled",        "type": "boolean", "label": "Watermark Free-User Downloads",       "default": false,   "group": "watermark" },
+        { "key": "watermark_logo_path",      "type": "string",  "label": "Watermark Logo",                      "default": "",      "group": "watermark", "description": "A PNG logo (transparency supported). When set, it is used instead of the text watermark." },
+        { "key": "watermark_text",           "type": "string",  "label": "Watermark Text",                      "default": "",      "group": "watermark", "description": "Used when no logo is uploaded." },
+        { "key": "watermark_position",       "type": "string",  "label": "Watermark Position",                  "default": "bottom-right", "group": "watermark" },
+        { "key": "watermark_opacity",        "type": "integer", "label": "Watermark Opacity (%)",               "default": 60,      "group": "watermark" },
+
+        { "key": "studio_heading",           "type": "string",   "label": "Studio Heading",                     "default": "What can I do for you?", "group": "generation" },
+        { "key": "studio_subheading",        "type": "string",   "label": "Studio Sub-heading",                 "default": "Hi, there!",             "group": "generation", "description": "A short greeting shown above the Studio heading." },
+
+        { "key": "landing_page_width",       "type": "select",   "label": "Page Width",                         "default": "default", "group": "landing", "options": ["default", "boxed"], "description": "`default` follows the site's container. `boxed` constrains the landing page to a narrower, centred column." },
+        { "key": "landing_gradient_enabled", "type": "boolean",  "label": "Gradient Colour Scheme",             "default": false, "group": "landing", "description": "Applies a purple-to-blue gradient to headings and primary buttons on the landing page." },
+        { "key": "landing_show_breadcrumb",  "type": "boolean",  "label": "Show Breadcrumb",                    "default": true,  "group": "landing" },
+        { "key": "landing_hero_badge",       "type": "string",   "label": "Hero Badge",                         "default": null,  "group": "landing" },
+        { "key": "landing_hero_heading",     "type": "string",   "label": "Hero Heading",                       "default": null,  "group": "landing" },
+        { "key": "landing_hero_subheading",  "type": "textarea", "label": "Hero Sub-heading",                   "default": null,  "group": "landing" },
+
+        { "key": "landing_examples_enabled",  "type": "boolean", "label": "Show Examples Section",              "default": true,  "group": "landing" },
+        { "key": "landing_examples_heading",  "type": "string",  "label": "Examples Heading",                   "default": null,  "group": "landing" },
+        { "key": "landing_examples",          "type": "json",    "label": "Example Prompts",                    "default": null,  "group": "landing", "description": "Cards shown under the prompt box. Each: title, description, image URL, prompt." },
+
+        { "key": "landing_features_enabled",    "type": "boolean",  "label": "Show Features Section",           "default": true,  "group": "landing" },
+        { "key": "landing_features_heading",    "type": "string",   "label": "Features Heading",                "default": null,  "group": "landing" },
+        { "key": "landing_features_subheading", "type": "textarea", "label": "Features Sub-heading",            "default": null,  "group": "landing" },
+        { "key": "landing_features",            "type": "json",     "label": "Feature Rows",                    "default": null,  "group": "landing", "description": "Alternating image/text rows. Each: title, body, image URL, CTA text, CTA link, CTA icon (revealed on hover)." },
+
+        { "key": "landing_usecases_enabled",    "type": "boolean",  "label": "Show Use Cases Section",          "default": true,  "group": "landing" },
+        { "key": "landing_usecases_heading",    "type": "string",   "label": "Use Cases Heading",               "default": null,  "group": "landing" },
+        { "key": "landing_usecases_subheading", "type": "textarea", "label": "Use Cases Sub-heading",           "default": null,  "group": "landing" },
+        { "key": "landing_usecases",            "type": "json",     "label": "Use Cases",                       "default": null,  "group": "landing", "description": "Each: Tabler icon class, title, body." },
+
+        { "key": "landing_benefits_enabled",    "type": "boolean",  "label": "Show Benefits Section",           "default": true,  "group": "landing" },
+        { "key": "landing_benefits_heading",    "type": "string",   "label": "Benefits Heading",                "default": null,  "group": "landing" },
+        { "key": "landing_benefits_subheading", "type": "textarea", "label": "Benefits Sub-heading",            "default": null,  "group": "landing" },
+        { "key": "landing_benefits",            "type": "json",     "label": "Benefits",                        "default": null,  "group": "landing", "description": "Each: Tabler icon class, title, body." },
+
+        { "key": "landing_steps_enabled",     "type": "boolean",  "label": "Show How It Works Section",          "default": true,  "group": "landing" },
+        { "key": "landing_steps_heading",     "type": "string",   "label": "How It Works Heading",              "default": null,  "group": "landing" },
+        { "key": "landing_steps_subheading",  "type": "textarea", "label": "How It Works Sub-heading",          "default": null,  "group": "landing" },
+        { "key": "landing_steps",             "type": "json",     "label": "How It Works Steps",                "default": null,  "group": "landing", "description": "Each: title, body, image URL." },
+
+        { "key": "landing_about_enabled",     "type": "boolean",  "label": "Show About Section",                "default": true,  "group": "landing" },
+        { "key": "landing_about_heading",     "type": "string",   "label": "About Heading",                     "default": null,  "group": "landing" },
+        { "key": "landing_about_body",        "type": "textarea", "label": "About Text",                        "default": null,  "group": "landing" },
+
+        { "key": "landing_faq_enabled",       "type": "boolean",  "label": "Show FAQ Section",                  "default": true,  "group": "landing" },
+        { "key": "landing_faq_heading",       "type": "string",   "label": "FAQ Heading",                       "default": null,  "group": "landing" },
+        { "key": "landing_faq_category_id",   "type": "integer",  "label": "FAQ Category",                      "default": 0,     "group": "landing", "description": "Pulls questions from the site's existing FAQ manager. 0 = none." },
+
+        { "key": "landing_cta_enabled",       "type": "boolean",  "label": "Show CTA Banner",                   "default": true,  "group": "landing" },
+        { "key": "landing_cta_heading",       "type": "string",   "label": "CTA Banner Heading",                "default": null,  "group": "landing" },
+        { "key": "landing_cta_subheading",    "type": "textarea", "label": "CTA Banner Sub-heading",            "default": null,  "group": "landing" },
+        { "key": "landing_cta_button_text",   "type": "string",   "label": "CTA Button Text",                   "default": null,  "group": "landing" },
+        { "key": "landing_cta_button_link",   "type": "string",   "label": "CTA Button Link",                   "default": null,  "group": "landing", "description": "Leave blank to send visitors straight into the Studio." },
+
+        { "key": "seo_title",                 "type": "string",   "label": "SEO Title",                         "default": null,  "group": "seo" },
+        { "key": "seo_description",           "type": "textarea", "label": "SEO Description",                   "default": null,  "group": "seo" }
+    ],
+    "permissions": [
+        { "slug": "addon.aip.use",      "name": "Use AI Image Pro",             "group": "AI Image Pro" },
+        { "slug": "addon.aip.manage",   "name": "View AI Image Pro Analytics",  "group": "AI Image Pro" },
+        { "slug": "addon.aip.settings", "name": "Manage AI Image Pro Settings", "group": "AI Image Pro" }
+    ],
+    "hooks": []
+}

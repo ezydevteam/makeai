@@ -5,7 +5,7 @@ import { Link, router, useForm, usePage } from '@inertiajs/vue3'
 import { onClickOutside } from '@vueuse/core'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useTheme } from '@/Composables/useTheme'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import TagManager from './TagManager.vue'
 import type { useChat, ChatProject, Conversation, ChatMode, ConversationTag } from '../Composables/useChat'
@@ -35,8 +35,12 @@ const isCompactSidebar = computed(() => collapsed.value && !isMobileSidebar.valu
 const showSettings = ref(false)
 const customInstructions = ref('')
 const customInstructionsSaved = ref(false)
+const customInstructionsError = ref('')
 const savingCustomInstructions = ref(false)
 const referralCopied = ref(false)
+const creatingProject = ref(false)
+const shareCopied = ref(false)
+const shareError = ref('')
 const profileForm = useForm({
     name: '',
     email: '',
@@ -76,6 +80,7 @@ type SidebarUser = {
     avatar?: string | null
     referral_link?: string | null
     is_pro?: boolean
+    plan_name?: string | null
     plan?: {
         type?: string
     } | null
@@ -83,6 +88,8 @@ type SidebarUser = {
 
 const user = computed(() => page.props.auth?.user as SidebarUser | undefined)
 const isPro = computed(() => user.value?.is_pro === true || user.value?.plan?.type === 'pro')
+// Plan name to show beneath the username — only meaningful for pro users.
+const planName = computed(() => (isPro.value ? (user.value?.plan_name || null) : null))
 const appName = computed(() => (page.props.appName as string) || t('Application'))
 const userDashboardHref = computed(() => route('user.dashboard'))
 
@@ -150,14 +157,16 @@ const openSettings = () => {
 }
 
 const saveCustomInstructions = async () => {
+    if (savingCustomInstructions.value) return
     savingCustomInstructions.value = true
     customInstructionsSaved.value = false
+    customInstructionsError.value = ''
     try {
         await chat.updateChatSettings(customInstructions.value || null)
         customInstructionsSaved.value = true
         setTimeout(() => { customInstructionsSaved.value = false }, 3000)
     } catch (error) {
-        console.error('Failed to save custom instructions:', error)
+        customInstructionsError.value = error instanceof Error ? error.message : t('Failed to save. Please try again.')
     } finally {
         savingCustomInstructions.value = false
     }
@@ -243,10 +252,19 @@ const allSections = computed(() => {
 })
 
 const doCreateProject = async () => {
-    if (!newProjectName.value.trim()) return
-    await chat.createProject(newProjectName.value.trim(), newProjectColor.value)
-    newProjectName.value = ''
-    showNewProject.value = false
+    // Bound to both @keyup.enter and the Create button — guard against double-submit
+    // that would otherwise create duplicate projects.
+    if (!newProjectName.value.trim() || creatingProject.value) return
+    creatingProject.value = true
+    try {
+        await chat.createProject(newProjectName.value.trim(), newProjectColor.value)
+        newProjectName.value = ''
+        showNewProject.value = false
+    } catch (e) {
+        console.error('Failed to create project:', e)
+    } finally {
+        creatingProject.value = false
+    }
 }
 
 const startRename = (proj: ChatProject) => {
@@ -261,43 +279,52 @@ const startConversationRename = (conv: Conversation) => {
 }
 
 const doRename = async () => {
-    if (renamingProjectId.value === null || !renameValue.value.trim()) {
-        renamingProjectId.value = null
-        return
-    }
-    await chat.renameProject(renamingProjectId.value, renameValue.value.trim())
+    const id = renamingProjectId.value
+    // Clear the flag SYNCHRONOUSLY before the await. Enter and blur both fire this; if we
+    // only cleared after the await, the blur call would slip past the guard and send a
+    // second PUT.
     renamingProjectId.value = null
+    if (id === null || !renameValue.value.trim()) return
+    await chat.renameProject(id, renameValue.value.trim())
 }
 
 const doRenameConversation = async () => {
-    if (renamingConversationUlid.value === null) {
-        return
-    }
-
-    const title = renameValue.value.trim()
-    await chat.renameConversation(renamingConversationUlid.value, title || null)
+    const ulid = renamingConversationUlid.value
     renamingConversationUlid.value = null
+    if (ulid === null) return
+    const title = renameValue.value.trim()
+    await chat.renameConversation(ulid, title || null)
+}
+
+const flashShareCopied = () => {
+    shareCopied.value = true
+    setTimeout(() => { shareCopied.value = false }, 2500)
 }
 
 const shareConversation = async (conv: Conversation) => {
+    shareError.value = ''
     try {
         const shareUrl = await chat.shareConversation(conv.ulid)
         await navigator.clipboard.writeText(shareUrl)
-        // Show a brief success indication
         moveMenuOpen.value = null
+        flashShareCopied()
     } catch (e) {
-        console.error('Failed to share conversation:', e)
+        shareError.value = e instanceof Error ? e.message : t('Failed to share conversation.')
+        setTimeout(() => { shareError.value = '' }, 3000)
     }
 }
 
 const copyShareLink = async (conv: Conversation) => {
     if (!conv.share_token) return
+    shareError.value = ''
     const shareUrl = `${window.location.origin}/share/${conv.share_token}`
     try {
         await navigator.clipboard.writeText(shareUrl)
         moveMenuOpen.value = null
+        flashShareCopied()
     } catch (e) {
-        console.error('Failed to copy share link:', e)
+        shareError.value = e instanceof Error ? e.message : t('Failed to copy link.')
+        setTimeout(() => { shareError.value = '' }, 3000)
     }
 }
 
@@ -892,7 +919,23 @@ const otherProjects = computed(() => {
                 </div>
             </template>
 
-            <div v-if="!isCompactSidebar && !allSections.length" class="px-3 py-8 text-center text-sm text-[#b0aca8] dark:text-white/20">
+            <!-- Loading conversations -->
+            <div v-if="!isCompactSidebar && chat.conversationsLoading.value && !allSections.length" class="px-3 py-8 flex justify-center">
+                <svg class="animate-spin h-4 w-4 text-[#b0aca8] dark:text-white/30" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            </div>
+
+            <!-- Load failed — show error + retry instead of a misleading "no conversations" -->
+            <div v-else-if="!isCompactSidebar && chat.conversationsError.value && !allSections.length" class="px-3 py-8 text-center">
+                <p class="text-sm text-danger-600 dark:text-danger-400 mb-2">{{ chat.conversationsError.value }}</p>
+                <button
+                    class="text-xs px-3 py-1.5 rounded-lg border border-black/10 dark:border-white/10 text-[#1a1a1a] dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    @click="chat.loadConversations(chat.selectedProject.value?.id ?? null)"
+                >
+                    {{ t('Retry') }}
+                </button>
+            </div>
+
+            <div v-else-if="!isCompactSidebar && !allSections.length" class="px-3 py-8 text-center text-sm text-[#b0aca8] dark:text-white/20">
                 {{ chat.selectedProject.value ? t('No conversations in this project yet') : t('No conversations yet') }}
             </div>
         </div>
@@ -908,7 +951,10 @@ const otherProjects = computed(() => {
                     <img v-if="user?.avatar" :src="'/storage/' + user.avatar" :alt="user?.name" class="w-full h-full object-cover" />
                     <span v-else>{{ user?.name?.charAt(0) || 'U' }}</span>
                 </div>
-                <span v-show="!isCompactSidebar" class="flex-1 text-sm font-medium truncate text-left">{{ user?.name || 'User' }}</span>
+                <span v-show="!isCompactSidebar" class="flex-1 min-w-0 text-left">
+                    <span class="block text-sm font-medium truncate">{{ user?.name || 'User' }}</span>
+                    <span v-if="planName" class="block text-[11px] font-medium leading-tight text-primary-600 dark:text-primary-400 truncate">{{ planName }}</span>
+                </span>
                 <svg v-show="!isCompactSidebar" class="w-4 h-4 shrink-0 transition-transform" :class="{ 'rotate-180': menuOpen }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
             </button>
 
@@ -973,7 +1019,6 @@ const otherProjects = computed(() => {
                         <div class="px-3.5 py-1.5 text-[11px] text-[#b0aca8] dark:!text-white/30">
                             <div class="font-medium text-[#6e6a65] dark:text-white/40 mb-1">{{ t('Keyboard Shortcuts') }}</div>
                             <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Ctrl+Shift+O</kbd><span>{{ t('New Chat') }}</span></div>
-                            <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Ctrl+K</kbd><span>{{ t('Command palette') }}</span></div>
                             <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Ctrl+B</kbd><span>{{ t('Toggle sidebar') }}</span></div>
                             <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Esc</kbd><span>{{ t('Close menus') }}</span></div>
                             <div class="flex items-center justify-between gap-3"><kbd class="text-[10px] text-[#252525] bg-black/5 dark:!bg-white/5 dark:!text-white/60 px-1.5 py-0.5 rounded">Enter</kbd><span>{{ t('Send') }}</span></div>
@@ -1088,6 +1133,7 @@ const otherProjects = computed(() => {
                             </button>
                         </div>
                         <p v-if="customInstructionsSaved" class="mt-2 text-xs text-success-500">{{ t('Saved successfully!') }}</p>
+                        <p v-if="customInstructionsError" class="mt-2 text-xs text-red-500">{{ customInstructionsError }}</p>
                     </div>
 
                     <div>
@@ -1126,6 +1172,19 @@ const otherProjects = computed(() => {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Transient share feedback toast -->
+    <Teleport to="body">
+        <div v-if="shareCopied || shareError" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[300]">
+            <div
+                class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-lg"
+                :class="shareError ? 'bg-red-600 text-white' : 'bg-[#1a1a1a] text-white dark:bg-white dark:text-[#1a1a1a]'"
+            >
+                <i class="ti" :class="shareError ? 'ti-alert-circle' : 'ti-check'"></i>
+                <span>{{ shareError || t('Link copied to clipboard') }}</span>
             </div>
         </div>
     </Teleport>

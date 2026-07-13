@@ -35,7 +35,7 @@ class RepurposerController extends Controller
     {
         $credits = (int) addon_setting('ai-repurposer', 'credits_per_repurpose', 15);
 
-        if (auth()->user()->credits < $credits) {
+        if (! credit_quota_mode() && auth()->user()->credits < $credits) {
             return back()->with('error', __('Insufficient credits.'));
         }
 
@@ -71,7 +71,7 @@ class RepurposerController extends Controller
         $bulkCredits = (int) addon_setting('ai-repurposer', 'credits_per_bulk_item', 12);
         $totalCredits = count($request->urls) * $bulkCredits;
 
-        if (auth()->user()->credits < $totalCredits) {
+        if (! credit_quota_mode() && auth()->user()->credits < $totalCredits) {
             return back()->with('error', __('Insufficient credits for bulk processing.'));
         }
 

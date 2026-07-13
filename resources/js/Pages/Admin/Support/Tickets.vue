@@ -1,12 +1,15 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { badgeClass } from '@/Composables/useBadge'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
+import AppFilterDropdown from '@/Components/Admin/AppFilterDropdown.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -93,6 +96,9 @@ const settingsForm = useForm<SupportSettingsForm>({
 const showBulkControls = computed(() => selectedIds.value.length > 0)
 const allVisibleSelected = computed(() => props.tickets.data.length > 0 && props.tickets.data.every((ticket) => selectedIds.value.includes(ticket.id)))
 const hasActiveFilters = computed(() => Boolean(search.value || status.value || priority.value || department.value || assignedTo.value))
+const activeFiltersCount = computed(() => {
+    return [status.value, priority.value, department.value, assignedTo.value].filter(Boolean).length
+})
 
 const statusOptions = computed(() => [
     { value: '', label: t('All statuses') },
@@ -390,45 +396,21 @@ onBeforeUnmount(() => {
     <Head :title="t('Support Tickets')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Support Tickets') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Manage customer tickets, replies, assignments, and SLA status from one support workspace.') }}
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
-                <a
-                    :href="route('admin.support.tickets.export')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                >
-                    <i class="ti ti-file-export text-base"></i>
-                    {{ t('Export') }}
-                </a>
-                <Link
-                    :href="route('admin.support.departments.index')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                >
-                    <i class="ti ti-building text-base"></i>
-                    {{ t('Departments') }}
-                </Link>
-                <Link
-                    :href="route('admin.support.canned-responses.index')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                >
-                    <i class="ti ti-message-2-code text-base"></i>
-                    {{ t('Canned Responses') }}
-                </Link>
-                <button
-                    type="button"
-                    class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold"
-                    @click="openSettingsModal"
-                >
-                    <i class="ti ti-settings text-base"></i>
-                    {{ t('Settings') }}
-                </button>
-            </div>
+            <a
+                :href="route('admin.support.tickets.export')"
+                class="shrink-0 items-center justify-center gap-2 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
+            >
+                <i class="ti ti-file-export text-base"></i>
+                {{ t('Export') }}
+            </a>
         </section>
 
         <!-- Stats Grid -->
@@ -449,9 +431,6 @@ onBeforeUnmount(() => {
             <StatsCard
                 :title="t('Open')"
                 :value="stats.open.value"
-                :comparison="stats.open.comparison.label"
-                :comparison-detail="t('vs last week')"
-                :comparison-type="stats.open.comparison.type"
                 color="danger"
             >
                 <template #icon>
@@ -462,9 +441,6 @@ onBeforeUnmount(() => {
             <StatsCard
                 :title="t('In Progress')"
                 :value="stats.in_progress.value"
-                :comparison="stats.in_progress.comparison.label"
-                :comparison-detail="t('vs last week')"
-                :comparison-type="stats.in_progress.comparison.type"
                 color="warning"
             >
                 <template #icon>
@@ -488,8 +464,8 @@ onBeforeUnmount(() => {
 
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 p-4 dark:border-surface-800 sm:px-6">
-                <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex-1 w-full min-w-[220px] md:max-w-sm">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -518,28 +494,37 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect v-model="status" :options="statusOptions" :placeholder="t('All statuses')" />
-                        </div>
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect v-model="priority" :options="priorityOptions" :placeholder="t('All priorities')" />
-                        </div>
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-52 lg:flex-none">
-                            <AppSelect v-model="department" :options="departmentOptions" :placeholder="t('All departments')" />
-                        </div>
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect v-model="assignedTo" :options="adminOptions" :placeholder="t('All agents')" />
-                        </div>
-                        <button
-                            v-if="hasActiveFilters"
-                            type="button"
-                            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                            @click="clearFilters"
-                        >
-                            <i class="ti ti-rotate-clockwise text-base"></i>
-                            {{ t('Reset') }}
-                        </button>
+                    <div class="shrink-0">
+                        <AppFilterDropdown :active-filters-count="activeFiltersCount">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('Status') }}</label>
+                                    <AppSelect v-model="status" :options="statusOptions" :placeholder="t('All statuses')" />
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('Priority') }}</label>
+                                    <AppSelect v-model="priority" :options="priorityOptions" :placeholder="t('All priorities')" />
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('Department') }}</label>
+                                    <AppSelect v-model="department" :options="departmentOptions" :placeholder="t('All departments')" />
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('Agent') }}</label>
+                                    <AppSelect v-model="assignedTo" :options="adminOptions" :placeholder="t('All agents')" />
+                                </div>
+                                <div v-if="activeFiltersCount > 0" class="border-t border-gray-100 pt-3 dark:border-surface-800 flex justify-end">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 transition hover:text-red-500 dark:text-red-400 dark:hover:text-red-300"
+                                        @click="clearFilters"
+                                    >
+                                        <i class="ti ti-rotate-clockwise text-sm"></i>
+                                        {{ t('Reset') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </AppFilterDropdown>
                     </div>
                 </div>
             </div>
@@ -564,7 +549,7 @@ onBeforeUnmount(() => {
                     </div>
                     <button
                         type="button"
-                        class="btn-primary inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                        class="btn-primary-admin inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50"
                         :disabled="!bulkAction"
                         @click="executeBulk"
                     >
@@ -575,19 +560,19 @@ onBeforeUnmount(() => {
 
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-100 dark:divide-surface-800">
-                    <thead class="bg-gray-50 dark:bg-surface-800/70">
+                    <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                         <tr>
                             <th class="w-10 px-4 py-3.5">
                                 <input type="checkbox" :checked="allVisibleSelected" :aria-label="t('Select all visible tickets')" @change="toggleAll">
                             </th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Ticket') }}</th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Customer') }}</th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Department') }}</th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Priority') }}</th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('SLA') }}</th>
-                            <th class="px-4 py-3.5 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Assigned') }}</th>
-                            <th class="px-4 py-3.5 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                            <th class="px-4 py-3.5 text-left">{{ t('Ticket') }}</th>
+                            <th class="px-4 py-3.5 text-left">{{ t('Customer') }}</th>
+                            <th class="px-4 py-3.5 text-center">{{ t('Department') }}</th>
+                            <th class="px-4 py-3.5 text-center">{{ t('Priority') }}</th>
+                            <th class="px-4 py-3.5 text-center">{{ t('Status') }}</th>
+                            <th class="px-4 py-3.5 text-center">{{ t('SLA') }}</th>
+                            <th class="px-4 py-3.5 text-center">{{ t('Assigned') }}</th>
+                            <th class="px-4 py-3.5 text-right">{{ t('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
@@ -619,26 +604,26 @@ onBeforeUnmount(() => {
                                 <div class="text-sm text-gray-700 dark:text-gray-200">{{ ticket.user?.name || t('Unknown user') }}</div>
                                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ ticket.user?.email || t('No email') }}</div>
                             </td>
-                            <td class="px-4 py-4 align-top text-sm text-gray-600 dark:text-gray-300">{{ ticket.department?.name || t('No department') }}</td>
-                            <td class="px-4 py-4 align-top">
+                            <td class="px-4 py-4 text-center align-top text-sm text-gray-600 dark:text-gray-300">{{ ticket.department?.name || t('No department') }}</td>
+                            <td class="px-4 py-4 text-center align-top">
                                 <span :class="badgeClass(ticket.priority)" class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium">
                                     {{ ticketPriorityLabel(ticket.priority) }}
                                 </span>
                             </td>
-                            <td class="px-4 py-4 align-top">
+                            <td class="px-4 py-4 text-center align-top">
                                 <span :class="badgeClass(ticket.status)" class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium">
                                     {{ ticketStatusLabel(ticket.status) }}
                                 </span>
                             </td>
-                            <td class="px-4 py-4 align-top">
+                            <td class="px-4 py-4 text-center align-top">
                                 <span v-if="slaIndicator(ticket)" class="text-xs font-semibold" :class="slaIndicator(ticket)?.color">{{ slaIndicator(ticket)?.label }}</span>
-                                <span v-else class="text-xs text-gray-400 dark:text-gray-500">—</span>
+                                <span v-else class="text-xs text-gray-400 dark:text-gray-500">â€”</span>
                             </td>
-                            <td class="px-4 py-4 align-top text-sm text-gray-600 dark:text-gray-300">{{ ticket.assigned_admin?.name ?? t('Unassigned') }}</td>
+                            <td class="px-4 py-4 text-center align-top text-sm text-gray-600 dark:text-gray-300">{{ ticket.assigned_admin?.name ?? t('Unassigned') }}</td>
                             <td class="px-4 py-4 text-right align-top">
                                 <Link
                                     :href="route('admin.support.tickets.show', ticket.ticket_number)"
-                                    class="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-primary-700 transition hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20"
+                                    class="inline-flex items-center gap-1 rounded-xl px-3 py-1.5 text-sm font-medium text-primary-700 transition hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20"
                                 >
                                     <i class="ti ti-arrow-right text-base"></i>
                                     {{ t('View') }}
@@ -667,107 +652,86 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <div v-if="showSettingsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeSettingsModal">
-            <div class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Support Settings') }}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure support ticket rules, notifications, and SLA thresholds.') }}</p>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                            :aria-label="t('Close modal')"
-                            @click="closeSettingsModal"
+        <AppModal
+            :open="showSettingsModal"
+            max-width="max-w-4xl"
+            :title="t('Support Settings')"
+            :subtitle="t('Configure support ticket rules, notifications, and SLA thresholds.')"
+            has-form
+            @close="closeSettingsModal"
+        >
+            <div class="space-y-6">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-5">
+                        <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Automation & Notifications') }}</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control whether tickets are enabled and how support notifications behave.') }}</p>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div
+                            v-for="key in ['notify_admin_new_ticket', 'notify_user_reply', 'satisfaction_rating_enabled', 'ai_reply_suggestion']"
+                            :key="key"
+                            class="flex items-start justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800"
                         >
-                            <i class="ti ti-x text-base"></i>
-                        </button>
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ label(key) }}</div>
+                            </div>
+                            <AppSwitch
+                                :model-value="Boolean(settingsForm[key as keyof SupportSettingsForm])"
+                                @update:model-value="val => settingsForm[key as keyof SupportSettingsForm] = val as never"
+                            />
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="flex-1 overflow-y-auto p-6">
-                    <div class="space-y-6">
-                        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <div class="mb-5">
-                                <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Automation & Notifications') }}</h4>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control whether tickets are enabled and how support notifications behave.') }}</p>
-                            </div>
-
-                            <div class="grid gap-4 md:grid-cols-2">
-                                <label
-                                    v-for="key in ['notify_admin_new_ticket', 'notify_user_reply', 'satisfaction_rating_enabled', 'ai_reply_suggestion']"
-                                    :key="key"
-                                    class="flex items-start justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800"
-                                >
-                                    <div>
-                                        <div class="text-sm font-semibold text-gray-900 dark:text-white">{{ label(key) }}</div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        :aria-checked="Boolean(settingsForm[key as keyof SupportSettingsForm])"
-                                        class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition"
-                                        :class="settingsForm[key as keyof SupportSettingsForm] ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                                        @click="settingsForm[key as keyof SupportSettingsForm] = !settingsForm[key as keyof SupportSettingsForm] as never"
-                                    >
-                                        <span
-                                            class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
-                                            :class="settingsForm[key as keyof SupportSettingsForm] ? 'translate-x-5' : 'translate-x-0.5'"
-                                        ></span>
-                                    </button>
-                                </label>
-                            </div>
-                        </section>
-
-                        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <div class="mb-5">
-                                <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Limits & SLA') }}</h4>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set attachment limits, auto-close timing, and response expectations for your support team.') }}</p>
-                            </div>
-
-                            <div class="grid gap-4 md:grid-cols-2">
-                                <label
-                                    v-for="key in ['max_attachments_per_reply', 'max_attachment_size_mb', 'auto_close_resolved_days', 'sla_first_response_hours', 'sla_resolution_hours']"
-                                    :key="key"
-                                    class="block"
-                                >
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ label(key) }}</span>
-                                    <input
-                                        v-model="settingsForm[key as keyof SupportSettingsForm]"
-                                        type="number"
-                                        min="1"
-                                        class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                </label>
-
-                                <label class="block md:col-span-2">
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ label('allowed_attachment_types') }}</span>
-                                    <input
-                                        v-model="settingsForm.allowed_attachment_types"
-                                        :placeholder="t('jpg,png,pdf,docx')"
-                                        type="text"
-                                        class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                </label>
-                            </div>
-                        </section>
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-5">
+                        <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Limits & SLA') }}</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set attachment limits, auto-close timing, and response expectations for your support team.') }}</p>
                     </div>
-                </div>
 
-                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <label
+                            v-for="key in ['max_attachments_per_reply', 'max_attachment_size_mb', 'auto_close_resolved_days', 'sla_first_response_hours', 'sla_resolution_hours']"
+                            :key="key"
+                            class="block"
+                        >
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ label(key) }}</span>
+                            <input
+                                v-model="settingsForm[key as keyof SupportSettingsForm]"
+                                type="number"
+                                min="1"
+                                class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                        </label>
+
+                        <label class="block md:col-span-2">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ label('allowed_attachment_types') }}</span>
+                            <input
+                                v-model="settingsForm.allowed_attachment_types"
+                                :placeholder="t('jpg,png,pdf,docx')"
+                                type="text"
+                                class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                        </label>
+                    </div>
+                </section>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-between gap-3 w-full">
                     <div class="text-sm text-gray-500 dark:text-gray-400">{{ t('These changes affect the public support flow and admin ticket handling.') }}</div>
                     <div class="flex items-center gap-3">
                         <button
                             type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
+                            class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
                             @click="closeSettingsModal"
                         >
                             {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
-                            class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="settingsForm.processing"
                             @click="submitSettings"
                         >
@@ -776,7 +740,7 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </AppModal>
     </div>
 </template>

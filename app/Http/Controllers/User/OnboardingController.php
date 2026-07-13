@@ -57,7 +57,7 @@ class OnboardingController extends Controller
                 'description' => $tool->description,
                 'icon' => $tool->icon,
                 'color' => $tool->color,
-                'requires_pro' => (bool) $tool->requires_pro,
+                'requires_pro' => $tool->isProRequired(),
                 'category' => optional($tool->category)->name,
             ])
             ->values()
@@ -95,6 +95,25 @@ class OnboardingController extends Controller
         $dismissed = (array) ($user->dismissed_tooltips ?? []);
         $dismissed[] = $validated['tooltip_key'];
         $user->update(['dismissed_tooltips' => array_unique($dismissed)]);
+
+        return back();
+    }
+
+    /**
+     * Merge a small patch into the user's UI preferences bag (e.g. dismissing the
+     * credit-low banner). Scalar values only; merged so unrelated keys survive.
+     */
+    public function updatePreferences(Request $request)
+    {
+        $validated = $request->validate([
+            'preferences' => ['required', 'array', 'max:30'],
+            'preferences.*' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $preferences = array_merge((array) ($user->preferences ?? []), $validated['preferences']);
+        $user->update(['preferences' => $preferences]);
 
         return back();
     }

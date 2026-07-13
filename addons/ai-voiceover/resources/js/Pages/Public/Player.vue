@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppLayout from '@/Layouts/AppLayout.vue'
+import AppLayout from '@themes/default/js/Layouts/AppLayout.vue'
 import { ref } from 'vue'
 
 defineOptions({ layout: AppLayout })

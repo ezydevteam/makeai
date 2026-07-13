@@ -21,6 +21,7 @@
             "page_loading_animation": "none",
             "smooth_scroll": true,
             "show_back_to_top": true,
+            "hide_scroll_top_mobile": false,
             "primary_color": "#10b981",
             "secondary_color": "#3b82f6",
             "accent_color": "#8b5cf6",
@@ -37,7 +38,6 @@
             "heading_weight": "700",
             "line_height": "1.5",
             "letter_spacing": "normal",
-            "border_radius": "12px",
             "container_width": "1280px"
         },
         "header": {
@@ -51,6 +51,7 @@
                 "notification_button_style": "rounded_soft_bg",
                 "show_social_icons": false,
                 "social_icon_style": "rounded_soft_bg",
+                "social_button_text": "Follow Us",
                 "show_language_switcher": true,
                 "language_switcher_style": "icon_with_label",
                 "show_dark_mode_toggle": true,
@@ -80,7 +81,8 @@
                 "text_color": "",
                 "menu_hover_color": "",
                 "show_border": true,
-                "show_shadow": false
+                "show_shadow": false,
+                "menu_transform": "default"
             },
             "mobile_top": {
                 "enabled": true,
@@ -116,35 +118,35 @@
             "style_columns": {
                 "default": {
                     "col_1": ["about_text"],
-                    "col_2": ["menu_links_1"],
+                    "col_2": ["menu"],
                     "col_3": ["contact_info"],
-                    "col_4": ["custom_text_1"]
+                    "col_4": ["custom_text"]
                 },
                 "centered": {
                     "col_1": ["about_text"],
-                    "col_2": ["menu_links_1"],
+                    "col_2": ["menu"],
                     "col_3": ["contact_info"]
                 },
                 "spotlight": {
-                    "col_1": ["menu_links_1"],
+                    "col_1": ["menu"],
                     "col_2": ["contact_info"],
-                    "col_3": ["custom_text_1"]
+                    "col_3": ["custom_text"]
                 },
                 "card_grid": {
-                    "col_1": ["menu_links_1"],
+                    "col_1": ["menu"],
                     "col_2": ["contact_info"],
-                    "col_3": ["custom_text_1"]
+                    "col_3": ["custom_text"]
                 },
                 "split_band": {
-                    "col_1": ["menu_links_1"],
+                    "col_1": ["menu"],
                     "col_2": ["contact_info"],
-                    "col_3": ["custom_text_1"],
-                    "col_4": ["tool_categories_1"]
+                    "col_3": ["custom_text"],
+                    "col_4": ["categories"]
                 },
                 "floating_panel": {
-                    "col_1": ["menu_links_1"],
+                    "col_1": ["menu"],
                     "col_2": ["contact_info"],
-                    "col_3": ["custom_text_1"]
+                    "col_3": ["custom_text"]
                 }
             },
             "brand_title": "",
@@ -161,27 +163,21 @@
             "contact_phone": "",
             "contact_address": "",
             "contact_details": "",
-            "menu_title_1": "",
-            "menu_column_1": "footer-company",
-            "menu_title_2": "",
-            "menu_column_2": "footer-support",
-            "menu_title_3": "",
-            "menu_column_3": "footer-legal",
-            "custom_title_1": "",
-            "custom_text_1": "",
-            "custom_title_2": "",
-            "custom_text_2": "",
-            "tool_categories_title_1": "",
-            "tool_categories_items_1": [],
-            "tool_categories_title_2": "",
-            "tool_categories_items_2": [],
+            "menu_title": "",
+            "menu_column": "footer-company",
+            "custom_title": "",
+            "custom_text": "",
+            "tool_categories_title": "",
+            "tool_categories_items": [],
             "footer_bg_color": "",
             "footer_text_color": "",
             "footer_heading_color": "",
             "footer_heading_text_case": "capitalize",
+            "logo_mode": "light",
             "container_width": "1280px",
-            "disable_logo_about": false,
-            "disable_card_style": false,
+            "show_logo_about": true,
+            "enable_card_style": true,
+            "hide_categories_count": false,
             "footer_vertical_padding": 56,
             "show_payment_icons": true,
             "payment_icons": "",
@@ -298,7 +294,7 @@
                         "subtitle": "Everything you need to build the future, powered by AI.",
                         "layout": "3-column",
                         "card_style": "bordered",
-                        "disable_card_style": false,
+                        "enable_card_style": true,
                         "items": [
                             {
                                 "icon": "ti ti-pencil",
@@ -553,6 +549,21 @@
             "hide_rating": false,
             "hide_share": false,
             "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": false,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": true,
+            "global_tools_embeddable_enabled": true,
+            "show_tool_credit_costs": true,
             "archive_layout": "default",
             "archive_show_breadcrumbs": true,
             "archive_show_stats": true,

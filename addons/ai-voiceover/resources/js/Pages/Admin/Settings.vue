@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue'
 import { Head, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 
@@ -189,7 +189,7 @@ const syncVoices = () => {
             <button
                 type="button"
                 :disabled="form.processing"
-                class="rounded-lg btn-primary disabled:opacity-60"
+                class="rounded-lg btn-primary-admin disabled:opacity-60"
                 @click="save"
             >
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}
@@ -506,10 +506,10 @@ const syncVoices = () => {
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 {{ selectedProviderStatus?.voice_count ?? 0 }} {{ t('voices') }}
                                 <template v-if="selectedProviderStatus?.last_synced_at">
-                                    · {{ t('Last synced: :time', { time: selectedProviderStatus.last_synced_at }) }}
+                                    Â· {{ t('Last synced: :time', { time: selectedProviderStatus.last_synced_at }) }}
                                 </template>
                                 <template v-else>
-                                    · {{ t('Never synced') }}
+                                    Â· {{ t('Never synced') }}
                                 </template>
                             </p>
                             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">

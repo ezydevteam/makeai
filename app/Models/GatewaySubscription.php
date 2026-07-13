@@ -22,6 +22,7 @@ class GatewaySubscription extends Model
         'user_id', 'plan_id', 'billing_cycle', 'status', 'gateway',
         'gateway_subscription_id', 'amount', 'currency',
         'trial_ends_at', 'current_period_start', 'current_period_end', 'cancelled_at',
+        'scheduled_plan_id', 'scheduled_billing_cycle', 'scheduled_change_at',
     ];
 
     protected function casts(): array
@@ -32,6 +33,7 @@ class GatewaySubscription extends Model
             'current_period_start' => 'datetime',
             'current_period_end' => 'datetime',
             'cancelled_at' => 'datetime',
+            'scheduled_change_at' => 'datetime',
         ];
     }
 
@@ -43,6 +45,16 @@ class GatewaySubscription extends Model
     public function plan()
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function scheduledPlan()
+    {
+        return $this->belongsTo(Plan::class, 'scheduled_plan_id');
+    }
+
+    public function hasScheduledChange(): bool
+    {
+        return $this->scheduled_plan_id !== null && $this->scheduled_change_at !== null;
     }
 
     public function isActive(): bool

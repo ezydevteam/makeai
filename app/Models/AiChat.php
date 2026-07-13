@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class AiChat extends Model
 {
     protected $fillable = [
-        'ulid', 'user_id', 'title', 'model', 'category', 'is_pinned',
+        'ulid', 'user_id', 'title', 'model', 'is_pinned',
     ];
 
     protected $casts = [

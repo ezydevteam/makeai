@@ -1,0 +1,1 @@
+import{t as e}from"./marked.esm-Ccg6WR5l.js";import{t}from"./purify.es-DY32g7DN.js";function n(n){let r=e.parse(n||``,{async:!1});return t.sanitize(r,{USE_PROFILES:{html:!0},FORBID_TAGS:[`style`,`form`,`input`,`button`],FORBID_ATTR:[`style`],ADD_ATTR:[`target`,`rel`]})}export{n as t};

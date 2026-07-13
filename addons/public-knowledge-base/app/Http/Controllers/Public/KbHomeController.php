@@ -33,11 +33,12 @@ class KbHomeController extends Controller
             }
         }
 
+        // Popular articles, paginated (Pagination component on the frontend).
         $featuredArticles = KbArticle::published()
             ->orderByDesc('views')
-            ->limit(6)
             ->with('category')
-            ->get(['id', 'ulid', 'title', 'slug', 'excerpt', 'views', 'helpful_count', 'published_at']);
+            ->paginate(8, ['id', 'ulid', 'title', 'slug', 'excerpt', 'views', 'helpful_count', 'published_at'])
+            ->withQueryString();
 
         return Inertia::render('Addons/public-knowledge-base/Public/Home', [
             'categories' => $categories,

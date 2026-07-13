@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -111,7 +111,7 @@ const approvalBadgeClass = computed(() => (
 
                 <Link
                     :href="route('addon.social.admin.settings')"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary-admin px-4 py-2 text-sm font-medium"
                 >
                     <i class="ti ti-settings text-base"></i>
                     {{ t('Settings') }}
@@ -263,7 +263,7 @@ const approvalBadgeClass = computed(() => (
                                     </p>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                         {{ post.user?.name ?? t('Unknown') }}
-                                        <span v-if="post.scheduled_at"> · {{ post.scheduled_at }}</span>
+                                        <span v-if="post.scheduled_at"> Â· {{ post.scheduled_at }}</span>
                                     </p>
                                 </div>
 

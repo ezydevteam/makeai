@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import Pagination from '@/Components/Pagination.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
 
@@ -143,9 +143,9 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card dark:border-surface-700 dark:bg-surface-900">
-            <div class="flex flex-col gap-4 border-b border-gray-200 px-6 py-4 dark:border-surface-700 lg:flex-row lg:items-center lg:justify-between">
-                <div class="relative w-full lg:max-w-md">
+        <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+            <div class="flex flex-col gap-4 border-b border-gray-200 px-6 py-4 dark:border-surface-700 md:flex-row md:items-center md:justify-between">
+                <div class="relative w-full min-w-[220px] md:max-w-sm">
                     <i class="ti ti-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400" />
                     <input
                         ref="searchInput"

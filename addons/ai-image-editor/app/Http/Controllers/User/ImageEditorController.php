@@ -9,6 +9,7 @@ use Addons\AiImageEditor\Jobs\ApplyImageEdit;
 use Addons\AiImageEditor\Models\IeEdit;
 use Addons\AiImageEditor\Models\IeSession;
 use Addons\AiImageEditor\Services\ImageEditorService;
+use App\Services\ContentModerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -69,8 +70,10 @@ class ImageEditorController extends \App\Http\Controllers\Controller
             $sourceImageId = $generatedImage->id;
         }
 
-        // Create or replace session
-        [$width, $height] = getimagesize(Storage::disk('public')->path($sourcePath)) ?: [null, null];
+        // Create or replace session. Read dimensions from the bytes so this works whether
+        // the public disk is local or an S3-compatible bucket (->path() has no meaning on S3).
+        $sourceBinary = Storage::disk('public')->get($sourcePath);
+        [$width, $height] = ($sourceBinary !== null ? @getimagesizefromstring($sourceBinary) : false) ?: [null, null];
         $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
 
         // Delete previous session (cascades to edits)
@@ -96,10 +99,20 @@ class ImageEditorController extends \App\Http\Controllers\Controller
     {
         $session = IeSession::where('user_id', auth()->id())->firstOrFail();
 
+        // Content safety gate — reject unsafe edit prompts before charging credits.
+        // No-op unless the Content Moderation extension is enabled in `block` mode.
+        $editPrompt = (string) ($request->input('params.prompt') ?? '');
+        if (ContentModerationService::fromSettings()->textViolates($editPrompt, 'image-editor')) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('This request was blocked by content safety filters.'),
+            ], 422);
+        }
+
         $service = app(ImageEditorService::class);
         $credits = $service->getCreditsForOperation($request->operation);
 
-        if (auth()->user()->credits < $credits) {
+        if (! credit_quota_mode() && auth()->user()->credits < $credits) {
             return response()->json([
                 'success' => false,
                 'message' => translate('Insufficient credits.'),

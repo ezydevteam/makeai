@@ -17,6 +17,7 @@ use App\Models\Setting;
 use App\Services\BroadcastingService;
 use App\Services\CaptchaService;
 use App\Services\CountryDetectionService;
+use App\Support\CurrencyCatalog;
 use App\Services\ThemeSettingsService;
 use App\Services\InAppNotificationService;
 use App\Services\SocialService;
@@ -77,7 +78,7 @@ class HandleInertiaRequests extends Middleware
             ];
         }
 
-        $defaultLocale = settings('default_language', 'en');
+        $defaultLocale = Language::defaultCode();
         $requestedLocale = session('locale_manually_selected')
             ? session('locale', $defaultLocale)
             : $defaultLocale;
@@ -101,9 +102,9 @@ class HandleInertiaRequests extends Middleware
         $frontendCustomCodeSettings = $frontendPresetService->getStoredCustomCodeSettings();
         $frontendToolPageSettings = $frontendPresetService->getResolvedFrontendToolPage();
 
-        $resolveImage = fn (?string $path) => $path ? (str_starts_with($path, 'http') ? $path : Storage::disk('public')->url($path)) : '';
-        // Use relative paths for local storage URLs to avoid mixed-content on HTTPS pages
-        $resolveImageUrl = fn (?string $path) => $path ? (str_starts_with($path, 'http') ? $path : '/storage/' . ltrim($path, '/')) : '';
+        // Driver-aware media resolver: root-relative /storage/... on the local disk
+        // (mixed-content safe), fully-qualified bucket/CDN URL on any cloud driver.
+        $resolveImageUrl = fn (?string $path) => media_url($path);
 
         return [
             ...parent::share($request),
@@ -139,7 +140,8 @@ class HandleInertiaRequests extends Middleware
                     'thousands' => $language?->thousands_separator ?? ',',
                     'system' => $language?->number_system ?? 'latn',
                 ],
-                'currency_position' => $language?->currency_position ?? settings('currency_position', 'before'),
+                // Currency position is exposed on the `currency` prop (below), which
+                // is what the frontend reads — no duplicate under `locale`.
             ],
             'isRtl' => (bool) ($language?->is_rtl ?? false),
             'translations' => fn () => $hasTranslationsTable && $hasLanguagesTable
@@ -152,13 +154,29 @@ class HandleInertiaRequests extends Middleware
                     ->orderBy('name')
                     ->get(['code', 'name', 'flag', 'is_rtl'])
                 : [],
-            'currency' => [
-                'code' => settings('default_currency', 'USD'),
-                'symbol' => settings('currency_symbol', '$'),
-                'position' => $language?->currency_position ?? settings('currency_position', 'before'),
-                'decimals' => (int) settings('currency_decimals', 2),
-            ],
+            // Derived from the ONE base currency so the frontend symbol/decimals can
+            // never go stale: explicit setting → static catalog → sane default. This
+            // keeps every frontend money display in sync when the base currency changes.
+            'currency' => (function () use ($language) {
+                $code = base_currency();
+                $catalog = CurrencyCatalog::get($code);
+
+                return [
+                    'code' => $code,
+                    'symbol' => settings('currency_symbol') ?: ($catalog['symbol'] ?? '$'),
+                    'position' => $language?->currency_position
+                        ?? (settings('currency_position') ?: ($catalog['position'] ?? 'before')),
+                    'decimals' => (int) (settings('currency_decimals') ?? $catalog['decimals'] ?? 2),
+                ];
+            })(),
             'isProAvailable' => fn () => isProAvailable(),
+            // Effective resetting-allowance limits (per-user override ?? global),
+            // mirroring TokenGuard, so the sidebar shows a Regular-license user's real
+            // remaining quota rather than the never-drained wallet balance.
+            'userDailyCreditLimit' => fn () => (float) (optional($request->user())->daily_limit ?? settings('user_daily_credit_limit', 0)),
+            'userMonthlyCreditLimit' => fn () => (float) (optional($request->user())->monthly_limit ?? settings('user_monthly_credit_limit', 0)),
+            'creditsUsedToday' => fn () => (float) (optional($request->user())->credits_used_today ?? 0),
+            'creditsUsedMonth' => fn () => (float) (optional($request->user())->credits_used_month ?? 0),
             'isExtendedLicense' => fn () => is_extended_license(),
             'licenseBlocked' => fn () => $this->isLicenseBlocked(),
             'socialLoginProviders' => fn () => $this->getSocialLoginProviders(),
@@ -276,9 +294,7 @@ class HandleInertiaRequests extends Middleware
                     ['id' => 'b2', 'type' => 'categories_list', 'config' => ['title' => translate('Categories'), 'show_count' => true]],
                     ['id' => 'b3', 'type' => 'recent_posts', 'config' => ['title' => translate('Recent Posts'), 'count' => 3]],
                 ],
-                'position' => 'right',
                 'sticky' => true,
-                'show_on_pages' => [],
             ]),
 
             'sidebarData' => [
@@ -317,9 +333,9 @@ class HandleInertiaRequests extends Middleware
 
             'globalMenus' => fn () => Menu::with(['items' => function ($q) {
                 $q->orderBy('sort_order');
-            }])->get(),
+            }, 'items.page'])->get(),
 
-            'affiliateEnabled' => fn () => (bool) settings('affiliate_enabled', false),
+            'affiliateEnabled' => fn () => is_extended_license() && (bool) settings('affiliate_enabled', false),
             'ticketsEnabled' => fn () => (bool) settings('tickets_enabled', true),
             'contactEnabled' => fn () => (bool) settings('contact_enabled', true),
             'blogEnabled' => fn () => (bool) settings('blog_enabled', true),
@@ -341,6 +357,7 @@ class HandleInertiaRequests extends Middleware
                 'show_faqs' => (bool) settings('global_tools_show_faqs_enabled', true),
                 'show_reviews' => (bool) settings('global_tools_show_reviews_enabled', true),
                 'embeddable' => (bool) settings('global_tools_embeddable_enabled', true),
+                'show_credit_costs' => (bool) settings('show_tool_credit_costs', true),
             ],
 
             'appearanceThemeSettings' => fn () => $frontendThemeSettings,
@@ -390,20 +407,6 @@ class HandleInertiaRequests extends Middleware
             return ['user' => null];
         }
 
-        $user->loadMissing('plan');
-        $plan = $user->plan;
-        $features = [
-            'plan_slug' => $plan?->slug,
-            'plan_name' => $plan?->name,
-            'features' => $plan?->features ?: [],
-            'ai_models' => $plan?->ai_models ?: [],
-            'max_tokens_per_request' => $plan?->max_tokens_per_request,
-            'daily_token_limit' => $plan?->daily_token_limit,
-            'max_images_per_day' => $plan?->max_images_per_day,
-            'max_chats' => $plan?->max_chats,
-        ];
-        $request->session()->put('subscription_features', $features);
-
         return [
             'user' => [
                 'ulid' => $user->ulid,
@@ -414,11 +417,14 @@ class HandleInertiaRequests extends Middleware
                 'profession' => $user->profession,
                 'credits' => (float) $user->credits,
                 'plan_id' => $user->plan_id,
+                // Plan display name (used e.g. under the chat sidebar username for pro
+                // users). The `plan` relation is already resolved by isPro() below, so
+                // this adds no extra query.
+                'plan_name' => $user->plan?->name,
                 'is_pro' => isProAvailable() && $user->isPro(),
                 'subscription_status' => $user->subscription_status,
                 'subscription_ends_at' => $user->subscription_ends_at?->toISOString(),
                 'trial_ends_at' => $user->trial_ends_at?->toISOString(),
-                'subscription_features' => $features,
                 'referral_code' => $user->referral_code,
                 'referral_earnings' => (float) $user->referral_earnings,
                 'referral_count' => (int) $user->referral_count,
@@ -429,6 +435,7 @@ class HandleInertiaRequests extends Middleware
                 'onboarding_completed_at' => $user->onboarding_completed_at?->toISOString(),
                 'use_case' => $user->use_case,
                 'dismissed_tooltips' => $user->dismissed_tooltips,
+                'preferences' => (array) ($user->preferences ?? []),
             ],
             'paletteTools' => fn () => \App\Models\AiTool::where('is_active', true)
                 ->select('name', 'slug', 'description', 'icon', 'color', 'category_id')
@@ -497,7 +504,7 @@ class HandleInertiaRequests extends Middleware
             return rtrim(rtrim(number_format((float) $coupon->value, 2, '.', ''), '0'), '.').'%';
         }
 
-        return CountryCatalog::formatMoney((float) $coupon->value, settings('pricing_currency_code', 'USD'));
+        return CountryCatalog::formatMoney((float) $coupon->value, base_currency());
     }
 
     private function getNotificationProps(Request $request): array
@@ -548,6 +555,7 @@ class HandleInertiaRequests extends Middleware
             'isSuperAdmin' => $admin->isSuperAdmin(),
             'permissions' => $admin->getAllPermissions(),
             'role' => $admin->role?->name,
+            'coreUpdate' => $this->getCoreUpdateStatus($admin),
             'pendingCommentsCount' => Comment::where('status', 'pending')->count(),
             'sidebarCounts' => [
                 'premium' => [
@@ -564,7 +572,41 @@ class HandleInertiaRequests extends Middleware
                     'payouts' => \App\Models\AffiliatePayout::where('status', 'pending')->count(),
                     'commissions' => \App\Models\AffiliateCommission::where('status', 'pending')->count(),
                 ],
+                'newsletter' => [
+                    'subscribers' => \App\Models\NewsletterSubscriber::where('status', 'subscribed')->where('created_at', '>=', now()->subDay())->count(),
+                ],
             ]
+        ];
+    }
+
+    /**
+     * Core update status for the sidebar badge + header banner. Only surfaced to
+     * admins who can actually manage the system. `available` drives the badge;
+     * `show_banner` also respects the snooze (24h) / dismiss (this version) state.
+     */
+    private function getCoreUpdateStatus($admin): array
+    {
+        if (! $admin->hasPermission('settings.manage')) {
+            return ['available' => false, 'show_banner' => false];
+        }
+
+        $available = (bool) settings('update_available', false);
+        $version = settings('update_version');
+
+        if (! $available || blank($version)) {
+            return ['available' => false, 'show_banner' => false];
+        }
+
+        $dismissed = settings('core_update_dismissed_version') === $version;
+        $snoozedUntil = settings('core_update_snoozed_until');
+        $snoozed = filled($snoozedUntil) && now()->lt(Carbon::parse($snoozedUntil));
+
+        return [
+            'available' => true,
+            'version' => $version,
+            'changelog' => settings('update_changelog'),
+            'show_banner' => ! $dismissed && ! $snoozed,
+            'updates_url' => route('admin.system.updates'),
         ];
     }
 

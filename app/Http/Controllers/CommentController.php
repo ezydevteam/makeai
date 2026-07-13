@@ -9,6 +9,7 @@ use App\Models\Comment;
 use App\Models\CommentLike;
 use App\Models\CommentReport;
 use App\Services\NotificationEventService;
+use App\Services\SpamFilterService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,22 +39,41 @@ class CommentController extends Controller
         $autoApproveUsers = (bool) settings('comments_auto_approve_users', true);
         $isAuthenticated = $request->user() !== null;
 
+        $status = (! $requiresApproval && $isAuthenticated && $autoApproveUsers) ? 'approved' : 'pending';
+
+        // Route Akismet-flagged submissions straight to the admin Spam tab so they
+        // never auto-publish or clutter the pending-moderation queue.
+        $isSpam = SpamFilterService::fromSettings()->check([
+            'type' => 'comment',
+            'content' => $data['content'],
+            'author' => $isAuthenticated ? $request->user()->name : ($data['guest_name'] ?? null),
+            'email' => $isAuthenticated ? $request->user()->email : ($data['guest_email'] ?? null),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'referrer' => $request->header('referer'),
+        ]);
+
+        if ($isSpam) {
+            $status = 'spam';
+        }
+
         $comment = Comment::create([
             'commentable_type' => $commentableClass,
             'commentable_id' => $commentable->id,
             'user_id' => $request->user()?->id,
             'parent_id' => $parent->id ?? null,
             'content' => $data['content'],
-            'status' => (! $requiresApproval && $isAuthenticated && $autoApproveUsers) ? 'approved' : 'pending',
+            'status' => $status,
             'guest_name' => $isAuthenticated ? null : $data['guest_name'],
             'guest_email' => $isAuthenticated ? null : $data['guest_email'],
-            'ip_address' => $request->ip(),
         ]);
 
         if ($comment->status === 'pending') {
             app(NotificationEventService::class)->newCommentPending($comment);
         }
 
+        // Spam is silently accepted from the visitor's side (no feedback that the
+        // filter triggered) but held for admin review.
         return back()->with(
             'success',
             $comment->status === 'approved'
@@ -120,18 +140,14 @@ class CommentController extends Controller
     {
         abort_unless($comment->status === 'approved', 404);
 
-        CommentReport::updateOrCreate(
-            [
-                'comment_id' => $comment->id,
-                'user_id' => $request->user()?->id,
-                'ip_hash' => $request->user() ? null : $this->ipHash($request),
-            ],
-            [
-                'reason' => $request->validated('reason'),
-                'details' => $request->validated('details'),
-                'status' => 'open',
-            ]
-        );
+        // A report is a flag: admins act on the report COUNT per comment, so we
+        // only need to record who reported it (deduped by user/ip). The former
+        // reason/details/status payload was never surfaced and has been dropped.
+        CommentReport::updateOrCreate([
+            'comment_id' => $comment->id,
+            'user_id' => $request->user()?->id,
+            'ip_hash' => $request->user() ? null : $this->ipHash($request),
+        ]);
 
         return back()->with('success', translate('Comment reported for review.'));
     }

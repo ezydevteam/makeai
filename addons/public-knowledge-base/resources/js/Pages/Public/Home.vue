@@ -1,9 +1,25 @@
 <script setup lang="ts">
 import { useTranslate } from '@/Composables/useTranslate'
-import { usePage } from '@inertiajs/vue3'
+import { Head, usePage } from '@inertiajs/vue3'
 import { ref, computed, onMounted } from 'vue'
 import DOMPurify from 'dompurify'
 import KbLayout from './KbLayout.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
+import { Swiper, SwiperSlide } from 'swiper/vue'
+import { Navigation as SwiperNavigation, Pagination as SwiperPagination } from 'swiper/modules'
+import 'swiper/css'
+import 'swiper/css/navigation'
+import 'swiper/css/pagination'
+
+interface Paginator<T> {
+  data: T[]
+  links: { url: string | null; label: string; active: boolean }[]
+  current_page: number
+  last_page: number
+  from: number | null
+  to: number | null
+  total: number
+}
 
 defineOptions({ layout: KbLayout })
 
@@ -34,7 +50,7 @@ interface Article {
 
 const props = defineProps<{
   categories: Category[]
-  featuredArticles: Article[]
+  featuredArticles: Paginator<Article>
   meta: { title: string; description: string }
   activeCategory: Category | null
   categoryArticles: Article[]
@@ -136,14 +152,21 @@ onMounted(() => {
 </script>
 
 <template>
+  <Head :title="props.meta.title">
+    <meta name="description" :content="props.meta.description || ''" head-key="description" />
+    <meta property="og:title" :content="props.meta.title" head-key="ogtitle" />
+    <meta property="og:description" :content="props.meta.description || ''" head-key="ogdescription" />
+    <meta property="og:type" content="website" head-key="ogtype" />
+  </Head>
+
   <div class="pb-12">
     <!-- Dedicated Category Page (OpenAI Style) -->
     <div v-if="props.activeCategory" class="max-w-4xl mx-auto space-y-8">
       <!-- Breadcrumbs & Back -->
-      <nav class="flex items-center gap-2 text-xs tracking-wider text-gray-400 dark:text-gray-550">
+      <nav class="flex items-center gap-2 text-xs tracking-wider text-gray-400 dark:text-gray-500">
         <a :href="`/${kbSlug}`" class="hover:text-primary-600 dark:hover:text-primary-400 transition-colors">{{ t('Help Center') }}</a>
         <i class="ti ti-chevron-right text-[10px]"></i>
-        <span class="text-gray-650 dark:text-gray-300 font-semibold">{{ props.activeCategory.name }}</span>
+        <span class="text-gray-600 dark:text-gray-300 font-semibold">{{ props.activeCategory.name }}</span>
       </nav>
 
       <!-- Category Hero Header -->
@@ -182,11 +205,11 @@ onMounted(() => {
             <h3 class="text-base font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
               {{ art.title }}
             </h3>
-            <p v-if="art.excerpt" class="text-xs text-gray-450 dark:text-gray-500 line-clamp-2 leading-relaxed">
+            <p v-if="art.excerpt" class="text-xs text-gray-400 dark:text-gray-500 line-clamp-2 leading-relaxed">
               {{ art.excerpt }}
             </p>
           </div>
-          <span class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-surface-800 text-gray-450 dark:text-gray-500 flex items-center justify-center group-hover:bg-primary-50 dark:group-hover:bg-primary-950/30 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-all shrink-0">
+          <span class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-surface-800 text-gray-400 dark:text-gray-500 flex items-center justify-center group-hover:bg-primary-50 dark:group-hover:bg-primary-950/30 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-all shrink-0">
             <i class="ti ti-chevron-right text-sm"></i>
           </span>
         </a>
@@ -220,13 +243,13 @@ onMounted(() => {
                   @keydown.enter="doSearch"
                   type="text"
                   :placeholder="t('Search articles, guides, questions...')"
-                  class="w-full pl-11 pr-10 py-3 bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-450 focus:outline-none text-sm"
+                  class="w-full pl-11 pr-10 py-3 bg-transparent text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:outline-none text-sm"
                 />
                 <button
                   v-if="searchQuery"
                   @click="clearSearch"
                   type="button"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-550 dark:hover:text-gray-300 w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-surface-800 transition-all cursor-pointer"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-surface-800 transition-all cursor-pointer"
                   :title="t('Clear search')"
                 >
                   <i class="ti ti-x text-sm"></i>
@@ -254,7 +277,7 @@ onMounted(() => {
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
                       <p class="text-sm font-bold text-gray-900 dark:text-white line-clamp-1 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{{ s.title }}</p>
-                      <p class="mt-1 line-clamp-2 text-xs text-gray-450 dark:text-gray-500 leading-normal">{{ s.excerpt }}</p>
+                      <p class="mt-1 line-clamp-2 text-xs text-gray-400 dark:text-gray-500 leading-normal">{{ s.excerpt }}</p>
                     </div>
                     <span class="w-7 h-7 rounded-lg bg-gray-100 dark:bg-surface-800 text-gray-500 flex items-center justify-center shrink-0 group-hover:bg-primary-50 dark:group-hover:bg-primary-950/30 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
                       <i class="ti ti-arrow-up-right text-sm"></i>
@@ -265,7 +288,7 @@ onMounted(() => {
 
               <!-- Dynamic Answer from AI -->
               <div v-if="answer" class="pt-2 border-t border-gray-100 dark:border-surface-750">
-                <p class="text-xs font-bold uppercase tracking-wider text-gray-450 dark:text-gray-500 mb-2 flex items-center gap-1.5">
+                <p class="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-1.5">
                   <i class="ti ti-sparkles text-primary-500"></i>
                   <span>{{ t('AI-Generated Answer') }}</span>
                 </p>
@@ -283,13 +306,13 @@ onMounted(() => {
             </div>
 
             <!-- Suggested Quick Links -->
-            <div v-if="props.featuredArticles.length && !hasSearchResults && !streaming" class="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs">
-              <span class="text-gray-450 dark:text-gray-500 font-medium">{{ t('Popular searches') }}:</span>
+            <div v-if="props.featuredArticles.data.length && !hasSearchResults && !streaming" class="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs">
+              <span class="text-gray-400 dark:text-gray-500 font-medium">{{ t('Popular searches') }}:</span>
               <a
-                v-for="article in props.featuredArticles.slice(0, 3)"
+                v-for="article in props.featuredArticles.data.slice(0, 3)"
                 :key="article.ulid"
                 :href="`/${kbSlug}/article/${article.slug}`"
-                class="px-3 py-1.5 rounded-full border border-gray-200 dark:border-surface-700 hover:border-primary-400 dark:hover:border-primary-500/50 bg-white dark:bg-surface-850 text-gray-650 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all font-medium"
+                class="px-3 py-1.5 rounded-full border border-gray-200 dark:border-surface-700 hover:border-primary-400 dark:hover:border-primary-500/50 bg-white dark:bg-surface-800 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-all font-medium"
               >
                 {{ article.title }}
               </a>
@@ -303,52 +326,72 @@ onMounted(() => {
         <div class="flex items-center gap-4">
           <h2 class="text-2xl font-bold text-gray-900 dark:text-white shrink-0">{{ t('Explore by Category') }}</h2>
           <div class="flex-grow h-px bg-gray-200 dark:bg-surface-800"></div>
+
+          <!-- Swiper hides these automatically (swiper-button-lock) when every
+               category already fits on screen, so there is nothing to scroll. -->
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" class="kb-cat-nav kb-cat-prev" :aria-label="t('Previous categories')">
+              <i class="ti ti-chevron-left"></i>
+            </button>
+            <button type="button" class="kb-cat-nav kb-cat-next" :aria-label="t('Next categories')">
+              <i class="ti ti-chevron-right"></i>
+            </button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          <a
-            v-for="cat in props.categories"
-            :key="cat.id"
-            :href="`/${kbSlug}?category=${cat.slug}`"
-            class="group relative block p-6 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-850 hover:border-primary-400 dark:hover:border-primary-500/50 rounded-2xl shadow-sm hover:shadow-md transition-all duration-305 hover:-translate-y-1 text-center"
-          >
-            <!-- Article Count Pill -->
-            <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-primary-50/70 dark:bg-primary-950/30 text-[10px] font-bold text-primary-700 dark:text-primary-400 group-hover:bg-primary-600 group-hover:text-white transition-colors duration-300">
-              {{ cat.articles_count }} {{ t('articles') }}
-            </span>
+        <Swiper
+          :modules="[SwiperNavigation, SwiperPagination]"
+          :slides-per-view="1.15"
+          :space-between="20"
+          :breakpoints="{ 640: { slidesPerView: 2 }, 768: { slidesPerView: 3 }, 1024: { slidesPerView: 4 } }"
+          :navigation="{ prevEl: '.kb-cat-prev', nextEl: '.kb-cat-next' }"
+          :pagination="{ clickable: true }"
+          class="kb-category-swiper !px-2 !pt-3 !pb-12"
+        >
+          <SwiperSlide v-for="cat in props.categories" :key="cat.id" class="!h-auto">
+            <a
+              :href="`/${kbSlug}?category=${cat.slug}`"
+              class="group relative flex h-full flex-col p-6 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-850 hover:border-primary-400 dark:hover:border-primary-500/50 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 text-center"
+            >
+              <!-- Article Count Pill -->
+              <span class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-primary-50/70 dark:bg-primary-950/30 text-[10px] font-bold text-primary-700 dark:text-primary-400 group-hover:bg-primary-600 group-hover:text-white transition-colors duration-300">
+                {{ cat.articles_count }} {{ t('articles') }}
+              </span>
 
-            <!-- Centered Icon -->
-            <div class="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary-50 to-indigo-50/50 dark:from-primary-950/20 dark:to-surface-800 text-primary-600 dark:text-primary-400 flex items-center justify-center group-hover:scale-110 group-hover:from-primary-600 group-hover:to-primary-500 group-hover:text-white transition-all duration-300 shadow-sm">
-              <i :class="cat.icon || 'ti ti-category'" class="text-2xl"></i>
-            </div>
+              <!-- Centered Icon -->
+              <div class="mx-auto w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary-50 to-primary-100/50 dark:from-primary-950/20 dark:to-surface-800 text-primary-600 dark:text-primary-400 flex items-center justify-center group-hover:scale-110 group-hover:from-primary-600 group-hover:to-primary-500 group-hover:text-white transition-all duration-300 shadow-sm">
+                <i :class="cat.icon || 'ti ti-category'" class="text-2xl"></i>
+              </div>
 
-            <h3 class="mt-4 text-base font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">
-              {{ cat.name }}
-            </h3>
+              <h3 class="mt-4 text-base font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight">
+                {{ cat.name }}
+              </h3>
 
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
-              {{ cat.description || t('View guides and resources.') }}
-            </p>
-          </a>
-        </div>
+              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                {{ cat.description || t('View guides and resources.') }}
+              </p>
+            </a>
+          </SwiperSlide>
+        </Swiper>
       </section>
 
       <!-- Popular Articles -->
-      <section v-if="props.featuredArticles.length" class="space-y-6">
+      <section v-if="props.featuredArticles.data.length" class="space-y-6">
         <div class="flex items-center gap-4">
           <h2 class="text-2xl font-bold text-gray-900 dark:text-white shrink-0">{{ t('Popular Articles') }}</h2>
           <div class="flex-grow h-px bg-gray-200 dark:bg-surface-800"></div>
+          <a :href="`/${kbSlug}/articles`" class="shrink-0 text-sm font-semibold text-primary-600 hover:text-primary-700 dark:text-primary-400 transition-colors">{{ t('View all') }}</a>
         </div>
 
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <a
-            v-for="a in props.featuredArticles"
+            v-for="a in props.featuredArticles.data"
             :key="a.ulid"
             :href="`/${kbSlug}/article/${a.slug}`"
             class="group block p-6 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-850 hover:border-primary-300 dark:hover:border-primary-500/40 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5"
           >
             <div class="flex items-center justify-between gap-3 mb-4">
-              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold tracking-tight bg-primary-50/50 dark:bg-primary-950/20 text-primary-750 dark:text-primary-300">
+              <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold tracking-tight bg-primary-50/50 dark:bg-primary-950/20 text-primary-700 dark:text-primary-300">
                 {{ a.category?.name || t('Help Guide') }}
               </span>
               <span class="inline-flex items-center gap-1 text-[10px] text-gray-400 font-bold uppercase tracking-wider bg-gray-50 dark:bg-surface-800 px-2 py-1 rounded-md">
@@ -361,7 +404,7 @@ onMounted(() => {
               {{ a.title }}
             </h3>
 
-            <p class="text-xs text-gray-450 dark:text-gray-550 leading-relaxed line-clamp-3 mb-4">
+            <p class="text-xs text-gray-400 dark:text-gray-500 leading-relaxed line-clamp-3 mb-4">
               {{ a.excerpt }}
             </p>
 
@@ -374,6 +417,16 @@ onMounted(() => {
             </div>
           </a>
         </div>
+
+        <Pagination
+          v-if="props.featuredArticles.last_page > 1"
+          :links="props.featuredArticles.links"
+          :from="props.featuredArticles.from"
+          :to="props.featuredArticles.to"
+          :total="props.featuredArticles.total"
+          :current-page="props.featuredArticles.current_page"
+          :last-page="props.featuredArticles.last_page"
+        />
       </section>
     </div>
   </div>
@@ -406,5 +459,41 @@ onMounted(() => {
 @keyframes kb-pulse {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 1; }
+}
+
+.kb-category-swiper :deep(.swiper-pagination-bullet) {
+  background: color-mix(in srgb, var(--color-primary-500) 40%, transparent);
+  opacity: 1;
+}
+.kb-category-swiper :deep(.swiper-pagination-bullet-active) {
+  background: var(--color-primary-500);
+}
+
+.kb-cat-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--color-primary-500) 22%, transparent);
+  background: color-mix(in srgb, var(--color-primary-500) 8%, transparent);
+  color: var(--color-primary-500);
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.kb-cat-nav:hover:not(.swiper-button-disabled) {
+  background: var(--color-primary-500);
+  border-color: var(--color-primary-500);
+  color: #fff;
+}
+
+/* Swiper adds this class at the first/last slide. */
+.kb-cat-nav.swiper-button-disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
 }
 </style>

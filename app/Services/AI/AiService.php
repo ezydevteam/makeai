@@ -212,7 +212,7 @@ class AiService
         try {
             TokenGuard::before($user, $template, $finalModel);
         } catch (Throwable $e) {
-            TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $finalModel, 'tool', 0, 0, [
                 'template_slug' => $template->slug,
                 'preflight_error' => class_basename($e),
             ]);
@@ -236,7 +236,7 @@ class AiService
                 $result['output_tokens'],
                 $result['model'],
                 $providerName,
-                'template',
+                'tool',
                 ['template_slug' => $template->slug, 'personal_api_key' => (bool) $completion->apiKey],
                 ! $completion->apiKey
             );
@@ -255,7 +255,7 @@ class AiService
                 'tokens_output' => $result['output_tokens'],
             ])->onQueue('ai');
         } catch (Throwable $e) {
-            TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $finalModel, 'tool', 0, 0, [
                 'template_slug' => $template->slug,
                 'error' => $e->getMessage(),
             ]);
@@ -351,7 +351,7 @@ class AiService
         try {
             TokenGuard::before($user, $template, $finalModel);
         } catch (Throwable $e) {
-            TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $finalModel, 'tool', 0, 0, [
                 'template_slug' => $template->slug,
                 'preflight_error' => class_basename($e),
             ]);
@@ -383,7 +383,7 @@ class AiService
                     $usageStats['output_tokens'],
                     $usageStats['model'] ?? $finalModel,
                     $providerName,
-                    'template',
+                    'tool',
                     ['template_slug' => $template->slug, 'personal_api_key' => (bool) $completion->apiKey],
                     ! $completion->apiKey
                 );
@@ -400,7 +400,7 @@ class AiService
                 ];
             }
         } catch (Throwable $e) {
-            TokenGuard::recordFailure($user, $providerName, $finalModel, 'template', 0, 0, [
+            TokenGuard::recordFailure($user, $providerName, $finalModel, 'tool', 0, 0, [
                 'template_slug' => $template->slug,
                 'error' => $e->getMessage(),
             ]);
@@ -571,6 +571,38 @@ class AiService
         }
     }
 
+    /**
+     * Push the DB-vault API key (and base URL) for a provider into the SDK's config,
+     * so the AiManager can authenticate when it resolves an image/audio/transcription
+     * provider directly.
+     *
+     * The text path never needs this because it goes through LaravelAiDriver, which does
+     * the same injection. The media methods call the AiManager themselves, so without
+     * this they'd only ever see the .env key — breaking any provider configured purely
+     * through the admin key vault. No-op when the provider isn't registered or has no
+     * stored key (the SDK then falls back to config/.env, preserving old behaviour).
+     */
+    private static function injectVaultKey(string $providerName): void
+    {
+        $driverName = strtolower(trim($providerName));
+
+        if (config("ai.providers.{$driverName}") === null) {
+            return; // not an SDK-config provider (e.g. an addon-only provider name)
+        }
+
+        $keyRecord = \App\Models\AiKey::forProvider($driverName)
+            ->available()
+            ->orderBy('usage_count', 'asc')
+            ->first();
+
+        if (! $keyRecord) {
+            return; // fall back to whatever config/.env already holds
+        }
+
+        config()->set("ai.providers.{$driverName}.key", $keyRecord->api_key);
+        $keyRecord->update(['last_used_at' => now(), 'usage_count' => $keyRecord->usage_count + 1]);
+    }
+
     // ─── 14C.1: Image Generation ─────────────────────────────────
 
     /**
@@ -583,38 +615,72 @@ class AiService
         ?string $size = null,
         ?string $quality = null,
         ?User $user = null,
+        array $attachments = [],
+        int $count = 1,
     ): array {
         $providerName = $provider ?? settings('ai_image_provider', config('ai.default_for_images', 'openai'));
+        // The text path resolves keys through ProviderRegistry/LaravelAiDriver, which
+        // injects the DB-vault key into config for the SDK. The media path calls the
+        // AiManager directly and would otherwise read only the .env key — so a provider
+        // configured solely through the admin key vault (e.g. Google/Gemini) sends a null
+        // auth header and the request dies before it leaves. Inject the vault key first.
+        self::injectVaultKey($providerName);
         $provider = app(AiManager::class)->imageProvider($providerName);
 
         try {
-            TokenGuard::before($user, null, $model);
+            // Media is billed per unit, not per token — gate on the real per-image cost.
+            TokenGuard::beforeMedia($user, 'image', $model, $count);
 
             $response = $provider->image(
                 prompt: $prompt,
+                attachments: $attachments,
                 size: $size,
                 quality: $quality,
                 model: $model,
             );
 
-            // Estimate tokens for image generation (rough estimate: 1000 tokens per image)
-            $estimatedTokens = 1000 * count($response->images);
+            // Post-generation safety gate. Runs BEFORE afterMedia so a blocked
+            // image is never billed. No-op unless Content Moderation is enabled
+            // in `block` mode with an image-capable provider; flag mode logs only.
+            //
+            // The URL-based scan only applies to providers that return a hosted URL.
+            // The SDK's GeneratedImage carries inline base64 with no URL property, so
+            // guard the access — reading a missing property would warn — and skip the
+            // scan for inline images (the active moderation provider fetches by URL).
+            $moderation = \App\Services\ContentModerationService::fromSettings();
+            foreach ($response->images as $image) {
+                $imageUrl = isset($image->url) && is_string($image->url) ? $image->url : '';
 
-            TokenGuard::after(
+                if ($imageUrl !== '' && $moderation->imageViolates($imageUrl, 'image-generator')) {
+                    throw new \RuntimeException(translate('This image was blocked by content safety filters.'));
+                }
+            }
+
+            TokenGuard::afterMedia(
                 $user,
-                $estimatedTokens,
-                0,
+                'image',
                 $response->meta->model,
                 $providerName,
-                'image_generation',
-                ['tool_slug' => 'image_generator']
+                $count,
+                ['type' => 'image_generation', 'tool_slug' => 'image_generator'],
             );
 
+            // The SDK returns each image as inline base64 (Laravel\Ai\…\GeneratedImage:
+            // ->image is base64, ->mime the type, ->content() the raw bytes) — not a hosted
+            // URL. Expose the base64 + mime, and also a data: URI so a display-only caller
+            // still has a `url` to render. `revised_prompt` isn't carried by this DTO.
             return [
-                'images' => collect($response->images)->map(fn ($img) => [
-                    'url' => $img->url,
-                    'revised_prompt' => $img->revisedPrompt,
-                ])->all(),
+                'images' => collect($response->images)->map(function ($img) {
+                    $b64 = $img->image ?? null;
+                    $mime = $img->mime ?? 'image/png';
+
+                    return [
+                        'b64' => $b64,
+                        'mime' => $mime,
+                        'url' => $b64 ? "data:{$mime};base64,{$b64}" : null,
+                        'revised_prompt' => null,
+                    ];
+                })->all(),
                 'model' => $response->meta->model,
             ];
         } catch (Throwable $e) {
@@ -640,10 +706,11 @@ class AiService
     ): array {
         $providerName = $provider ?? settings('ai_audio_provider', config('ai.default_for_audio', 'openai'));
 
+        self::injectVaultKey($providerName);
         $provider = app(AiManager::class)->audioProvider($providerName);
 
         try {
-            TokenGuard::before($user, null, $model);
+            TokenGuard::beforeMedia($user, 'audio', $model);
 
             $response = $provider->audio(
                 text: $text,
@@ -651,17 +718,13 @@ class AiService
                 model: $model,
             );
 
-            // Estimate tokens for audio generation (rough estimate: 1 token per 4 chars)
-            $estimatedTokens = (int) ceil(mb_strlen($text) / 4);
-
-            TokenGuard::after(
+            TokenGuard::afterMedia(
                 $user,
-                $estimatedTokens,
-                0,
+                'audio',
                 $response->meta->model,
                 $providerName,
-                'audio_generation',
-                ['tool_slug' => 'audio_generator']
+                1,
+                ['type' => 'audio_generation', 'tool_slug' => 'audio_generator'],
             );
 
             return [
@@ -691,10 +754,11 @@ class AiService
     ): array {
         $providerName = $provider ?? settings('ai_transcription_provider', config('ai.default_for_transcription', 'openai'));
 
+        self::injectVaultKey($providerName);
         $provider = app(AiManager::class)->transcriptionProvider($providerName);
 
         try {
-            TokenGuard::before($user, null, $model);
+            TokenGuard::beforeMedia($user, 'transcription', $model);
 
             $response = $provider->transcribe(
                 audio: $audio,
@@ -703,17 +767,13 @@ class AiService
                 model: $model,
             );
 
-            // Estimate tokens for transcription (rough estimate: 1 token per 4 chars of output)
-            $estimatedTokens = (int) ceil(mb_strlen($response->text) / 4);
-
-            TokenGuard::after(
+            TokenGuard::afterMedia(
                 $user,
-                0,
-                $estimatedTokens,
+                'transcription',
                 $response->meta->model,
                 $providerName,
-                'transcription',
-                ['tool_slug' => 'transcriber']
+                1,
+                ['type' => 'transcription', 'tool_slug' => 'transcriber'],
             );
 
             return [

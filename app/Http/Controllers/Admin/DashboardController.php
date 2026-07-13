@@ -13,7 +13,6 @@ use App\Models\GatewaySubscription;
 use App\Models\Comment;
 use App\Models\LoginHistory;
 use App\Models\Payment;
-use App\Models\Plan;
 use App\Models\SupportTicket;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -49,14 +48,6 @@ class DashboardController extends Controller
     {
         $emptySeries = ['today' => [], '7d' => [], '30d' => [], '90d' => [], 'lifetime' => []];
 
-        foreach (['totalRevenue', 'revenueToday', 'revenueThisMonth', 'revenueLastMonth', 'mrr'] as $key) {
-            $data['dashboardStats'][$key] = 0.0;
-        }
-
-        foreach (['activeSubscriptions', 'trialingSubscriptions', 'pastDueSubscriptions'] as $key) {
-            $data['dashboardStats'][$key] = 0;
-        }
-
         foreach (['revenueChart', 'subscriptionRevenueChart', 'subscriptionConversionsChart', 'subscriptionRetainedChart', 'subscriptionChurnedChart', 'revenueVsCost', 'proSubs'] as $key) {
             $data['dashboardCharts'][$key] = $emptySeries;
         }
@@ -79,62 +70,9 @@ class DashboardController extends Controller
         $selectedPeriodStart = null;
         $monthStart = $now->copy()->startOfMonth();
         $lastMonthStart = $now->copy()->subMonth()->startOfMonth();
-        $lastMonthEnd = $now->copy()->subMonth()->endOfMonth();
-        $today = $now->toDateString();
 
-        // ─── 1. User stats ───
-        $totalUsers = User::count();
-        $newUsersToday = User::whereDate('created_at', $today)->count();
-        $newUsersThisMonth = User::where('created_at', '>=', $monthStart)->count();
-        $newUsersLastMonth = User::whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->count();
-        $activeUsers = User::where('is_active', true)->count();
-        $bannedUsers = User::where('is_banned', true)->count();
-
-        // ─── 2. Revenue stats ───
-        $totalRevenue = Payment::where('status', 'completed')->sum('amount');
-        $revenueToday = Payment::where('status', 'completed')->whereDate('created_at', $today)->sum('amount');
-        $revenueThisMonth = Payment::where('status', 'completed')->where('created_at', '>=', $monthStart)->sum('amount');
-        $revenueLastMonth = Payment::where('status', 'completed')->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])->sum('amount');
-        
-        // MRR: Monthly Recurring Revenue from active subscriptions
-        $mrr = User::where('subscription_status', 'active')
-            ->where('subscription_ends_at', '>=', $now)
-            ->whereHas('plan')
-            ->with('plan:id,price_monthly')
-            ->get()
-            ->sum(fn($user) => $user->plan->price_monthly ?? 0);
-
-        // ─── 3. AI Usage stats ───
-        $totalAiRequests = AiUsageLog::count();
-        $aiRequestsToday = AiUsageLog::whereDate('created_at', $today)->count();
-        $totalCreditsUsed = AiUsageLog::sum('credits_used');
-        $creditsUsedToday = AiUsageLog::whereDate('created_at', $today)->sum('credits_used');
-        $creditsUsedThisMonth = AiUsageLog::where('created_at', '>=', $monthStart)->sum('credits_used');
-        $totalCost = AiUsageLog::sum('cost_usd');
-        $costToday = AiUsageLog::whereDate('created_at', $today)->sum('cost_usd');
-        $tokensUsedToday = AiUsageLog::whereDate('created_at', $today)->sum(\DB::raw('input_tokens + output_tokens'));
-        $totalOutputTokens = AiUsageLog::sum('output_tokens');
-        $outputTokensToday = AiUsageLog::whereDate('created_at', $today)->sum('output_tokens');
-
-        // ─── 3b. Internal AI Usage stats (System User) ───
+        // System (internal AI) user — drives the internal-usage card comparisons and charts below.
         $systemUser = User::where('email', User::internalAiEmail())->first();
-        $internalAiRequests = $systemUser ? AiUsageLog::where('user_id', $systemUser->id)->count() : 0;
-        $internalAiThisMonth = $systemUser ? AiUsageLog::where('user_id', $systemUser->id)->where('created_at', '>=', $monthStart)->count() : 0;
-        $internalAiCost = $systemUser ? round((float) AiUsageLog::where('user_id', $systemUser->id)->sum('cost_usd'), 4) : 0;
-
-        // ─── 4. Subscription stats ───
-        $activeSubscriptions = User::where('subscription_status', 'active')
-            ->where('subscription_ends_at', '>=', $now)
-            ->count();
-        $trialingSubscriptions = User::where('subscription_status', 'trialing')
-            ->where('subscription_ends_at', '>=', $now)
-            ->count();
-        $pastDueSubscriptions = User::where('subscription_status', 'past_due')->count();
-        $activePlans = Plan::where('is_active', true)->count();
-
-        // ─── 5. Ticket & comment stats ───
-        $openTickets = SupportTicket::whereIn('status', ['open', 'in_progress'])->count();
-        $pendingComments = Comment::where('status', 'pending')->count();
 
         // ─── 0. Earliest data point for lifetime charts ───
         $earliestUser = User::min('created_at') ?? $now->copy()->subYear();
@@ -150,10 +88,21 @@ class DashboardController extends Controller
 
         $cardComparisons = [];
         foreach ($cardComparisonPeriods as $period => $days) {
-            $currentStart = $now->copy()->subDays($days - 1)->startOfDay();
-            $currentEnd = $now->copy()->endOfDay();
-            $previousStart = $now->copy()->subDays($days * 2 - 1)->startOfDay();
-            $previousEnd = $now->copy()->subDays($days)->endOfDay();
+            if ($period === '30d') {
+                // The 30d card value sums a month-to-date series (startOfMonth → now),
+                // so its trend must compare month-to-date against the SAME elapsed slice
+                // of last month — not a rolling 30-day window.
+                $elapsedDays = (int) $monthStart->diffInDays($now);
+                $currentStart = $monthStart->copy();
+                $currentEnd = $now->copy()->endOfDay();
+                $previousStart = $lastMonthStart->copy();
+                $previousEnd = $lastMonthStart->copy()->addDays($elapsedDays)->endOfDay();
+            } else {
+                $currentStart = $now->copy()->subDays($days - 1)->startOfDay();
+                $currentEnd = $now->copy()->endOfDay();
+                $previousStart = $now->copy()->subDays($days * 2 - 1)->startOfDay();
+                $previousEnd = $now->copy()->subDays($days)->endOfDay();
+            }
 
             // Batch User queries
             $signupsCurrent = User::whereBetween('created_at', [$currentStart, $currentEnd])->count();
@@ -356,12 +305,16 @@ class DashboardController extends Controller
             'count'
         );
 
-        // Special case: subscriptionRetainedChart - cumulative count of active subscribers
-        $subscriptionRetainedChart = $this->buildCumulativeSeries(
-            User::whereIn('subscription_status', ['active', 'trialing']),
+        // Subscription health (premium): new subscriptions started per period, mirrored
+        // against the per-period churn series below. Sourced from billing subscriptions —
+        // NOT the users table — and stripped for non-pro installs in stripPremiumData().
+        // The cumulative active-subscription curve lives separately in the proSubs chart.
+        $subscriptionRetainedChart = $this->buildSeriesFromQuery(
+            GatewaySubscription::whereIn('status', ['active', 'trialing']),
             'created_at',
             $now,
-            $lifetimeStart
+            $lifetimeStart,
+            'count'
         );
 
         // Special case: subscriptionChurnedChart - uses cancelled_at or current_period_end
@@ -594,25 +547,24 @@ class DashboardController extends Controller
             ->toArray();
 
         // ─── 17. Lists: recent pro subscriptions (5) ───
-        $recentProSubscriptions = User::query()
-            ->with('plan:id,name')
-            ->whereIn('subscription_status', ['active', 'trialing'])
-            ->latest('updated_at')
+        $recentProSubscriptions = GatewaySubscription::query()
+            ->with(['user:id,ulid,name,email', 'plan:id,name'])
+            ->whereIn('status', ['active', 'trialing'])
+            ->latest()
             ->limit(5)
             ->get()
-            ->map(fn (User $user) => [
-                'id' => $user->id,
-                'status' => $user->subscription_status,
-                'gateway' => null,
-                'billing_cycle' => null,
-                'created_at' => optional($user->updated_at ?? $user->created_at)?->toISOString(),
-                'user' => [
-                    'ulid' => $user->ulid,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                ],
-                'plan' => $user->plan ? [
-                    'name' => $user->plan->name,
+            ->map(fn (GatewaySubscription $sub) => [
+                'id' => $sub->id,
+                'status' => $sub->status,
+                'billing_cycle' => $sub->billing_cycle,
+                'created_at' => optional($sub->created_at)?->toISOString(),
+                'user' => $sub->user ? [
+                    'ulid' => $sub->user->ulid,
+                    'name' => $sub->user->name,
+                    'email' => $sub->user->email,
+                ] : null,
+                'plan' => $sub->plan ? [
+                    'name' => $sub->plan->name,
                 ] : null,
             ])
             ->toArray();
@@ -627,38 +579,6 @@ class DashboardController extends Controller
         $addonStats = $this->getAddonStats();
 
         return [
-            'dashboardStats' => [
-                'totalUsers' => $totalUsers,
-                'newUsersToday' => $newUsersToday,
-                'newUsersThisMonth' => $newUsersThisMonth,
-                'newUsersLastMonth' => $newUsersLastMonth,
-                'activeUsers' => $activeUsers,
-                'bannedUsers' => $bannedUsers,
-                'totalRevenue' => (float) $totalRevenue,
-                'revenueToday' => (float) $revenueToday,
-                'revenueThisMonth' => (float) $revenueThisMonth,
-                'revenueLastMonth' => (float) $revenueLastMonth,
-                'mrr' => (float) $mrr,
-                'totalAiRequests' => $totalAiRequests,
-                'aiRequestsToday' => $aiRequestsToday,
-                'totalCreditsUsed' => (float) $totalCreditsUsed,
-                'creditsUsedToday' => (float) $creditsUsedToday,
-                'creditsUsedThisMonth' => (float) $creditsUsedThisMonth,
-                'totalCost' => round((float) $totalCost, 4),
-                'costToday' => round((float) $costToday, 4),
-                'tokensUsedToday' => (int) $tokensUsedToday,
-                'totalOutputTokens' => (int) $totalOutputTokens,
-                'outputTokensToday' => (int) $outputTokensToday,
-                'internalAiRequests' => (int) $internalAiRequests,
-                'internalAiThisMonth' => (int) $internalAiThisMonth,
-                'internalAiCost' => (float) $internalAiCost,
-                'activeSubscriptions' => $activeSubscriptions,
-                'trialingSubscriptions' => $trialingSubscriptions,
-                'pastDueSubscriptions' => $pastDueSubscriptions,
-                'activePlans' => $activePlans,
-                'openTickets' => $openTickets,
-                'pendingComments' => $pendingComments,
-            ],
             'dashboardCharts' => [
                 'signupsChart' => $signupsChart,
                 'revenueChart' => $revenueChart,

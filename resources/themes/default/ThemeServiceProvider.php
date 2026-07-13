@@ -6,6 +6,7 @@
 namespace Resources\Themes\Default;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\View;
 
 class ThemeServiceProvider extends ServiceProvider
 {
@@ -16,8 +17,10 @@ class ThemeServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Override views:
-        // $this->loadViewsFrom(__DIR__.'/views', 'theme');
+        // Prepend the theme's views folder to Laravel's view paths so theme templates take precedence
+        if (is_dir(__DIR__.'/views')) {
+            View::prependLocation(__DIR__.'/views');
+        }
 
         // Publish assets:
         // $this->publishes([__DIR__.'/assets' => public_path('themes/default')], 'theme-default');

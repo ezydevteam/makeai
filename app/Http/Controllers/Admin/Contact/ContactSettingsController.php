@@ -8,13 +8,6 @@ use Illuminate\Http\RedirectResponse;
 
 class ContactSettingsController extends Controller
 {
-    public function edit(): RedirectResponse
-    {
-        $this->authorizeContact();
-
-        return redirect()->route('admin.contact.messages.index', ['settings' => 1]);
-    }
-
     public function update(ContactSettingsRequest $request)
     {
         foreach ($request->validated() as $key => $value) {

@@ -17,22 +17,28 @@ class KbSettingsController extends Controller
             'public_slug' => addon_setting('public-knowledge-base', 'public_slug', 'help'),
             'page_title' => addon_setting('public-knowledge-base', 'page_title', 'Help Center'),
             'page_description' => addon_setting('public-knowledge-base', 'page_description', ''),
+            'logo' => addon_setting('public-knowledge-base', 'logo', ''),
+            'header_menu' => addon_setting('public-knowledge-base', 'header_menu', 'main'),
+            'footer_menu' => addon_setting('public-knowledge-base', 'footer_menu', 'footer'),
             'show_vote_buttons' => addon_setting('public-knowledge-base', 'show_vote_buttons', true),
             'allow_guest_search' => addon_setting('public-knowledge-base', 'allow_guest_search', true),
             'widget_enabled' => addon_setting('public-knowledge-base', 'widget_enabled', false),
             'widget_accent_color' => addon_setting('public-knowledge-base', 'widget_accent_color', '#10b981'),
             'ai_model' => addon_setting('public-knowledge-base', 'ai_model', ''),
-            'embedding_model' => addon_setting('public-knowledge-base', 'embedding_model', ''),
             'top_k' => addon_setting('public-knowledge-base', 'top_k', 5),
             'max_answer_tokens' => addon_setting('public-knowledge-base', 'max_answer_tokens', 512),
             'provider' => addon_setting('public-knowledge-base', 'provider', ''),
+            'system_prompt' => addon_setting('public-knowledge-base', 'system_prompt', ''),
         ];
 
         $providers = $this->configuredProviders();
 
+        $menus = \App\Models\Menu::orderBy('name')->get(['name', 'slug']);
+
         return Inertia::render('Addons/public-knowledge-base/Admin/Settings', [
             'settings' => $settings,
             'providers' => $providers,
+            'menus' => $menus,
         ]);
     }
 

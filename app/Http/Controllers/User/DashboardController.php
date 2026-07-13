@@ -8,7 +8,6 @@ use App\Models\CreditTransaction;
 use App\Models\Document;
 use App\Models\LoginHistory;
 use App\Models\SupportTicket;
-use App\Models\UserCollection;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,24 +53,14 @@ class DashboardController extends Controller
     {
         return [
             'credits' => (float) $user->credits,
-            'credits_used_today' => (float) $user->credits_used_today,
             'credits_used_month' => (float) $user->credits_used_month,
             'total_conversations' => (is_addon_active('ai-chatbot') && \Illuminate\Support\Facades\Schema::hasTable('conversations'))
                 ? $user->conversations()->count()
                 : 0,
             'total_documents' => $user->documents()->count(),
-            'total_favorites' => $user->favorites()->count(),
-            'total_collections' => UserCollection::where('user_id', $user->id)->count(),
             'total_open_support_tickets' => SupportTicket::query()
                 ->where('user_id', $user->id)
                 ->whereIn('status', ['open', 'in_progress'])
-                ->count(),
-            'active_days' => $user->creditTransactions()
-                ->where('type', 'usage')
-                ->where('created_at', '>=', now()->subDays(30)->startOfDay())
-                ->get()
-                ->groupBy(fn (CreditTransaction $transaction) => $transaction->created_at?->toDateString() ?? '')
-                ->filter(fn ($group, string $date) => $date !== '')
                 ->count(),
             'lifetime_credits_used' => (float) $user->creditTransactions()
                 ->where('type', 'usage')
@@ -129,7 +118,7 @@ class DashboardController extends Controller
                 'description' => $tool->description,
                 'icon' => $tool->icon,
                 'color' => $tool->color,
-                'requires_pro' => (bool) $tool->requires_pro,
+                'requires_pro' => $tool->isProRequired(),
                 'is_new' => $tool->created_at && $tool->created_at->gt(now()->subDays(30)),
             ])
             ->values()
@@ -150,7 +139,6 @@ class DashboardController extends Controller
                 'id' => $conversation->id,
                 'ulid' => $conversation->ulid,
                 'title' => $conversation->title ?: translate('Untitled'),
-                'model' => $conversation->model,
                 'message_count' => $conversation->message_count,
                 'last_message_at' => optional($conversation->last_message_at)->toISOString(),
             ])
@@ -195,6 +183,13 @@ class DashboardController extends Controller
 
     private function planData(User $user): ?array
     {
+        // Plans/subscriptions are an Extended-license feature. Under Regular
+        // license (or Extended with subscriptions off) there is no plan concept,
+        // so send nothing — the dashboard hides the plan card accordingly.
+        if (! isProAvailable()) {
+            return null;
+        }
+
         $plan = $user->plan;
 
         if (! $plan) {
@@ -209,8 +204,6 @@ class DashboardController extends Controller
             'subscription_status' => $user->subscription_status,
             'subscription_ends_at' => optional($user->subscription_ends_at)->toISOString(),
             'trial_ends_at' => optional($user->trial_ends_at)->toISOString(),
-            'daily_limit' => $user->daily_limit ? (float) $user->daily_limit : null,
-            'monthly_limit' => $user->monthly_limit ? (float) $user->monthly_limit : null,
         ];
     }
 

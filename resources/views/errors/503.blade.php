@@ -1,7 +1,7 @@
 @php
     $appName = settings('app_name', 'Application');
     $primaryColor = settings('primary_color', '#8b5cf6');
-    $logoUrl = settings('app_logo_light') ? Storage::url(settings('app_logo_light')) : null;
+    $logoUrl = media_url(settings('site_logo_light')) ?: null;
     $isAdminError = request()->is('admin') || request()->is('admin/*');
     $primaryActionUrl = $isAdminError ? route('admin.dashboard') : url('/');
     $primaryActionLabel = $isAdminError ? translate('Back to Dashboard') : translate('Go to Homepage');
@@ -79,7 +79,7 @@
         @if($logoUrl)
             <img src="{{ $logoUrl }}" alt="{{ $appName }}" class="logo-img">
         @else
-            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 2)->upper() }}</div>
+            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 1)->upper() }}</div>
         @endif
     </div>
     <div class="code" aria-label="503">

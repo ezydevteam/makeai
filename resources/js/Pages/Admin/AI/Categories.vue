@@ -2,12 +2,14 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import type { SelectOption } from '@/Components/AppSelect.vue'
-import AppColorPicker from '@/Components/AppColorPicker.vue'
-import IconClassSelect from '@/Components/IconClassSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import type { SelectOption } from '@/Components/UI/AppSelect.vue'
+import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
+import IconClassSelect from '@/Components/Admin/IconClassSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -290,223 +292,25 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="t('AI Tool Categories — Admin')" />
 
-    <Teleport to="body">
-        <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div
-                v-if="formModalOpen"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-                @click.self="resetForm"
-            >
-                <Transition
-                    appear
-                    enter-active-class="transition duration-200 ease-out"
-                    enter-from-class="translate-y-2 scale-95 opacity-0"
-                    enter-to-class="translate-y-0 scale-100 opacity-100"
-                    leave-active-class="transition duration-150 ease-in"
-                    leave-from-class="translate-y-0 scale-100 opacity-100"
-                    leave-to-class="translate-y-2 scale-95 opacity-0"
-                >
-                    <section
-                        v-if="formModalOpen"
-                        class="flex max-h-[90vh] w-full sm:max-w-3xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900"
-                    >
-                        <div class="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                            <div>
-                                <h2 class="text-lg font-bold text-gray-900 dark:text-white">
-                                    {{ editingId ? t('Edit Category') : t('Create Category') }}
-                                </h2>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">
-                                    {{ editingId
-                                        ? t('Update category details, hierarchy, and access requirements.')
-                                        : t('Create a new AI category with icon, color, and access settings.') }}
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800"
-                                @click="resetForm"
-                            >
-                                <i class="ti ti-x text-base"></i>
-                            </button>
-                        </div>
-
-                        <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
-                            <div class="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Name') }}</label>
-                                        <input
-                                            v-model="form.name"
-                                            @input="syncSlug"
-                                            :placeholder="t('Enter category name')"
-                                            type="text"
-                                            required
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        />
-                                        <p v-if="form.errors.name" class="mt-1 text-xs text-danger-500">{{ form.errors.name }}</p>
-                                    </div>
-
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
-                                        <input
-                                            v-model="form.slug"
-                                            @input="markSlugTouched"
-                                            :placeholder="t('Enter category slug')"
-                                            type="text"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        />
-                                        <p class="mt-1 text-xs text-gray-400">{{ t('Generated from name. Edit if needed.') }}</p>
-                                        <p v-if="form.errors.slug" class="mt-1 text-xs text-danger-500">{{ form.errors.slug }}</p>
-                                    </div>
-                                </div>
-
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <AppSelect
-                                        v-model="form.parent_id"
-                                        :options="parentOptions"
-                                        :label="t('Parent')"
-                                        :placeholder="t('No parent')"
-                                    />
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Sort order') }}</label>
-                                        <input
-                                            v-model.number="form.sort_order"
-                                            type="number"
-                                            min="0"
-                                            :placeholder="t('Enter sort order')"
-                                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</label>
-                                    <textarea
-                                        v-model="form.description"
-                                        :placeholder="t('Enter category description')"
-                                        rows="3"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    ></textarea>
-                                </div>
-
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <IconClassSelect v-model="form.icon" :label="t('Icon')" />
-                                    <AppColorPicker v-model="form.color" :label="t('Color')" />
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta title (SEO)') }}</label>
-                                    <input
-                                        v-model="form.meta_title"
-                                        :placeholder="t('Enter meta title')"
-                                        type="text"
-                                        maxlength="160"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta description (SEO)') }}</label>
-                                    <textarea
-                                        v-model="form.meta_description"
-                                        :placeholder="t('Enter meta description')"
-                                        rows="3"
-                                        maxlength="500"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    ></textarea>
-                                </div>
-
-                                <div class="grid gap-3 md:grid-cols-2">
-                                    <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
-                                        <span>
-                                            <span class="block text-sm font-medium text-gray-700 dark:text-white">{{ t('Active Category') }}</span>
-                                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Make active or inactive this ai category') }}</span>
-                                        </span>
-                                        <button
-                                            type="button"
-                                            :class="form.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                            class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                            @click="form.is_active = !form.is_active"
-                                        >
-                                            <span
-                                                :class="form.is_active ? 'translate-x-4' : 'translate-x-0'"
-                                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                                            />
-                                        </button>
-                                    </label>
-                                    <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800/60">
-                                        <AppSelect
-                                            v-model="form.access_level"
-                                            :options="accessLevels"
-                                            :label="t('Access Level')"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="shrink-0 border-t border-gray-100 bg-gray-50/80 px-6 py-3 dark:border-surface-800 dark:bg-surface-950">
-                                <div class="flex items-center justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                                        @click="resetForm"
-                                    >
-                                        {{ t('Cancel') }}
-                                    </button>
-                                    <button
-                                        :disabled="form.processing"
-                                        type="submit"
-                                        class="rounded-lg btn-primary px-5 disabled:opacity-50"
-                                    >
-                                        {{ form.processing ? t('Saving...') : editingId ? t('Save Changes') : t('Create Category') }}
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-                    </section>
-                </Transition>
-            </div>
-        </Transition>
-    </Teleport>
-
-    <ActionConfirmModal
-        :open="Boolean(deleteTarget)"
-        :title="t('Delete Category')"
-        :message="t('This category will be permanently removed. Tools in this category will be detached, not deleted.')"
-        :confirm-label="t('Delete')"
-        :processing-label="t('Deleting...')"
-        :processing="deleteProcessing"
-        variant="danger"
-        @cancel="deleteTarget = null"
-        @confirm="executeDelete"
-    />
-
-    <div class="w-full px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10" @click="closeAllMenus">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-6">
+    <div class="w-full space-y-6 px-4 py-6 sm:px-6 lg:px-6 xl:px-8 2xl:px-10" @click="closeAllMenus">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tool Categories') }}</h1>
                 <p class="mt-1 w-full sm:max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Manage the dynamic groups used by public tool pages and admin templates. Categories control tool visibility and access requirements.') }}
                 </p>
             </div>
-            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
+            <div class="shrink-0 flex gap-3">
                 <Link
                     :href="route('admin.ai.tools.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
                 >
                     <i class="ti ti-apps text-base"></i>
                     {{ t('All Tools') }}
                 </Link>
                 <button
                     type="button"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm text-white w-full sm:w-auto"
+                    class="grow btn-primary-admin inline-flex items-center justify-center gap-2"
                     @click="openCreateModal"
                 >
                     <i class="ti ti-plus text-base"></i>
@@ -519,7 +323,7 @@ onBeforeUnmount(() => {
             <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                        <div class="flex-1 min-w-[240px]">
+                        <div class="flex-1 min-w-[220px] sm:max-w-xs">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -551,14 +355,12 @@ onBeforeUnmount(() => {
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
-                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                                <AppSelect
-                                    v-model="statusFilter"
-                                    :options="statusFilterOptions"
-                                    :placeholder="t('All status')"
-                                />
-                            </div>
+                        <div class="min-w-[150px]">
+                            <AppSelect
+                                v-model="statusFilter"
+                                :options="statusFilterOptions"
+                                :placeholder="t('All status')"
+                            />
                         </div>
                     </div>
                 </div>
@@ -599,7 +401,7 @@ onBeforeUnmount(() => {
                                     <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Parent') }}</th>
                                     <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tools') }}</th>
                                     <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Active') }}</th>
-                                    <th class="px-4 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Created') }}</th>
+                                    <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Created') }}</th>
                                     <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
                                 </tr>
                             </thead>
@@ -610,12 +412,18 @@ onBeforeUnmount(() => {
                                     class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30"
                                 >
                                     <td class="px-6 py-4">
-                                        <div class="flex items-center gap-2.5">
-                                            <span
-                                                v-if="category.color"
-                                                class="h-3 w-3 shrink-0 rounded-full"
-                                                :style="{ backgroundColor: category.color }"
-                                            />
+                                        <div class="flex items-center gap-3">
+                                            <div
+                                                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors"
+                                                :class="category.color ? '' : 'bg-gray-50 text-gray-500 border-gray-100 dark:bg-surface-800 dark:text-gray-400 dark:border-surface-700/50'"
+                                                :style="category.color ? {
+                                                    backgroundColor: `color-mix(in srgb, ${category.color} 12%, transparent)`,
+                                                    borderColor: `color-mix(in srgb, ${category.color} 20%, transparent)`,
+                                                    color: category.color
+                                                } : {}"
+                                            >
+                                                <i :class="[category.icon || 'ti ti-folder', 'text-lg']"></i>
+                                            </div>
                                             <div>
                                                 <div class="font-semibold text-gray-900 dark:text-white">{{ category.name }}</div>
                                                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ category.slug }}</div>
@@ -636,19 +444,12 @@ onBeforeUnmount(() => {
                                         <span v-else class="text-sm text-gray-400">{{ t('0') }}</span>
                                     </td>
                                     <td class="px-4 py-4 text-center">
-                                        <button
-                                            type="button"
-                                            @click="toggleActive(category)"
-                                            class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
-                                            :class="[category.is_active ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700']"
-                                        >
-                                            <span
-                                                :class="category.is_active ? 'translate-x-4' : 'translate-x-0'"
-                                                class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"
-                                            />
-                                        </button>
+                                        <AppSwitch
+                                            :model-value="category.is_active"
+                                            @update:model-value="toggleActive(category)"
+                                        />
                                     </td>
-                                    <td class="whitespace-nowrap px-4 py-4 text-xs text-gray-500 dark:text-gray-400">
+                                    <td class="text-center whitespace-nowrap px-4 py-4 text-xs text-gray-500 dark:text-gray-400">
                                         {{ formatDate(category.created_at) }}
                                     </td>
                                     <td class="px-6 py-4">
@@ -696,4 +497,130 @@ onBeforeUnmount(() => {
             </div>
         </div>
     </div>
+
+    <AppModal
+        :open="formModalOpen"
+        max-width="max-w-3xl"
+        :title="editingId ? t('Edit Category') : t('Create Category')"
+        :subtitle="editingId ? t('Update category details, hierarchy, and access requirements.') : t('Create a new AI category with icon, color, and access settings.')"
+        has-form
+        :confirm-text="editingId ? t('Save Changes') : t('Create Category')"
+        :confirm-loading="form.processing"
+        :confirm-loading-text="t('Saving...')"
+        @close="resetForm"
+        @submit="submit"
+    >
+        <div class="grid gap-4 md:grid-cols-2">
+            <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Name') }}</label>
+                <input
+                    v-model="form.name"
+                    @input="syncSlug"
+                    :placeholder="t('Enter category name')"
+                    type="text"
+                    required
+                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                />
+                <p v-if="form.errors.name" class="mt-1 text-xs text-danger-500">{{ form.errors.name }}</p>
+            </div>
+
+            <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
+                <input
+                    v-model="form.slug"
+                    @input="markSlugTouched"
+                    :placeholder="t('Enter category slug')"
+                    type="text"
+                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                />
+                <p class="mt-1 text-xs text-gray-400">{{ t('Generated from name. Edit if needed.') }}</p>
+                <p v-if="form.errors.slug" class="mt-1 text-xs text-danger-500">{{ form.errors.slug }}</p>
+            </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+            <AppSelect
+                v-model="form.parent_id"
+                :options="parentOptions"
+                :label="t('Parent')"
+                :placeholder="t('No parent')"
+            />
+            <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Sort order') }}</label>
+                <input
+                    v-model.number="form.sort_order"
+                    type="number"
+                    min="0"
+                    :placeholder="t('Enter sort order')"
+                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                />
+            </div>
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Description') }}</label>
+            <textarea
+                v-model="form.description"
+                :placeholder="t('Enter category description')"
+                rows="3"
+                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+            ></textarea>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2">
+            <IconClassSelect v-model="form.icon" :label="t('Icon')" />
+            <AppColorPicker v-model="form.color" :label="t('Color')" />
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2">
+            <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
+                <span>
+                    <span class="block text-sm font-medium text-gray-700 dark:text-white">{{ t('Active Category') }}</span>
+                    <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Make active or inactive this ai category') }}</span>
+                </span>
+                <AppSwitch v-model="form.is_active" />
+            </label>
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800/60">
+                <AppSelect
+                    v-model="form.access_level"
+                    :options="accessLevels"
+                    :label="t('Access Level')"
+                />
+            </div>
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta title (SEO)') }}</label>
+            <input
+                v-model="form.meta_title"
+                :placeholder="t('Enter meta title')"
+                type="text"
+                maxlength="160"
+                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+            />
+        </div>
+
+        <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Meta description (SEO)') }}</label>
+            <textarea
+                v-model="form.meta_description"
+                :placeholder="t('Enter meta description')"
+                rows="3"
+                maxlength="500"
+                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+            ></textarea>
+        </div>
+    </AppModal>
+
+    <ActionConfirmModal
+        :open="Boolean(deleteTarget)"
+        :title="t('Delete Category')"
+        :message="t('This category will be permanently removed. Tools in this category will be detached, not deleted.')"
+        :confirm-label="t('Delete')"
+        :processing-label="t('Deleting...')"
+        :processing="deleteProcessing"
+        variant="danger"
+        @cancel="deleteTarget = null"
+        @confirm="executeDelete"
+    />
 </template>

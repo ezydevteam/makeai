@@ -1,12 +1,12 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -159,7 +159,7 @@ const runAiAssist = async (action: string) => {
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mx-auto max-w-7xl">
-            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ pageTitle }}</h1>
@@ -173,10 +173,10 @@ const runAiAssist = async (action: string) => {
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Create or edit reusable email content with merge variables and rich formatting.') }}</p>
                 </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="shrink-0 flex gap-3">
                     <Link
                         :href="route('admin.mail.templates.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-gray-200 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900/20 dark:text-gray-300 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                     >
                         <i class="ti ti-arrow-left text-base"></i>
                         {{ t('Back') }}
@@ -184,7 +184,7 @@ const runAiAssist = async (action: string) => {
                     <button
                         type="button"
                         :disabled="form.processing"
-                        class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                        class="btn-primary-admin inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                         @click="submit"
                     >
                         <i class="ti ti-device-floppy text-base"></i>

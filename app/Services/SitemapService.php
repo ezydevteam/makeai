@@ -65,7 +65,7 @@ class SitemapService
 
             // Custom pages
             if (class_exists(Page::class)) {
-                $pages = Page::where('is_active', true)->get(['slug', 'updated_at']);
+                $pages = Page::published()->get(['slug', 'updated_at']);
                 foreach ($pages as $page) {
                     $urls[] = $this->urlEntry(
                         "{$baseUrl}/page/{$page->slug}",

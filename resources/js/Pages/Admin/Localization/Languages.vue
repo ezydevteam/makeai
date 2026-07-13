@@ -1,10 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Head, Link, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import FlagIcon from '@/Components/FlagIcon.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import FlagIcon from '@/Components/Utility/FlagIcon.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -66,10 +67,10 @@ const timeFormatOptions = computed<SelectOption[]>(() => [
 
 const numberSystemOptions = computed<SelectOption[]>(() => [
     { value: 'latn', label: `${t('English digits')} - 123,456.78` },
-    { value: 'arab', label: `${t('Arabic-Indic digits')} - ١٢٣٬٤٥٦٫٧٨` },
-    { value: 'arabext', label: `${t('Eastern Arabic digits')} - ۱۲۳٬۴۵۶٫۷۸` },
-    { value: 'beng', label: `${t('Bengali digits')} - ১২৩,৪৫৬.৭৮` },
-    { value: 'deva', label: `${t('Devanagari digits')} - १२३,४५६.७८` },
+    { value: 'arab', label: `${t('Arabic-Indic digits')} - Ù¡Ù¢Ù£Ù¬Ù¤Ù¥Ù¦Ù«Ù§Ù¨` },
+    { value: 'arabext', label: `${t('Eastern Arabic digits')} - Û±Û²Û³Ù¬Û´ÛµÛ¶Ù«Û·Û¸` },
+    { value: 'beng', label: `${t('Bengali digits')} - à§§à§¨à§©,à§ªà§«à§¬.à§­à§®` },
+    { value: 'deva', label: `${t('Devanagari digits')} - à¥§à¥¨à¥©,à¥ªà¥«à¥¬.à¥­à¥®` },
 ])
 
 const currencyPositionOptions = computed<SelectOption[]>(() => [
@@ -286,7 +287,7 @@ onUnmounted(() => {
     <Head :title="t('Languages')" />
 
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Languages') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
@@ -296,7 +297,7 @@ onUnmounted(() => {
 
             <button
                 type="button"
-                class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary"
+                class="inline-flex items-center justify-center gap-2 btn-primary-admin shrink-0"
                 @click="openCreateModal"
             >
                 <i class="ti ti-plus text-base" />
@@ -307,7 +308,7 @@ onUnmounted(() => {
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+                    <div class="flex-1 min-w-[220px] md:max-w-sm">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base" />
@@ -338,7 +339,7 @@ onUnmounted(() => {
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                    <div class="flex flex-wrap items-center gap-3 shrink-0">
                         <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-56 lg:flex-none">
                             <AppSelect v-model="statusFilter" :options="statusOptions" :placeholder="t('Select filter')" />
                         </div>
@@ -481,7 +482,7 @@ onUnmounted(() => {
                                                 <button
                                                     v-if="props.languages.length === 0"
                                                     type="button"
-                                                    class="rounded-lg px-5 py-2.5 text-sm font-medium text-white btn-primary"
+                                                    class="rounded-lg px-5 py-2.5 text-sm font-medium text-white btn-primary-admin"
                                                     @click="openCreateModal"
                                                 >
                                                     {{ t('Add First Language') }}
@@ -507,181 +508,145 @@ onUnmounted(() => {
     </div>
 
 
-    <Teleport to="body">
-        <div
-            v-if="showModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-            @click.self="closeModal"
-        >
-            <div class="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
-                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-700">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">
-                            {{ editingLanguage ? t('Edit Language') : t('Create Language') }}
-                        </h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ t('Configure locale formatting, direction, and visibility for this language.') }}
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                        @click="closeModal"
-                    >
-                        <i class="ti ti-x text-base" />
-                    </button>
+    <AppModal
+        :open="showModal"
+        max-width="max-w-4xl"
+        :title="editingLanguage ? t('Edit Language') : t('Create Language')"
+        :subtitle="t('Configure locale formatting, direction, and visibility for this language.')"
+        has-form
+        :confirm-text="editingLanguage ? t('Update Language') : t('Create Language')"
+        :confirm-loading="form.processing"
+        confirm-loading-text="Processing..."
+        @close="closeModal"
+        @submit="submit"
+    >
+        <div class="space-y-6">
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="mb-4">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Language Details') }}</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set the language name, ISO code, and optional flag asset.') }}</p>
                 </div>
 
-                <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="submit">
-                    <div class="min-h-0 flex-1 overflow-y-auto p-6">
-                        <div class="space-y-6">
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Language Details') }}</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Set the language name, ISO code, and optional flag asset.') }}</p>
-                                </div>
-
-                                <div class="grid gap-6 xl:grid-cols-12">
-                                    <div class="xl:col-span-7">
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Language Name') }}</label>
-                                        <input
-                                            v-model="form.name"
-                                            type="text"
-                                            :placeholder="t('e.g. French')"
-                                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
-                                            required
-                                        >
-                                        <p v-if="form.errors.name" class="mt-2 text-xs text-red-600">{{ form.errors.name }}</p>
-                                    </div>
-                                    <div class="xl:col-span-5">
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('ISO Code') }}</label>
-                                        <input
-                                            v-model="form.code"
-                                            type="text"
-                                            :placeholder="t('e.g. fr')"
-                                            :disabled="Boolean(editingLanguage)"
-                                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 disabled:opacity-60 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
-                                            required
-                                        >
-                                        <p v-if="form.errors.code" class="mt-2 text-xs text-red-600">{{ form.errors.code }}</p>
-                                    </div>
-                                </div>
-
-                                <div class="mt-6">
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Flag Image') }}</label>
-                                    <div class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-950/40 md:flex-row md:items-center">
-                                        <div v-if="editingLanguage" class="shrink-0">
-                                            <FlagIcon :flag="editingLanguage.flag" :language-code="editingLanguage.code" :language-name="editingLanguage.name" size="lg" />
-                                        </div>
-                                        <input
-                                            type="file"
-                                            accept=".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/png,image/jpeg,image/webp"
-                                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100"
-                                            @change="setFlagFile"
-                                        >
-                                    </div>
-                                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Upload SVG, PNG, JPG, or WebP up to 512 KB.') }}</p>
-                                    <p v-if="form.errors.flag_file" class="mt-2 text-xs text-red-600">{{ form.errors.flag_file }}</p>
-                                </div>
-                            </section>
-
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Locale Formatting') }}</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control how dates, times, numbers, and currency are displayed for this language.') }}</p>
-                                </div>
-
-                                <div class="grid gap-6 md:grid-cols-2">
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Date Format') }}</label>
-                                        <AppSelect v-model="form.date_format" :options="dateFormatOptions" :placeholder="t('Select date format')" />
-                                    </div>
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Time Format') }}</label>
-                                        <AppSelect v-model="form.time_format" :options="timeFormatOptions" :placeholder="t('Select time format')" />
-                                    </div>
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Number System') }}</label>
-                                        <AppSelect v-model="form.number_system" :options="numberSystemOptions" :placeholder="t('Select number system')" />
-                                    </div>
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Currency Position') }}</label>
-                                        <AppSelect v-model="form.currency_position" :options="currencyPositionOptions" :placeholder="t('Select currency position')" />
-                                    </div>
-                                </div>
-
-                                <div class="mt-6 grid gap-6 md:grid-cols-2">
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Decimal Separator') }}</label>
-                                        <input v-model="form.decimal_separator" type="text" maxlength="1" :placeholder="t('e.g. .')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30" required>
-                                    </div>
-                                    <div>
-                                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Thousands Separator') }}</label>
-                                        <input v-model="form.thousands_separator" type="text" maxlength="1" :placeholder="t('e.g. ,')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30" required>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                                <div class="mb-4">
-                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Availability') }}</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose whether the language is active and whether it should use RTL layout rules.') }}</p>
-                                </div>
-
-                                <div class="grid gap-4 md:grid-cols-2">
-                                    <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
-                                        <span>
-                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('RTL Layout') }}</span>
-                                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Enable right-to-left reading direction.') }}</span>
-                                        </span>
-                                        <button
-                                            type="button"
-                                            class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                            :class="form.is_rtl ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
-                                            @click="form.is_rtl = !form.is_rtl"
-                                        >
-                                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" :class="form.is_rtl ? 'translate-x-5' : 'translate-x-1'" />
-                                        </button>
-                                    </label>
-                                    <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
-                                        <span>
-                                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Active') }}</span>
-                                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Show this language across the platform.') }}</span>
-                                        </span>
-                                        <button
-                                            type="button"
-                                            class="relative inline-flex h-6 w-11 items-center rounded-full transition"
-                                            :class="form.is_active ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
-                                            @click="form.is_active = !form.is_active"
-                                        >
-                                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" :class="form.is_active ? 'translate-x-5' : 'translate-x-1'" />
-                                        </button>
-                                    </label>
-                                </div>
-                            </section>
-                        </div>
+                <div class="grid gap-6 xl:grid-cols-12">
+                    <div class="xl:col-span-7">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Language Name') }}</label>
+                        <input
+                            v-model="form.name"
+                            type="text"
+                            :placeholder="t('e.g. French')"
+                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                            required
+                        >
+                        <p v-if="form.errors.name" class="mt-2 text-xs text-red-600">{{ form.errors.name }}</p>
                     </div>
+                    <div class="xl:col-span-5">
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('ISO Code') }}</label>
+                        <input
+                            v-model="form.code"
+                            type="text"
+                            :placeholder="t('e.g. fr')"
+                            :disabled="Boolean(editingLanguage)"
+                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 disabled:opacity-60 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30"
+                            required
+                        >
+                        <p v-if="form.errors.code" class="mt-2 text-xs text-red-600">{{ form.errors.code }}</p>
+                    </div>
+                </div>
 
-                    <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900/40">
+                <div class="mt-6">
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Flag Image') }}</label>
+                    <div class="flex flex-col gap-4 rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-surface-700 dark:bg-surface-950/40 md:flex-row md:items-center">
+                        <div v-if="editingLanguage" class="shrink-0">
+                            <FlagIcon :flag="editingLanguage.flag" :language-code="editingLanguage.code" :language-name="editingLanguage.name" size="lg" />
+                        </div>
+                        <input
+                            type="file"
+                            accept=".svg,.png,.jpg,.jpeg,.webp,image/svg+xml,image/png,image/jpeg,image/webp"
+                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-700 hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100"
+                            @change="setFlagFile"
+                        >
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Upload SVG, PNG, JPG, or WebP up to 512 KB.') }}</p>
+                    <p v-if="form.errors.flag_file" class="mt-2 text-xs text-red-600">{{ form.errors.flag_file }}</p>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="mb-4">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Locale Formatting') }}</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control how dates, times, numbers, and currency are displayed for this language.') }}</p>
+                </div>
+
+                <div class="grid gap-6 md:grid-cols-2">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Date Format') }}</label>
+                        <AppSelect v-model="form.date_format" :options="dateFormatOptions" :placeholder="t('Select date format')" />
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Time Format') }}</label>
+                        <AppSelect v-model="form.time_format" :options="timeFormatOptions" :placeholder="t('Select time format')" />
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Number System') }}</label>
+                        <AppSelect v-model="form.number_system" :options="numberSystemOptions" :placeholder="t('Select number system')" />
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Currency Position') }}</label>
+                        <AppSelect v-model="form.currency_position" :options="currencyPositionOptions" :placeholder="t('Select currency position')" />
+                    </div>
+                </div>
+
+                <div class="mt-6 grid gap-6 md:grid-cols-2">
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Decimal Separator') }}</label>
+                        <input v-model="form.decimal_separator" type="text" maxlength="1" :placeholder="t('e.g. .')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30" required>
+                    </div>
+                    <div>
+                        <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Thousands Separator') }}</label>
+                        <input v-model="form.thousands_separator" type="text" maxlength="1" :placeholder="t('e.g. ,')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30" required>
+                    </div>
+                </div>
+            </section>
+
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="mb-4">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Availability') }}</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose whether the language is active and whether it should use RTL layout rules.') }}</p>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('RTL Layout') }}</span>
+                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Enable right-to-left reading direction.') }}</span>
+                        </span>
                         <button
                             type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                            @click="closeModal"
+                            class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                            :class="form.is_rtl ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
+                            @click="form.is_rtl = !form.is_rtl"
                         >
-                            {{ t('Cancel') }}
+                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" :class="form.is_rtl ? 'translate-x-5' : 'translate-x-1'" />
                         </button>
+                    </label>
+                    <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-4 dark:border-surface-700 dark:bg-surface-950/50">
+                        <span>
+                            <span class="block text-sm font-semibold text-gray-900 dark:text-white">{{ t('Active') }}</span>
+                            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Show this language across the platform.') }}</span>
+                        </span>
                         <button
-                            type="submit"
-                            :disabled="form.processing"
-                            class="btn-primary rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-60"
+                            type="button"
+                            class="relative inline-flex h-6 w-11 items-center rounded-full transition"
+                            :class="form.is_active ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
+                            @click="form.is_active = !form.is_active"
                         >
-                            {{ form.processing ? t('Processing...') : (editingLanguage ? t('Update Language') : t('Create Language')) }}
+                            <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow transition" :class="form.is_active ? 'translate-x-5' : 'translate-x-1'" />
                         </button>
-                    </div>
-                </form>
-            </div>
+                    </label>
+                </div>
+            </section>
         </div>
-    </Teleport>
+    </AppModal>
 
     <ActionConfirmModal
         :open="Boolean(deleteTarget)"

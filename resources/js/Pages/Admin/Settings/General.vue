@@ -2,8 +2,8 @@
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppSelect from '@/Components/AppSelect.vue'
-import { computed } from 'vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import { computed, watch } from 'vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -27,7 +27,7 @@ type GeneralSettings = {
 }
 
 type LanguageOption = { code: string; name: string }
-type CurrencyOption = { code: string; name: string; symbol: string | null }
+type CurrencyOption = { code: string; name: string; symbol: string | null; position?: string; decimals?: number }
 const props = defineProps<{
     settings: GeneralSettings
     languages: LanguageOption[]
@@ -68,6 +68,32 @@ const positionOptions = computed(() => [
     { value: 'after_with_space', label: t('After amount with space') },
 ])
 
+// Auto-fill symbol / position / decimals from the catalog when the admin picks a
+// different currency. Skips the initial load so it never overwrites saved values,
+// and only fires on a real user change; the fields stay editable afterwards.
+let currencyInit = true
+watch(() => form.default_currency, (code) => {
+    if (currencyInit) {
+        currencyInit = false
+        return
+    }
+
+    const match = props.currencies.find((currency) => currency.code === code)
+    if (!match) {
+        return
+    }
+
+    if (match.symbol) {
+        form.currency_symbol = match.symbol
+    }
+    if (match.position) {
+        form.currency_position = match.position as GeneralSettings['currency_position']
+    }
+    if (typeof match.decimals === 'number') {
+        form.currency_decimals = match.decimals
+    }
+})
+
 const saveSettings = () => {
     form.post(route('admin.settings.update'), {
         preserveScroll: true,
@@ -78,13 +104,14 @@ const saveSettings = () => {
 <template>
     <Head :title="t('General Settings')" />
 
-    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('General Settings') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage site identity, brand assets, support links, locale defaults, and pricing display from one unified admin surface.') }}</p>
             </div>
-            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="saveSettings">
+            <button type="button" :disabled="form.processing" class="shrink-0 btn-primary-admin disabled:opacity-60" @click="saveSettings">
+                <i class="ti ti-device-floppy"></i>
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}
             </button>
         </div>

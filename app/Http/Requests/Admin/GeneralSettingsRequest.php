@@ -25,7 +25,10 @@ class GeneralSettingsRequest extends FormRequest
             'site_privacy_url'    => ['nullable', 'url', 'max:255'],
 
             'site_url'           => ['nullable', 'url', 'max:255'],
-            'default_language'   => ['required', 'string', 'max:20', Rule::exists('languages', 'code')],
+            // NOTE: default_language is intentionally NOT a settings key. The default
+            // language lives in the languages.is_default column (single source of
+            // truth); the controller translates this field into a column flip.
+            'default_language'   => ['sometimes', 'string', 'max:20', Rule::exists('languages', 'code')],
             'default_currency'   => ['required', 'string', 'size:3', Rule::exists('currencies', 'code')],
             'currency_symbol'    => ['required', 'string', 'max:10'],
             'currency_position'  => ['required', Rule::in(['before', 'before_with_space', 'after', 'after_with_space'])],

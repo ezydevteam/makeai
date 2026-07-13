@@ -44,7 +44,6 @@ class FaqController extends Controller
 
         FaqCategory::create([
             'name' => $validated['name'],
-            'slug' => Str::slug($validated['name']).'-'.uniqid(),
             'sort_order' => $validated['sort_order'],
         ]);
 
@@ -57,7 +56,6 @@ class FaqController extends Controller
 
         $category->update([
             'name' => $validated['name'],
-            'slug' => Str::slug($validated['name']).'-'.uniqid(),
             'sort_order' => $validated['sort_order'],
         ]);
 
@@ -131,15 +129,7 @@ class FaqController extends Controller
 
     public function generate(FaqGenerateRequest $request, AiService $aiService): JsonResponse
     {
-        $user = User::firstOrCreate(
-            ['email' => User::internalAiEmail()],
-            [
-                'name' => User::internalAiName(),
-                'password' => bcrypt(Str::random(32)),
-                'is_active' => true,
-                'is_banned' => false,
-            ]
-        );
+        $user = User::internalAi();
 
         $validated = $request->validated();
         $extraPrompt = trim((string) ($validated['prompt'] ?? ''));

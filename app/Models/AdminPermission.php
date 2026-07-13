@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class AdminPermission extends Model
 {
-    protected $fillable = ['name', 'slug', 'group', 'description'];
+    protected $fillable = ['name', 'slug', 'group'];
 
     /**
      * Roles that have this permission.

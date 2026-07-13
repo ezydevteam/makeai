@@ -1,9 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 import { applyPurchaseCodeMask } from '@/lib/purchaseCode'
@@ -16,6 +18,7 @@ interface LicenseInfo {
     buyer: string
     purchase_code_masked: string
     purchased_at: string
+    supported_until: string | null
     verified_at: string
     status: string
     domain_ok: boolean
@@ -27,8 +30,14 @@ interface AddonConfig {
     requires_license: number; is_active: boolean; license_ok: boolean
     envato_item_id?: number
     logo_url?: string | null
+    installed_at?: string | null
+    activated_at?: string | null
     license?: LicenseInfo | null
     settings?: Array<{ key: string; label: string; type: string; default: any }>
+    update_available?: boolean
+    latest_version?: string | null
+    update_changelog?: string | null
+    update_checked_at?: string | null
 }
 
 const props = defineProps<{ addons: AddonConfig[] }>()
@@ -140,12 +149,22 @@ const deactivate = (slug: string) => {
     })
 }
 
+const checkingUpdates = ref(false)
+function checkUpdates() {
+    checkingUpdates.value = true
+    router.post(route('admin.addons.check-updates'), {}, {
+        preserveScroll: true,
+        onFinish: () => { checkingUpdates.value = false },
+    })
+}
+
 const showUploadModal = ref(false)
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const searchQuery = ref('')
 const statusFilter = ref('')
+const searchFocused = ref(false)
 const hiddenLogos = ref<string[]>([])
 const confirmModal = ref({
     open: false,
@@ -275,7 +294,7 @@ async function handleUpload() {
     }
 }
 
-// ─── License Modal State ───
+// â”€â”€â”€ License Modal State â”€â”€â”€
 const licenseModal = ref(false)
 const licenseAddonSlug = ref('')
 const licenseAddonName = ref('')
@@ -323,7 +342,7 @@ async function verifyLicense() {
         const data = await response.json()
 
         if (response.ok && data.success) {
-            // License verified — activate the addon
+            // License verified â€” activate the addon
             closeLicenseModal()
             router.post(route('admin.addons.activate', { slug: licenseAddonSlug.value }), {}, {
                 onFinish: () => window.location.reload(),
@@ -340,18 +359,18 @@ async function verifyLicense() {
     }
 }
 
-// ─── Activation entry point ───
+// â”€â”€â”€ Activation entry point â”€â”€â”€
 function handleActivate(addon: AddonConfig) {
-    // Addons with requires_license AND no valid license → show license modal first
+    // Addons with requires_license AND no valid license â†’ show license modal first
     if (addon.requires_license && !addon.license?.license_type) {
         openLicenseModal(addon)
         return
     }
-    // Already licensed → direct activation
+    // Already licensed â†’ direct activation
     activate(addon.slug)
 }
 
-// Purchase code mask — allows the fake TEST-... codes while LICENSE_TEST_MODE is on
+// Purchase code mask â€” allows the fake TEST-... codes while LICENSE_TEST_MODE is on
 function onPurchaseCodeInput(e: Event) {
     purchaseCode.value = applyPurchaseCodeMask((e.target as HTMLInputElement).value, true)
 }
@@ -399,22 +418,28 @@ onBeforeUnmount(() => {
 
 <template>
     <Head :title="t('Addons')" />
-        <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Addon Manager') }}</h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Install, activate, and configure platform addons.') }}</p>
             </div>
-            <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary">
-                <i class="ti ti-upload text-base"></i>
-                {{ t('Upload Addon') }}
-            </button>
+            <div class="flex items-center gap-2">
+                <button @click="checkUpdates" :disabled="checkingUpdates" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-green-50 hover:border-green-200 hover:text-green-700 disabled:opacity-60 dark:border-gray-700 dark:text-gray-300 dark:hover:!border-green-800 dark:hover:!bg-green-900/20 dark:hover:!text-green-300">
+                    <i class="ti text-base" :class="checkingUpdates ? 'ti-loader animate-spin' : 'ti-refresh'"></i>
+                    {{ checkingUpdates ? t('Checking...') : t('Check for Updates') }}
+                </button>
+                <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary-admin">
+                    <i class="ti ti-upload text-base"></i>
+                    {{ t('Upload Addon') }}
+                </button>
+            </div>
         </div>
 
-        <div class="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-            <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="w-full xl:max-w-md">
+        <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex-1 min-w-[240px] sm:max-w-md">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -423,12 +448,14 @@ onBeforeUnmount(() => {
                                 ref="searchInputRef"
                                 v-model="searchQuery"
                                 type="text"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                :placeholder="t('Filter this list by addon name, slug, version, or description...')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                :placeholder="t('Search addons...')"
+                                @focus="searchFocused = true"
+                                @blur="searchFocused = false"
                             />
                             <span
-                                v-if="!searchQuery"
-                                class="pointer-events-none absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500"
+                                v-if="!searchQuery && !searchFocused"
+                                class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
                             >
                                 /
                             </span>
@@ -445,25 +472,16 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
 
-                    <div class="w-44 md:ml-auto">
-                        <AppSelect
-                            v-model="statusFilter"
-                            :options="statusOptions"
-                            :placeholder="t('All Status')"
-                        />
-                    </div>
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
+                        <div class="w-full sm:w-48 sm:flex-none">
+                            <AppSelect
+                                v-model="statusFilter"
+                                :options="statusOptions"
+                                :placeholder="t('All Status')"
+                            />
+                        </div>
 
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
-                        <button
-                            v-if="hasActiveFilters"
-                            type="button"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                            @click="clearFilters"
-                        >
-                            <i class="ti ti-filter-off text-base"></i>
-                            {{ t('Clear') }}
-                        </button>
-                        <div v-if="filteredAddons.length" class="flex items-center gap-2">
+                        <div v-if="filteredAddons.length" class="flex items-center gap-2 shrink-0">
                             <input
                                 type="checkbox"
                                 :checked="allSelected"
@@ -473,6 +491,16 @@ onBeforeUnmount(() => {
                             />
                             <label class="text-sm text-gray-600 dark:text-gray-400" for="bulkAddonSelect">{{ t('Select All') }}</label>
                         </div>
+
+                        <button
+                            v-if="hasActiveFilters"
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700 w-full sm:w-auto"
+                            @click="clearFilters"
+                        >
+                            <i class="ti ti-rotate-clockwise text-base"></i>
+                            {{ t('Reset') }}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -509,8 +537,8 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <div v-for="addon in filteredAddons" :key="addon.slug" :class="[addon.is_active ? 'border-primary-500/30 bg-primary-50/30 dark:bg-primary-500/5' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40']" class="rounded-xl border p-5 shadow-sm transition-colors">
-            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div v-for="addon in filteredAddons" :key="addon.slug" :class="[addon.is_active ? 'border-primary-500/30 bg-primary-50/30 dark:bg-primary-500/5' : 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900/40']" class="rounded-xl border p-5 shadow-sm transition-colors">
+            <div class="flex gap-4">
                 <div class="flex min-w-0 items-start gap-4">
                 <!-- Checkbox -->
                 <input
@@ -533,75 +561,122 @@ onBeforeUnmount(() => {
                     <div class="mb-0.5 flex flex-wrap items-center gap-2">
                         <h3 class="text-gray-900 dark:text-white font-semibold">{{ addon.name }}</h3>
                         <span class="text-xs text-gray-500 dark:text-gray-400">v{{ addon.version }}</span>
-                        <span v-if="addon.is_active" class="px-2 py-0.5 bg-emerald-500/15 text-emerald-500 text-[10px] font-bold rounded-full">{{ t('ACTIVE') }}</span>
+                        <span
+                            v-if="addon.update_available"
+                            class="px-2 py-0.5 bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-bold rounded-full cursor-help"
+                            :title="(addon.update_changelog ? addon.update_changelog + '\n\n' : '') + t('Download v:v from CodeCanyon, then use Upload Addon to install it.', { v: addon.latest_version ?? '' })"
+                        >{{ t('UPDATE v:v', { v: addon.latest_version ?? '' }) }}</span>
+                        <span v-if="addon.is_active" class="px-2 py-0.5 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold rounded-full">{{ t('ACTIVE') }}</span>
+                        <span v-else class="px-2 py-0.5 bg-gray-100 text-gray-500 dark:bg-surface-800 dark:text-gray-400 text-[10px] font-bold rounded-full">{{ t('INACTIVE') }}</span>
                         <span v-if="addon.license?.status === 'grace'" class="px-2 py-0.5 bg-amber-500/15 text-amber-500 text-[10px] font-bold rounded-full">{{ t('GRACE') }}</span>
                         <span v-if="!addon.license_ok" class="px-2 py-0.5 bg-red-500/15 text-red-500 text-[10px] font-bold rounded-full">{{ t('LICENSE') }}</span>
                     </div>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 truncate">{{ addon.description || t('No description') }}</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ addon.description || t('No description') }}</p>
 
                     <!-- License info row -->
-                    <div v-if="addon.license?.buyer" class="flex items-center gap-3 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                    <div v-if="addon.license?.buyer" class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
                         <span>{{ t('Licensed to :buyer', { buyer: addon.license.buyer }) }}</span>
                         <span class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
                         <span>{{ addon.license.license_type_label }}</span>
+                        <template v-if="addon.license.purchased_at">
+                            <span class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                            <span>{{ t('Purchased :date', { date: addon.license.purchased_at }) }}</span>
+                        </template>
+                        <template v-if="addon.license.supported_until">
+                            <span class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                            <span>{{ t('Supported until :date', { date: addon.license.supported_until }) }}</span>
+                        </template>
                         <span v-if="!addon.license.domain_ok" class="text-amber-500">{{ t('Domain changed') }}</span>
+                    </div>
+
+                    <!-- Install / activation timeline -->
+                    <div v-if="addon.installed_at || addon.activated_at" class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                        <span v-if="addon.installed_at">{{ t('Installed :date', { date: addon.installed_at }) }}</span>
+                        <template v-if="addon.activated_at">
+                            <span v-if="addon.installed_at" class="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+                            <span>{{ t('Activated :date', { date: addon.activated_at }) }}</span>
+                        </template>
                     </div>
                 </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2 xl:justify-end">
-                    <Link v-if="addon.settings?.length" :href="route('admin.addons.settings', { slug: addon.slug })" :aria-label="t('Settings for :name addon', { name: addon.name })" class="px-3 py-2 bg-white dark:bg-gray-700 text-primary-500 border border-gray-200 dark:border-gray-700 dark:text-primary-500 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 dark:border-gray-600 text-sm">{{ t('Settings') }}</Link>
-                    <button
-                        v-if="addon.is_active"
-                        @click="deactivate(addon.slug)"
-                        :disabled="processing[addon.slug]"
-                        :aria-label="t('Deactivate :name addon', { name: addon.name })"
-                        class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
-                            <i class="ti ti-loader-2 animate-spin"></i>
-                            {{ t('Deactivating...') }}
-                        </span>
-                        <span v-else>{{ t('Deactivate') }}</span>
-                    </button>
-                    <button
-                        v-else-if="addon.license_ok"
-                        @click="handleActivate(addon)"
-                        :disabled="processing[addon.slug]"
-                        :aria-label="t('Activate :name addon', { name: addon.name })"
-                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <span v-if="processing[addon.slug]" class="inline-flex items-center gap-2">
-                            <i class="ti ti-loader-2 animate-spin"></i>
-                            {{ t('Activating...') }}
-                        </span>
-                        <span v-else>{{ t('Activate') }}</span>
-                    </button>
-                    <span v-else class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-lg text-sm">{{ t('Locked') }}</span>
-                    <button
-                        v-if="!addon.is_active"
-                        type="button"
-                        :aria-label="t('Delete :name addon', { name: addon.name })"
-                        class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded-lg text-sm font-medium transition-colors"
-                        @click="confirmDelete(addon)"
-                    >
-                        {{ t('Delete') }}
-                    </button>
+                <div class="ml-auto flex flex-wrap items-center gap-2 xl:justify-end overflow-visible">
+                    <TableActionMenu>
+                        <template #default="{ close }">
+                            <Link
+                                v-if="addon.settings?.length"
+                                :href="route('admin.addons.settings', { slug: addon.slug })"
+                                :aria-label="t('Settings for :name addon', { name: addon.name })"
+                                class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-primary-300"
+                                @click="close"
+                            >
+                                <i class="ti ti-settings text-base" />
+                                <span>{{ t('Settings') }}</span>
+                            </Link>
+
+                            <button
+                                v-if="addon.is_active"
+                                type="button"
+                                class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-primary-300"
+                                :disabled="processing[addon.slug]"
+                                @click="deactivate(addon.slug); close()"
+                            >
+                                <i v-if="processing[addon.slug]" class="ti ti-loader-2 animate-spin text-base" />
+                                <i v-else class="ti ti-circle-x text-base" />
+                                <span>{{ processing[addon.slug] ? t('Deactivating...') : t('Deactivate') }}</span>
+                            </button>
+
+                            <button
+                                v-else-if="addon.license_ok"
+                                type="button"
+                                class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-primary-300"
+                                :disabled="processing[addon.slug]"
+                                @click="handleActivate(addon); close()"
+                            >
+                                <i v-if="processing[addon.slug]" class="ti ti-loader-2 animate-spin text-base" />
+                                <i v-else class="ti ti-circle-check text-base" />
+                                <span>{{ processing[addon.slug] ? t('Activating...') : t('Activate') }}</span>
+                            </button>
+
+                            <button
+                                v-else
+                                type="button"
+                                class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-primary-300"
+                                :disabled="processing[addon.slug]"
+                                @click="handleActivate(addon); close()"
+                            >
+                                <i class="ti ti-lock text-base" />
+                                <span>{{ t('Enter License') }}</span>
+                            </button>
+
+                            <hr v-if="!addon.is_active" class="my-1 border-gray-200 dark:border-surface-700" />
+
+                            <button
+                                v-if="!addon.is_active"
+                                type="button"
+                                class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                @click="confirmDelete(addon); close()"
+                            >
+                                <i class="ti ti-trash text-base" />
+                                <span>{{ t('Delete') }}</span>
+                            </button>
+                        </template>
+                    </TableActionMenu>
                 </div>
             </div>
         </div>
-            </div>
+    </div>
 
-            <div v-else class="px-6 py-16 text-center">
-                <i class="ti ti-puzzle-off text-5xl text-gray-300 dark:text-gray-600"></i>
-                <p class="mt-4 text-gray-500 dark:text-gray-400 text-sm mb-2">{{ t('No addons installed yet') }}</p>
-                <p class="text-gray-400 dark:text-gray-500 text-xs mb-6">{{ t('Upload an addon zip or place it manually in the addons directory.') }}</p>
-                <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary">
-                    <i class="ti ti-upload text-base"></i>
+        <div v-else class="px-6 py-16 text-center">
+            <i class="ti ti-puzzle-off text-5xl text-gray-300 dark:text-gray-600"></i>
+            <p class="mt-4 text-gray-500 dark:text-gray-400 text-sm mb-2">{{ t('No addons installed yet') }}</p>
+            <p class="text-gray-400 dark:text-gray-500 text-xs mb-6">{{ t('Upload an addon zip or place it manually in the addons directory.') }}</p>
+            <button @click="showUploadModal = true" class="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white btn-primary-admin">
+            <i class="ti ti-upload text-base"></i>
                     {{ t('Upload Addon') }}
                 </button>
-            </div>
         </div>
     </div>
+</div>
 
 
     <ActionConfirmModal
@@ -617,95 +692,72 @@ onBeforeUnmount(() => {
     />
 
     <!-- Upload Modal -->
-    <Teleport to="body">
-        <div v-if="showUploadModal" class="fixed inset-0 z-50 flex items-center justify-center">
-            <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showUploadModal = false" />
-            <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Upload Addon') }}</h2>
-                    <button @click="showUploadModal = false" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">{{ t('Upload a .zip file containing the addon.') }}</p>
-                <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors" :class="{ 'border-blue-500 bg-blue-50 dark:bg-blue-500/10': selectedFile }" @click="fileInput?.click()">
-                    <input ref="fileInput" type="file" name="addon_zip" accept=".zip" required class="hidden" @change="onFilePicked" />
-                    <template v-if="!selectedFile">
-                        <i class="ti ti-cloud-upload text-4xl text-gray-300 dark:text-gray-600 mx-auto mb-3"></i>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Click to select a .zip file') }}</p>
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t('Max 20 MB') }}</p>
-                    </template>
-                    <template v-else>
-                        <i class="ti ti-file-zip text-4xl text-blue-500 mx-auto mb-3"></i>
-                        <p class="text-sm text-gray-700 dark:text-gray-300 font-medium">{{ selectedFile.name }}</p>
-                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ (selectedFile.size / 1024).toFixed(1) }} KB</p>
-                    </template>
-                </div>
-                <div class="flex justify-end gap-3 mt-6">
-                    <button type="button" @click="showUploadModal = false" class="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">{{ t('Cancel') }}</button>
-                    <button @click="handleUpload" :disabled="uploading || !selectedFile" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2">
-                        <i v-if="uploading" class="ti ti-loader-2 text-base animate-spin"></i>
-                        {{ uploading ? t('Installing...') : t('Install Addon') }}
-                    </button>
-                </div>
-            </div>
+    <AppModal
+        :open="showUploadModal"
+        max-width="max-w-md"
+        :title="t('Upload Addon')"
+        :subtitle="t('Upload a .zip file containing the addon.')"
+        :confirm-text="t('Install Addon')"
+        :confirm-loading="uploading"
+        :confirm-disabled="!selectedFile"
+        confirm-variant="admin"
+        @close="showUploadModal = false"
+        @confirm="handleUpload"
+    >
+        <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors" :class="{ 'border-blue-500 bg-blue-50 dark:bg-blue-500/10': selectedFile }" @click="fileInput?.click()">
+            <input ref="fileInput" type="file" name="addon_zip" accept=".zip" required class="hidden" @change="onFilePicked" />
+            <template v-if="!selectedFile">
+                <i class="ti ti-cloud-upload text-4xl text-gray-300 dark:text-gray-600 mx-auto mb-3"></i>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Click to select a .zip file') }}</p>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ t('Max 20 MB') }}</p>
+            </template>
+            <template v-else>
+                <i class="ti ti-file-zip text-4xl text-blue-500 mx-auto mb-3"></i>
+                <p class="text-sm text-gray-700 dark:text-gray-300 font-medium">{{ selectedFile.name }}</p>
+                <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">{{ (selectedFile.size / 1024).toFixed(1) }} KB</p>
+            </template>
         </div>
-    </Teleport>
+    </AppModal>
 
     <!-- License Verification Modal -->
-    <Teleport to="body">
-        <div v-if="licenseModal" class="fixed inset-0 z-50 flex items-center justify-center">
-            <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="closeLicenseModal" />
-            <div class="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Activate :name', { name: licenseAddonName }) }}</h2>
-                    <button @click="closeLicenseModal" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
-
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ t('Enter your Envato purchase code for this addon. Find it in Envato Downloads and the license certificate purchase code section.') }}</p>
-
-                <!-- Error -->
-                <div v-if="licenseError" class="mb-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
-                    <i class="ti ti-alert-circle text-base shrink-0 mt-0.5"></i>
-                    <span>{{ licenseError }}</span>
-                </div>
-
-                <!-- Purchase code input -->
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Purchase Code') }}</label>
-                <input
-                    :value="purchaseCode"
-                    @input="onPurchaseCodeInput"
-                    type="text"
-                    :placeholder="t('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')"
-                    maxlength="36"
-                    class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                />
-
-                <!-- Help link -->
-                <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 mb-1 flex items-center gap-1">
-                    <i class="ti ti-info-circle text-sm"></i>
-                    {{ t('This code is different from your MakeAI core purchase code.') }}
-                </p>
-                <a
-                    href="https://help.market.envato.com/hc/en-us/articles/202822600-Where-Is-My-Purchase-Code"
-                    target="_blank"
-                    class="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
-                >{{ t('Where do I find this?') }}</a>
-
-                <div class="flex justify-end gap-3 mt-6">
-                    <button @click="closeLicenseModal" class="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">{{ t('Cancel') }}</button>
-                    <button
-                        @click="verifyLicense"
-                        :disabled="licenseVerifying || !purchaseCode.trim()"
-                        class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
-                    >
-                        <i v-if="licenseVerifying" class="ti ti-loader-2 text-base animate-spin"></i>
-                        {{ licenseVerifying ? t('Verifying...') : t('Verify & Activate') }}
-                    </button>
-                </div>
-            </div>
+    <AppModal
+        :open="licenseModal"
+        max-width="max-w-md"
+        :title="t('Activate :name', { name: licenseAddonName })"
+        :subtitle="t('Enter your Envato purchase code for this addon. Find it in Envato Downloads and the license certificate purchase code section.')"
+        :confirm-text="t('Verify & Activate')"
+        :confirm-loading="licenseVerifying"
+        :confirm-disabled="!purchaseCode.trim()"
+        confirm-variant="admin"
+        @close="closeLicenseModal"
+        @confirm="verifyLicense"
+    >
+        <!-- Error -->
+        <div v-if="licenseError" class="mb-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
+            <i class="ti ti-alert-circle text-base shrink-0 mt-0.5"></i>
+            <span>{{ licenseError }}</span>
         </div>
-    </Teleport>
+
+        <!-- Purchase code input -->
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">{{ t('Purchase Code') }}</label>
+        <input
+            :value="purchaseCode"
+            @input="onPurchaseCodeInput"
+            type="text"
+            :placeholder="t('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx')"
+            maxlength="36"
+            class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+        />
+
+        <!-- Help link -->
+        <p class="text-xs text-gray-400 dark:text-gray-500 mt-2 mb-1 flex items-center gap-1">
+            <i class="ti ti-info-circle text-sm"></i>
+            {{ t('This code is different from your MakeAI core purchase code.') }}
+        </p>
+        <a
+            href="https://help.market.envato.com/hc/en-us/articles/202822600-Where-Is-My-Purchase-Code"
+            target="_blank"
+            class="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
+        >{{ t('Where do I find this?') }}</a>
+    </AppModal>
 </template>

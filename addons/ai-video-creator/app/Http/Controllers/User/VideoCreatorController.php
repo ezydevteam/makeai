@@ -8,6 +8,7 @@ use Addons\AiVideoCreator\Jobs\GenerateSlideshow;
 use Addons\AiVideoCreator\Jobs\GenerateTextToVideo;
 use Addons\AiVideoCreator\Models\VcProject;
 use Addons\AiVideoCreator\Services\VideoProviderService;
+use App\Services\ContentModerationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -49,6 +50,17 @@ class VideoCreatorController extends Controller
             'voice_id' => ['nullable', 'string'],
             'music_volume' => ['nullable', 'numeric', 'min:0', 'max:1'],
         ]);
+
+        // Content safety gate — reject unsafe prompts/scripts before a render is
+        // created and credits are charged. No-op unless the Content Moderation
+        // extension is enabled in `block` mode.
+        $moderationText = trim(($validated['prompt'] ?? '') . "\n" . ($validated['script'] ?? ''));
+        if (ContentModerationService::fromSettings()->textViolates($moderationText, 'video-creator')) {
+            return response()->json([
+                'success' => false,
+                'message' => translate('This request was blocked by content safety filters.'),
+            ], 422);
+        }
 
         if ($validated['project_id'] ?? null) {
             $project = VcProject::find($validated['project_id']);

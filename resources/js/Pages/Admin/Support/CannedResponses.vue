@@ -1,13 +1,13 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 
 defineOptions({ layout: AdminLayout })
 declare const route: (name: string, params?: unknown) => string
@@ -113,12 +113,12 @@ const filter = () => router.get(route('admin.support.canned-responses.index'), {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Canned Responses') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Manage reusable replies for support agents.') }}</p>
             </div>
-            <Link :href="route('admin.support.tickets.index')" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
+            <Link :href="route('admin.support.tickets.index')" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
                 <i class="ti ti-arrow-left text-base"></i>
                 {{ t('Back to Tickets') }}
             </Link>
         </div>
- 
+
         <div class="mt-6 grid gap-6 xl:grid-cols-[1fr_520px]">
             <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
                 <div class="flex flex-col gap-3 border-b border-gray-100 p-4 md:flex-row dark:border-surface-800 sm:px-6">
@@ -155,7 +155,7 @@ const filter = () => router.get(route('admin.support.canned-responses.index'), {
                     <div v-for="response in responses.data" :key="response.id" class="flex items-center justify-between gap-4 px-4 py-2.5">
                         <div>
                             <div class="font-semibold text-gray-900 dark:text-white">{{ response.title }}</div>
-                            <div class="text-sm text-gray-500">{{ response.department?.name ?? t('All departments') }} · {{ response.usage_count }} {{ t('uses') }}</div>
+                            <div class="text-sm text-gray-500">{{ response.department?.name ?? t('All departments') }} Â· {{ response.usage_count }} {{ t('uses') }}</div>
                         </div>
                         <div class="flex gap-2">
                             <Tooltip :content="t('Edit response')" placement="top">
@@ -181,10 +181,10 @@ const filter = () => router.get(route('admin.support.canned-responses.index'), {
                     <div v-if="responses.data.length === 0" class="px-4 py-12 text-center text-sm text-gray-500">{{ t('No canned responses found.') }}</div>
                 </div>
             </section>
- 
+
             <form @submit.prevent="save" class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                 <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ editing ? t('Edit Response') : t('New Response') }}</h2>
-                
+
                 <div>
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }} <span class="text-danger-600">*</span></span>
@@ -218,7 +218,7 @@ const filter = () => router.get(route('admin.support.canned-responses.index'), {
 
                 <div class="mt-5 flex gap-2">
                     <button v-if="editing" type="button" @click="reset" class="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button>
-                    <button type="submit" :disabled="form.processing" class="flex-1 rounded-lg btn-primary disabled:cursor-not-allowed disabled:opacity-70">{{ form.processing ? t('Processing...') : (editing ? t('Update') : t('Create')) }}</button>
+                    <button type="submit" :disabled="form.processing" class="flex-1 rounded-lg btn-primary-admin disabled:cursor-not-allowed disabled:opacity-70">{{ form.processing ? t('Processing...') : (editing ? t('Update') : t('Create')) }}</button>
                 </div>
             </form>
         </div>

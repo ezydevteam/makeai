@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AiKey;
 use App\Models\AiModel;
 use App\Models\Setting;
+use App\Services\AI\CreditPricingService;
 use App\Services\AI\ProviderRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -57,14 +58,22 @@ class AiManagementController extends Controller
                 'fallback_provider' => settings('fallback_ai_provider', ''),
                 'fallback_model' => settings('fallback_ai_model', ''),
                 'max_tokens' => settings('max_tokens_per_request', config('ai.limits.max_tokens_per_request')),
-                'show_tool_credit_costs' => (bool) settings('show_tool_credit_costs', true),
                 // Spend controls (0 = disabled)
                 'user_daily_credit_limit' => (float) settings('user_daily_credit_limit', 0),
                 'user_monthly_credit_limit' => (float) settings('user_monthly_credit_limit', 0),
                 'global_daily_ai_budget_usd' => (float) settings('global_daily_ai_budget_usd', 0),
                 'credit_alert_threshold' => (int) settings('credit_alert_threshold', 100),
+                'guest_daily_credit_limit' => (int) settings('guest_daily_credit_limit', 20),
                 'public_tool_max_output_chars' => (int) settings('public_tool_max_output_chars', 1200),
                 'ai_max_input_chars' => (int) settings('ai_max_input_chars', 30000),
+            ],
+            // Credit economics — credits_per_1k is derived from real provider cost
+            // (see CreditPricingService). credit_price_per_unit is owned by Credit
+            // Settings and shown here read-only as the USD anchor.
+            'creditPricing' => [
+                'ai_credit_markup' => (float) settings('ai_credit_markup', 3),
+                'ai_credit_min_per_1k' => (int) settings('ai_credit_min_per_1k', 1),
+                'credit_price_per_unit' => (float) settings('credit_price_per_unit', 0.01),
             ],
         ]);
     }
@@ -80,13 +89,16 @@ class AiManagementController extends Controller
             'fallback_provider' => 'nullable|string|max:50',
             'fallback_model' => 'nullable|string|max:100',
             'max_tokens' => 'required|integer|min:1|max:128000',
-            'show_tool_credit_costs' => 'required|boolean',
             'user_daily_credit_limit' => 'nullable|numeric|min:0|max:100000000',
             'user_monthly_credit_limit' => 'nullable|numeric|min:0|max:100000000',
             'global_daily_ai_budget_usd' => 'nullable|numeric|min:0|max:1000000',
             'credit_alert_threshold' => 'nullable|integer|min:0|max:100000000',
+            'guest_daily_credit_limit' => 'nullable|integer|min:0|max:100000000',
             'public_tool_max_output_chars' => 'nullable|integer|min:0|max:100000',
             'ai_max_input_chars' => 'nullable|integer|min:1000|max:500000',
+            'ai_credit_markup' => 'nullable|numeric|min:0.1|max:1000',
+            'ai_credit_min_per_1k' => 'nullable|integer|min:0|max:1000',
+            'credit_price_per_unit' => 'nullable|numeric|min:0.0001|max:999.9999',
         ]);
 
         // Validate that the selected model belongs to the selected provider
@@ -121,15 +133,26 @@ class AiManagementController extends Controller
         Setting::setValue('fallback_ai_model', $data['fallback_model'] ?? '', 'string', 'ai');
         Setting::setValue('max_tokens_per_request', $data['max_tokens'], 'integer', 'ai');
         Setting::setValue('default_max_tokens', $data['max_tokens'], 'integer', 'ai');
-        Setting::setValue('show_tool_credit_costs', $data['show_tool_credit_costs'], 'boolean', 'ai');
 
         // Spend controls (0 = disabled)
         Setting::setValue('user_daily_credit_limit', (string) ($data['user_daily_credit_limit'] ?? 0), 'string', 'ai');
         Setting::setValue('user_monthly_credit_limit', (string) ($data['user_monthly_credit_limit'] ?? 0), 'string', 'ai');
         Setting::setValue('global_daily_ai_budget_usd', (string) ($data['global_daily_ai_budget_usd'] ?? 0), 'string', 'ai');
         Setting::setValue('credit_alert_threshold', (int) ($data['credit_alert_threshold'] ?? 100), 'integer', 'ai');
+        Setting::setValue('guest_daily_credit_limit', (int) ($data['guest_daily_credit_limit'] ?? 20), 'integer', 'ai');
         Setting::setValue('public_tool_max_output_chars', (int) ($data['public_tool_max_output_chars'] ?? 1200), 'integer', 'ai');
         Setting::setValue('ai_max_input_chars', (int) ($data['ai_max_input_chars'] ?? 30000), 'integer', 'ai');
+
+        // Credit economics anchor (see CreditPricingService).
+        Setting::setValue('ai_credit_markup', (string) ($data['ai_credit_markup'] ?? 3), 'string', 'ai');
+        Setting::setValue('ai_credit_min_per_1k', (int) ($data['ai_credit_min_per_1k'] ?? 1), 'integer', 'ai');
+
+        // Credit value — same key Credit Settings (top-ups) uses; persisted in the
+        // 'billing' group so both stay in sync. Editable here so a Regular-license
+        // admin (Credit Settings is premium-gated) can still tune it. Only when sent.
+        if (array_key_exists('credit_price_per_unit', $data) && $data['credit_price_per_unit'] !== null) {
+            Setting::setValue('credit_price_per_unit', (string) $data['credit_price_per_unit'], 'string', 'billing');
+        }
 
         return back()->with('success', translate('AI settings updated successfully.'));
     }
@@ -158,6 +181,18 @@ class AiManagementController extends Controller
                 'last_used_at' => $k->last_used_at,
             ]),
             'models' => AiModel::where('provider', $slug)->get(),
+            // Anchor + defaults so the per-unit media pricing UI can show the
+            // credits a given $ cost/unit derives to, and the config fallback.
+            'creditPricing' => [
+                'ai_credit_markup' => (float) settings('ai_credit_markup', 3),
+                'ai_credit_min_per_1k' => (int) settings('ai_credit_min_per_1k', 1),
+                'credit_price_per_unit' => (float) settings('credit_price_per_unit', 0.01),
+            ],
+            'mediaCreditDefaults' => [
+                'image' => (float) config('ai.media_credits.image', 4),
+                'audio' => (float) config('ai.media_credits.audio', 2),
+                'transcription' => (float) config('ai.media_credits.transcription', 2),
+            ],
         ]);
     }
 
@@ -268,16 +303,95 @@ class AiManagementController extends Controller
             'cost_input_1k' => 'required|numeric|min:0',
             'cost_output_1k' => 'required|numeric|min:0',
             'credits_per_1k' => 'required|integer|min:0',
-            'max_tokens' => 'required|integer|min:1',
+            // min:0 — audio/image models legitimately carry max_tokens = 0.
+            'max_tokens' => 'required|integer|min:0',
+            'credits_auto' => 'nullable|boolean',
+            // Per-minute request cap enforced by ThrottleAiRequests. 0/blank = no limit.
+            'rate_limit_per_min' => 'nullable|integer|min:0|max:100000',
+            // Per-unit pricing for media models (audio/image/transcription), stored in
+            // meta. cost_per_unit (USD) → derives credits via markup; credits_per_unit
+            // is a hard manual override. Blank clears (falls back to config default).
+            'cost_per_unit' => 'nullable|numeric|min:0|max:1000000',
+            'credits_per_unit' => 'nullable|numeric|min:0|max:100000000',
         ]);
 
-        $model->update($data);
+        // Normalize the rate limit: 0 or blank means "no per-model cap" (null).
+        $data['rate_limit_per_min'] = ($data['rate_limit_per_min'] ?? 0) ?: null;
+
+        // Merge per-unit media pricing into meta (only when the form sends them, i.e.
+        // for non-chat models). Blank/null removes the key so the resolution falls
+        // through: manual credits_per_unit → cost_per_unit → config default.
+        if ($request->has('cost_per_unit') || $request->has('credits_per_unit')) {
+            $meta = $model->meta ?? [];
+            foreach (['cost_per_unit', 'credits_per_unit'] as $metaKey) {
+                $value = $data[$metaKey] ?? null;
+                if ($value === null || $value === '') {
+                    unset($meta[$metaKey]);
+                } else {
+                    $meta[$metaKey] = (float) $value;
+                }
+            }
+            $model->meta = $meta;
+        }
+        unset($data['cost_per_unit'], $data['credits_per_unit']);
+
+        // When credits are auto-derived, keep them in sync with the current cost
+        // so an admin editing pricing never has to touch the credits field.
+        if ($request->boolean('credits_auto')) {
+            $data['credits_auto'] = true;
+            $model->fill($data);
+            $model->credits_per_1k = CreditPricingService::deriveCreditsPer1k($model);
+        } else {
+            // Manual pricing — respect the typed value and stop auto-recalc.
+            $data['credits_auto'] = false;
+            $model->fill($data);
+        }
+
+        $model->save();
 
         return back()->with('success', translate(':model updated.', ['model' => $model->name]));
     }
 
     /**
-     * Manage non-LLM external API integrations for special tools.
+     * Preview derived credits for every chat model (current → derived), without
+     * writing anything. Powers the "Recalculate" confirmation modal.
+     */
+    public function previewCredits(): JsonResponse
+    {
+        return response()->json([
+            'rows' => CreditPricingService::preview(),
+            'markup' => (float) settings('ai_credit_markup', 3),
+            'price_per_credit' => (float) settings('credit_price_per_unit', 0.01),
+        ]);
+    }
+
+    /**
+     * Recalculate and persist credits_per_1k for every auto-priced chat model.
+     */
+    public function recalculateCredits()
+    {
+        $changed = CreditPricingService::recalculateAll();
+
+        return back()->with('success', translate(':count model credit rate(s) recalculated.', ['count' => $changed]));
+    }
+
+    /**
+     * External tool integrations that are per-user, credit-billable AI tools —
+     * shown on the "Integrations" page (under AI Management). Everything not in
+     * this list is a platform/system connector shown on "Extensions" (under
+     * Settings), where a per-use credit cost is meaningless.
+     */
+    private const AI_TOOL_INTEGRATIONS = [
+        'plagiarism', 'ai_detector', 'grammar', 'translation',
+    ];
+
+    private function integrationGroup(string $slug): string
+    {
+        return in_array($slug, self::AI_TOOL_INTEGRATIONS, true) ? 'ai_tool' : 'system';
+    }
+
+    /**
+     * Manage per-user AI generation/analysis tools (Integrations, under AI Management).
      */
     public function integrations()
     {
@@ -296,9 +410,20 @@ class AiManagementController extends Controller
         }
 
         return Inertia::render('Admin/AI/Integrations', [
-            'integrations' => $this->integrationPayload(),
+            'integrations' => $this->integrationPayload('ai_tool'),
             'defaultAiProvider' => $defaultProvider,
             'configuredAiProviders' => $configuredModels,
+        ]);
+    }
+
+    /**
+     * Manage platform/system connectors — security, spam filtering, analytics,
+     * messaging, content safety (Extensions, under Settings). No per-user cost.
+     */
+    public function extensions()
+    {
+        return Inertia::render('Admin/Settings/Extensions', [
+            'integrations' => $this->integrationPayload('system'),
         ]);
     }
 
@@ -382,6 +507,12 @@ class AiManagementController extends Controller
         }
 
         foreach ($catalog as $integrationSlug => $integration) {
+            // Each page (Integrations / Extensions) submits only its own subset —
+            // skip anything absent so one page can't reset the other's settings.
+            if (! array_key_exists($integrationSlug, $incoming)) {
+                continue;
+            }
+
             $payload = Arr::get($incoming, $integrationSlug, []);
             if (! is_array($payload)) {
                 continue;
@@ -403,10 +534,33 @@ class AiManagementController extends Controller
             settings_set("external_{$integrationSlug}_provider", $selectedProvider, 'string', 'external_apis');
 
             $timeout = max(5, min(180, (int) Arr::get($payload, 'timeout', 30)));
-            $fixedCreditCost = max(0, round((float) Arr::get($payload, 'fixed_credit_cost', 0), 2));
-
             settings_set("external_{$integrationSlug}_timeout", $timeout, 'integer', 'external_apis');
-            settings_set("external_{$integrationSlug}_fixed_credit_cost", (string) $fixedCreditCost, 'string', 'external_apis');
+
+            // Integration-level behavioral settings declared in the catalog
+            // (e.g. content moderation enforcement mode). Validated against the
+            // schema so only known values/types are ever persisted.
+            foreach ($integration['settings'] ?? [] as $field) {
+                $key = $field['key'];
+                $incomingValue = Arr::get($payload, "settings.{$key}");
+
+                if ($field['type'] === 'boolean') {
+                    settings_set("external_{$integrationSlug}_{$key}", (bool) $incomingValue, 'boolean', 'external_apis');
+                    continue;
+                }
+
+                // select: only accept a value present in the declared options.
+                $allowed = array_column($field['options'] ?? [], 'value');
+                $value = in_array($incomingValue, $allowed, true)
+                    ? $incomingValue
+                    : ($field['default'] ?? ($allowed[0] ?? null));
+                settings_set("external_{$integrationSlug}_{$key}", (string) $value, 'string', 'external_apis');
+            }
+
+            // Credit cost only applies to per-user billable AI tools (Integrations page).
+            if ($this->integrationGroup($integrationSlug) === 'ai_tool') {
+                $fixedCreditCost = max(0, round((float) Arr::get($payload, 'fixed_credit_cost', 0), 2));
+                settings_set("external_{$integrationSlug}_fixed_credit_cost", (string) $fixedCreditCost, 'string', 'external_apis');
+            }
 
             foreach ($integration['providers'] ?? [] as $providerSlug => $provider) {
                 $providerPayload = Arr::get($payload, "providers.{$providerSlug}", []);
@@ -441,11 +595,15 @@ class AiManagementController extends Controller
         return back()->with('success', translate('Integration settings updated successfully.'));
     }
 
-    private function integrationPayload(): array
+    private function integrationPayload(?string $group = null): array
     {
         $catalog = config('external-tools.integrations', []);
 
-        return collect($catalog)->mapWithKeys(function (array $integration, string $integrationSlug) {
+        return collect($catalog)
+            ->when($group !== null, fn ($collection) => $collection->filter(
+                fn (array $integration, string $slug) => $this->integrationGroup($slug) === $group,
+            ))
+            ->mapWithKeys(function (array $integration, string $integrationSlug) {
             $providerKeys = array_keys($integration['providers'] ?? []);
             $firstProvider = $providerKeys[0] ?? null;
             $storedProvider = settings("external_{$integrationSlug}_provider", $firstProvider);
@@ -479,14 +637,25 @@ class AiManagementController extends Controller
                 ]];
             })->toArray();
 
+            $group = $this->integrationGroup($integrationSlug);
+
+            $settingsSchema = collect($integration['settings'] ?? [])->map(function (array $field) use ($integrationSlug) {
+                $field['value'] = settings("external_{$integrationSlug}_{$field['key']}", $field['default'] ?? null);
+
+                return $field;
+            })->values()->toArray();
+
             return [$integrationSlug => [
                 'name' => $integration['name'],
+                'description' => $integration['description'] ?? null,
+                'settings' => $settingsSchema,
                 'service' => $integration['service'],
                 'enabled' => (bool) settings("external_{$integrationSlug}_enabled", false),
                 'provider' => $storedProvider,
                 'timeout' => (int) settings("external_{$integrationSlug}_timeout", 30),
                 'fixed_credit_cost' => settings("external_{$integrationSlug}_fixed_credit_cost", '0'),
-                'tab' => $integration['tab'] ?? 'utilities',
+                'group' => $group,
+                'billable' => $group === 'ai_tool',
                 'doc_url' => $integration['doc_url'] ?? null,
                 'ai_fallback' => $integration['ai_fallback'] ?? true,
                 'providers' => $providers,
@@ -583,6 +752,15 @@ class AiManagementController extends Controller
                 'map_reduce_batch_size' => (int) settings('rag_map_reduce_batch_size', 10),
                 'ingest_credits_per_mb' => (float) settings('rag_ingest_credits_per_mb', 0),
                 'ingest_credits_url' => (float) settings('rag_ingest_credits_url', 0),
+
+                // Web scraper (Chat with Website)
+                'max_url_fetch_mb' => (int) settings('rag_max_url_fetch_mb', 10),
+                'scraper_user_agent' => settings('rag_scraper_user_agent', 'Mozilla/5.0 (compatible; MakeAI RAG Bot/1.0)'),
+                'scraper_timeout' => (int) settings('rag_scraper_timeout', 30),
+
+                // YouTube transcript API (Chat with YouTube)
+                'youtube_transcript_endpoint' => settings('rag_youtube_transcript_endpoint', 'https://youtube-transcript.ai/transcript/{id}.txt'),
+                'youtube_transcript_api_key_set' => filled(settings('rag_youtube_transcript_api_key')),
             ],
             'embeddingModels' => $embeddingModels,
             'fallbackEmbedding' => [
@@ -614,6 +792,11 @@ class AiManagementController extends Controller
             'map_reduce_batch_size' => 'required|integer|min:1|max:50',
             'ingest_credits_per_mb' => 'nullable|numeric|min:0|max:100000',
             'ingest_credits_url' => 'nullable|numeric|min:0|max:100000',
+            'max_url_fetch_mb' => 'required|integer|min:1|max:100',
+            'scraper_user_agent' => 'required|string|max:255',
+            'scraper_timeout' => 'required|integer|min:5|max:120',
+            'youtube_transcript_endpoint' => 'required|string|max:500',
+            'youtube_transcript_api_key' => 'nullable|string|max:255',
         ]);
 
         // Validate system_prompt contains {context} placeholder
@@ -640,6 +823,18 @@ class AiManagementController extends Controller
         Setting::setValue('rag_map_reduce_batch_size', $data['map_reduce_batch_size'], 'integer', 'rag');
         Setting::setValue('rag_ingest_credits_per_mb', (string) ($data['ingest_credits_per_mb'] ?? 0), 'string', 'rag');
         Setting::setValue('rag_ingest_credits_url', (string) ($data['ingest_credits_url'] ?? 0), 'string', 'rag');
+
+        // Web scraper (Chat with Website)
+        Setting::setValue('rag_max_url_fetch_mb', $data['max_url_fetch_mb'], 'integer', 'rag');
+        Setting::setValue('rag_scraper_user_agent', $data['scraper_user_agent'], 'string', 'rag');
+        Setting::setValue('rag_scraper_timeout', $data['scraper_timeout'], 'integer', 'rag');
+
+        // YouTube transcript API (Chat with YouTube)
+        Setting::setValue('rag_youtube_transcript_endpoint', $data['youtube_transcript_endpoint'], 'string', 'rag');
+        // Leave the key field blank to keep the current one.
+        if (filled($data['youtube_transcript_api_key'] ?? null)) {
+            Setting::setValue('rag_youtube_transcript_api_key', $data['youtube_transcript_api_key'], 'encrypted', 'rag');
+        }
 
         return back()->with('success', translate('RAG settings updated successfully.'));
     }

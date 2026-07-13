@@ -56,7 +56,12 @@ class ConversationTagController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        $tag = Auth::user()->conversationTags()->findOrFail($id);
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Sign in to manage tags.'], 403);
+        }
+
+        $tag = $user->conversationTags()->findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'required|string|max:50',
@@ -73,7 +78,12 @@ class ConversationTagController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        $tag = Auth::user()->conversationTags()->findOrFail($id);
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Sign in to manage tags.'], 403);
+        }
+
+        $tag = $user->conversationTags()->findOrFail($id);
         $tag->delete();
 
         return response()->json([
@@ -83,8 +93,13 @@ class ConversationTagController extends Controller
 
     public function tagConversation(Request $request, string $ulid): JsonResponse
     {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['success' => false, 'message' => 'Sign in to manage tags.'], 403);
+        }
+
         $conversation = Conversation::where('ulid', $ulid)
-            ->where('user_id', Auth::id())
+            ->where('user_id', $user->id)
             ->firstOrFail();
 
         $validated = $request->validate([
@@ -93,7 +108,7 @@ class ConversationTagController extends Controller
         ]);
 
         // Verify tags belong to user
-        $validTagIds = Auth::user()->conversationTags()
+        $validTagIds = $user->conversationTags()
             ->whereIn('id', $validated['tag_ids'])
             ->pluck('id')
             ->toArray();

@@ -160,11 +160,19 @@ class ThemeService
 
     /**
      * Check if a theme's license requirement is met.
+     *
+     * Premium themes (declaring an envato_item_id in their manifest) need their own
+     * per-theme license, verified against the License Server — exactly like addons.
+     * Bundled themes (e.g. `default`, no item id) are gated by the core license tier.
      */
     private function checkLicenseRequirement(array $config): bool
     {
         if (! license_verified()) {
             return false;
+        }
+
+        if (! empty($config['envato_item_id'])) {
+            return app(ThemeLicenseService::class)->isLicensed($config['slug'] ?? '');
         }
 
         $required = $config['requires_license'] ?? 1;

@@ -11,12 +11,10 @@ class KbEmbedding extends Model
         'chunk_index',
         'chunk_text',
         'embedding',
-        'token_count',
     ];
 
     protected $casts = [
         'chunk_index' => 'integer',
-        'token_count' => 'integer',
         'embedding' => 'array',
     ];
 

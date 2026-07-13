@@ -94,6 +94,40 @@ class CountryCatalog
         ];
     }
 
+    /**
+     * Map a country (ISO alpha-2) to its primary currency code, for automatic
+     * GeoIP price localization. Returns null when unknown — the caller then keeps
+     * the store base currency. Only currencies we can format/convert are returned.
+     */
+    public static function currencyForCountry(?string $countryCode): ?string
+    {
+        if (! is_string($countryCode) || strlen($countryCode) !== 2) {
+            return null;
+        }
+
+        static $map = [
+            'US' => 'USD', 'GB' => 'GBP', 'IN' => 'INR', 'BD' => 'BDT', 'PK' => 'PKR',
+            'NP' => 'NPR', 'LK' => 'LKR', 'CA' => 'CAD', 'AU' => 'AUD', 'NZ' => 'NZD',
+            'SG' => 'SGD', 'MY' => 'MYR', 'ID' => 'IDR', 'PH' => 'PHP', 'TH' => 'THB',
+            'VN' => 'VND', 'JP' => 'JPY', 'KR' => 'KRW', 'CN' => 'CNY', 'HK' => 'HKD',
+            'AE' => 'AED', 'SA' => 'SAR', 'QA' => 'QAR', 'KW' => 'KWD', 'BH' => 'BHD',
+            'OM' => 'OMR', 'TR' => 'TRY', 'ZA' => 'ZAR', 'NG' => 'NGN', 'KE' => 'KES',
+            'EG' => 'EGP', 'MA' => 'MAD', 'BR' => 'BRL', 'MX' => 'MXN', 'AR' => 'ARS',
+            'CL' => 'CLP', 'CO' => 'COP', 'PE' => 'PEN', 'CH' => 'CHF', 'SE' => 'SEK',
+            'NO' => 'NOK', 'DK' => 'DKK', 'PL' => 'PLN', 'CZ' => 'CZK', 'HU' => 'HUF',
+            'RO' => 'RON',
+            // Eurozone
+            'DE' => 'EUR', 'FR' => 'EUR', 'IT' => 'EUR', 'ES' => 'EUR', 'NL' => 'EUR',
+            'BE' => 'EUR', 'AT' => 'EUR', 'IE' => 'EUR', 'PT' => 'EUR', 'FI' => 'EUR',
+            'GR' => 'EUR', 'SK' => 'EUR', 'SI' => 'EUR', 'LT' => 'EUR', 'LV' => 'EUR',
+            'EE' => 'EUR', 'LU' => 'EUR', 'CY' => 'EUR', 'MT' => 'EUR', 'HR' => 'EUR',
+        ];
+
+        $code = $map[strtoupper($countryCode)] ?? null;
+
+        return $code && in_array($code, self::currencies(), true) ? $code : null;
+    }
+
     public static function countryName(?string $countryCode, string $locale = 'en'): ?string
     {
         if (! is_string($countryCode) || strlen($countryCode) !== 2) {
@@ -167,9 +201,15 @@ class CountryCatalog
             ->where('code', $currencyCode)
             ->first(['symbol', 'decimal_places']);
 
+        // Fallback chain for a currency with no DB row: static catalog → intl → code.
+        $catalog = CurrencyCatalog::get($currencyCode);
+
         return self::$currencyFormats[$currencyCode] = [
-            'symbol' => $currency?->symbol ?: self::intlCurrencySymbol($currencyCode),
-            'decimals' => (int) ($currency?->decimal_places ?? settings('currency_decimals', 2)),
+            'symbol' => $currency?->symbol
+                ?: ($catalog['symbol'] ?? self::intlCurrencySymbol($currencyCode)),
+            'decimals' => (int) ($currency?->decimal_places
+                ?? $catalog['decimals']
+                ?? settings('currency_decimals', 2)),
         ];
     }
 
@@ -199,7 +239,7 @@ class CountryCatalog
         }
 
         $position = Language::query()
-            ->where('code', app()->getLocale() ?: settings('default_language', 'en'))
+            ->where('code', app()->getLocale() ?: Language::defaultCode())
             ->value('currency_position');
 
         if (! in_array($position, [

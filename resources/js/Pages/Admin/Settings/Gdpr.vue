@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
-import AppColorPicker from '@/Components/AppColorPicker.vue'
+import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -48,13 +49,14 @@ const saveSettings = () => {
 <template>
     <Head :title="t('GDPR Settings')" />
 
-    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('GDPR & Cookie Consent') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure banner visibility, consent copy, colors, and policy links from one unified compliance settings page.') }}</p>
             </div>
-            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="saveSettings">
+            <button type="button" :disabled="form.processing" class="shrink-0 btn-primary-admin disabled:opacity-60" @click="saveSettings">
+                <i class="ti ti-device-floppy"></i>
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}
             </button>
         </div>
@@ -74,9 +76,7 @@ const saveSettings = () => {
                                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Global GDPR Cookie Consent') }}</span>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show the granular cookie consent banner to visitors.') }}</p>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="form.enabled" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form.enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.enabled = !form.enabled">
-                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.enabled ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                </button>
+                                <AppSwitch v-model="form.enabled" />
                             </label>
 
                             <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
@@ -84,9 +84,7 @@ const saveSettings = () => {
                                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('EU / EEA Countries Only') }}</span>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Only show the banner to EU and EEA visitors using your configured geolocation source.') }}</p>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="form.eu_only" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form.eu_only ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.eu_only = !form.eu_only">
-                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.eu_only ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                </button>
+                                <AppSwitch v-model="form.eu_only" />
                             </label>
 
                             <div>
@@ -176,9 +174,7 @@ const saveSettings = () => {
                                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Privacy & Cookie Policy links on banner') }}</span>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Add direct links so visitors can review your policies before accepting preferences.') }}</p>
                                 </div>
-                                <button type="button" role="switch" :aria-checked="form.show_policy_links" class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition" :class="form.show_policy_links ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'" @click="form.show_policy_links = !form.show_policy_links">
-                                    <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.show_policy_links ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                                </button>
+                                <AppSwitch v-model="form.show_policy_links" />
                             </label>
 
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">

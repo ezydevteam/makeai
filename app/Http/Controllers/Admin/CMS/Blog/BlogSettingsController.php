@@ -36,8 +36,6 @@ class BlogSettingsController extends Controller
                 'comments_require_approval' => (bool) settings('comments_require_approval', false),
                 'comments_notify_admin' => (bool) settings('comments_notify_admin', false),
                 'comments_poll_seconds' => (int) settings('comments_poll_seconds', 60),
-                'comments_akismet_key' => '',
-                'comments_akismet_configured' => filled(settings('comments_akismet_key')),
             ],
             'authors' => Admin::orderBy('name')->get(['id', 'name']),
             'shareNetworks' => collect(SocialService::SHARE_NETWORKS)
@@ -48,7 +46,7 @@ class BlogSettingsController extends Controller
 
     public function update(BlogSettingsRequest $request)
     {
-        foreach ($request->safe()->except('comments_akismet_key') as $key => $value) {
+        foreach ($request->safe()->all() as $key => $value) {
             $type = is_bool($value) ? 'boolean' : (is_int($value) ? 'integer' : (is_array($value) ? 'json' : 'string'));
             $settingKey = str_starts_with($key, 'social_share_')
                 ? $key
@@ -58,10 +56,6 @@ class BlogSettingsController extends Controller
                 : (str_starts_with($key, 'comments_') ? 'comments' : 'blog');
 
             settings_set($settingKey, $value, $type, $group);
-        }
-
-        if ($request->filled('comments_akismet_key')) {
-            settings_set('comments_akismet_key', $request->validated('comments_akismet_key'), 'encrypted', 'comments');
         }
 
         return back()->with('success', translate('Blog settings saved.'));

@@ -66,8 +66,7 @@ CLAUDE.md
 .clineRules
 .gemini/
 .cline/
-.brainsync/
-caveman/
+.mcp-memory/
 
 
 # Auto-generated agent rules (personalized per developer)

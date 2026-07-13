@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\AiModel;
+use App\Services\AI\CreditPricingService;
 use Illuminate\Database\Seeder;
 
 class AiModelSeeder extends Seeder
@@ -109,19 +110,10 @@ class AiModelSeeder extends Seeder
         ['slug' => 'voyage-3',        'input' => 0.00002, 'output' => 0, 'credits' => 0, 'max_tokens' => 4096, 'type' => 'embedding', 'name' => 'Voyage 3 (Text Embedding)'],
         ['slug' => 'voyage-3-lite',   'input' => 0.00002, 'output' => 0, 'credits' => 0, 'max_tokens' => 2048, 'type' => 'embedding', 'name' => 'Voyage 3 Lite (Lightweight Embedding)'],
 
-        // ─── Together AI ────────────────────────────────────────────────
-        ['slug' => 'meta-llama/Llama-4-Maverick-17B-128E-Instruct',  'input' => 0.00020, 'output' => 0.00090, 'credits' => 2,  'max_tokens' => 16384, 'type' => 'chat', 'name' => 'Llama 4 Maverick (Together AI)'],
-        ['slug' => 'meta-llama/Llama-4-Scout-17B-16E-Instruct',      'input' => 0.00010, 'output' => 0.00040, 'credits' => 1,  'max_tokens' => 16384, 'type' => 'chat', 'name' => 'Llama 4 Scout (Together AI)'],
-        ['slug' => 'meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo',   'input' => 0.00088, 'output' => 0.00088, 'credits' => 2,  'max_tokens' => 16384, 'type' => 'chat', 'name' => 'Llama 3.3 70B (Together AI)'],
-        ['slug' => 'deepseek-ai/DeepSeek-V4-Pro',                    'input' => 0.000435, 'output' => 0.00087, 'credits' => 3, 'max_tokens' => 16384, 'type' => 'chat', 'name' => 'DeepSeek V4 Pro (Together AI)'],
-        ['slug' => 'deepseek-ai/DeepSeek-V4-Flash',                  'input' => 0.000140, 'output' => 0.00028, 'credits' => 1, 'max_tokens' => 16384, 'type' => 'chat', 'name' => 'DeepSeek V4 Flash (Together AI)'],
-        ['slug' => 'mistralai/Mixtral-8x7B-Instruct-v0.1',           'input' => 0.00060,  'output' => 0.00060, 'credits' => 2, 'max_tokens' => 4096,  'type' => 'chat', 'name' => 'Mixtral 8x7B (Together AI)'],
-
-        // ─── Replicate ──────────────────────────────────────────────────
-        ['slug' => 'meta/meta-llama-3.3-70b-instruct',              'input' => 0.00088, 'output' => 0.00088, 'credits' => 2,  'max_tokens' => 16384, 'type' => 'chat',  'name' => 'Llama 3.3 70B (Replicate)'],
-        ['slug' => 'mistralai/mixtral-8x7b-instruct-v0.1',          'input' => 0.00060, 'output' => 0.00060, 'credits' => 2,  'max_tokens' => 4096,  'type' => 'chat',  'name' => 'Mixtral 8x7B (Replicate)'],
-        ['slug' => 'stability-ai/stable-diffusion-3.5-large',       'input' => 0,       'output' => 0,       'credits' => 10, 'max_tokens' => 0,     'type' => 'image', 'name' => 'Stable Diffusion 3.5 (Image Gen)'],
-        ['slug' => 'black-forest-labs/flux-1.1-pro',                 'input' => 0,       'output' => 0,       'credits' => 8,  'max_tokens' => 0,     'type' => 'image', 'name' => 'Flux 1.1 Pro (Image Gen)'],
+        // NOTE: Together AI, Replicate, and image-generation models are intentionally
+        // omitted — no such provider is defined in config/ai.php, so the seeder (which
+        // iterates configured providers) never created them. Media pricing is anchored
+        // via config('ai.media_costs'); addons that add those providers seed their own.
     ];
 
     public function up(): void
@@ -133,7 +125,7 @@ class AiModelSeeder extends Seeder
             foreach ($models as $modelSlug) {
                 $costs = $this->findCosts($modelSlug);
 
-                AiModel::updateOrCreate(
+                $model = AiModel::updateOrCreate(
                     ['slug' => $modelSlug],
                     [
                         'name' => $costs['name'],
@@ -146,6 +138,40 @@ class AiModelSeeder extends Seeder
                         'max_tokens' => $costs['max_tokens'],
                     ]
                 );
+
+                // Chat models are token-billed: their credits derive from real
+                // provider cost via CreditPricingService (single source of truth).
+                // Media/embedding/reranking bill per-unit or are free, so keep
+                // their curated credits and exclude them from auto-recalc.
+                if ($costs['type'] === 'chat') {
+                    if ($model->wasRecentlyCreated || $model->credits_auto) {
+                        $model->credits_per_1k = CreditPricingService::deriveCreditsPer1k($model);
+                        $model->credits_auto = true;
+                        $model->save();
+                    }
+                } else {
+                    // Media (audio/image/transcription) is billed PER UNIT, not per
+                    // token. Seed the curated per-unit credit cost into meta so the
+                    // charge (TokenGuard::mediaCreditCost) reflects the intended value
+                    // instead of the flat config default. Only seed on create — never
+                    // overwrite an admin's manual meta.credits_per_unit on re-seed.
+                    $dirty = false;
+                    if ($model->credits_auto) {
+                        $model->credits_auto = false;
+                        $dirty = true;
+                    }
+                    if ($model->wasRecentlyCreated
+                        && in_array($costs['type'], ['audio', 'image', 'transcription'], true)
+                        && (int) $costs['credits'] > 0) {
+                        $meta = $model->meta ?? [];
+                        $meta['credits_per_unit'] = (float) $costs['credits'];
+                        $model->meta = $meta;
+                        $dirty = true;
+                    }
+                    if ($dirty) {
+                        $model->save();
+                    }
+                }
             }
         }
     }

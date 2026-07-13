@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import QRCode from 'qrcode'
@@ -164,7 +164,7 @@ const regenerateRecoveryCodes = () => {
                         <p v-if="enableForm.errors.code" class="mt-1 text-sm text-danger-500">{{ enableForm.errors.code }}</p>
                     </div>
 
-                    <button type="submit" :disabled="enableForm.processing || enableForm.code.length !== 6" class="w-full rounded-lg btn-primary shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60">
+                    <button type="submit" :disabled="enableForm.processing || enableForm.code.length !== 6" class="w-full rounded-lg btn-primary-admin shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-60">
                         {{ enableForm.processing ? $t('Enabling...') : $t('Enable Two-Factor') }}
                     </button>
                 </form>

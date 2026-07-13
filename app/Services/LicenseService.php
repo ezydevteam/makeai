@@ -17,16 +17,9 @@ class LicenseService
     public const TYPE_REGULAR = 1;
     public const TYPE_EXTENDED = 2;
 
-    // Public key shipped in core — pairs with the private key on the License Server.
-    // Class constant, NOT settings/DB/.env — settings can be edited by a nuller.
-    //
-    // ⚠️ BEFORE PACKAGING FOR ENVATO: replace this with the REAL base64-encoded
-    // Ed25519 public key from your License Server. While it equals
-    // PLACEHOLDER_PUBLIC_KEY, all real (non-test-mode) activations are refused with
-    // a clear "not configured" message so buyers never see a cryptic signature error.
-    private const LICENSE_SERVER_PUBLIC_KEY = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
-    private const PLACEHOLDER_PUBLIC_KEY    = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
-    private const LICENSE_SERVER_URL        = 'https://license.ezydev.net/api/v1/verify';
+    // Public key lives in App\Support\LicenseKey — the single place to set it,
+    // shared with AddonLicenseService so the two can never diverge.
+    private const LICENSE_SERVER_URL = 'https://license.ezydev.net/api/v1/verify';
 
     /**
      * Verify a purchase code via the Author License Server.
@@ -57,7 +50,7 @@ class LicenseService
         }
 
         if (! $this->publicKeyConfigured()) {
-            Log::critical('LicenseService: LICENSE_SERVER_PUBLIC_KEY is still the placeholder — the real key was not set before packaging.');
+            Log::critical('LicenseService: License Server public key (App\Support\LicenseKey) is still the placeholder — the real key was not set before packaging.');
             return LicenseResult::failure(
                 translate('License verification is not configured on this build. Please contact the author/support.'),
                 'public_key_missing'
@@ -197,6 +190,65 @@ class LicenseService
                 'connection_error'
             );
         }
+    }
+
+    /**
+     * The License Server update endpoints, derived from the verify URL so there is
+     * a single source for the server host + embedded public key.
+     */
+    public function verifyEndpoint(): string
+    {
+        return self::LICENSE_SERVER_URL;
+    }
+
+    /** Public wrapper so sibling services can store the exact signed payload bytes. */
+    public function extractSignedPayload(string $responseBody): ?string
+    {
+        return $this->extractRawPayload($responseBody);
+    }
+
+    public function updateEndpoint(): string
+    {
+        return str_replace('/verify', '/update', self::LICENSE_SERVER_URL);
+    }
+
+    public function downloadEndpoint(): string
+    {
+        return str_replace('/verify', '/update/download', self::LICENSE_SERVER_URL);
+    }
+
+    /**
+     * Verify an Ed25519-signed License Server response and return its payload, or
+     * null if the signature can't be trusted. Shared by license verification and
+     * the update flow so both use the same embedded public key + byte contract.
+     *
+     * @param  array<string,mixed>  $data  the decoded JSON body ($response->json())
+     * @return array<string,mixed>|null
+     */
+    public function verifySignedResponse(string $responseBody, array $data): ?array
+    {
+        if (! isset($data['signature'], $data['payload']) || ! $this->publicKeyConfigured()) {
+            return null;
+        }
+
+        if (! function_exists('sodium_crypto_sign_verify_detached')) {
+            return null;
+        }
+
+        $rawPayload = $this->extractRawPayload($responseBody);
+        if (! $rawPayload) {
+            return null;
+        }
+
+        $signatureBytes = @base64_decode($data['signature']);
+        $publicKeyBytes = @base64_decode($this->getPublicKey());
+
+        if (! $signatureBytes || ! $publicKeyBytes
+            || ! @sodium_crypto_sign_verify_detached($signatureBytes, $rawPayload, $publicKeyBytes)) {
+            return null;
+        }
+
+        return $data['payload'];
     }
 
     public function getLicenseType(): int
@@ -694,7 +746,7 @@ class LicenseService
         if (app()->runningUnitTests() && app()->has('test.license_public_key')) {
             return app('test.license_public_key');
         }
-        return self::LICENSE_SERVER_PUBLIC_KEY;
+        return \App\Support\LicenseKey::PUBLIC_KEY;
     }
 
     /**
@@ -703,7 +755,7 @@ class LicenseService
      */
     private function publicKeyConfigured(): bool
     {
-        return $this->getPublicKey() !== self::PLACEHOLDER_PUBLIC_KEY;
+        return $this->getPublicKey() !== \App\Support\LicenseKey::PLACEHOLDER;
     }
 
     /**

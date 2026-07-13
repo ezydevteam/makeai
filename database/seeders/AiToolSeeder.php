@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use RuntimeException;
 
 /**
- * Seeds the 255 predefined AI tools from AI_SaaS_Master_Prompt Part 14.7.
+ * Seeds the 402 predefined AI tools from AI_SaaS_Master_Prompt Part 14.7.
  */
 class AiToolSeeder extends Seeder
 {
@@ -18,7 +18,7 @@ class AiToolSeeder extends Seeder
     {
         $categories = Category::aiTools()->where('is_active', true)->get()->keyBy('slug');
         $catalog = $this->catalog();
-        $expectedTotal = 280;
+        $expectedTotal = 402;
         $actualTotal = collect($catalog)->flatten(1)->count();
 
         if ($actualTotal !== $expectedTotal) {
@@ -38,10 +38,15 @@ class AiToolSeeder extends Seeder
             foreach ($tools as $tool) {
                 $activeSlugs[] = $tool['slug'];
 
-                AiTool::updateOrCreate(
-                    ['slug' => $tool['slug']],
-                    $this->payload($tool, $category, $sortOrder++)
-                );
+                // Look up with trashed so a previously soft-deleted canonical tool is
+                // restored and updated in place, rather than triggering a unique-slug
+                // insert collision (the unique index spans soft-deleted rows).
+                $model = AiTool::withTrashed()->firstOrNew(['slug' => $tool['slug']]);
+                $model->fill($this->payload($tool, $category, $sortOrder++));
+                if ($model->trashed()) {
+                    $model->deleted_at = null;
+                }
+                $model->save();
             }
 
             $category->updateToolsCount();
@@ -86,7 +91,6 @@ class AiToolSeeder extends Seeder
                 : 'inherit',
             'is_active' => true,
             'is_featured' => in_array($tool['slug'], $this->featuredSlugs(), true),
-            'requires_pro' => false,
             'supports_brand_voice' => ! in_array($category->slug, ['development', 'academic', 'language'], true),
             'avg_output_tokens' => $this->avgOutputTokens($category->slug, $tool['slug']),
             'sort_order' => $sortOrder,
@@ -297,6 +301,8 @@ PROMPT;
                 'trending-ideas', 'clickbait-title', 'social-bio', 'content-calendar',
                 'hashtag-strategy', 'video-description', 'video-ideas',
                 'newsletter-intro',
+                'youtube-script', 'youtube-chapters', 'video-sales-letter',
+                'explainer-video-script', 'video-hook-generator', 'shorts-script',
             ]),
             'advertising' => $this->tools([
                 'google-ads-headline', 'google-ads-description', 'facebook-ad', 'instagram-ad',
@@ -310,7 +316,7 @@ PROMPT;
                 'sales-email', 'subject-lines', 'email-sequence', 'drip-campaign',
                 'reactivation-email', 'thank-you-email', 'apology-email', 'event-invitation-email',
                 'product-launch-email', 'testimonial-request-email', 'referral-email',
-                'email-generator', 'winback-email',
+                'email-generator', 'winback-email', 'onboarding-email-sequence',
             ]),
             'ecommerce' => $this->tools([
                 'product-description', 'product-features', 'product-name-ideas', 'product-title',
@@ -318,6 +324,8 @@ PROMPT;
                 'shopify-product', 'product-comparison', 'upsell-message', 'flash-sale-copy',
                 'abandoned-cart-email', 'order-confirmation-email', 'promo-sms',
                 'discount-announcement', 'holiday-sale-copy',
+                'app-store-description', 'etsy-listing', 'ebay-listing',
+                'product-bullet-points', 'size-guide', 'image-alt-text',
             ]),
             'business' => $this->tools([
                 'business-plan', 'swot-analysis', 'pitch-deck-script', 'meeting-minutes',
@@ -326,6 +334,9 @@ PROMPT;
                 'business-model-canvas', 'kpi-dashboard-copy', 'quarterly-report',
                 'investor-update', 'job-description', 'sop-generator', 'risk-assessment',
                 'stakeholder-email',
+                'release-notes', 'changelog-generator', 'product-hunt-launch',
+                'feature-announcement', 'push-notification-copy',
+                'elevator-pitch', 'one-line-pitch', 'lean-canvas', 'yc-application',
             ]),
             'academic' => $this->tools([
                 'research-outline', 'literature-review', 'research-question',
@@ -351,6 +362,8 @@ PROMPT;
                 'meta-description', 'keyword-cluster', 'content-brief',
                 'internal-link-suggestions', 'robots-txt-generator', 'sitemap-plan',
                 'local-seo-page', 'product-page-seo', 'paraphrasing-tool', 'seo-blog',
+                'pricing-page-copy', 'people-also-ask', 'featured-snippet',
+                'seo-content-audit', 'topic-cluster-planner',
             ]),
             'creative-writing' => $this->tools([
                 'story-generator', 'song-lyrics', 'poem-writer', 'dialogue-writer',
@@ -386,6 +399,8 @@ PROMPT;
                 'campaign-brief', 'buyer-persona', 'value-proposition', 'brand-story',
                 'content-strategy', 'channel-strategy', 'survey-questions',
                 'case-study',
+                'business-name-generator', 'brand-name-generator', 'slogan-generator',
+                'domain-name-ideas', 'startup-name-generator', 'tagline-generator',
             ]),
             'customer-support' => $this->tools([
                 'ticket-reply', 'kb-article', 'onboarding-guide', 'chatbot-script',
@@ -395,12 +410,54 @@ PROMPT;
             'legal-finance' => $this->tools([
                 'contract-summary', 'legal-privacy-policy', 'disclaimer',
                 'fundraising-pitch', 'budget-plan', 'invoice-email', 'investment-memo',
+                'nda-generator', 'cookie-policy', 'refund-policy', 'return-policy',
+                'gdpr-statement', 'affiliate-disclosure', 'service-agreement', 'shipping-policy',
             ]),
             'productivity' => $this->tools([
                 'pros-cons', 'smart-goals', 'action-plan', 'how-to-guide',
                 'prompt-generator', 'checklist-generator', 'decision-matrix',
                 'meeting-agenda', 'weekly-plan', 'project-timeline', 'brainstorming-ideas',
                 'productivity-system',
+                'email-reply-generator', 'meeting-summary-notes', 'daily-standup',
+                'journaling-prompts',
+            ]),
+            'sales' => $this->tools([
+                'cold-call-script', 'sales-proposal', 'objection-handling',
+                'discovery-call-questions', 'linkedin-outreach-dm', 'sales-follow-up',
+                'sales-pitch', 'upsell-crosssell-script', 'rfp-response', 'case-study-interview',
+            ]),
+            'hr-recruiting' => $this->tools([
+                'job-ad', 'interview-questions-hiring', 'offer-letter',
+                'candidate-rejection-email', 'performance-review', 'employee-onboarding-email',
+                'employee-handbook-section', 'promotion-announcement', 'reference-check-questions',
+                'recruiter-outreach',
+            ]),
+            'podcast' => $this->tools([
+                'podcast-outline', 'podcast-show-notes', 'podcast-title-ideas',
+                'podcast-description', 'podcast-interview-questions', 'podcast-episode-summary',
+            ]),
+            'ai-prompts' => $this->tools([
+                'midjourney-prompt', 'stable-diffusion-prompt', 'dalle-prompt',
+                'chatgpt-prompt-optimizer', 'system-prompt-generator', 'negative-prompt-generator',
+            ]),
+            'video' => $this->tools([
+                'video-script-outline', 'video-storyboard', 'voiceover-script',
+                'video-shot-list', 'b-roll-ideas', 'video-thumbnail-text',
+                'video-intro-script', 'video-outro-cta', 'webinar-script',
+                'product-demo-script', 'course-lesson-script', 'testimonial-video-questions',
+                'video-editing-brief',
+                'live-stream-script', 'video-series-plan', 'youtube-community-post',
+                'video-caption-file', 'tutorial-script', 'video-ad-storyboard',
+                'video-content-calendar', 'unboxing-script', 'video-chapter-summary',
+            ]),
+            'image-design' => $this->tools([
+                'image-caption', 'carousel-copy', 'infographic-outline', 'infographic-copy',
+                'logo-design-brief', 'graphic-design-brief', 'moodboard-concept',
+                'color-palette-ideas', 'photo-shoot-brief', 'product-photography-brief',
+                'stock-photo-keywords', 'meme-caption',
+                'presentation-slide-copy', 'banner-copy', 'packaging-copy', 'icon-set-brief',
+                'brand-style-guide', 'ui-microcopy', 'poster-copy', 'image-concept-brief',
+                'flyer-copy', 'album-cover-brief', 'typography-pairing',
             ]),
         ];
     }
@@ -458,6 +515,31 @@ PROMPT;
             'readme-generator' => 'README Generator',
             'gtm-strategy' => 'Go-to-Market Strategy',
             'kb-article' => 'Knowledge Base Article',
+            'dalle-prompt' => 'DALL·E Prompt',
+            'chatgpt-prompt-optimizer' => 'ChatGPT Prompt Optimizer',
+            'rfp-response' => 'RFP Response',
+            'nda-generator' => 'NDA Generator',
+            'gdpr-statement' => 'GDPR Statement',
+            'yc-application' => 'YC Application Answers',
+            'linkedin-outreach-dm' => 'LinkedIn Outreach DM',
+            'seo-content-audit' => 'SEO Content Audit',
+            'youtube-script' => 'YouTube Script',
+            'youtube-chapters' => 'YouTube Chapters',
+            'ebay-listing' => 'eBay Listing',
+            'upsell-crosssell-script' => 'Upsell & Cross-Sell Script',
+            'interview-questions-hiring' => 'Interview Questions (Hiring)',
+            'shorts-script' => 'Shorts / Reels Script',
+            'meeting-summary-notes' => 'Meeting Summary From Notes',
+            'one-line-pitch' => 'One-Line Pitch',
+            'podcast-outline' => 'Podcast Episode Outline',
+            'daily-standup' => 'Daily Standup Update',
+            'recruiter-outreach' => 'Recruiter Outreach Message',
+            'b-roll-ideas' => 'B-Roll Ideas',
+            'video-outro-cta' => 'Video Outro & CTA',
+            'testimonial-video-questions' => 'Testimonial Video Questions',
+            'youtube-community-post' => 'YouTube Community Post',
+            'video-caption-file' => 'Video Captions & Subtitles',
+            'ui-microcopy' => 'UI Microcopy',
         ];
 
         return $names[$slug] ?? Str::headline($slug);

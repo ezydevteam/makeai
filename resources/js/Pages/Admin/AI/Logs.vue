@@ -3,8 +3,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppFilterDropdown from '@/Components/Admin/AppFilterDropdown.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -28,6 +30,7 @@ interface UsageLog {
     response_time_ms?: number | null
     created_at: string
     user?: UsageUser | null
+    metadata?: Record<string, any> | null
 }
 
 interface PaginationLink {
@@ -82,6 +85,10 @@ const dateTo = computed(() => props.filters.date_to || '')
 
 const hasActiveFilters = computed(() => Boolean(searchInput.value || currentProvider.value || currentStatus.value || dateFrom.value || dateTo.value))
 
+const activeFiltersCount = computed(() => {
+    return [currentProvider.value, currentStatus.value, dateFrom.value, dateTo.value].filter(Boolean).length
+})
+
 const providerOptions = computed(() => {
     return [
         { value: '', label: t('All Providers') },
@@ -133,8 +140,9 @@ const updateFilter = (key: string, value: any) => {
 }
 
 const resetFilters = () => {
-    searchInput.value = ''
-    router.get(route('admin.ai.logs.index'), {}, {
+    router.get(route('admin.ai.logs.index'), {
+        search: searchInput.value || undefined
+    }, {
         preserveState: true,
         preserveScroll: true,
         replace: true,
@@ -236,6 +244,25 @@ const formatToolSlug = (slug: string | null | undefined) => {
     return toolNames[slug] || slug.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
+const formatMetadataKey = (key: string) => {
+    return key
+        .replace(/[_-]/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+const detailsModalOpen = ref(false)
+const selectedLog = ref<UsageLog | null>(null)
+
+const openDetailsModal = (log: UsageLog) => {
+    selectedLog.value = log
+    detailsModalOpen.value = true
+}
+
+const closeDetailsModal = () => {
+    detailsModalOpen.value = false
+    selectedLog.value = null
+}
+
 onMounted(() => {
     window.addEventListener('keydown', handleKeydown)
 })
@@ -250,7 +277,7 @@ onBeforeUnmount(() => {
     <Head :title="t('AI Usage Logs')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t('AI Usage Logs') }}
@@ -260,7 +287,7 @@ onBeforeUnmount(() => {
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+            <div class="shrink-0 text-xs text-gray-500 dark:text-gray-400">
                 <span class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-surface-700 dark:bg-surface-900">
                     <i class="ti ti-list-details text-sm text-primary-600 dark:text-primary-400"></i>
                     {{ t(':count log(s)', { count: logs.total || 0 }) }}
@@ -324,76 +351,86 @@ onBeforeUnmount(() => {
         </div>
 
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-wrap items-center gap-3 border-b border-gray-100 p-4 dark:border-surface-800">
-                <div class="relative min-w-[240px] flex-1">
-                    <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400"></i>
+            <div class="flex gap-4 items-center justify-between border-b border-gray-100 p-4 dark:border-surface-800">
+                <div class="flex-1 relative md:max-w-sm">
+                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                        <i class="ti ti-search text-base"></i>
+                    </span>
                     <input
                         ref="searchField"
                         v-model="searchInput"
                         type="text"
-                        class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder-gray-400 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                         :placeholder="t('Search tool, user, model...')"
                         @keydown.enter="applyFilters"
                         @focus="searchFocused = true"
                         @blur="searchFocused = false"
                     />
-                    <span
-                        v-if="!searchInput && !searchFocused"
-                        class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                    >
-                        /
-                    </span>
+                    <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                        <span v-if="!searchInput && !searchFocused" class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white text-[11px] font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500">/</span>
+                    </div>
                     <button
                         v-if="searchInput"
                         type="button"
-                        class="absolute right-3 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 transition hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-surface-700 dark:hover:text-gray-200"
+                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
                         :aria-label="t('Clear search')"
                         @click="searchInput = ''; applyFilters()"
                     >
-                        <i class="ti ti-x text-sm"></i>
+                        <i class="ti ti-x text-base"></i>
                     </button>
                 </div>
 
-                <AppSelect
-                    :model-value="currentProvider"
-                    :options="providerOptions"
-                    :placeholder="t('All Providers')"
-                    class="w-full sm:w-56"
-                    @update:model-value="updateFilter('provider', $event)"
-                />
-
-                <AppSelect
-                    :model-value="currentStatus"
-                    :options="statusOptions"
-                    :placeholder="t('All Statuses')"
-                    class="w-full sm:w-48"
-                    @update:model-value="updateFilter('status', $event)"
-                />
-
-                <input
-                    type="date"
-                    :value="dateFrom"
-                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white sm:w-auto"
-                    :placeholder="t('From')"
-                    @change="updateFilter('date_from', ($event.target as HTMLInputElement).value)"
-                />
-
-                <input
-                    type="date"
-                    :value="dateTo"
-                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-transparent focus:ring-2 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-800 dark:text-white sm:w-auto"
-                    :placeholder="t('To')"
-                    @change="updateFilter('date_to', ($event.target as HTMLInputElement).value)"
-                />
-
-                <button
-                    v-if="hasActiveFilters"
-                    type="button"
-                    class="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                    @click="resetFilters"
-                >
-                    {{ t('Clear filters') }}
-                </button>
+                <div class="shrink-0">
+                    <AppFilterDropdown :active-filters-count="activeFiltersCount">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('Provider') }}</label>
+                                <AppSelect
+                                    :model-value="currentProvider"
+                                    :options="providerOptions"
+                                    :placeholder="t('All Providers')"
+                                    @update:model-value="updateFilter('provider', $event)"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('Status') }}</label>
+                                <AppSelect
+                                    :model-value="currentStatus"
+                                    :options="statusOptions"
+                                    :placeholder="t('All Statuses')"
+                                    @update:model-value="updateFilter('status', $event)"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('From Date') }}</label>
+                                <input
+                                    type="date"
+                                    :value="dateFrom"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                    @change="updateFilter('date_from', ($event.target as HTMLInputElement).value)"
+                                />
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400">{{ t('To Date') }}</label>
+                                <input
+                                    type="date"
+                                    :value="dateTo"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                    @change="updateFilter('date_to', ($event.target as HTMLInputElement).value)"
+                                />
+                            </div>
+                            <div v-if="activeFiltersCount > 0" class="border-t border-gray-100 pt-3 dark:border-surface-800 flex justify-end">
+                                <button
+                                    type="button"
+                                    class="text-xs font-semibold text-red-600 hover:text-red-500 transition-colors"
+                                    @click="resetFilters"
+                                >
+                                    {{ t('Clear Filters') }}
+                                </button>
+                            </div>
+                        </div>
+                    </AppFilterDropdown>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
@@ -418,9 +455,13 @@ onBeforeUnmount(() => {
                             class="transition-colors hover:bg-gray-50/50 dark:hover:bg-surface-800/30"
                         >
                             <td class="px-6 py-4">
-                                <div class="font-medium text-gray-900 dark:text-white">
+                                <button
+                                    type="button"
+                                    class="font-medium text-gray-900 hover:text-primary-600 transition-colors text-left dark:text-white dark:hover:text-primary-400 cursor-pointer focus:outline-none"
+                                    @click="openDetailsModal(log)"
+                                >
                                     {{ log.user?.name || t('Guest') }}
-                                </div>
+                                </button>
                                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                     {{ log.user?.email || t('—') }}
                                 </div>
@@ -491,5 +532,117 @@ onBeforeUnmount(() => {
                 />
             </div>
         </section>
+
+        <!-- Usage Log Details Modal -->
+        <AppModal
+            :open="detailsModalOpen"
+            maxWidth="max-w-xl"
+            :title="t('AI Log Details')"
+            :subtitle="selectedLog ? t('Request ID: #:id', { id: selectedLog.id }) : ''"
+            :cancel-text="t('Close')"
+            @close="closeDetailsModal"
+        >
+            <div v-if="selectedLog" class="space-y-6">
+                <!-- User Information -->
+                <div>
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2.5">{{ t('User Information') }}</h4>
+                    <div class="rounded-xl border border-gray-200 p-4 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-950">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Name') }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedLog.user?.name || t('Guest') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Email') }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedLog.user?.email || t('—') }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API & Model Info -->
+                <div>
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2.5">{{ t('AI Model Settings') }}</h4>
+                    <div class="rounded-xl border border-gray-200 p-4 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-950">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Provider') }}</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize mt-1" :class="providerBadgeClass(selectedLog.provider)">
+                                    {{ selectedLog.provider || t('Unknown') }}
+                                </span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Model') }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ selectedLog.model || t('—') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Tool Used') }}</span>
+                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-300 mt-1">
+                                    {{ formatToolSlug(selectedLog.tool_slug) }}
+                                </span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Status') }}</span>
+                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize mt-1" :class="statusBadgeClass(selectedLog.status)">
+                                    {{ selectedLog.status || t('Unknown') }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Usage Metrics -->
+                <div>
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2.5">{{ t('Token & Cost Metrics') }}</h4>
+                    <div class="rounded-xl border border-gray-200 p-4 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-950">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Credits Spent') }}</span>
+                                <span class="font-semibold text-gray-900 dark:text-white">{{ formatCredits(selectedLog.credits_used) }} {{ t('credits') }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Calculated Cost') }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatCost(selectedLog.cost_usd) }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Total Token Consumption') }}</span>
+                                <span class="font-medium text-gray-900 dark:text-white">{{ formatNumber(normalizeTokenCount((selectedLog.input_tokens || 0) + (selectedLog.output_tokens || 0))) }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-xs text-gray-400 dark:text-gray-500">{{ t('Token Details') }}</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">
+                                    {{ t('Input: :count', { count: formatNumber(selectedLog.input_tokens || 0) }) }} / {{ t('Output: :count', { count: formatNumber(selectedLog.output_tokens || 0) }) }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Execution Speed -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">{{ t('Response Time') }}</h4>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ formatResponseTime(selectedLog.response_time_ms) }}</span>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">{{ t('Timestamp') }}</h4>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatDateTime(selectedLog.created_at) }}</span>
+                    </div>
+                </div>
+
+                <!-- Metadata/Context -->
+                <div v-if="selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider dark:text-gray-400 mb-2">{{ t('Additional Details') }}</h4>
+                    <div class="rounded-xl border border-gray-200 p-4 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-950 max-h-48 overflow-y-auto space-y-2.5">
+                        <div v-for="(val, key) in selectedLog.metadata" :key="key" class="flex flex-col sm:flex-row sm:justify-between gap-1 border-b border-gray-100/50 pb-2 last:border-0 last:pb-0 dark:border-surface-800/50">
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ formatMetadataKey(key) }}</span>
+                            <span class="text-xs text-gray-800 dark:text-gray-200 break-all sm:text-right">
+                                {{ typeof val === 'object' ? JSON.stringify(val) : val }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </AppModal>
     </div>
 </template>

@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, useForm, usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -136,7 +136,7 @@ const accessOptions = computed(() => {
                     {{ t('Control provider access, API keys, limits, and polling behavior from one unified settings page.') }}
                 </p>
             </div>
-            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="save">
+            <button type="button" :disabled="form.processing" class="rounded-lg btn-primary-admin disabled:opacity-60" @click="save">
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}
             </button>
         </div>

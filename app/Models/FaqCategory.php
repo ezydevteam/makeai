@@ -13,7 +13,6 @@ class FaqCategory extends Model
 
     protected $fillable = [
         'name',
-        'slug',
         'sort_order',
     ];
 

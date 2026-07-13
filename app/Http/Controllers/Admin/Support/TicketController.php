@@ -14,7 +14,6 @@ use App\Services\AI\AiService;
 use App\Services\SupportTicketService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -105,17 +104,9 @@ class TicketController extends Controller
 
         $ticket->load(['user:id,name', 'department:id,name', 'replies']);
         
-        // Use a dedicated system user for internal admin AI operations to prevent leaking customer quotas/context
-        $user = User::firstOrCreate(
-            ['email' => User::internalAiEmail()],
-            [
-                'name' => User::internalAiName(),
-                'password' => bcrypt(Str::random(32)),
-                'is_active' => true,
-                'plan_id' => null,
-                'subscription_status' => 'active',
-            ]
-        );
+        // A dedicated system user backs internal admin AI operations, so drafting a reply never
+        // leaks the customer's quota or context into the generation.
+        $user = User::internalAi();
 
         $history = $ticket->replies
             ->where('is_internal_note', false)
@@ -234,7 +225,7 @@ class TicketController extends Controller
             $handle = fopen('php://output', 'w');
             
             try {
-                fputcsv($handle, ['Ticket #', 'Subject', 'Customer', 'Email', 'Department', 'Assigned To', 'Status', 'Priority', 'Created', 'Resolved At', 'Rating']);
+                fputcsv($handle, ['Ticket #', 'Subject', 'Customer', 'Email', 'Department', 'Assigned To', 'Status', 'Priority', 'Created', 'Resolved At', 'Rating', 'Rating Comment']);
 
                 foreach ($tickets as $ticket) {
                     fputcsv($handle, [
@@ -249,6 +240,7 @@ class TicketController extends Controller
                         $ticket->created_at?->toDateTimeString() ?? '',
                         $ticket->resolved_at?->toDateTimeString() ?? '',
                         $ticket->satisfaction_rating ?? '',
+                        $ticket->satisfaction_comment ?? '',
                     ]);
                 }
             } finally {
@@ -277,8 +269,9 @@ class TicketController extends Controller
         $inProgressPrevious = SupportTicket::where('status', 'in_progress')->where('created_at', '<', $sevenDaysAgo)->count();
 
         // 4. Resolved Tickets
+        // Resolved a week ago is driven by resolved_at, not when the ticket was created.
         $resolvedCurrent = SupportTicket::where('status', 'resolved')->count();
-        $resolvedPrevious = SupportTicket::where('status', 'resolved')->where('created_at', '<', $sevenDaysAgo)->count();
+        $resolvedPrevious = SupportTicket::whereNotNull('resolved_at')->where('resolved_at', '<', $sevenDaysAgo)->count();
 
         return [
             'total' => [
@@ -346,8 +339,8 @@ class TicketController extends Controller
     {
         $admins = $ticket->replies->where('author_type', 'admin')->pluck('author_id')->unique()->values();
         $users = $ticket->replies->where('author_type', 'user')->pluck('author_id')->unique()->values();
-        $adminNames = Admin::whereIn('id', $admins)->pluck('name', 'id');
-        $userNames = User::whereIn('id', $users)->pluck('name', 'id');
+        $adminData = Admin::whereIn('id', $admins)->get(['id', 'name', 'avatar'])->keyBy('id');
+        $userData = User::whereIn('id', $users)->get(['id', 'name', 'avatar'])->keyBy('id');
 
         return [
             ...$ticket->toArray(),
@@ -357,8 +350,11 @@ class TicketController extends Controller
             'replies' => $ticket->replies->map(fn ($reply) => [
                 ...$reply->toArray(),
                 'author_name' => $reply->author_type === 'admin'
-                    ? ($adminNames[$reply->author_id] ?? translate('Support agent'))
-                    : ($userNames[$reply->author_id] ?? translate('Customer')),
+                    ? ($adminData[$reply->author_id]?->name ?? translate('Support agent'))
+                    : ($userData[$reply->author_id]?->name ?? translate('Customer')),
+                'author_avatar' => $reply->author_type === 'admin'
+                    ? ($adminData[$reply->author_id]?->avatar ?? null)
+                    : ($userData[$reply->author_id]?->avatar ?? null),
             ])->values(),
         ];
     }

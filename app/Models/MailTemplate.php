@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class MailTemplate extends Model
 {
@@ -12,6 +13,14 @@ class MailTemplate extends Model
     ];
 
     /**
+     * The admin who last saved this template (for the "Edited by" label).
+     */
+    public function editor(): BelongsTo
+    {
+        return $this->belongsTo(Admin::class, 'last_edited_by');
+    }
+
+    /**
      * Render the template with provided variables.
      */
     public function render(array $variables = []): array
@@ -19,8 +28,10 @@ class MailTemplate extends Model
         $vars = array_merge([
             'site_name' => settings('app_name', config('app.name')),
             'site_url' => settings('app_url', config('app.url')),
-            'site_logo_url' => settings('site_logo_url', ''),
-            'support_email' => settings('support_email', settings('mail_from_address', '')),
+            'site_logo_url' => settings('site_logo_light', ''),
+            // ?: (not the settings() default arg) so a seeded-but-empty
+            // site_support_email still falls back to the from-address.
+            'support_email' => settings('site_support_email') ?: settings('mail_from_address', ''),
             'current_year' => now()->year,
             'year' => now()->year,
             'unsubscribe_url' => $variables['unsubscribe_url'] ?? '#',

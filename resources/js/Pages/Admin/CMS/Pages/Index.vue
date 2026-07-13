@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -17,7 +17,6 @@ interface PageItem {
     title: string
     slug: string
     status: string
-    template: string
     is_system: boolean
     deleted_at: string | null
 }
@@ -255,8 +254,8 @@ onBeforeUnmount(() => {
     <Head :title="t('Pages')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t('Pages') }}
                 </h1>
@@ -265,10 +264,10 @@ onBeforeUnmount(() => {
                 </p>
             </div>
 
-            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
+            <div class="flex gap-3 shrink-0">
                 <Link
                     :href="route('admin.pages.create')"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition w-full sm:w-auto"
+                    class="btn-primary-admin inline-flex items-center justify-center gap-2 shrink-0"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('Create Page') }}
@@ -278,8 +277,8 @@ onBeforeUnmount(() => {
 
         <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
             <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
-                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+                <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+                    <div class="flex-1 w-full lg:max-w-xs lg:min-w-[280px] relative">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -288,44 +287,44 @@ onBeforeUnmount(() => {
                                 ref="searchField"
                                 v-model="searchInput"
                                 type="text"
-                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                :placeholder="t('Search page title, slug, or template...')"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                :placeholder="t('Search page title or slug...')"
                                 @keydown.enter="applyFilters"
                                 @focus="searchFocused = true"
                                 @blur="searchFocused = false"
-                            />
-                            <span
+                              />
+                              <span
                                 v-if="!searchInput && !searchFocused"
                                 class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
-                            >
+                              >
                                 /
-                            </span>
-                            <button
-                                v-if="searchInput"
-                                type="button"
-                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                :aria-label="t('Clear search')"
-                                @click="clearSearch"
-                            >
-                                <i class="ti ti-x text-base"></i>
-                            </button>
-                        </div>
-                    </div>
+                              </span>
+                              <button
+                                  v-if="searchInput"
+                                  type="button"
+                                  class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                                  :aria-label="t('Clear search')"
+                                  @click="clearSearch"
+                              >
+                                  <i class="ti ti-x text-base"></i>
+                              </button>
+                          </div>
+                      </div>
 
-                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect
-                                v-model="status"
-                                :options="statusOptions"
-                                :placeholder="t('All Statuses')"
-                                @update:model-value="applyFilters"
-                            />
-                        </div>
+                      <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end shrink-0">
+                          <div class="w-full sm:w-44">
+                              <AppSelect
+                                  v-model="status"
+                                  :options="statusOptions"
+                                  :placeholder="t('All Statuses')"
+                                  @update:model-value="applyFilters"
+                              />
+                          </div>
 
                         <button
                             v-if="hasActiveFilters"
                             type="button"
-                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 w-full sm:w-auto"
+                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 w-full sm:w-auto shrink-0"
                             @click="resetFilters"
                         >
                             {{ t('Clear filters') }}
@@ -340,8 +339,7 @@ onBeforeUnmount(() => {
                         <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
                             <tr>
                                 <th scope="col" class="px-4 py-3">{{ t('Page') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ t('Template') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ t('Status') }}</th>
+                                <th scope="col" class="px-4 py-3 text-center"">{{ t('Status') }}</th>
                                 <th scope="col" class="px-4 py-3 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
@@ -370,12 +368,7 @@ onBeforeUnmount(() => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-4">
-                                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                                        {{ page.template }}
-                                    </span>
-                                </td>
-                                <td class="px-4 py-4">
+                                <td class="px-4 py-4 text-center"">
                                     <span
                                         class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                                         :class="getStatusClass(isTrashed ? 'trashed' : page.status)"
@@ -389,7 +382,7 @@ onBeforeUnmount(() => {
                                             <a
                                                 :href="'/' + page.slug"
                                                 target="_blank"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="close"
                                             >
                                                 <i class="ti ti-external-link text-base"></i>
@@ -399,7 +392,7 @@ onBeforeUnmount(() => {
                                                 v-if="page.status === 'draft' || page.status === 'scheduled'"
                                                 :href="route('admin.pages.preview', page.id)"
                                                 target="_blank"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="close"
                                             >
                                                 <i class="ti ti-eye text-base"></i>
@@ -407,7 +400,7 @@ onBeforeUnmount(() => {
                                             </a>
                                             <Link
                                                 :href="route('admin.pages.edit', page.id)"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="close"
                                             >
                                                 <i class="ti ti-edit text-base"></i>
@@ -450,7 +443,7 @@ onBeforeUnmount(() => {
                             </tr>
 
                             <tr v-if="pages.data.length === 0">
-                                <td colspan="4" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="3" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                     <i class="ti ti-file-off mx-auto mb-3 block text-4xl text-gray-300 dark:text-gray-600"></i>
                                     <p class="font-medium">{{ hasActiveFilters ? t('No pages match your filters') : t('No pages found') }}</p>
                                     <button

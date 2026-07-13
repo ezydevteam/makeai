@@ -16,7 +16,8 @@ return new class extends Migration
 
         Schema::create('affiliate_programs', function (Blueprint $table) {
             $table->id();
-            $table->boolean('is_active')->default(false);
+            // Master on/off lives in the `affiliate_enabled` setting (a feature toggle,
+            // grouped with the other feature toggles), so there is no is_active column.
             $table->enum('commission_type', ['percentage', 'fixed'])->default('percentage');
             $table->decimal('commission_value', 8, 2)->default(20);
             $table->enum('commission_on', ['first_purchase', 'all_purchases', 'subscription'])->default('first_purchase');
@@ -29,7 +30,8 @@ return new class extends Migration
             $table->json('marketing_banners')->nullable();
             $table->json('promotional_emails')->nullable();
             $table->json('social_posts')->nullable();
-            $table->longText('terms')->nullable();
+            // Program terms are referenced by page slug (`terms_page_slug`, added in a
+            // later migration), not stored inline.
             $table->timestamps();
         });
 
@@ -57,7 +59,6 @@ return new class extends Migration
             $table->enum('status', ['pending', 'approved', 'paid', 'rejected', 'cancelled'])->default('pending');
             $table->timestamp('approved_at')->nullable();
             $table->timestamp('paid_at')->nullable();
-            $table->text('notes')->nullable();
             $table->timestamps();
 
             $table->index(['referrer_id', 'status']);

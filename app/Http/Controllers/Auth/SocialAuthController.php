@@ -111,6 +111,9 @@ class SocialAuthController extends Controller
                 'email_verified_at' => now(),
             ]);
 
+            // Apply the admin's "new user gets" choice (Pricing Settings).
+            $user->applyRegistrationDefault();
+
             $affiliate->attachReferralToUser($request, $user);
             app(NotificationEventService::class)->newUserRegistered($user);
         }

@@ -14,7 +14,6 @@ class AffiliateCommission extends Model
         'status',
         'approved_at',
         'paid_at',
-        'notes',
     ];
 
     protected function casts(): array

@@ -66,7 +66,7 @@ class AffiliateController extends Controller
         $status = $request->string('status')->toString();
 
         $payouts = tap(AffiliatePayout::query()
-            ->with(['user:id,ulid,name,email'])
+            ->with(['user:id,ulid,name,email', 'processor:id,name'])
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($search, function ($q) use ($search) {
                 $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
@@ -135,6 +135,7 @@ class AffiliateController extends Controller
 
         $payouts = tap(AffiliatePayout::query()
             ->where('user_id', $user->id)
+            ->with('processor:id,name')
             ->latest()
             ->paginate(10), function ($paginator) {
                 $paginator->getCollection()->transform(fn (AffiliatePayout $p) => $this->payoutToArray($p));
@@ -249,6 +250,13 @@ class AffiliateController extends Controller
         $status = $request->validated('status');
         $holdDays = (int) $this->affiliate->program()->commission_hold_days;
 
+        // Paying out as wallet credits converts the currency amount via the store
+        // credit price. Guard a zero/misconfigured price up-front so we never mark
+        // a payout paid while granting a bogus number of credits.
+        if ($status === 'paid' && $payout->method === 'credits' && (float) settings('credit_price_per_unit', 0.01) <= 0) {
+            return back()->withErrors(['status' => translate('Set a credit price greater than zero before paying out as credits.')]);
+        }
+
         $processedPayout = DB::transaction(function () use ($request, $payout, $status, $holdDays) {
             // Lock the payout row and re-check the terminal guard INSIDE the
             // transaction. Without this, two concurrent submits (e.g. an admin
@@ -271,8 +279,23 @@ class AffiliateController extends Controller
                 $this->affiliate->markCommissionsPaid($locked->user_id, (float) $locked->amount, $holdDays);
 
                 if ($locked->method === 'credits') {
-                    $locked->user->addCredits((float) $locked->amount, 'referral', 'Affiliate payout', [
+                    // The payout amount is denominated in the store base currency; convert
+                    // it to wallet credits with the same anchor the top-up flow uses
+                    // (credit_price_per_unit), so "$X of affiliate balance" grants the same
+                    // credits a buyer gets spending $X. Granting the raw amount as a credit
+                    // count would short the affiliate by 1/price (e.g. $10 → 10 credits
+                    // instead of 1000 at the default $0.01/credit). round() before floor()
+                    // so float error doesn't shave a whole credit (19.99/0.01 = 1998.99… → 1999).
+                    $pricePerUnit = (float) settings('credit_price_per_unit', 0.01);
+                    $credits = $pricePerUnit > 0
+                        ? (int) floor(round((float) $locked->amount / $pricePerUnit, 6))
+                        : 0;
+
+                    $locked->user->addCredits((float) $credits, 'referral', 'Affiliate payout', [
                         'payout_id' => $locked->id,
+                        'payout_amount' => (float) $locked->amount,
+                        'price_per_unit' => $pricePerUnit,
+                        'credits' => $credits,
                     ]);
                 }
             }
@@ -304,13 +327,14 @@ class AffiliateController extends Controller
         $now = now();
         $sevenDaysAgo = $now->copy()->subDays(7);
 
-        // 1. Total Affiliates
+        // 1. Total Affiliates — someone was an affiliate a week ago if they already
+        //    had a referral before T (referral date, not the user's registration date).
         $affiliatesCurrent = User::whereHas('affiliateReferrals')->count();
-        $affiliatesPrevious = User::whereHas('affiliateReferrals')->where('created_at', '<', $sevenDaysAgo)->count();
+        $affiliatesPrevious = User::whereHas('affiliateReferrals', fn ($q) => $q->where('created_at', '<', $sevenDaysAgo))->count();
 
-        // 2. Total Paid Payouts
+        // 2. Total Paid Payouts — driven by processed_at (when paid), not created_at.
         $paidCurrent = (float) AffiliatePayout::where('status', 'paid')->sum('amount');
-        $paidPrevious = (float) AffiliatePayout::where('status', 'paid')->where('created_at', '<', $sevenDaysAgo)->sum('amount');
+        $paidPrevious = (float) AffiliatePayout::where('status', 'paid')->whereNotNull('processed_at')->where('processed_at', '<', $sevenDaysAgo)->sum('amount');
 
         // 3. Pending Payouts
         $pendingPayoutsCurrent = (float) AffiliatePayout::whereIn('status', ['pending', 'processing'])->sum('amount');
@@ -320,9 +344,10 @@ class AffiliateController extends Controller
         $pendingCommissionsCurrent = (float) AffiliateCommission::where('status', 'pending')->sum('amount');
         $pendingCommissionsPrevious = (float) AffiliateCommission::where('status', 'pending')->where('created_at', '<', $sevenDaysAgo)->sum('amount');
 
-        // 5. Total Earnings (Approved/Paid Commissions)
+        // 5. Total Earnings (Approved/Paid Commissions) — earned a week ago is driven
+        //    by approved_at (when the commission was approved), not created_at.
         $earningsCurrent = (float) AffiliateCommission::whereIn('status', ['paid', 'approved'])->sum('amount');
-        $earningsPrevious = (float) AffiliateCommission::whereIn('status', ['paid', 'approved'])->where('created_at', '<', $sevenDaysAgo)->sum('amount');
+        $earningsPrevious = (float) AffiliateCommission::whereNotNull('approved_at')->where('approved_at', '<', $sevenDaysAgo)->sum('amount');
 
         return [
             'total_affiliates' => [
@@ -330,19 +355,19 @@ class AffiliateController extends Controller
                 'comparison' => $this->calculateComparison($affiliatesCurrent, $affiliatesPrevious),
             ],
             'total_paid' => [
-                'value' => '$' . number_format($paidCurrent, 2),
+                'value' => format_currency($paidCurrent),
                 'comparison' => $this->calculateComparison($paidCurrent, $paidPrevious),
             ],
             'pending_payouts' => [
-                'value' => '$' . number_format($pendingPayoutsCurrent, 2),
+                'value' => format_currency($pendingPayoutsCurrent),
                 'comparison' => $this->calculateComparison($pendingPayoutsCurrent, $pendingPayoutsPrevious),
             ],
             'pending_commissions' => [
-                'value' => '$' . number_format($pendingCommissionsCurrent, 2),
+                'value' => format_currency($pendingCommissionsCurrent),
                 'comparison' => $this->calculateComparison($pendingCommissionsCurrent, $pendingCommissionsPrevious),
             ],
             'total_earnings' => [
-                'value' => '$' . number_format($earningsCurrent, 2),
+                'value' => format_currency($earningsCurrent),
                 'comparison' => $this->calculateComparison($earningsCurrent, $earningsPrevious),
             ],
         ];
@@ -387,7 +412,7 @@ class AffiliateController extends Controller
     protected function recentPayouts(int $limit): array
     {
         return AffiliatePayout::query()
-            ->with(['user:id,ulid,name,email'])
+            ->with(['user:id,ulid,name,email', 'processor:id,name'])
             ->latest()
             ->limit($limit)
             ->get()
@@ -448,6 +473,7 @@ class AffiliateController extends Controller
             'payout_details' => $payout->payout_details,
             'admin_note' => $payout->admin_note,
             'processed_at' => $payout->processed_at?->toIso8601String(),
+            'processed_by' => $payout->processor?->only(['id', 'name']),
             'created_at' => $payout->created_at?->toIso8601String(),
             'user' => $payout->user ? [
                 'ulid' => $payout->user->ulid,

@@ -11,9 +11,6 @@ class CommentReport extends Model
         'comment_id',
         'user_id',
         'ip_hash',
-        'reason',
-        'details',
-        'status',
     ];
 
     public function comment(): BelongsTo

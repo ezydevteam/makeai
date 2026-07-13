@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, computed } from 'vue'
-import Pagination from '@/Components/Pagination.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 

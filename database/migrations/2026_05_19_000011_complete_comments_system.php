@@ -24,14 +24,11 @@ return new class extends Migration
             $table->foreignId('comment_id')->constrained()->cascadeOnDelete();
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('ip_hash', 64)->nullable();
-            $table->string('reason', 100)->nullable();
-            $table->text('details')->nullable();
-            $table->enum('status', ['open', 'reviewed', 'dismissed'])->default('open');
             $table->timestamps();
 
             $table->unique(['comment_id', 'user_id']);
             $table->unique(['comment_id', 'ip_hash']);
-            $table->index(['status', 'created_at']);
+            $table->index('created_at');
         });
     }
 

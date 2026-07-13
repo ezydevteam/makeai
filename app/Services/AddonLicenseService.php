@@ -17,13 +17,9 @@ class AddonLicenseService
  
     private const CACHE_TTL = 3600;
 
-    // Public key shipped in core — pairs with the private key on the license server.
-    // Stored as a class constant, NOT in settings/DB (settings can be edited by a nuller).
-    // ⚠️ BEFORE PACKAGING: replace with the REAL base64 Ed25519 public key
-    // (must be identical to LicenseService::LICENSE_SERVER_PUBLIC_KEY).
-    private const LICENSE_SERVER_PUBLIC_KEY = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
-    private const PLACEHOLDER_PUBLIC_KEY    = 'MzItYnl0ZS1wdWJsaWMta2V5LXBsYWNlaG9sZGVyISE=';
-    private const LICENSE_SERVER_URL        = 'https://license.ezydev.net/api/v1/verify';
+    // Public key lives in App\Support\LicenseKey — the single place to set it,
+    // shared with LicenseService so the two can never diverge.
+    private const LICENSE_SERVER_URL = 'https://license.ezydev.net/api/v1/verify';
  
     /**
      * Verify a purchase code via the author's license server.
@@ -54,8 +50,8 @@ class AddonLicenseService
             );
         }
  
-        if ($this->getPublicKey() === self::PLACEHOLDER_PUBLIC_KEY) {
-            \Illuminate\Support\Facades\Log::critical('AddonLicenseService: LICENSE_SERVER_PUBLIC_KEY is still the placeholder — real key not set before packaging.');
+        if (! $this->publicKeyConfigured()) {
+            \Illuminate\Support\Facades\Log::critical('AddonLicenseService: License Server public key (App\Support\LicenseKey) is still the placeholder — real key not set before packaging.');
             return LicenseResult::failure(
                 translate('License verification is not configured on this build. Please contact the author/support.'),
                 'public_key_missing'
@@ -163,7 +159,6 @@ class AddonLicenseService
                 ['addon_slug' => $addonSlug],
                 [
                     'purchase_code' => Crypt::encryptString($purchaseCode),
-                    'envato_item_id' => (int) ($payload['item_id'] ?? 0),
                     'license_type' => $type,
                     'buyer' => $payload['buyer'] ?? translate('Unknown'),
                     'purchased_at' => $payload['purchased_at'] ?? now(),
@@ -249,6 +244,7 @@ class AddonLicenseService
             'buyer' => $license->buyer,
             'purchase_code_masked' => $purchaseCode,
             'purchased_at' => $license->purchased_at?->toDateString(),
+            'supported_until' => $license->supported_until?->toDateString(),
             'verified_at' => $license->verified_at?->toDateTimeString(),
             'status' => $license->status,
             'domain_ok' => $this->checkDomain($addonSlug),
@@ -289,6 +285,13 @@ class AddonLicenseService
             Cache::forget(self::CACHE_KEY_PREFIX . $addonSlug);
             Log::info('AddonLicenseService: addon re-verified via TEST MODE', ['addon' => $addonSlug]);
 
+            return;
+        }
+
+        // Key not configured on this build — can't verify signatures. Treat as a
+        // transient condition; never punish the buyer (mirrors LicenseService).
+        if (! $this->publicKeyConfigured()) {
+            Log::critical('AddonLicenseService: Re-verify skipped — license server public key not configured.', ['addon' => $addonSlug]);
             return;
         }
 
@@ -389,10 +392,108 @@ class AddonLicenseService
     {
         $license = AddonLicense::where('addon_slug', $addonSlug)->first();
         if (! $license) return false;
- 
+
         return $license->domain === request()->getHost();
     }
- 
+
+    /**
+     * Check the license server for an available update for one addon and cache the
+     * result in addon settings for the admin UI. Read-only — never modifies files.
+     *
+     * @return array{update_available:bool, latest_version:?string, changelog:?string, error:?string}
+     */
+    public function checkAddonUpdate(string $addonSlug): array
+    {
+        $fail = static fn (string $error): array => [
+            'update_available' => false, 'latest_version' => null, 'changelog' => null, 'error' => $error,
+        ];
+
+        $license = AddonLicense::where('addon_slug', $addonSlug)->first();
+        if (! $license) {
+            return $fail('not_licensed');
+        }
+
+        try {
+            $code = Crypt::decryptString($license->purchase_code);
+        } catch (\Throwable) {
+            return $fail('decrypt_failed');
+        }
+
+        $manifest = app(AddonService::class)->getAddonConfig($addonSlug);
+        $current = $manifest['version'] ?? '0.0.0';
+
+        // Test mode: never contact the server — simulate a manifest so the badge and
+        // flow are testable locally. Control via settings("addon_{slug}_test_latest_version").
+        if (PurchaseCode::testModeActive()) {
+            $latest = (string) settings("addon_{$addonSlug}_test_latest_version", $this->bumpVersion($current));
+            $available = version_compare($latest, $current, '>');
+            $changelog = $available ? '(Test mode) Simulated addon update to preview the UI.' : '';
+
+            addon_setting_set($addonSlug, 'update_available', $available, 'boolean');
+            addon_setting_set($addonSlug, 'latest_version', $latest);
+            addon_setting_set($addonSlug, 'update_changelog', $changelog);
+            addon_setting_set($addonSlug, 'update_checked_at', now()->toDateTimeString());
+
+            return ['update_available' => $available, 'latest_version' => $latest, 'changelog' => $changelog ?: null, 'error' => null];
+        }
+
+        $license_service = app(LicenseService::class);
+
+        try {
+            $response = Http::timeout(20)->retry(2, 1000)->post($license_service->updateEndpoint(), [
+                'product' => 'addon',
+                'slug' => $addonSlug,
+                'purchase_code' => $code,
+                'domain' => request()?->getHost() ?? settings('site_url', ''),
+                'current_version' => $current,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('AddonLicenseService: addon update check network error', ['addon' => $addonSlug]);
+            return $fail('network');
+        }
+
+        if (! $response->successful()) {
+            return $fail('server');
+        }
+
+        $payload = $license_service->verifySignedResponse($response->body(), (array) $response->json());
+        if ($payload === null || empty($payload['valid'])) {
+            return $fail($payload['error'] ?? 'unverified');
+        }
+
+        $available = (bool) ($payload['update_available'] ?? false);
+        addon_setting_set($addonSlug, 'update_available', $available, 'boolean');
+        addon_setting_set($addonSlug, 'latest_version', $payload['latest_version'] ?? '');
+        addon_setting_set($addonSlug, 'update_changelog', $payload['changelog'] ?? '');
+        addon_setting_set($addonSlug, 'update_checked_at', now()->toDateTimeString());
+
+        return [
+            'update_available' => $available,
+            'latest_version' => $payload['latest_version'] ?? null,
+            'changelog' => $payload['changelog'] ?? null,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Check every active, licensed addon for updates.
+     *
+     * @return array<string,array>
+     */
+    public function checkAllAddonUpdates(): array
+    {
+        $results = [];
+
+        foreach (\App\Models\Addon::where('is_active', true)->pluck('slug') as $slug) {
+            if (! AddonLicense::where('addon_slug', $slug)->exists()) {
+                continue; // no license → not eligible for server updates
+            }
+            $results[$slug] = $this->checkAddonUpdate($slug);
+        }
+
+        return $results;
+    }
+
     /**
      * Remove stored license — only on addon delete.
      */
@@ -408,6 +509,14 @@ class AddonLicenseService
     public function getLicensedAddons(): array
     {
         return AddonLicense::where('status', '!=', 'invalid')->pluck('addon_slug')->toArray();
+    }
+
+    private function bumpVersion(string $version): string
+    {
+        $parts = explode('.', $version ?: '1.0.0');
+        $parts[count($parts) - 1] = (string) ((int) end($parts) + 1);
+
+        return implode('.', $parts);
     }
 
     /**
@@ -609,7 +718,16 @@ class AddonLicenseService
         if (app()->runningUnitTests() && app()->has('test.license_public_key')) {
             return app('test.license_public_key');
         }
-        return self::LICENSE_SERVER_PUBLIC_KEY;
+        return \App\Support\LicenseKey::PUBLIC_KEY;
+    }
+
+    /**
+     * Whether a real License Server public key has been baked in (mirrors
+     * LicenseService::publicKeyConfigured).
+     */
+    private function publicKeyConfigured(): bool
+    {
+        return $this->getPublicKey() !== \App\Support\LicenseKey::PLACEHOLDER;
     }
 
     /**
@@ -622,7 +740,6 @@ class AddonLicenseService
             ['addon_slug' => $addonSlug],
             [
                 'purchase_code' => Crypt::encryptString(strtoupper(trim($purchaseCode))),
-                'envato_item_id' => 0,
                 'license_type' => $type,
                 'buyer' => 'test-buyer',
                 'purchased_at' => now(),

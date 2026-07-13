@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppColorPicker from '@/Components/AppColorPicker.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { FONT_FAMILY_SELECT_OPTIONS } from '@/config/fontFamilies'
 
 defineOptions({ layout: AdminLayout })
@@ -43,14 +43,15 @@ const submit = () => form.post(route('admin.appearance.update'))
 <template>
     <Head :title="t('Admin Panel Appearance')" />
 
-    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Admin Panel Appearance') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control the admin shell colors, typography, and navigation feel from one place.') }}</p>
             </div>
-            <div class="flex flex-wrap gap-3">
-                <button type="button" :disabled="form.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="submit">
+            <div class="shrink-0 flex flex-wrap gap-3">
+                <button type="button" :disabled="form.processing" class="rounded-xl btn-primary-admin disabled:opacity-60" @click="submit">
+                    <i class="ti ti-device-floppy text-base"></i>
                     {{ form.processing ? t('Saving...') : t('Save Changes') }}
                 </button>
             </div>

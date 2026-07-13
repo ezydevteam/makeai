@@ -18,11 +18,6 @@ return new class extends Migration
             $table->decimal('price_yearly', 10, 2)->default(0);
             $table->decimal('credits', 12, 2)->default(0);            // credits per period
             $table->json('features')->nullable();                      // feature flags
-            $table->json('ai_models')->nullable();                     // allowed models
-            $table->integer('max_tokens_per_request')->default(4096);
-            $table->integer('daily_token_limit')->default(50000);
-            $table->integer('max_images_per_day')->default(10);
-            $table->integer('max_chats')->default(50);
             $table->boolean('is_featured')->default(false);
             $table->boolean('is_active')->default(true);
             $table->boolean('is_free')->default(false);
@@ -75,22 +70,10 @@ return new class extends Migration
             $table->index('gateway_payment_id');
         });
 
-        // ─── Credit Topup Packs ───────────────
-        Schema::create('credit_packs', function (Blueprint $table) {
-            $table->id();
-            $table->string('name');
-            $table->decimal('credits', 12, 2);
-            $table->decimal('price', 10, 2);
-            $table->boolean('is_popular')->default(false);
-            $table->boolean('is_active')->default(true);
-            $table->integer('sort_order')->default(0);
-            $table->timestamps();
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('credit_packs');
         Schema::dropIfExists('payments');
         Schema::dropIfExists('subscriptions');
         Schema::dropIfExists('plans');

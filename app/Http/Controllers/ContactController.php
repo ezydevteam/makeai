@@ -7,6 +7,7 @@ use App\Models\ContactMessage;
 use App\Services\CaptchaService;
 use App\Services\InAppNotificationService;
 use App\Services\RateLimiterService;
+use App\Services\SpamFilterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
@@ -54,6 +55,22 @@ class ContactController extends Controller
 
         unset($validated['website']);
 
+        // Silently drop Akismet-flagged submissions the same way the honeypot does:
+        // the sender sees success, but nothing is stored or forwarded to admins.
+        $isSpam = SpamFilterService::fromSettings()->check([
+            'type' => 'contact-form',
+            'content' => $validated['message'],
+            'author' => $validated['name'],
+            'email' => $validated['email'],
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'referrer' => $request->header('referer'),
+        ]);
+
+        if ($isSpam) {
+            return back()->with('success', settings('contact_success_message', translate('Your message has been sent successfully. We will get back to you soon!')));
+        }
+
         $message = ContactMessage::create(array_merge($validated, [
             'ip_address' => $request->ip(),
         ]));
@@ -74,9 +91,22 @@ class ContactController extends Controller
             ->all();
     }
 
+    /**
+     * Resolve where contact notifications are sent / sent from. Falls back through
+     * the branding support address and the mail "from" address so a fresh install
+     * (where the contact_notification_email key is not yet saved) still delivers.
+     */
+    private function notificationEmail(): ?string
+    {
+        return settings('contact_notification_email')
+            ?: settings('site_support_email')
+            ?: settings('mail_from_address')
+            ?: null;
+    }
+
     private function queueNotification(ContactMessage $message): void
     {
-        $recipient = settings('contact_notification_email');
+        $recipient = $this->notificationEmail();
 
         if (! $recipient) {
             return;
@@ -124,7 +154,7 @@ class ContactController extends Controller
         Mail::to($message->email)->queue(new ContactMessageMail(
             settings('contact_auto_reply_subject', translate('We received your message')),
             $body,
-            settings('contact_notification_email'),
+            $this->notificationEmail(),
             settings('app_name', translate('Application'))
         ));
     }

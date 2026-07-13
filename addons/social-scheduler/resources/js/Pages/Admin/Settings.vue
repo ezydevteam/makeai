@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, watch } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -38,7 +38,7 @@ const props = defineProps<{
     providers: Record<string, SchedulerProvider>
 }>()
 
-const providerSlugs = computed(() => Object.keys(props.providers))
+const providerSlugs = computed(() => Object.keys(props.providers ?? {}))
 const initialProvider = providerSlugs.value.includes(props.settings.provider)
     ? props.settings.provider
     : providerSlugs.value[0] ?? ''
@@ -118,7 +118,7 @@ const save = () => {
             <button
                 type="button"
                 :disabled="form.processing"
-                class="rounded-lg btn-primary disabled:opacity-60"
+                class="rounded-lg btn-primary-admin disabled:opacity-60"
                 @click="save"
             >
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}

@@ -4,15 +4,21 @@ import type { DefineComponent } from 'vue'
 import { createInertiaApp, Link, Head, router } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
 import { ZiggyVue } from 'ziggy-js'
-import AppSelect from './Components/AppSelect.vue'
-import AppColorPicker from './Components/AppColorPicker.vue'
-import ToastContainer from './Components/ToastContainer.vue'
-import ShortcutsReferenceModal from './Components/ShortcutsReferenceModal.vue'
-import PageLoader from './Components/PageLoader.vue'
+import AppSelect from './Components/UI/AppSelect.vue'
+import AppColorPicker from './Components/UI/AppColorPicker.vue'
+import ToastContainer from './Components/UI/ToastContainer.vue'
+import ShortcutsReferenceModal from '@themes/default/js/Components/ShortcutsReferenceModal.vue'
+import PageLoader from './Components/UI/PageLoader.vue'
 import { useGlobalShortcuts } from './Composables/useKeyboardShortcuts'
 
 const appName = import.meta.env.VITE_APP_NAME || document.title
-const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue')
+const pages = import.meta.glob<{ default: DefineComponent }>([
+    './Pages/**/*.vue',
+    '../themes/*/js/**/*.vue',
+    '!../themes/*/js/Components/**/*.vue',
+    '!../themes/*/js/Layouts/**/*.vue',
+    '!../themes/*/js/Sections/**/*.vue',
+])
 const addonPages = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Pages/**/*.vue')
 const addonComponents = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Components/**/*.vue')
 const addonTemplates = import.meta.glob<{ default: DefineComponent }>('../../addons/*/resources/js/Templates/**/*.vue')
@@ -87,10 +93,10 @@ function applyThemeDefaults(themeSettings: Record<string, string> | undefined) {
         document.head.appendChild(styleTag)
     }
     styleTag.textContent = isAdmin ? '' : `
-        [style*="--page-width: ${pageWidth}"] .mx-auto {
+        main .mx-auto {
             max-width: var(--page-width) !important;
         }
-        .max-w-7xl {
+        main .max-w-7xl {
             max-width: var(--page-width, 1280px) !important;
         }
     `
@@ -102,7 +108,8 @@ function applyThemeDefaults(themeSettings: Record<string, string> | undefined) {
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
     resolve: async (name) => {
-        const page = pages[`./Pages/${name}.vue`]
+        const page = pages[`../themes/default/js/${name}.vue`]
+            ?? pages[`./Pages/${name}.vue`]
             ?? (
                 name.startsWith('Templates/')
                 ? addonTemplateMap[`ai-chatbot/${name.slice('Templates/'.length)}`]

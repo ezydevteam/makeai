@@ -2,10 +2,12 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router, usePage, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 
@@ -15,6 +17,7 @@ interface ToolCategory {
     id: number
     name: string
     slug: string
+    color?: string
 }
 
 interface ToolItem {
@@ -71,46 +74,6 @@ const { t } = useTranslate()
 const { formatNumber } = useNumberFormat()
 
 const page = usePage()
-const isGlobalSettingsOpen = ref(false)
-
-const settingsForm = useForm({
-    global_tools_brand_voice_enabled: true,
-    global_tools_variations_enabled: true,
-    global_tools_regenerate_enabled: true,
-    global_tools_improve_enabled: true,
-    global_tools_editor_enabled: true,
-    global_tools_show_about_enabled: true,
-    global_tools_show_how_it_works_enabled: true,
-    global_tools_show_usage_examples_enabled: true,
-    global_tools_show_faqs_enabled: true,
-    global_tools_show_reviews_enabled: true,
-    global_tools_embeddable_enabled: true,
-})
-
-const openGlobalSettingsModal = () => {
-    const current = (page.props.globalToolSettings || {}) as Record<string, boolean>
-    settingsForm.global_tools_brand_voice_enabled = current.brand_voice !== false
-    settingsForm.global_tools_variations_enabled = current.variations !== false
-    settingsForm.global_tools_regenerate_enabled = current.regenerate !== false
-    settingsForm.global_tools_improve_enabled = current.improve !== false
-    settingsForm.global_tools_editor_enabled = current.editor !== false
-    settingsForm.global_tools_show_about_enabled = current.show_about !== false
-    settingsForm.global_tools_show_how_it_works_enabled = current.show_how_it_works !== false
-    settingsForm.global_tools_show_usage_examples_enabled = current.show_usage_examples !== false
-    settingsForm.global_tools_show_faqs_enabled = current.show_faqs !== false
-    settingsForm.global_tools_show_reviews_enabled = current.show_reviews !== false
-    settingsForm.global_tools_embeddable_enabled = current.embeddable !== false
-    isGlobalSettingsOpen.value = true
-}
-
-const saveGlobalSettings = () => {
-    settingsForm.post(route('admin.ai.tools.global-settings'), {
-        preserveScroll: true,
-        onSuccess: () => {
-            isGlobalSettingsOpen.value = false
-        },
-    })
-}
 
 const categoryOptions = computed(() => [
     { value: '', label: t('All Categories') },
@@ -318,6 +281,10 @@ const handleKeydown = (event: KeyboardEvent) => {
     }
 }
 
+const getToolColor = (tool: ToolItem) => {
+    return tool.color || (typeof tool.category === 'object' ? tool.category?.color : null) || null
+}
+
 onMounted(() => {
     window.addEventListener('keydown', handleKeydown)
 })
@@ -335,31 +302,23 @@ onBeforeUnmount(() => {
     <Head :title="t('AI Tools — Admin')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('AI Tools') }}</h1>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Manage AI tools, prompts, and configurations.') }}</p>
             </div>
-            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
-                <button
-                    type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
-                    @click="openGlobalSettingsModal"
-                >
-                    <i class="ti ti-settings text-base"></i>
-                    {{ t('Global Settings') }}
-                </button>
+            <div class="shrink-0 flex gap-3">
                 <Link
                     v-if="hasTrashedTools"
                     :href="route('admin.ai.tools.trash')"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:!border-red-900/30 dark:hover:!bg-red-900/30 dark:hover:!text-red-300"
                 >
                     <i class="ti ti-trash text-base"></i>
                     {{ t('Trash') }}
                 </Link>
                 <Link
                     :href="route('admin.ai.tools.create')"
-                    class="btn-primary-admin inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm text-white w-full sm:w-auto"
+                    class="grow btn-primary-admin inline-flex items-center justify-center gap-2"
                 >
                     <i class="ti ti-plus text-base"></i>
                     {{ t('New Tool') }}
@@ -370,7 +329,7 @@ onBeforeUnmount(() => {
         <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
             <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+                    <div class="flex-1 min-w-[240px] md:max-w-sm">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -379,7 +338,7 @@ onBeforeUnmount(() => {
                                 ref="searchInput"
                                 v-model="search"
                                 type="text"
-                                :placeholder="t('Search tools...')"
+                                :placeholder="t('Search AI tools...')"
                                 class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                                 @input="handleSearchInput"
                                 @focus="searchFocused = true"
@@ -453,7 +412,7 @@ onBeforeUnmount(() => {
                 <div class="overflow-x-auto">
                     <table class="min-w-[760px] w-full text-sm">
                         <thead>
-                            <tr class="border-b border-gray-100 bg-gray-50/50 dark:border-surface-800 dark:bg-surface-800/50">
+                            <tr class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                                 <th class="w-4 px-4 py-3.5 text-left">
                                     <input
                                         type="checkbox"
@@ -462,11 +421,11 @@ onBeforeUnmount(() => {
                                         @change="toggleAll"
                                     />
                                 </th>
-                                <th class="px-6 py-3.5 text-left text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
-                                <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Category') }}</th>
-                                <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                                <th class="px-4 py-3.5 text-center text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Uses') }}</th>
-                                <th class="px-6 py-3.5 text-right text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                                <th class="px-6 py-3.5 text-left">{{ t('Tool') }}</th>
+                                <th class="px-4 py-3.5 text-center">{{ t('Category') }}</th>
+                                <th class="px-4 py-3.5 text-center">{{ t('Status') }}</th>
+                                <th class="px-4 py-3.5 text-center">{{ t('Uses') }}</th>
+                                <th class="px-6 py-3.5 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50 dark:divide-surface-800">
@@ -481,7 +440,15 @@ onBeforeUnmount(() => {
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-xl dark:bg-surface-800" :style="{ color: tool.color || 'var(--color-primary-500)' }">
+                                        <div
+                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition-colors"
+                                            :class="getToolColor(tool) ? '' : 'bg-gray-50 text-gray-500 border-gray-100 dark:bg-surface-800 dark:border-surface-700/50'"
+                                            :style="getToolColor(tool) ? {
+                                                backgroundColor: `color-mix(in srgb, ${getToolColor(tool)} 12%, transparent)`,
+                                                borderColor: `color-mix(in srgb, ${getToolColor(tool)} 20%, transparent)`,
+                                                color: getToolColor(tool) || undefined
+                                            } : {}"
+                                        >
                                             <i :class="tool.icon || 'ti ti-tool'"></i>
                                         </div>
                                         <div>
@@ -493,24 +460,25 @@ onBeforeUnmount(() => {
                                     </div>
                                 </td>
                                 <td class="px-4 py-4 text-center">
-                                    <span v-if="tool.category" class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-400">
+                                    <span
+                                        v-if="tool.category"
+                                        class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                                        :class="typeof tool.category === 'object' && tool.category.color ? '' : 'bg-gray-100 text-gray-600 border-transparent dark:bg-surface-800 dark:text-gray-400'"
+                                        :style="typeof tool.category === 'object' && tool.category.color ? {
+                                            backgroundColor: `color-mix(in srgb, ${tool.category.color} 10%, transparent)`,
+                                            borderColor: `color-mix(in srgb, ${tool.category.color} 15%, transparent)`,
+                                            color: tool.category.color
+                                        } : {}"
+                                    >
                                         {{ typeof tool.category === 'object' ? tool.category.name : tool.category }}
                                     </span>
                                     <span v-else class="text-xs text-gray-400">{{ t('—') }}</span>
                                 </td>
                                 <td class="px-4 py-4 text-center">
-                                    <button
-                                        type="button"
-                                        @click="toggleTool(tool.id)"
-                                        class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none"
-                                        :class="[tool.is_active ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700']"
-                                    >
-                                        <span
-                                            aria-hidden="true"
-                                            class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5"
-                                            :class="[tool.is_active ? 'translate-x-4' : 'translate-x-0']"
-                                        />
-                                    </button>
+                                    <AppSwitch
+                                        :model-value="tool.is_active"
+                                        @update:model-value="toggleTool(tool.id)"
+                                    />
                                 </td>
                                 <td class="px-4 py-4 text-center font-medium text-gray-600 dark:text-gray-400">
                                     {{ formatNumber(Number(tool.usage_count || 0)) }}
@@ -573,164 +541,4 @@ onBeforeUnmount(() => {
         @cancel="closeConfirmModal"
         @confirm="runConfirmedAction"
     />
-
-    <!-- Global Settings Modal -->
-    <Teleport to="body">
-        <Transition
-            enter-active-class="transition-opacity duration-300 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition-opacity duration-200 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div v-if="isGlobalSettingsOpen" class="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4" @click="isGlobalSettingsOpen = false">
-                <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl overflow-hidden w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col" @click.stop>
-                    <!-- Header -->
-                    <div class="px-6 py-3 border-b border-gray-100 dark:border-surface-800 flex items-center justify-between sticky top-0 bg-white dark:bg-surface-900 z-10">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Global AI Tool Settings') }}</h3>
-                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ t('Override individual tool settings globally.') }}</p>
-                        </div>
-                        <button type="button" class="rounded-full w-8 h-8 text-gray-400 hover:bg-gray-200/30 hover:text-gray-600 dark:hover:text-white dark:hover:bg-gray-800" @click="isGlobalSettingsOpen = false">
-                            <i class="ti ti-x text-base"></i>
-                        </button>
-                    </div>
-
-                    <!-- Body -->
-                    <div class="p-6 space-y-6 flex-1 overflow-y-auto">
-                        <!-- Group 1: Features -->
-                        <div class="space-y-4">
-                            <h4 class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">{{ t('Generation Features') }}</h4>
-                            <div class="rounded-xl border border-gray-100 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50 p-4 space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Supports Brand Voice') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Allows users to target brand voices.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_brand_voice_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_brand_voice_enabled = !settingsForm.global_tools_brand_voice_enabled">
-                                        <span :class="settingsForm.global_tools_brand_voice_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Variations') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Allows generating multiple output variants simultaneously.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_variations_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_variations_enabled = !settingsForm.global_tools_variations_enabled">
-                                        <span :class="settingsForm.global_tools_variations_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Regenerate Button') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Show the option to regenerate output.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_regenerate_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_regenerate_enabled = !settingsForm.global_tools_regenerate_enabled">
-                                        <span :class="settingsForm.global_tools_regenerate_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Improve Button') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Show the option to automatically improve input prompts.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_improve_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_improve_enabled = !settingsForm.global_tools_improve_enabled">
-                                        <span :class="settingsForm.global_tools_improve_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Enable Edit in Editor Button') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Allows opening generated content in full document editor.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_editor_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_editor_enabled = !settingsForm.global_tools_editor_enabled">
-                                        <span :class="settingsForm.global_tools_editor_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Group 2: Content Sections -->
-                        <div class="space-y-4">
-                            <h4 class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">{{ t('Tool Details Content') }}</h4>
-                            <div class="rounded-xl border border-gray-100 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50 p-4 space-y-4">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show About') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display the tool description/about section.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_show_about_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_show_about_enabled = !settingsForm.global_tools_show_about_enabled">
-                                        <span :class="settingsForm.global_tools_show_about_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show How It Works') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display instructions on how to use the tool.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_show_how_it_works_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_show_how_it_works_enabled = !settingsForm.global_tools_show_how_it_works_enabled">
-                                        <span :class="settingsForm.global_tools_show_how_it_works_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Examples') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display usage examples.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_show_usage_examples_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_show_usage_examples_enabled = !settingsForm.global_tools_show_usage_examples_enabled">
-                                        <span :class="settingsForm.global_tools_show_usage_examples_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show FAQs') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display FAQs for the tool.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_show_faqs_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_show_faqs_enabled = !settingsForm.global_tools_show_faqs_enabled">
-                                        <span :class="settingsForm.global_tools_show_faqs_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                                <div class="flex items-center justify-between border-t border-gray-100 dark:border-surface-800 pt-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Show Reviews') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Display ratings and reviews section.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_show_reviews_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_show_reviews_enabled = !settingsForm.global_tools_show_reviews_enabled">
-                                        <span :class="settingsForm.global_tools_show_reviews_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Group 3: Embedding -->
-                        <div class="space-y-4">
-                            <h4 class="text-xs font-bold text-primary-600 dark:text-primary-400 uppercase tracking-wider">{{ t('Sharing & Embedding') }}</h4>
-                            <div class="rounded-xl border border-gray-100 dark:border-surface-800 bg-gray-50/50 dark:bg-surface-900/50 p-4">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Embeddable') }}</span>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('Allow tools to be embedded in external websites.') }}</p>
-                                    </div>
-                                    <button type="button" :class="settingsForm.global_tools_embeddable_enabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="settingsForm.global_tools_embeddable_enabled = !settingsForm.global_tools_embeddable_enabled">
-                                        <span :class="settingsForm.global_tools_embeddable_enabled ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Footer -->
-                    <div class="px-6 py-3 border-t border-gray-100 dark:border-surface-800 flex items-center justify-end gap-3 sticky bottom-0 bg-white dark:bg-surface-900 z-10">
-                        <button type="button" class="rounded-lg border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-800" @click="isGlobalSettingsOpen = false">
-                            {{ t('Cancel') }}
-                        </button>
-                        <button type="button" :disabled="settingsForm.processing" class="btn-primary-admin px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" @click="saveGlobalSettings">
-                            {{ settingsForm.processing ? t('Saving...') : t('Save Settings') }}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </Transition>
-    </Teleport>
 </template>

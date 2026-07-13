@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { sanitizeErrorMessage } from '@/Composables/useErrorSanitizer'
+import { t } from '@/Composables/useTranslate'
 
 interface StreamPayload {
     slug: string
@@ -116,7 +117,7 @@ export function useStream() {
 
                 if (!response.ok) {
                     const data = await response.json().catch(() => ({}))
-                    const errMsg = data.message || data.error || `Generation failed (${response.status}).`
+                    const errMsg = data.message || data.error || t('Generation failed (:status).', { status: response.status })
 
                     if (isRetryable(errMsg) && attempt < maxRetries) {
                         const retrySecs = parseRetryAfter(response.headers) ?? backoffs[attempt]
@@ -124,7 +125,7 @@ export function useStream() {
                             await delay(retrySecs)
                             continue
                         } catch {
-                            error.value = 'Retry cancelled.'
+                            error.value = t('Retry cancelled.')
                             isStreaming.value = false
                             return
                         }
@@ -134,7 +135,7 @@ export function useStream() {
                 }
 
                 const reader = response.body?.getReader()
-                if (!reader) throw new Error('Streaming is not supported by this browser.')
+                if (!reader) throw new Error(t('Streaming is not supported by this browser.'))
 
                 const decoder = new TextDecoder()
                 let buffer = ''
@@ -166,7 +167,7 @@ export function useStream() {
                                     await delay(retrySecs)
                                     break
                                 } catch {
-                                    error.value = 'Retry cancelled.'
+                                    error.value = t('Retry cancelled.')
                                     isStreaming.value = false
                                     return
                                 }
@@ -187,14 +188,14 @@ export function useStream() {
                 isStreaming.value = false
                 return
             } catch (err) {
-                const errMsg = err instanceof Error ? err.message : 'Network error. Please try again.'
+                const errMsg = err instanceof Error ? err.message : t('Network error. Please try again.')
                 if (isRetryable(errMsg) && attempt < maxRetries) {
                     const retrySecs = backoffs[attempt]
                     try {
                         await delay(retrySecs)
                         continue
                     } catch {
-                        error.value = 'Retry cancelled.'
+                        error.value = t('Retry cancelled.')
                         isStreaming.value = false
                         return
                     }
@@ -205,7 +206,7 @@ export function useStream() {
             }
         }
 
-        error.value = 'AI is busy. Please try again later.'
+        error.value = t('AI is busy. Please try again later.')
         isStreaming.value = false
     }
 

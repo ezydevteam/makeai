@@ -1,7 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -35,6 +36,11 @@ const props = defineProps<{
         map_reduce_batch_size: number
         ingest_credits_per_mb: number
         ingest_credits_url: number
+        max_url_fetch_mb: number
+        scraper_user_agent: string
+        scraper_timeout: number
+        youtube_transcript_endpoint: string
+        youtube_transcript_api_key_set: boolean
     }
     embeddingModels: EmbeddingModel[]
     fallbackEmbedding: FallbackEmbedding
@@ -58,6 +64,11 @@ const form = useForm({
     map_reduce_batch_size: props.settings.map_reduce_batch_size,
     ingest_credits_per_mb: props.settings.ingest_credits_per_mb,
     ingest_credits_url: props.settings.ingest_credits_url,
+    max_url_fetch_mb: props.settings.max_url_fetch_mb,
+    scraper_user_agent: props.settings.scraper_user_agent,
+    scraper_timeout: props.settings.scraper_timeout,
+    youtube_transcript_endpoint: props.settings.youtube_transcript_endpoint,
+    youtube_transcript_api_key: '',
 })
 
 const chunkingModeOptions = [
@@ -66,12 +77,12 @@ const chunkingModeOptions = [
 ]
 
 const searchModeOptions = [
-    { value: 'vector', label: t('Vector — semantic similarity only') },
-    { value: 'hybrid', label: t('Hybrid — BM25 keyword + semantic fusion') },
+    { value: 'vector', label: t('Vector â€” semantic similarity only') },
+    { value: 'hybrid', label: t('Hybrid â€” BM25 keyword + semantic fusion') },
 ]
 
 const embeddingModelOptions = [
-    { value: '', label: t('Default — :label', { label: props.fallbackEmbedding.label }) },
+    { value: '', label: t('Default â€” :label', { label: props.fallbackEmbedding.label }) },
     ...props.embeddingModels,
 ]
 
@@ -81,11 +92,11 @@ const saveSettings = () => {
 </script>
 
 <template>
-    <Head :title="t('RAG Settings — Admin')" />
+    <Head :title="t('RAG Settings â€” Admin')" />
 
-    <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
+    <div class="mx-auto w-full max-w-5xl space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('RAG Settings') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Configure retrieval-augmented generation defaults for the Document AI tools suite.') }}</p>
             </div>
@@ -93,13 +104,14 @@ const saveSettings = () => {
                 type="button"
                 :disabled="form.processing"
                 @click="saveSettings"
-                class="inline-flex items-center justify-center rounded-lg btn-primary px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+                class="shrink-0 inline-flex items-center justify-center gap-2 btn-primary-admin disabled:opacity-60"
             >
+                <i class="ti ti-device-floppy"></i>
                 {{ form.processing ? t('Saving...') : t('Save Settings') }}
             </button>
         </div>
 
-        <div class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Ingestion & Chunking') }}</h2>
             </div>
@@ -152,7 +164,7 @@ const saveSettings = () => {
         </div>
 
         <!-- Retrieval & Search -->
-        <div class="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div class="mt-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Retrieval & Search') }}</h2>
             </div>
@@ -191,7 +203,7 @@ const saveSettings = () => {
         </div>
 
         <!-- Credits & Retention -->
-        <div class="mt-6 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div class="mt-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Credits & Retention') }}</h2>
             </div>
@@ -225,39 +237,77 @@ const saveSettings = () => {
             </div>
         </div>
 
+        <!-- Web Scraper (Chat with Website) -->
+        <div class="mt-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+            <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('Web Scraper (Chat with Website)') }}</h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Max Page Size (MB)') }}</label>
+                        <input type="number" v-model="form.max_url_fetch_mb" min="1" max="100"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('Pages larger than this are rejected during ingestion.') }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Request Timeout (seconds)') }}</label>
+                        <input type="number" v-model="form.scraper_timeout" min="5" max="120"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('How long to wait when fetching a webpage.') }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('User Agent') }}</label>
+                        <input type="text" v-model="form.scraper_user_agent"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('Identifies the crawler when fetching pages.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- YouTube & System Prompt -->
-        <div class="mb-6 mt-6 rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div class="mb-6 mt-6 rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-base font-semibold text-gray-900 dark:text-white">{{ t('YouTube & Grounding') }}</h2>
             </div>
             <div class="p-6 space-y-6">
-                <div class="flex items-start gap-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
-                    <button type="button"
-                        @click="form.youtube_whisper_fallback = !form.youtube_whisper_fallback"
-                        :class="form.youtube_whisper_fallback ? 'bg-[#1F75FE]' : 'bg-gray-300'"
-                        class="relative w-11 h-6 rounded-full transition-colors shrink-0 mt-0.5 cursor-pointer">
-                        <span
-                            class="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform"
-                            :class="form.youtube_whisper_fallback ? 'translate-x-[22px] left-0.5' : 'left-0.5'" />
-                    </button>
+                <div class="flex items-start justify-between gap-3 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
                     <div>
                         <span class="block text-sm font-medium text-gray-800">{{ t('YouTube Whisper Fallback') }}</span>
                         <span class="block text-xs text-gray-500 mt-0.5">{{ t('When captions are unavailable, transcribe using OpenAI Whisper. Charges credits per audio minute.') }}</span>
+                    </div>
+                    <AppSwitch v-model="form.youtube_whisper_fallback" class="mt-2.5" />
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Transcript API Endpoint') }}</label>
+                        <input type="text" v-model="form.youtube_transcript_endpoint"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('Use {id} as the video ID placeholder.') }}</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Transcript API Key (optional)') }}</label>
+                        <input type="password" v-model="form.youtube_transcript_api_key"
+                            :placeholder="props.settings.youtube_transcript_api_key_set ? t('â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢ (leave blank to keep)') : t('Not set')"
+                            class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none" />
+                        <p class="text-xs text-gray-400 mt-1.5">{{ t('Sent as a Bearer token when provided.') }}</p>
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1.5">{{ t('Grounding System Prompt') }}</label>
-                    <textarea v-model="form.system_prompt" rows="5" maxlength="4000"
+                    <textarea v-model="form.system_prompt" rows="6" maxlength="4000"
                         class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 transition-colors outline-none resize-y font-mono"></textarea>
                     <div class="flex items-center justify-between mt-1.5">
                         <p class="text-xs text-gray-400">{{ t('The {context} placeholder is replaced with retrieved document chunks before each AI call. This prompt is never exposed to end users.') }}</p>
                         <span class="text-xs" :class="form.system_prompt.length > 3800 ? 'text-red-500' : 'text-gray-400'">{{ form.system_prompt.length }}/4000</span>
                     </div>
-                    <div class="mt-3 p-3 rounded-lg bg-sky-50 border border-sky-100 text-xs text-sky-700 space-y-1.5">
+                    <div class="mt-3 p-3 rounded-xl bg-sky-50 border border-sky-100 text-xs text-sky-700 space-y-1.5">
                         <p class="font-semibold text-sky-800">{{ t('How this works') }}</p>
                         <p>{{ t('When a user asks a question about their uploaded document, the system finds the most relevant text chunks, inserts them where {context} appears in this prompt, and sends it to the AI. The AI then answers based ONLY on those chunks.') }}</p>
-                        <p>{{ t('If the answer isn\'t in the document chunks, the AI will honestly say so instead of guessing. This is called "grounding" — keeping the AI\'s answers anchored to real content.') }}</p>
+                        <p>{{ t('If the answer isn\'t in the document chunks, the AI will honestly say so instead of guessing. This is called "grounding" â€” keeping the AI\'s answers anchored to real content.') }}</p>
                     </div>
                 </div>
             </div>

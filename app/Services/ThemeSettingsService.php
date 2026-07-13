@@ -31,7 +31,12 @@ class ThemeSettingsService
             return $this->defaultsCache;
         }
 
-        $path = resource_path('themes/default/settings.json');
+        $activeTheme = settings('active_theme', 'default');
+        $path = resource_path("themes/{$activeTheme}/settings.json");
+
+        if (! File::exists($path)) {
+            $path = resource_path('themes/default/settings.json');
+        }
 
         if (! File::exists($path)) {
             $this->defaultsCache = [];

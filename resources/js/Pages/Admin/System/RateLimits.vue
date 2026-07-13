@@ -1,10 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import Tooltip from '@/Components/UI/Tooltip.vue'
@@ -84,7 +84,7 @@ const tierForm = useForm({
 const banForm = useForm({
     ip_address: '',
     reason: '',
-    // Default to a full site-wide block — the common intent when banning an IP.
+    // Default to a full site-wide block â€” the common intent when banning an IP.
     category: 'site',
     expires_in_hours: null as number | null,
 })
@@ -217,7 +217,7 @@ function formatWindow(seconds: number): string {
     <Head :title="t('Rate Limits')" />
 
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Rate Limits') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
@@ -229,7 +229,7 @@ function formatWindow(seconds: number): string {
                 v-if="activeTab === 'tiers'"
                 type="button"
                 :disabled="tierForm.processing"
-                class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
+                class="shrink-0  btn-primary-admin inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
                 @click="saveTiers"
             >
                 <i class="ti ti-device-floppy text-base"></i>
@@ -276,13 +276,13 @@ function formatWindow(seconds: number): string {
                     <table class="min-w-full border-separate border-spacing-0">
                         <thead>
                             <tr class="bg-gray-50 dark:bg-surface-800/80">
-                                <th class="rounded-tl-xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Endpoint Category') }}</th>
-                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:border-surface-700 dark:text-amber-300">{{ t('Guest Max') }}</th>
-                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:border-surface-700 dark:text-amber-300">{{ t('Guest Window') }}</th>
-                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 dark:border-surface-700 dark:text-blue-300">{{ t('Free Max') }}</th>
-                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-blue-700 dark:border-surface-700 dark:text-blue-300">{{ t('Free Window') }}</th>
-                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-violet-700 dark:border-surface-700 dark:text-violet-300">{{ t('Premium Max') }}</th>
-                                <th class="rounded-tr-xl border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-violet-700 dark:border-surface-700 dark:text-violet-300">{{ t('Premium Window') }}</th>
+                                <th class="rounded-tl-xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Endpoint Category') }}</th>
+                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-amber-700 dark:border-surface-700 dark:text-amber-300">{{ t('Guest Max') }}</th>
+                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-amber-700 dark:border-surface-700 dark:text-amber-300">{{ t('Guest Window') }}</th>
+                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-blue-700 dark:border-surface-700 dark:text-blue-300">{{ t('Free Max') }}</th>
+                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-blue-700 dark:border-surface-700 dark:text-blue-300">{{ t('Free Window') }}</th>
+                                <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-violet-700 dark:border-surface-700 dark:text-violet-300">{{ t('Premium Max') }}</th>
+                                <th class="rounded-tr-xl border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-violet-700 dark:border-surface-700 dark:text-violet-300">{{ t('Premium Window') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -344,20 +344,19 @@ function formatWindow(seconds: number): string {
                 <div class="grid gap-4 xl:grid-cols-12">
                     <div class="xl:col-span-3">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('IP Address') }}</label>
-                        <input v-model="banForm.ip_address" type="text" required :placeholder="t('e.g. 192.168.1.1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model="banForm.ip_address" type="text" required :placeholder="t('e.g. 192.168.1.1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="xl:col-span-3">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Reason') }}</label>
-                        <input v-model="banForm.reason" type="text" required :placeholder="t('e.g. Brute force attempt')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model="banForm.reason" type="text" required :placeholder="t('e.g. Brute force attempt')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="xl:col-span-3">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Ban Scope') }}</label>
                         <AppSelect v-model="banForm.category" :options="banCategoryOptions" :placeholder="t('Select scope')" />
-                        <p class="mt-1 text-[11px] text-gray-400">{{ t('“Entire Site” blocks every request including page views; “All Endpoints” blocks forms/login/AI but still allows browsing; a specific scope blocks only that endpoint group.') }}</p>
                     </div>
                     <div class="xl:col-span-2">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Expires After Hours') }}</label>
-                        <input v-model.number="banForm.expires_in_hours" type="number" min="1" max="8760" :placeholder="t('Optional')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model.number="banForm.expires_in_hours" type="number" min="1" max="8760" :placeholder="t('Optional')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="flex items-end xl:col-span-1">
                         <button type="submit" :disabled="banForm.processing" class="bg-red-600 text-white w-full rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-60 hover:bg-red-700">
@@ -371,12 +370,12 @@ function formatWindow(seconds: number): string {
                 <table class="min-w-full border-separate border-spacing-0">
                     <thead>
                         <tr class="bg-gray-50 dark:bg-surface-800/80">
-                            <th class="rounded-tl-xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('IP Address') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Category') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Reason') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Banned At') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Expires') }}</th>
-                            <th class="rounded-tr-xl border-b border-gray-100 px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Actions') }}</th>
+                            <th class="rounded-tl-xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('IP Address') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Category') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Reason') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Banned At') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Expires') }}</th>
+                            <th class="rounded-tr-xl border-b border-gray-100 px-5 py-4 text-right text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -443,7 +442,7 @@ function formatWindow(seconds: number): string {
                 <div class="grid gap-4 xl:grid-cols-12">
                     <div class="xl:col-span-2">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('User ID') }}</label>
-                        <input v-model="overrideForm.user_id" type="text" required :placeholder="t('User ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model="overrideForm.user_id" type="text" required :placeholder="t('User ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="xl:col-span-3">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Endpoint Category') }}</label>
@@ -451,18 +450,18 @@ function formatWindow(seconds: number): string {
                     </div>
                     <div class="xl:col-span-2">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Max Requests') }}</label>
-                        <input v-model.number="overrideForm.max_attempts" type="number" min="1" max="100000" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model.number="overrideForm.max_attempts" type="number" min="1" max="100000" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="xl:col-span-2">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Window Seconds') }}</label>
-                        <input v-model.number="overrideForm.window_seconds" type="number" min="1" max="86400" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model.number="overrideForm.window_seconds" type="number" min="1" max="86400" required class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="xl:col-span-2">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Expires After Hours') }}</label>
-                        <input v-model.number="overrideForm.expires_in_hours" type="number" min="1" max="8760" :placeholder="t('Optional')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                        <input v-model.number="overrideForm.expires_in_hours" type="number" min="1" max="8760" :placeholder="t('Optional')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                     </div>
                     <div class="flex items-end xl:col-span-1">
-                        <button type="submit" :disabled="overrideForm.processing" class="btn-primary w-full rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-60">
+                        <button type="submit" :disabled="overrideForm.processing" class="btn-primary-admin w-full rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-60">
                             {{ overrideForm.processing ? t('Saving...') : t('Add') }}
                         </button>
                     </div>
@@ -473,12 +472,12 @@ function formatWindow(seconds: number): string {
                 <table class="min-w-full border-separate border-spacing-0">
                     <thead>
                         <tr class="bg-gray-50 dark:bg-surface-800/80">
-                            <th class="rounded-tl-xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('User') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Category') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Max Requests') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Window') }}</th>
-                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Expires') }}</th>
-                            <th class="rounded-tr-xl border-b border-gray-100 px-5 py-4 text-right text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:border-surface-700 dark:text-gray-400">{{ t('Actions') }}</th>
+                            <th class="rounded-tl-xl border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('User') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Category') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Max Requests') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-center text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Window') }}</th>
+                            <th class="border-b border-gray-100 px-5 py-4 text-left text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Expires') }}</th>
+                            <th class="rounded-tr-xl border-b border-gray-100 px-5 py-4 text-right text-xs font-semibold uppercase text-gray-700 dark:border-surface-700 dark:text-gray-400">{{ t('Actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>

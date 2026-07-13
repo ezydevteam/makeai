@@ -18,7 +18,6 @@ class BlogCategory extends Model
         'color',
         'meta_title',
         'meta_description',
-        'og_image',
         'is_active',
         'sort_order',
         'posts_count',

@@ -57,9 +57,4 @@ class Ad extends Model
 
         return round(($this->clicks / $this->impressions) * 100, 2);
     }
-
-    public function getDisplayTitleAttribute(): string
-    {
-        return $this->title;
-    }
 }

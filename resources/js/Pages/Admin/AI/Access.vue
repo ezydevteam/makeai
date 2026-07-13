@@ -1,10 +1,10 @@
-<script setup lang="ts">
+/<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -133,14 +133,25 @@ const getAccessLevelLabel = (level: string) => {
 
 const getAccessLevelBadgeClass = (level: string) => {
     switch (level) {
-        case 'guest': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-        case 'login': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-        case 'premium': return 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300'
+        case 'inherit':
+            return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10'
+        case 'public':
+        case 'guest':
+            return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20'
+        case 'login_required':
+        case 'login':
+            return 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/20'
+        case 'free_plan':
+        case 'free':
+            return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20'
+        case 'pro_plan':
+        case 'premium':
+            return 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20'
         default:
             if (level.startsWith('plan:')) {
-                return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300'
+                return 'bg-purple-50 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-500/20'
             }
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+            return 'bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10'
     }
 }
 
@@ -291,32 +302,19 @@ onBeforeUnmount(() => {
 
     <AdminLayout>
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div class="min-w-0">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-                        {{ t('AI Access Settings') }}
-                    </h1>
-                    <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-                        {{ t('Manage visibility and access requirements for all AI tools.') }}
-                    </p>
-                </div>
-
-                <div class="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 sm:w-auto">
-                    <span class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-surface-700 dark:bg-surface-900">
-                        <i class="ti ti-shield-check text-sm text-primary-600 dark:text-primary-400"></i>
-                        {{ t(':count tools', { count: props.tools.total ?? props.tools.data.length }) }}
-                    </span>
-                    <span class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 dark:border-surface-700 dark:bg-surface-900">
-                        <i class="ti ti-adjustments text-sm text-primary-600 dark:text-primary-400"></i>
-                        {{ t('Default: :level', { level: getAccessLevelLabel(props.globalDefault) }) }}
-                    </span>
-                </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+                    {{ t('AI Access Settings') }}
+                </h1>
+                <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Manage visibility and access requirements for all AI tools.') }}
+                </p>
             </div>
 
             <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                        <div class="flex-1 min-w-[240px]">
+                        <div class="flex-1 min-w-[240px] sm:max-w-xs">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -482,7 +480,7 @@ onBeforeUnmount(() => {
                             </tbody>
                         </table>
                     </div>
- 
+
                     <div v-if="tools.links && tools.links.length > 3" class="border-t border-gray-100 px-4 py-4 dark:border-gray-800">
                         <Pagination
                             :links="tools.links"

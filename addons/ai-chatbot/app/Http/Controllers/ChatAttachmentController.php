@@ -18,6 +18,14 @@ class ChatAttachmentController extends Controller
 
     public function store(Request $request, TextExtractionService $extractor): JsonResponse
     {
+        // Enforce the admin toggle server-side — not just by hiding the UI button.
+        if (! addon_setting('ai-chatbot', 'enable_file_upload', true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File upload is disabled.',
+            ], 403);
+        }
+
         $maxSizeMb = (int) $this->getPlanSetting('max_file_size_mb', 10);
         if ($maxSizeMb <= 0) {
             $maxSizeMb = 10;

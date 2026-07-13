@@ -7,6 +7,7 @@ use Addons\PublicKnowledgeBase\Models\KbEmbedding;
 use Addons\PublicKnowledgeBase\Models\KbSearch;
 use App\Services\AI\AiService;
 use App\Services\AI\ProviderRegistry;
+use App\Services\AI\TokenGuard;
 use Generator;
 use Illuminate\Support\Collection;
 
@@ -136,7 +137,15 @@ class KbSearchService
         $appName = settings('app_name', 'MakeAI');
         $maxTokens = (int) addon_setting('public-knowledge-base', 'max_answer_tokens', 512);
 
-        $systemPrompt = "You are a helpful support assistant for {$appName}. "
+        // Optional admin-authored persona/tone. The RAG grounding rules are always
+        // appended so a custom prompt can't disable "answer only from context / cite
+        // sources" — it only shapes voice.
+        $persona = trim((string) addon_setting('public-knowledge-base', 'system_prompt', ''));
+        if ($persona === '') {
+            $persona = "You are a helpful support assistant for {$appName}.";
+        }
+
+        $systemPrompt = $persona . " "
             . "Answer the user's question using ONLY the provided knowledge base context. "
             . "At the end of your answer, list the source articles you referenced as: Sources: [Article Title 1], [Article Title 2] "
             . "If the context does not contain the answer, say so honestly. "
@@ -159,6 +168,30 @@ class KbSearchService
             $modelName = settings('default_ai_model', 'gpt-4o-mini');
         }
 
+        // Cost governance: KB answers are free to end users, but the operator still
+        // pays the provider. Gate on the global daily AI budget kill-switch (graceful,
+        // not an exception), then record the spend afterward so the budget stays
+        // accurate — WITHOUT charging any user (deductCredits: false). Behaves
+        // identically under Regular and Extended licenses (no per-user credit involved).
+        if (TokenGuard::globalBudgetExceeded()) {
+            yield json_encode(['type' => 'delta', 'text' => 'The assistant is temporarily unavailable due to high demand. Please browse the articles below or try again later.']) . "\n";
+
+            $log = KbSearch::create([
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'query' => $query,
+                'results_count' => count($uniqueArticles),
+                'was_answered' => false,
+                'article_ids' => collect($uniqueArticles)->pluck('ulid')->toArray(),
+            ]);
+
+            yield json_encode(['type' => 'done', 'query_id' => $log->id]) . "\n";
+            return;
+        }
+
+        $fullAnswer = '';
+        $answered = true;
+
         try {
             $adapter = ProviderRegistry::resolve($providerName);
             $stream = $adapter->streamChatCompletion($messages, $modelName, [
@@ -168,11 +201,35 @@ class KbSearchService
 
             foreach ($stream as $chunk) {
                 if (is_string($chunk)) {
+                    $fullAnswer .= $chunk;
                     yield json_encode(['type' => 'delta', 'text' => $chunk]) . "\n";
                 }
             }
         } catch (\Throwable $e) {
+            $answered = false;
             yield json_encode(['type' => 'delta', 'text' => "\n[Error generating answer. Please try again.]"]) . "\n";
+        }
+
+        // Track the answer-generation spend against the global AI budget so the
+        // kill-switch above stays accurate. No user is charged (deductCredits: false).
+        if ($fullAnswer !== '') {
+            $inputTokens = (int) ceil(mb_strlen($systemPrompt . $userPrompt) / 4);
+            $outputTokens = (int) ceil(mb_strlen($fullAnswer) / 4);
+            try {
+                TokenGuard::after(
+                    null,
+                    $inputTokens,
+                    $outputTokens,
+                    $modelName,
+                    $providerName,
+                    'kb_answer',
+                    ['tool_slug' => 'kb-answer'],
+                    false,      // deductCredits — never charge end users for public help
+                    $answered,
+                );
+            } catch (\Throwable $e) {
+                // Cost accounting must never break the user-facing answer.
+            }
         }
 
         $log = KbSearch::create([
@@ -180,7 +237,7 @@ class KbSearchService
             'user_id' => $userId,
             'query' => $query,
             'results_count' => count($uniqueArticles),
-            'was_answered' => true,
+            'was_answered' => $answered,
             'article_ids' => collect($uniqueArticles)->pluck('ulid')->toArray(),
         ]);
 

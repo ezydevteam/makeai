@@ -98,11 +98,9 @@ class AccountSettingsController extends Controller
         /** @var Admin $admin */
         $admin = auth('admin')->user();
 
-        $path = $request->file('avatar')->store('admin-avatars', 'public');
-
-        if ($admin->avatar && ! str_starts_with($admin->avatar, 'http://') && ! str_starts_with($admin->avatar, 'https://')) {
-            Storage::disk('public')->delete($admin->avatar);
-        }
+        // Store the new avatar first; the old one (unless it's an external social-login
+        // URL, which media_path leaves alone) is removed only after that succeeds.
+        $path = store_public_upload($request->file('avatar'), 'admin-avatars', $admin->avatar);
 
         $admin->update([
             'avatar' => $path,

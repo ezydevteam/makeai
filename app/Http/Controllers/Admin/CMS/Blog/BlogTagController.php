@@ -15,7 +15,7 @@ class BlogTagController extends Controller
     {
         $this->authorizeBlog();
 
-        return Inertia::render('Admin/CMS/Blog/Tags/Index', [
+        return Inertia::render('Admin/CMS/Blog/Tags', [
             'tags' => BlogTag::query()
                 ->when($request->filled('search'), fn ($query) => $query->where('name', 'like', '%'.$request->string('search')->toString().'%'))
                 ->orderBy('name')

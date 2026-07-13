@@ -23,7 +23,7 @@ class AiToolController extends Controller
 {
     public function index(Request $request)
     {
-        $query = AiTool::with('category:id,name,slug')
+        $query = AiTool::with('category:id,name,slug,color')
             ->orderBy('sort_order')
             ->orderBy('name');
 
@@ -48,7 +48,7 @@ class AiToolController extends Controller
     public function trash(Request $request)
     {
         $query = AiTool::onlyTrashed()
-            ->with('category:id,name,slug')
+            ->with('category:id,name,slug,color')
             ->orderByDesc('deleted_at')
             ->orderBy('name');
 
@@ -95,6 +95,7 @@ class AiToolController extends Controller
                     ]);
             })(),
             'accessLevels' => app(\App\Services\AccessLevelService::class)->getOptions(),
+            'integrations' => \App\Services\AI\UtilityToolRunner::availableIntegrations(),
         ]);
     }
 
@@ -110,7 +111,7 @@ class AiToolController extends Controller
         $data = $this->processUsageExamples($data);
 
         if ($request->hasFile('og_image_file')) {
-            $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
+            $data['og_image'] = store_public_upload($request->file('og_image_file'), 'ai-tools');
         }
 
         $tool = AiTool::create($data);
@@ -152,6 +153,7 @@ class AiToolController extends Controller
                 ->take(20)
                 ->get(),
             'accessLevels' => app(\App\Services\AccessLevelService::class)->getOptions(),
+            'integrations' => \App\Services\AI\UtilityToolRunner::availableIntegrations(),
         ]);
     }
 
@@ -166,7 +168,7 @@ class AiToolController extends Controller
         $data = $this->processUsageExamples($data);
 
         if ($request->hasFile('og_image_file')) {
-            $data['og_image'] = $request->file('og_image_file')->store('ai-tools', 'public');
+            $data['og_image'] = store_public_upload($request->file('og_image_file'), 'ai-tools', $tool->og_image);
         }
 
         $wasActive = $tool->is_active;
@@ -322,6 +324,8 @@ class AiToolController extends Controller
             'prompt_user' => 'nullable|string|max:10000',
             'output_type' => 'nullable|in:text,markdown,html,code,list,image,audio,video,json',
             'model_override' => 'nullable|string|max:100',
+            'generation_mode' => 'nullable|in:llm,integration,integration_llm_fallback',
+            'integration_slug' => 'nullable|string|max:60',
             'max_tokens_override' => 'nullable|integer|min:1|max:128000',
             'temperature' => 'nullable|numeric|min:0|max:2',
             'supports_brand_voice' => 'boolean',
@@ -372,9 +376,7 @@ class AiToolController extends Controller
             'show_faqs' => 'boolean',
             'show_reviews' => 'boolean',
             'show_related_tools' => 'boolean',
-            'show_regenerate' => 'boolean',
             'show_improve' => 'boolean',
-            'show_editor' => 'boolean',
 
             // Tab 5: SEO
             'meta_title' => 'nullable|string|max:255',
@@ -524,28 +526,5 @@ class AiToolController extends Controller
                 }
             })
             ->firstOrFail();
-    }
-
-    public function updateGlobalSettings(Request $request)
-    {
-        $validated = $request->validate([
-            'global_tools_brand_voice_enabled' => ['required', 'boolean'],
-            'global_tools_variations_enabled' => ['required', 'boolean'],
-            'global_tools_regenerate_enabled' => ['required', 'boolean'],
-            'global_tools_improve_enabled' => ['required', 'boolean'],
-            'global_tools_editor_enabled' => ['required', 'boolean'],
-            'global_tools_show_about_enabled' => ['required', 'boolean'],
-            'global_tools_show_how_it_works_enabled' => ['required', 'boolean'],
-            'global_tools_show_usage_examples_enabled' => ['required', 'boolean'],
-            'global_tools_show_faqs_enabled' => ['required', 'boolean'],
-            'global_tools_show_reviews_enabled' => ['required', 'boolean'],
-            'global_tools_embeddable_enabled' => ['required', 'boolean'],
-        ]);
-
-        foreach ($validated as $key => $value) {
-            settings_set($key, (bool) $value, 'boolean');
-        }
-
-        return back()->with('success', translate('Global tools settings updated successfully.'));
     }
 }

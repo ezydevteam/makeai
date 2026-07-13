@@ -8,7 +8,8 @@ use App\Http\Requests\Auth\EnableTwoFactorRequest;
 use App\Http\Requests\Auth\RegenerateRecoveryCodesRequest;
 use App\Http\Requests\User\UpdateProfileRequest;
 use App\Models\User;
-use App\Models\UserApiKey;
+use App\Models\UserByok;
+use App\Services\MailService;
 use App\Services\Security\TotpService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,6 +88,7 @@ class SettingsController extends Controller
         $validated = $request->validated();
 
         $emailChanged = $validated['email'] !== $user->email;
+        $previousEmail = $user->email;
 
         $user->update($validated);
 
@@ -94,6 +96,13 @@ class SettingsController extends Controller
             $user->email_verified_at = null;
             $user->save();
             $user->sendEmailVerificationNotification();
+
+            // Security alert to the previous address so the owner is warned if
+            // the change wasn't them. {user_email} is the new address.
+            app(MailService::class)->send('email_changed', $previousEmail, [
+                'user_name' => $user->name,
+                'user_email' => $user->email,
+            ]);
 
             return redirect()->route('user.dashboard.profile')
                 ->with('success', translate('Profile updated. Please verify your new email address.'));
@@ -150,11 +159,8 @@ class SettingsController extends Controller
             'avatar' => ['required', 'image', 'max:2048'],
         ]);
 
-        $path = $request->file('avatar')->store('avatars', 'public');
-
-        if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
-        }
+        // Store the new avatar first; the old one is removed only after that succeeds.
+        $path = store_public_upload($request->file('avatar'), 'avatars', $user->avatar);
 
         $user->update(['avatar' => $path]);
 
@@ -164,13 +170,13 @@ class SettingsController extends Controller
 
     // ─── API Keys ──────────────────────────────
 
-    public function apiKeys(Request $request): Response
+    public function byok(Request $request): Response
     {
         /** @var User $user */
         $user = $request->user();
 
-        return Inertia::render('User/ApiKeys', [
-            'apiKeys' => $user->apiKeys()->latest()->get()->map(fn (UserApiKey $key) => [
+        return Inertia::render('User/Byok', [
+            'byokKeys' => $user->byok()->latest()->get()->map(fn (UserByok $key) => [
                 'id' => $key->id,
                 'provider' => $key->provider,
                 'is_active' => $key->is_active,
@@ -179,7 +185,7 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function storeApiKey(Request $request): RedirectResponse
+    public function storeByok(Request $request): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -189,16 +195,16 @@ class SettingsController extends Controller
             'api_key' => ['required', 'string', 'max:1000'],
         ]);
 
-        $user->apiKeys()->create([
+        $user->byok()->create([
             'provider' => $validated['provider'],
             'api_key' => encrypt($validated['api_key']),
             'created_at' => now(),
         ]);
 
-        return back()->with('success', translate('API key added successfully.'));
+        return back()->with('success', translate('BYOK key added successfully.'));
     }
 
-    public function destroyApiKey(Request $request, UserApiKey $key): RedirectResponse
+    public function destroyByok(Request $request, UserByok $key): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -210,7 +216,7 @@ class SettingsController extends Controller
         $key->delete();
         $request->session()->forget(['error', 'warning', 'info']);
 
-        return back()->with('success', translate('API key removed.'));
+        return back()->with('success', translate('BYOK key removed.'));
     }
 
     // ─── 2FA ───────────────────────────────────

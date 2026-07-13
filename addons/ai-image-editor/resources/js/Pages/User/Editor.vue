@@ -8,6 +8,23 @@ import axios from 'axios'
 const { t } = useTranslate()
 const page = usePage()
 
+// The credit badge must respect the license mode. In METERED mode (Extended + billing)
+// the wallet is a real spend-down balance, so show it. In QUOTA mode (Regular license)
+// the wallet is never drained — usage meters against a resetting daily allowance — so
+// the wallet figure is meaningless; show the remaining daily allowance instead, or '∞'
+// when no daily cap is configured (unlimited). Core shares these props globally.
+const extraProps = computed(() => page.props as unknown as Record<string, unknown>)
+const isQuotaMode = computed(() => extraProps.value.isProAvailable === false)
+const creditsBadge = computed(() => {
+    if (!isQuotaMode.value) {
+        return String(page.props.auth.user?.credits ?? 0)
+    }
+    const dailyLimit = Number(extraProps.value.userDailyCreditLimit ?? 0)
+    if (dailyLimit <= 0) return '∞' // unlimited daily allowance
+    const used = Number(extraProps.value.creditsUsedToday ?? 0)
+    return String(Math.max(0, dailyLimit - used))
+})
+
 const isDragging = ref(false)
 const fileToUpload = ref<File | null>(null)
 const isUploading = ref(false)
@@ -432,7 +449,7 @@ watch(brushSize, (size) => {
                 <span class="text-gray-300 text-sm">{{ currentVersion }}</span>
             </div>
             <div class="flex items-center gap-3">
-                <span class="badge badge-blue text-xs">{{ t('Credits') }}: {{ page.props.auth.user?.credits || 0 }}</span>
+                <span class="badge badge-blue text-xs">{{ t('Credits') }}: {{ creditsBadge }}</span>
             </div>
         </div>
 

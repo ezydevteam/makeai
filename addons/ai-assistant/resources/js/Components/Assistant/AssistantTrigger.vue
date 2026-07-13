@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { usePage } from '@inertiajs/vue3'
+import { useTranslate } from '@/Composables/useTranslate'
+import type { AssistantSettings } from '../../types'
 
-const props = defineProps<{
+defineProps<{
     isOpen: boolean
-    settings: Record<string, any>
+    settings: AssistantSettings
     unreadCount: number
 }>()
 
@@ -11,27 +12,31 @@ defineEmits<{
     (e: 'click'): void
 }>()
 
-const page = usePage()
-const $t = (key: string, replace?: Record<string, string | number>) => {
-    const translations = (page.props.translations ?? {}) as Record<string, string>
-    let text = translations[key] ?? key
-    if (replace) {
-        for (const [k, v] of Object.entries(replace)) {
-            text = text.replace(new RegExp(`:${k}`, 'g'), String(v))
-        }
-    }
-    return text
-}
+const { t } = useTranslate()
 </script>
 
 <template>
     <button
-        class="ai-trigger-fab w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-0 cursor-pointer transition-all duration-200 hover:scale-105 relative"
-        :aria-label="isOpen ? $t('Close assistant') : $t('Open assistant')"
+        class="ai-trigger-fab relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full border-0 shadow-lg transition-all duration-200 hover:scale-105"
+        :aria-label="isOpen ? t('Close assistant') : t('Open assistant')"
         @click="$emit('click')"
     >
-        <!-- Chat icon -->
-        <i v-if="!isOpen" :class="[settings.widget_icon || 'ti ti-robot', 'text-2xl text-white']"></i>
+        <!-- The uploaded avatar IS the bubble, filling the circle edge to edge. The clipping
+             lives on this inner wrapper, not the button, so the unread badge below isn't
+             clipped along with it. Falls back to a robot glyph on the accent colour. -->
+        <span
+            v-if="!isOpen"
+            class="flex h-full w-full items-center justify-center overflow-hidden rounded-full"
+        >
+            <img
+                v-if="settings.avatar_url"
+                :src="settings.avatar_url"
+                :alt="settings.assistant_name ?? ''"
+                class="h-full w-full object-cover"
+            />
+            <i v-else class="ti ti-robot text-2xl text-white"></i>
+        </span>
+
         <!-- Close icon -->
         <svg v-else class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />

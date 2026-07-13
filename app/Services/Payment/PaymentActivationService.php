@@ -17,10 +17,13 @@ class PaymentActivationService extends SubscriptionLifecycleService
     public function activateCreditTopup(Payment $payment, string $gatewayPaymentId): void
     {
         DB::transaction(function () use ($payment, $gatewayPaymentId) {
-            // Idempotency check
-            if ($payment->status === 'completed') {
+            // Concurrency-safe idempotency: row-lock + re-read inside the transaction
+            // so a redelivered/racing webhook can't double-credit the wallet.
+            $locked = Payment::whereKey($payment->id)->lockForUpdate()->first();
+            if (! $locked || $locked->status === 'completed') {
                 return;
             }
+            $payment->setRawAttributes($locked->getAttributes(), true);
 
             $metadata = $payment->metadata ?: [];
             $totalCredits = (int) ($metadata['total_credits'] ?? 0);

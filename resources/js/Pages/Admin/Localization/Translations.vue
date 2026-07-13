@@ -1,7 +1,7 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -453,9 +453,9 @@ function handleKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-    <Head :title="t('Translations — :language', { language: language.name })" />
+    <Head :title="t('Translations â€” :language', { language: language.name })" />
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t(':language Translations', { language: language.name }) }}
@@ -465,17 +465,17 @@ function handleKeydown(event: KeyboardEvent) {
                 </p>
             </div>
 
-            <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div class="shrink-0 flex gap-3">
                 <Link
                     :href="route('admin.languages.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     <span>{{ t('Back') }}</span>
                 </Link>
                 <button
                     type="button"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
                     :disabled="savingAll || translatingAiAll"
                     @click="aiTranslateAll"
                 >
@@ -485,7 +485,7 @@ function handleKeydown(event: KeyboardEvent) {
                 </button>
                 <button
                     type="button"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+                    class="btn-primary-admin inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                     :disabled="savingAll"
                     @click="saveAllChanges"
                 >
@@ -500,8 +500,8 @@ function handleKeydown(event: KeyboardEvent) {
 
         <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-4 py-4 dark:border-surface-800 sm:px-6">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div class="w-full xl:max-w-md">
+                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div class="w-full md:max-w-md">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -534,7 +534,7 @@ function handleKeydown(event: KeyboardEvent) {
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2 text-sm">
+                    <div class="shrink-0 flex items-center gap-2 text-xs">
                         <span class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-gray-600 dark:bg-surface-800 dark:text-gray-300">
                             {{ t(':count filled', { count: filledCount }) }}
                         </span>
@@ -584,7 +584,7 @@ function handleKeydown(event: KeyboardEvent) {
                                 <Tooltip :content="t('AI Auto-Fill')" placement="top">
                                     <button
                                         type="button"
-                                        class="inline-flex h-5 w-5 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
+                                        class="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition-colors hover:border-violet-300 hover:bg-violet-100 dark:border-violet-900/50 dark:bg-violet-900/20 dark:text-violet-300"
                                         :disabled="translatingAi !== null"
                                         @click="aiTranslate(translation.id)"
                                     >
@@ -597,7 +597,7 @@ function handleKeydown(event: KeyboardEvent) {
 
                         <textarea
                             v-model="translation.value"
-                            rows="3"
+                            rows="2"
                             class="block w-full resize-y rounded-lg border bg-gray-50 px-3 py-2.5 text-sm leading-6 text-gray-900 transition-all focus:border-primary-500 focus:outline-none dark:bg-surface-800 dark:text-white"
                             :class="isDirty(translation)
                                 ? 'border-primary-300 ring-2 ring-primary-100 dark:border-primary-700 dark:ring-primary-900/30'

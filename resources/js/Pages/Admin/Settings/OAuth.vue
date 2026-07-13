@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -66,23 +67,18 @@ const copyRedirectUrl = (providerName: string, url: string) => {
 <template>
     <Head :title="t('OAuth Settings')" />
 
-        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('OAuth Settings') }}</h1>
-                    <span class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
-                        {{ t('Authentication') }}
-                    </span>
-                </div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('OAuth Settings') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-                    {{ t('Enable OAuth registration and login providers for user authentication pages.') }}
+                    {{ t('Enable social OAuth registration and login providers for user authentication pages.') }}
                 </p>
             </div>
             <button
                 type="button"
                 :disabled="form.processing"
-                class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                class="shrink-0 btn-primary-admin inline-flex items-center justify-center gap-2 disabled:opacity-60"
                 @click="submit"
             >
                 <svg
@@ -99,14 +95,14 @@ const copyRedirectUrl = (providerName: string, url: string) => {
             </button>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Frontend Display') }}</h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control how social-auth related share buttons appear on supported frontend pages.') }}</p>
             </div>
 
             <div class="p-6">
-                <div class="max-w-xl">
+                <div class="col-span">
                     <AppSelect v-model="form.settings.social_share_blog_style" :options="oauthDisplayModeOptions" :label="t('Display mode')" />
                     <p class="mt-1 text-xs text-gray-500">{{ t('Controls how social share buttons are displayed on supported frontend pages.') }}</p>
                     <p v-if="form.errors['settings.social_share_blog_style']" class="mt-1 text-xs text-danger-600">
@@ -116,7 +112,7 @@ const copyRedirectUrl = (providerName: string, url: string) => {
             </div>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Login Providers') }}</h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Enable each OAuth provider and manage the client credentials used for registration and sign-in flows.') }}</p>
@@ -126,7 +122,7 @@ const copyRedirectUrl = (providerName: string, url: string) => {
                 <div
                     v-for="(provider, index) in form.social_login_providers"
                     :key="provider.provider"
-                    class="rounded-xl border border-gray-200 bg-gray-50/80 shadow-sm dark:border-surface-700 dark:bg-surface-800/50"
+                    class="rounded-2xl border border-gray-200 bg-gray-50/80 dark:border-surface-700 dark:bg-surface-800/50"
                 >
                     <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-700">
                         <div class="flex items-start justify-between gap-3">
@@ -146,15 +142,7 @@ const copyRedirectUrl = (providerName: string, url: string) => {
 
                         <div class="mt-4 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2.5 dark:border-surface-700 dark:bg-surface-900">
                             <span class="text-sm text-gray-600 dark:text-gray-300">{{ t('Enable login') }}</span>
-                            <button
-                                type="button"
-                                :aria-pressed="provider.enabled"
-                                :class="provider.enabled ? 'bg-primary-500' : 'bg-gray-300 dark:bg-surface-700'"
-                                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200"
-                                @click="provider.enabled = !provider.enabled"
-                            >
-                                <span :class="provider.enabled ? 'translate-x-5' : 'translate-x-0.5'" class="inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200"></span>
-                            </button>
+                            <AppSwitch v-model="provider.enabled" />
                         </div>
                         <p v-if="form.errors[`social_login_providers.${index}.enabled`]" class="mt-2 text-xs text-danger-600">
                             {{ form.errors[`social_login_providers.${index}.enabled`] }}

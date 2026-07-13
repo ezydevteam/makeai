@@ -237,6 +237,7 @@ class ToolCatalogCacheService
             'slug' => $tool->slug,
             'description' => $tool->description,
             'category' => $this->serializeCategory($tool->category),
+            'category_id' => $tool->category_id,
             'icon' => $tool->icon,
             'color' => $tool->color,
             'fields' => $tool->fields ?? [],
@@ -248,14 +249,11 @@ class ToolCatalogCacheService
             'requires_login' => (bool) ($tool->category?->requires_login ?? false),
             'supports_brand_voice' => (bool) $tool->supports_brand_voice,
             'max_variants' => (int) ($tool->max_variants ?? 1),
-            'show_regenerate' => (bool) ($tool->show_regenerate ?? true),
             'show_improve' => (bool) ($tool->show_improve ?? true),
-            'show_editor' => (bool) ($tool->show_editor ?? true),
             'sort_order' => $tool->sort_order,
             'usage_count' => (int) $tool->usage_count,
             'views_count' => (int) ($tool->views_count ?? 0),
             'avg_output_tokens' => (int) $tool->avg_output_tokens,
-            'avg_latency_ms' => (int) ($tool->avg_latency_ms ?? 0),
             'avg_rating' => (float) $tool->avg_rating,
             'review_count' => (int) $tool->review_count,
             'meta_title' => $tool->meta_title,
@@ -326,14 +324,11 @@ class ToolCatalogCacheService
             'is_embeddable',
             'supports_brand_voice',
             'max_variants',
-            'show_regenerate',
             'show_improve',
-            'show_editor',
             'sort_order',
             'usage_count',
             'views_count',
             'avg_output_tokens',
-            'avg_latency_ms',
             'avg_rating',
             'review_count',
             'meta_title',
@@ -370,9 +365,7 @@ class ToolCatalogCacheService
 
         $tool['supports_brand_voice'] = (bool) ($tool['supports_brand_voice'] ?? false) && settings('global_tools_brand_voice_enabled', true);
         $tool['max_variants'] = settings('global_tools_variations_enabled', true) ? (int) ($tool['max_variants'] ?? 1) : 1;
-        $tool['show_regenerate'] = (bool) ($tool['show_regenerate'] ?? true) && settings('global_tools_regenerate_enabled', true);
         $tool['show_improve'] = (bool) ($tool['show_improve'] ?? true) && settings('global_tools_improve_enabled', true);
-        $tool['show_editor'] = (bool) ($tool['show_editor'] ?? true) && settings('global_tools_editor_enabled', true);
         $tool['show_about'] = (bool) ($tool['show_about'] ?? true) && settings('global_tools_show_about_enabled', true);
         $tool['show_how_it_works'] = (bool) ($tool['show_how_it_works'] ?? true) && settings('global_tools_show_how_it_works_enabled', true);
         $tool['show_usage_examples'] = (bool) ($tool['show_usage_examples'] ?? true) && settings('global_tools_show_usage_examples_enabled', true);

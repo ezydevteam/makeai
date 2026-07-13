@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { usePage } from '@inertiajs/vue3'
+import { useTranslate } from '@/Composables/useTranslate'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js/lib/core'
@@ -44,6 +44,8 @@ const props = defineProps<{
     share_token: string
 }>()
 
+const { t } = useTranslate()
+
 const loading = ref(true)
 const error = ref('')
 const data = ref<SharedData | null>(null)
@@ -52,16 +54,16 @@ onMounted(async () => {
     try {
         const res = await fetch(`/api/v1/share/${props.share_token}`)
         if (!res.ok) {
-            throw new Error('Failed to load shared conversation')
+            throw new Error(t('Failed to load shared conversation'))
         }
         const json = await res.json()
         if (json.success) {
             data.value = json.data
         } else {
-            throw new Error(json.message || 'Failed to load shared conversation')
+            throw new Error(json.message || t('Failed to load shared conversation'))
         }
     } catch (e) {
-        error.value = e instanceof Error ? e.message : 'An error occurred'
+        error.value = e instanceof Error ? e.message : t('An error occurred')
     } finally {
         loading.value = false
     }
@@ -105,10 +107,10 @@ function renderMarkdown(content: string): string {
                     </div>
                     <div>
                         <h1 class="text-lg font-semibold text-gray-900 dark:text-white">
-                            {{ data?.title || 'Shared Conversation' }}
+                            {{ data?.title || t('Shared Conversation') }}
                         </h1>
                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                            Shared conversation
+                            {{ t('Shared conversation') }}
                         </p>
                     </div>
                 </div>
@@ -129,7 +131,7 @@ function renderMarkdown(content: string): string {
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
                 </div>
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Unable to load conversation</h2>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">{{ t('Unable to load conversation') }}</h2>
                 <p class="text-gray-500 dark:text-gray-400">{{ error }}</p>
             </div>
 
@@ -149,7 +151,7 @@ function renderMarkdown(content: string): string {
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                                     </svg>
                                 </div>
-                                <span class="text-sm font-medium text-gray-900 dark:text-white">Assistant</span>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Assistant') }}</span>
                             </div>
                             <span v-if="message.model" class="text-xs text-gray-500 dark:text-gray-400">
                                 {{ message.model }}
@@ -169,9 +171,9 @@ function renderMarkdown(content: string): string {
                 <!-- Footer -->
                 <div class="text-center pt-8 border-t border-gray-200 dark:border-gray-700">
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                        This is a shared conversation. 
+                        {{ t('This is a shared conversation.') }}
                         <a href="/" class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300">
-                            Start your own conversation
+                            {{ t('Start your own conversation') }}
                         </a>
                     </p>
                 </div>

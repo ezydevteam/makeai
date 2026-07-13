@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin\Activity;
 
 use App\Http\Controllers\Controller;
+use App\Support\AuditLogPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -29,7 +30,12 @@ class AdminLogController extends Controller
         }
 
         if ($request->filled('action')) {
-            $query->where('admin_audit_logs.action', 'like', '%' . $request->action . '%');
+            $term = '%'.$request->action.'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('admin_audit_logs.action', 'like', $term)
+                    ->orWhere('admin_audit_logs.route_name', 'like', $term)
+                    ->orWhere('admin_audit_logs.target_type', 'like', $term);
+            });
         }
 
         if ($request->filled('date_from')) {
@@ -40,7 +46,25 @@ class AdminLogController extends Controller
             $query->where('admin_audit_logs.created_at', '<=', $request->date_to);
         }
 
-        $logs = $query->paginate(50);
+        $logs = $query->paginate(50)->withQueryString();
+
+        // Enrich each row with buyer-friendly presentation (label, category
+        // icon/colour, target, redacted payload) from the single server-side
+        // presenter — the frontend renders these directly, no parsing.
+        $logs->getCollection()->transform(function ($log) {
+            $presented = AuditLogPresenter::present($log);
+
+            $log->action_label = $presented['label'];
+            $log->category = $presented['category'];
+            $log->category_label = $presented['category_label'];
+            $log->category_icon = $presented['icon'];
+            $log->category_color = $presented['color'];
+            $log->method = $presented['method'];
+            $log->target = $presented['target'];
+            $log->payload = $presented['payload'];
+
+            return $log;
+        });
 
         $admins = DB::table('admins')
             ->where('is_active', true)

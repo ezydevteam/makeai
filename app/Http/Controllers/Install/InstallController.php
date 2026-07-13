@@ -371,7 +371,6 @@ class InstallController extends Controller
                         'name' => $data['step_5']['admin_name'],
                         'email' => $data['step_5']['admin_email'],
                         'password' => $data['step_5']['admin_password'],
-                        'must_change_password' => false,
                     ]);
                     $debug('Phase 4: Admin updated successfully.');
                 } else {
@@ -383,7 +382,6 @@ class InstallController extends Controller
                         'password' => $data['step_5']['admin_password'],
                         'role_id' => $roleId,
                         'is_active' => true,
-                        'must_change_password' => false,
                     ]);
                     $debug('Phase 4: Admin created successfully (no default admin found).');
                 }

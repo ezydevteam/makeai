@@ -271,4 +271,20 @@ class AdminController extends Controller
 
         return back()->with('success', translate('Bulk action completed.'));
     }
+
+    /**
+     * Force disable two-factor authentication for the administrator.
+     */
+    public function disableTwoFactor(Admin $admin)
+    {
+        abort_unless(auth('admin')->user()->isSuperAdmin(), 403);
+
+        if (! $admin->hasTotpEnabled()) {
+            return back()->with('info', translate('Two-factor authentication is not enabled for this administrator.'));
+        }
+
+        $admin->disableTotp();
+
+        return back()->with('success', translate('Two-factor authentication disabled for :name.', ['name' => $admin->name]));
+    }
 }

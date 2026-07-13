@@ -1,10 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppIconSelect from '@/Components/IconClassSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppIconSelect from '@/Components/Admin/IconClassSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -202,7 +202,7 @@ const remove = () => {
             </div>
             <button
                 type="button"
-                class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium"
+                class="inline-flex items-center gap-2 rounded-lg btn-primary-admin px-4 py-2 text-sm font-medium"
                 @click="openCreate"
             >
                 <i class="ti ti-plus text-base"></i>
@@ -269,7 +269,7 @@ const remove = () => {
                         >
                             <td class="px-4 py-4 align-top">
                                 <i v-if="category.icon" :class="category.icon" class="text-xl text-primary-600 dark:text-primary-400"></i>
-                                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
+                                <span v-else class="text-gray-400 dark:text-gray-500">â€”</span>
                             </td>
                             <td class="px-4 py-4 align-top">
                                 <div class="min-w-0">
@@ -491,7 +491,7 @@ const remove = () => {
                                     <button
                                         type="submit"
                                         :disabled="form.processing"
-                                        class="rounded-lg btn-primary px-5 disabled:opacity-50"
+                                        class="rounded-lg btn-primary-admin px-5 disabled:opacity-50"
                                     >
                                         {{ form.processing ? t('Processing...') : (editing ? t('Update') : t('Create')) }}
                                     </button>

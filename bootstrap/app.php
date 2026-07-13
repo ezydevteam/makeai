@@ -70,6 +70,13 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             'embed/*',
         ]);
 
+        // The cookie-consent banner writes this cookie from JavaScript, so it must
+        // stay plaintext (not Laravel-encrypted) to be readable both client-side
+        // and server-side — e.g. gating the analytics tag before consent.
+        $middleware->encryptCookies(except: [
+            'cookie_consent',
+        ]);
+
         $middleware->alias([
             'admin.auth' => AdminAuth::class,
             'admin.permission' => AdminPermission::class,
@@ -116,6 +123,20 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
                 'integration' => $e->integration,
             ], 503);
         });
+
+        // A failed media write (see store_public_upload) surfaces as a flashed error on
+        // web/Inertia requests and a 500 JSON payload on API requests — never a silent
+        // "saved" with a broken path.
+        $exceptions->renderable(function (\App\Exceptions\StorageWriteException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'error' => 'Storage write failed',
+                    'message' => $e->getMessage(),
+                ], 500);
+            }
+
+            return back()->withInput()->with('error', $e->getMessage());
+        });
     });
 
 $app = $appConfigurator->create();
@@ -128,4 +149,3 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && basename($_SERVER['SCRIPT_FILENAME']) 
 }
 
 return $app;
-app;

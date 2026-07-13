@@ -177,8 +177,13 @@ class RepurposerTest extends TestCase
     }
 
     /** @test */
-    public function it_refunds_credits_when_process_repurpose_job_fails_at_transcription(): void
+    public function it_refunds_credits_to_the_wallet_when_a_job_fails_in_metered_mode(): void
     {
+        // Metered mode (Extended license + billing): the charge drained the wallet,
+        // so a failed job returns the credits to the wallet.
+        settings_set('license_type', '2', 'integer', 'license');
+        settings_set('subscriptions_enabled', '1', 'boolean', 'ai');
+
         $job = RpJob::create([
             'user_id'           => $this->user->id,
             'source_type'       => 'youtube_url',
@@ -200,7 +205,46 @@ class RepurposerTest extends TestCase
             // Expected
         }
 
-        $this->assertEquals(100, $this->user->fresh()->credits);
+        $this->assertEquals(100, $this->user->fresh()->credits, 'Metered refund returns credits to the wallet.');
+        $this->assertEquals('failed', $job->fresh()->status);
+    }
+
+    /** @test */
+    public function it_winds_back_the_allowance_when_a_job_fails_in_quota_mode(): void
+    {
+        // Quota mode (Regular license — the default): the wallet was never drained,
+        // so a failed job winds back the consumed daily/monthly allowance and leaves
+        // the wallet untouched. A raw wallet increment would hand out free credits here.
+        settings_set('license_type', '1', 'integer', 'license');
+        settings_set('subscriptions_enabled', '0', 'boolean', 'ai');
+
+        $job = RpJob::create([
+            'user_id'           => $this->user->id,
+            'source_type'       => 'youtube_url',
+            'source_url'        => 'https://youtube.com/watch?v=badurl',
+            'status'            => 'queued',
+            'formats_requested' => ['blog_post'],
+            'credits_deducted'  => 15,
+        ]);
+
+        $this->user->update([
+            'credits'            => 85,
+            'credits_used_today' => 20,
+            'credits_used_month' => 20,
+        ]);
+
+        $processJob = new ProcessRepurposeJob($job->id);
+
+        try {
+            $processJob->failed(new \RuntimeException('Transcription failed'));
+        } catch (\Throwable) {
+            // Expected
+        }
+
+        $fresh = $this->user->fresh();
+        $this->assertEquals(85, (float) $fresh->credits, 'Quota refund must not touch the wallet.');
+        $this->assertEquals(5, (float) $fresh->credits_used_today, 'Allowance wound back by the refunded 15.');
+        $this->assertEquals(5, (float) $fresh->credits_used_month);
         $this->assertEquals('failed', $job->fresh()->status);
     }
 

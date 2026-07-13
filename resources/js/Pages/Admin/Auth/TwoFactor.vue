@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
+﻿<script setup lang="ts">
+import AuthCaptchaField from '@/Components/Utility/AuthCaptchaField.vue'
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed, onMounted, ref } from 'vue'
 import { useFlashToasts } from '@/Composables/useToastr'
@@ -179,7 +179,7 @@ onMounted(() => {
                                 <button
                                     type="submit"
                                     :disabled="form.processing || form.code.length < 6"
-                                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                                    class="btn-primary-admin inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                     <svg v-if="form.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

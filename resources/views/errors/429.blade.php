@@ -1,7 +1,7 @@
 @php
     $appName = settings('app_name', 'Application');
     $primaryColor = settings('primary_color', '#f59e0b');
-    $logoUrl = settings('app_logo_light') ? Storage::url(settings('app_logo_light')) : null;
+    $logoUrl = media_url(settings('site_logo_light')) ?: null;
     $isAdminError = request()->is('admin') || request()->is('admin/*');
     $pageTitle = translate('Too Many Requests');
     $retryAfter = $exception->getHeaders()['Retry-After'] ?? $exception->retryAfter ?? 30;
@@ -83,7 +83,7 @@
         @if($logoUrl)
             <img src="{{ $logoUrl }}" alt="{{ $appName }}" class="logo-img">
         @else
-            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 2)->upper() }}</div>
+            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 1)->upper() }}</div>
         @endif
     </div>
     <div class="code" aria-label="429">
@@ -102,7 +102,7 @@
 </main>
 </div>
 <script>
-    let seconds = {{ (int) $retryAfter }};
+    let seconds = parseInt('{{ (int) $retryAfter }}') || 30;
     const el = document.getElementById('retry-timer');
     function pad(n) { return String(n).padStart(2, '0'); }
     function update() {

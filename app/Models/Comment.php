@@ -14,7 +14,7 @@ class Comment extends Model
 
     protected $fillable = [
         'commentable_type', 'commentable_id', 'user_id', 'parent_id',
-        'content', 'status', 'guest_name', 'guest_email', 'ip_address', 'likes_count',
+        'content', 'status', 'guest_name', 'guest_email', 'likes_count',
     ];
 
     protected function casts(): array

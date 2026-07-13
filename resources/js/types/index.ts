@@ -43,7 +43,6 @@ export interface LocaleInfo {
     is_rtl: boolean
     date_format?: string | null
     time_format?: string | null
-    currency_position?: CurrencyPosition | null
     number_format?: {
         decimal?: string
         thousands?: string

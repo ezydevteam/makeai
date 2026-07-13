@@ -64,7 +64,7 @@ class PermanentlyDeleteUserJob implements ShouldQueue
             DB::table('newsletter_subscribers')->where('email', $this->user->email)->delete();
 
             // Delete personal API keys
-            DB::table('user_api_keys')->where('user_id', $this->user->id)->delete();
+            DB::table('user_byok')->where('user_id', $this->user->id)->delete();
 
             // Hard delete the user (already soft-deleted with scheduled_deletion_at set)
             $this->user->forceDelete();

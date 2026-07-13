@@ -102,7 +102,7 @@ class VideoProviderService
         $duration = $params['duration'] ?? 5;
         $credits = $this->calculateCredits($type, $duration);
 
-        if ($user->credits < $credits) {
+        if (! credit_quota_mode() && $user->credits < $credits) {
             throw new \App\Exceptions\AI\InsufficientCreditsException($user->credits, $credits);
         }
 
@@ -141,16 +141,14 @@ class VideoProviderService
             return;
         }
 
-        DB::table('credit_transactions')->insert([
-            'user_id' => $render->user_id,
-            'amount' => $render->credits_deducted,
-            'balance_after' => $user->credits + $render->credits_deducted,
-            'type' => 'refund',
-            'description' => 'Video generation failed — refund: ' . $render->ulid,
-            'created_at' => now(),
-        ]);
-
-        $user->increment('credits', $render->credits_deducted);
+        // Mode-correct: metered mode returns wallet credits; quota mode (Regular
+        // license) winds back the consumed daily/monthly allowance instead, so a
+        // failed render doesn't keep eating the user's quota.
+        $user->refundCredits(
+            (float) $render->credits_deducted,
+            'Video generation failed — refund: ' . $render->ulid,
+            ['render_ulid' => $render->ulid],
+        );
     }
 
     private function checkAccess(User $user): void

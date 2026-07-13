@@ -2,10 +2,11 @@
 import { computed, ref } from 'vue'
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import AppColorPicker from '@/Components/AppColorPicker.vue'
-import IconClassSelect from '@/Components/IconClassSelect.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppColorPicker from '@/Components/UI/AppColorPicker.vue'
+import IconClassSelect from '@/Components/Admin/IconClassSelect.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -19,6 +20,7 @@ const props = defineProps<{
     aiModels?: any[]
     reviews?: any[]
     accessLevels?: Array<{ value: string; label: string; description?: string }>
+    integrations?: Array<{ slug: string; name: string }>
 }>()
 
 const isEditing = computed(() => !!props.tool)
@@ -114,13 +116,13 @@ const form = useForm({
     prompt_user: props.tool?.prompt_user || '',
     output_type: props.tool?.output_type || 'markdown',
     model_override: props.tool?.model_override || '',
+    generation_mode: props.tool?.generation_mode || 'llm',
+    integration_slug: props.tool?.integration_slug || '',
     max_tokens_override: props.tool?.max_tokens_override || '',
     temperature: props.tool?.temperature ?? 0.7,
     supports_brand_voice: props.tool?.supports_brand_voice ?? true,
     max_variants: props.tool?.max_variants ?? 1,
-    show_regenerate: props.tool?.show_regenerate ?? true,
     show_improve: props.tool?.show_improve ?? true,
-    show_editor: props.tool?.show_editor ?? true,
     avg_output_tokens: props.tool?.avg_output_tokens || '',
 
     // Fields
@@ -191,6 +193,16 @@ const modelOptions = computed(() => {
         ...models.map((m: any) => ({ value: m.slug, label: `${m.name} (${m.provider})` })),
     ]
 })
+
+const generationModeOptions = [
+    { value: 'llm', label: t('LLM only') },
+    { value: 'integration_llm_fallback', label: t('Integration + LLM fallback') },
+    { value: 'integration', label: t('Integration only') },
+]
+
+const integrationOptions = computed(() => [
+    ...(props.integrations || []).map((i) => ({ value: i.slug, label: i.name })),
+])
 
 const fieldTypeOptions = [
     { value: 'text', label: t('Text') },
@@ -334,16 +346,16 @@ const submit = () => {
     <Head :title="pageTitle + ' - ' + t('Admin')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div class="min-w-0">
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ pageTitle }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ pageDescription }}</p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="shrink-0 flex items-center gap-3">
                 <Link
                     :href="route('admin.ai.tools.index')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
+                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700  transition  hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
@@ -353,7 +365,7 @@ const submit = () => {
                     @click="submit"
                     :disabled="form.processing"
                     :class="form.processing ? 'cursor-wait opacity-50' : ''"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm"
+                    class="inline-flex items-center gap-2 btn-primary-admin"
                 >
                     <i v-if="form.processing" class="ti ti-loader-2 animate-spin text-base"></i>
                     <i v-else-if="!isEditing" class="ti ti-plus text-base"></i>
@@ -465,58 +477,23 @@ const submit = () => {
                     <!-- Toggle Switches (switch first, then label) -->
                     <div class="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.is_active ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.is_active = !form.is_active"
-                            >
-                                <span :class="form.is_active ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.is_active" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Active') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.is_featured ? 'bg-warning-500' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.is_featured = !form.is_featured"
-                            >
-                                <span :class="form.is_featured ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.is_featured" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Featured') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.show_header ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.show_header = !form.show_header"
-                            >
-                                <span :class="form.show_header ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_header" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Site Header') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.show_footer ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.show_footer = !form.show_footer"
-                            >
-                                <span :class="form.show_footer ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_footer" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Site Footer') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.is_embeddable ? 'bg-primary-500' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.is_embeddable = !form.is_embeddable"
-                            >
-                                <span :class="form.is_embeddable ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.is_embeddable" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Embeddable') }}</span>
                         </div>
                     </div>
@@ -544,7 +521,18 @@ const submit = () => {
                         </div>
                         <div>
                             <AppSelect v-model="form.model_override" :options="modelOptions" :label="t('Model Override')" :placeholder="t('Use default model')" />
-                            <p class="text-xs text-gray-400 mt-1">{{ t('Force a specific AI model for this tool.') }}</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ t('Force a specific AI model for this tool. Also the LLM-fallback model below.') }}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <div>
+                            <AppSelect v-model="form.generation_mode" :options="generationModeOptions" :label="t('Generation Source')" />
+                            <p class="text-xs text-gray-400 mt-1">{{ t('Run on an integration, the LLM, or the integration with LLM fallback.') }}</p>
+                        </div>
+                        <div v-if="form.generation_mode !== 'llm'">
+                            <AppSelect v-model="form.integration_slug" :options="integrationOptions" :label="t('Integration')" :placeholder="t('Select an integration')" />
+                            <p class="text-xs text-gray-400 mt-1">{{ t('When unavailable, falls back to the Model Override (or global default).') }}</p>
                         </div>
                     </div>
 
@@ -563,59 +551,19 @@ const submit = () => {
 
                     <div class="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.supports_brand_voice ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.supports_brand_voice = !form.supports_brand_voice"
-                            >
-                                <span :class="form.supports_brand_voice ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.supports_brand_voice" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Supports Brand Voice') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.max_variants > 1 ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.max_variants = form.max_variants > 1 ? 1 : 3"
-                            >
-                                <span :class="form.max_variants > 1 ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch
+                                :model-value="form.max_variants > 1"
+                                @update:model-value="form.max_variants = form.max_variants > 1 ? 1 : 3"
+                            />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Variations') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.show_regenerate ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.show_regenerate = !form.show_regenerate"
-                            >
-                                <span :class="form.show_regenerate ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Regenerate Button') }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.show_improve ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.show_improve = !form.show_improve"
-                            >
-                                <span :class="form.show_improve ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_improve" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Improve Button') }}</span>
-                        </div>
-                        <div class="flex items-center gap-3">
-                            <button
-                                type="button"
-                                :class="form.show_editor ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                @click="form.show_editor = !form.show_editor"
-                            >
-                                <span :class="form.show_editor ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Enable Edit in Editor Button') }}</span>
                         </div>
                     </div>
                 </div>
@@ -629,7 +577,7 @@ const submit = () => {
                                 <i class="ti ti-x text-base"></i>
                             </button>
                         </div>
-                        <div class="grid grid-cols-4 gap-3">
+                        <div class="grid grid-cols-4 gap-4">
                             <div>
                                 <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Key') }}</label>
                                 <input v-model="field.name" @input="field.key = field.name" type="text" :placeholder="t('field_key')" class="w-full px-3 py-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-700 rounded-lg text-sm font-mono" />
@@ -644,14 +592,7 @@ const submit = () => {
                             </div>
                             <div>
                                 <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">{{ t('Required') }}</label>
-                                <button
-                                    type="button"
-                                    :class="field.required ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'"
-                                    class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors"
-                                    @click="field.required = !field.required"
-                                >
-                                    <span :class="field.required ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                                </button>
+                                <AppSwitch v-model="field.required" class="mt-1" />
                             </div>
                         </div>
 
@@ -847,39 +788,27 @@ const submit = () => {
 
                     <div v-show="activeContentSection === 'visibility'" class="flex flex-wrap items-center gap-x-8 gap-y-3 pt-2">
                         <div class="flex items-center gap-3">
-                            <button type="button" :class="form.show_about ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_about = !form.show_about">
-                                <span :class="form.show_about ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_about" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show About') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button type="button" :class="form.show_how_it_works ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_how_it_works = !form.show_how_it_works">
-                                <span :class="form.show_how_it_works ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_how_it_works" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show How It Works') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button type="button" :class="form.show_usage_examples ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_usage_examples = !form.show_usage_examples">
-                                <span :class="form.show_usage_examples ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_usage_examples" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Examples') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button type="button" :class="form.show_faqs ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_faqs = !form.show_faqs">
-                                <span :class="form.show_faqs ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_faqs" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show FAQs') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button type="button" :class="form.show_reviews ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_reviews = !form.show_reviews">
-                                <span :class="form.show_reviews ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_reviews" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Reviews') }}</span>
                         </div>
                         <div class="flex items-center gap-3">
-                            <button type="button" :class="form.show_related_tools ? 'bg-success-600' : 'bg-gray-200 dark:bg-surface-600'" class="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors" @click="form.show_related_tools = !form.show_related_tools">
-                                <span :class="form.show_related_tools ? 'translate-x-4' : 'translate-x-0'" class="pointer-events-none ml-0.5 mt-0.5 inline-block h-4 w-4 rounded-full bg-white shadow transition-transform" />
-                            </button>
+                            <AppSwitch v-model="form.show_related_tools" />
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Show Related') }}</span>
                         </div>
                     </div>

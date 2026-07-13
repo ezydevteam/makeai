@@ -47,6 +47,18 @@ return [
             'report' => false,
         ],
 
+        // Stable reference to the on-server public media root. The `public` disk
+        // above may be rebound to a cloud bucket at runtime (Settings → Storage);
+        // this one never is, so storage migration can always reach local files.
+        'local_public_media' => [
+            'driver' => 'local',
+            'root' => env('PUBLIC_DISK_ROOT', storage_path('app/public')),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

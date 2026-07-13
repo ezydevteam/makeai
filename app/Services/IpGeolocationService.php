@@ -26,20 +26,60 @@ class IpGeolocationService
         return filled($this->token);
     }
 
+    /**
+     * Resolve an IP address to its 2-letter country code (best-effort).
+     * Returns null when unconfigured, unreachable, or on any error.
+     */
+    public function lookupCountry(string $ip): ?string
+    {
+        return $this->lookupLocation($ip)['country'];
+    }
+
+    /**
+     * Resolve an IP to its country (2-letter) and city (best-effort). Returns
+     * ['country' => ?string, 'city' => ?string]; both null when unconfigured,
+     * unreachable, or on any error. Geolocation must never break the request.
+     *
+     * @return array{country: ?string, city: ?string}
+     */
+    public function lookupLocation(string $ip): array
+    {
+        $none = ['country' => null, 'city' => null];
+
+        if (! $this->isConfigured() || $ip === '') {
+            return $none;
+        }
+
+        try {
+            $response = Http::timeout(5)->get("https://ipinfo.io/{$ip}", ['token' => $this->token]);
+
+            if ($response->successful()) {
+                $country = (string) $response->json('country');
+                $city = trim((string) $response->json('city'));
+
+                return [
+                    'country' => strlen($country) === 2 ? strtoupper($country) : null,
+                    'city' => $city !== '' ? $city : null,
+                ];
+            }
+        } catch (Throwable) {
+            // Best-effort — geolocation must never break the request.
+        }
+
+        return $none;
+    }
+
     public function testConnection(): array
     {
         if (! $this->isConfigured()) {
             return ['success' => false, 'error' => 'No token configured.'];
         }
 
-        try {
-            $url = $this->token ? "https://ipinfo.io?token={$this->token}" : 'https://ipinfo.io/json';
+        // Verify reachability + a real lookup against a known public IP.
+        $country = $this->lookupCountry('8.8.8.8');
 
-            $response = Http::timeout(15)->get($url);
-
-            return ['success' => $response->successful(), 'message' => 'IPInfo API reachable.'];
-        } catch (Throwable $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
+        return $country
+            ? ['success' => true, 'message' => "IPInfo API reachable (8.8.8.8 → {$country})."]
+            : ['success' => false, 'error' => 'IPInfo did not return a country — check the token.'];
     }
 }

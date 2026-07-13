@@ -245,7 +245,9 @@ class RagToolService
             return;
         }
 
-        if (! $user->deductCredits($credits, "RAG ingestion: {$tool->slug}", [
+        // Mode-correct charge: drains the wallet in metered mode, meters the daily
+        // allowance in quota mode (Regular license) where it never fails on balance.
+        if (! $user->chargeCredits($credits, "RAG ingestion: {$tool->slug}", [
             'source_type' => $sourceType,
             'tool_slug' => $tool->slug,
         ])) {
@@ -477,12 +479,12 @@ class RagToolService
                     ['tool_slug' => $session->tool_slug],
                 );
 
-                // Add chunk-based credits — through the ledger so the balance
-                // check, transaction record and usage counters all apply.
+                // Add chunk-based credits — mode-correct so quota mode (Regular
+                // license) meters the allowance instead of draining the wallet.
                 $chunksPerCredit = (int) settings('rag_chunks_per_credit', 50);
                 if ($chunksPerCredit > 0 && count($sources) > 0) {
                     $chunkCredits = (float) ceil(count($sources) / $chunksPerCredit);
-                    if ($user->deductCredits($chunkCredits, 'RAG context retrieval', [
+                    if ($user->chargeCredits($chunkCredits, 'RAG context retrieval', [
                         'tool_slug' => $session->tool_slug,
                         'chunks' => count($sources),
                     ])) {

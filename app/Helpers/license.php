@@ -47,6 +47,21 @@ if (! function_exists('isProAvailable')) {
     }
 }
 
+if (! function_exists('credit_quota_mode')) {
+    /**
+     * Credit accounting mode.
+     *
+     * When billing is unavailable (Regular license, or Extended with subscriptions
+     * off), credits are a RESETTING ALLOWANCE (guest per-IP daily + logged-in
+     * daily/monthly) rather than a purchasable wallet — TokenGuard meters against the
+     * quota and never blocks on an un-refillable balance. Returns true in quota mode.
+     */
+    function credit_quota_mode(): bool
+    {
+        return ! isProAvailable();
+    }
+}
+
 if (! function_exists('license_verified')) {
     /**
      * Quick check if license is verified (from cache).

@@ -2,13 +2,16 @@
 
 namespace App\Services\Pricing;
 
+use App\Support\CurrencyCatalog;
 use Illuminate\Http\Request;
 
 class PricingCountryDetector
 {
     public function detect(Request $request): string
     {
-        $defaultCountry = strtoupper((string) settings('default_pricing_country', 'US'));
+        // Real per-visitor signal (Cloudflare) localizes their prices. This header is
+        // present on every request behind the CDN, so no session caching is needed —
+        // and caching a *defaulted* value used to self-perpetuate a stale country.
         $remoteAddress = (string) $request->server('REMOTE_ADDR', '');
 
         if ($this->isTrustedProxy($remoteAddress)) {
@@ -19,13 +22,20 @@ class PricingCountryDetector
             }
         }
 
-        $sessionCountry = $request->session()->get('pricing_country');
+        // No real signal → the store's base-currency country, so an undetected visitor
+        // sees the BASE currency (never localized into another). An explicit
+        // default_pricing_country override still wins if configured.
+        return $this->defaultCountry();
+    }
 
-        if ($this->isValidCountry($sessionCountry)) {
-            return strtoupper($sessionCountry);
+    private function defaultCountry(): string
+    {
+        $configured = strtoupper((string) settings('default_pricing_country', ''));
+        if ($this->isValidCountry($configured)) {
+            return $configured;
         }
 
-        return $this->isValidCountry($defaultCountry) ? $defaultCountry : 'US';
+        return CurrencyCatalog::country(base_currency()) ?? 'US';
     }
 
     private function isTrustedProxy(string $remoteAddress): bool

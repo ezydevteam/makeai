@@ -2,7 +2,7 @@
 import { useTranslate } from '@/Composables/useTranslate'
 import { usePage, Link, router } from '@inertiajs/vue3'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import SocialFollow from '@/Components/SocialFollow.vue'
+import SocialFollow from '@themes/default/js/Components/SocialFollow.vue'
 
 const { t } = useTranslate()
 
@@ -38,43 +38,90 @@ const userAvatar = computed(() => {
   return '/storage/' + user.value.avatar
 })
 
+const kbLogo = computed(() => kbSettings.value.logo || null)
+
+// Header/footer navigation come from admin-selected site menus (globalMenus is shared
+// to every page). Respect each item's active flag and auth visibility.
+const globalMenus = computed<any[]>(() => (page.props as any).globalMenus || [])
+const isLoggedIn = computed(() => !!user.value)
+
+function menuVisible(item: any): boolean {
+  if (item.is_active === false) return false
+  const auth = item.requires_auth || 'none'
+  if (auth === 'auth') return isLoggedIn.value
+  if (auth === 'guest') return !isLoggedIn.value
+  return true
+}
+function resolveMenu(slug: string): any[] {
+  if (!slug) return []
+  const menu = globalMenus.value.find((m) => m.slug === slug)
+  return menu ? (menu.items || []).filter(menuVisible) : []
+}
+const headerMenuItems = computed(() => resolveMenu(kbSettings.value.header_menu || 'main'))
+const footerMenuItems = computed(() => resolveMenu(kbSettings.value.footer_menu || 'footer'))
+
+// User dropdown — mirror the main site header's account menu so the KB feels native.
+const isProAvailable = computed(() => !!(page.props as any).isProAvailable)
+const affiliateEnabled = computed(() => !!(page.props as any).affiliateEnabled)
+const hasPremium = computed(() => !!user.value?.is_pro)
+const isAdmin = computed(() => {
+  const u = user.value
+  return !!(u && (u.role === 'admin' || u.is_admin || u.is_superuser))
+})
+
+const userMenuLinks = computed(() => {
+  const links: Array<{ href: string; label: string; icon: string; tone?: string }> = [
+    { href: route('user.dashboard'), label: t('Dashboard'), icon: 'ti ti-layout-dashboard' },
+    { href: route('user.dashboard.profile'), label: t('My Profile'), icon: 'ti ti-user-circle' },
+    { href: route('user.dashboard.favorites.index'), label: t('My Favorites'), icon: 'ti ti-heart' },
+    { href: route('user.dashboard.history.index'), label: t('History'), icon: 'ti ti-history' },
+  ]
+  if (affiliateEnabled.value) links.push({ href: route('user.dashboard.affiliate'), label: t('Affiliate'), icon: 'ti ti-affiliate' })
+  if (isProAvailable.value && !hasPremium.value) links.push({ href: route('user.dashboard.billing'), label: t('Upgrade'), icon: 'ti ti-rocket', tone: 'success' })
+  if (isProAvailable.value && hasPremium.value) links.push({ href: route('user.dashboard.credit-topup'), label: t('Buy Credits'), icon: 'ti ti-coins', tone: 'success' })
+  return links
+})
+
 const closeProfile = () => { profileOpen.value = false }
 onMounted(() => document.addEventListener('click', closeProfile))
 onUnmounted(() => document.removeEventListener('click', closeProfile))
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-200 selection:bg-primary-500 selection:text-white">
+  <!-- `frontend-theme` is required: /css/theme-variables.css scopes every
+       --color-primary-* override to that class, so without it the KB ignores
+       the admin's theme color and falls back to the compiled default. -->
+  <div class="frontend-theme min-h-screen flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-800 dark:text-gray-200 selection:bg-primary-500 selection:text-white">
     <!-- Navigation Header -->
     <nav class="border-b border-gray-200 dark:border-surface-850 bg-white/70 dark:bg-surface-900/70 backdrop-blur-md sticky top-0 z-40 transition-all duration-300">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <!-- Logo & Menu Links -->
         <div class="flex items-center gap-6 lg:gap-8 min-w-0">
           <a :href="'/' + kbSettings.public_slug" class="flex items-center gap-2.5 group shrink-0">
-            <div v-if="siteFavicon" class="w-8 h-8 flex items-center justify-center shrink-0">
-              <img :src="siteFavicon" :alt="siteName" class="w-7 h-7 object-contain rounded-lg" />
-            </div>
-            <div v-else class="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-500 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-primary-500/10 group-hover:scale-105 transition-transform duration-200 shrink-0">
-              <i class="ti ti-lifebuoy text-lg"></i>
-            </div>
-            <span class="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-primary-700 to-indigo-600 dark:from-white dark:via-primary-400 dark:to-indigo-400 truncate max-w-[150px] sm:max-w-none">
-              {{ kbSettings.page_title || t('Help Center') }}
-            </span>
+            <img v-if="kbLogo" :src="kbLogo" :alt="kbSettings.page_title || siteName" class="h-8 w-auto max-w-[170px] object-contain" />
+            <template v-else>
+              <div v-if="siteFavicon" class="w-8 h-8 flex items-center justify-center shrink-0">
+                <img :src="siteFavicon" :alt="siteName" class="w-7 h-7 object-contain rounded-lg" />
+              </div>
+              <div v-else class="w-8 h-8 rounded-xl bg-gradient-to-tr from-primary-500 to-primary-700 flex items-center justify-center text-white shadow-md shadow-primary-500/10 group-hover:scale-105 transition-transform duration-200 shrink-0">
+                <i class="ti ti-lifebuoy text-lg"></i>
+              </div>
+              <span class="font-bold text-lg tracking-tight text-gray-900 dark:text-white truncate max-w-[150px] sm:max-w-none">
+                {{ kbSettings.page_title || t('Help Center') }}
+              </span>
+            </template>
           </a>
 
-          <!-- Menu Links (About, AI Tools, Pricing) -->
-          <div class="hidden md:flex items-center gap-5 shrink-0">
-            <a :href="'/' + kbSettings.public_slug" class="text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400 dark:hover:text-primary-400 transition-colors">
-              {{ t('Home') }}
-            </a>
-            <a href="/about" class="text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400 dark:hover:text-primary-400 transition-colors">
-              {{ t('About') }}
-            </a>
-            <a href="/ai-tools" class="text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400 dark:hover:text-primary-400 transition-colors">
-              {{ t('AI Tools') }}
-            </a>
-            <a href="/pricing" class="text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400 dark:hover:text-primary-400 transition-colors">
-              {{ t('Pricing') }}
+          <!-- Header menu (admin-selected site menu) -->
+          <div v-if="headerMenuItems.length" class="hidden md:flex items-center gap-5 shrink-0">
+            <a
+              v-for="item in headerMenuItems"
+              :key="item.id"
+              :href="item.final_url"
+              :target="item.target || '_self'"
+              class="text-sm font-semibold text-gray-500 hover:text-primary-500 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
+            >
+              {{ item.label }}
             </a>
           </div>
         </div>
@@ -95,7 +142,7 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
           <!-- User Section -->
           <div class="flex items-center gap-3">
             <!-- Guest Mode (Sign In) -->
-            <a v-if="!user" href="/login" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-primary-600 hover:bg-primary-750 text-white shadow-md shadow-primary-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
+            <a v-if="!user" href="/login" class="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold rounded-xl bg-primary-600 hover:bg-primary-700 text-white shadow-md shadow-primary-500/10 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200">
               <i class="ti ti-login-2"></i>
               <span>{{ t('Sign In') }}</span>
             </a>
@@ -107,7 +154,7 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                   <img v-if="userAvatar" :src="userAvatar" :alt="user.name" class="w-full h-full object-cover" />
                   <span v-else>{{ user.name.charAt(0).toUpperCase() }}</span>
                 </div>
-                <i class="ti ti-chevron-down text-[10px] text-gray-405 dark:text-gray-500 pr-1"></i>
+                <i class="ti ti-chevron-down text-[10px] text-gray-400 dark:text-gray-500 pr-1 transition-transform" :class="{ 'rotate-180': profileOpen }"></i>
               </button>
 
               <Transition
@@ -118,18 +165,24 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
                 leave-from-class="opacity-100 scale-100"
                 leave-to-class="opacity-0 scale-95"
               >
-                <div v-if="profileOpen" class="absolute right-0 mt-2 w-56 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl shadow-xl py-1.5 z-50">
+                <div v-if="profileOpen" class="absolute right-0 mt-2 w-60 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl shadow-xl py-1.5 z-50">
                   <div class="px-4 py-2.5 border-b border-gray-100 dark:border-surface-850">
                     <p class="text-xs font-bold text-gray-900 dark:text-white truncate">{{ user.name }}</p>
                     <p class="text-[10px] text-gray-400 dark:text-gray-500 truncate mt-0.5">{{ user.email }}</p>
                   </div>
 
-                  <a href="/dashboard" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-850 transition-colors">
-                    <i class="ti ti-layout-dashboard text-base"></i>
-                    <span>{{ t('Dashboard') }}</span>
+                  <a
+                    v-for="link in userMenuLinks"
+                    :key="link.href"
+                    :href="link.href"
+                    class="flex items-center gap-2 px-4 py-2 text-sm transition-colors hover:bg-gray-50 dark:hover:bg-surface-850"
+                    :class="link.tone === 'success' ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'text-gray-700 dark:text-gray-300'"
+                  >
+                    <i :class="link.icon" class="text-base"></i>
+                    <span>{{ link.label }}</span>
                   </a>
 
-                  <a v-if="user.role === 'admin' || user.is_admin || user.is_superuser" href="/admin" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-850 transition-colors">
+                  <a v-if="isAdmin" href="/admin" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-surface-850 transition-colors">
                     <i class="ti ti-settings text-base"></i>
                     <span>{{ t('Admin Panel') }}</span>
                   </a>
@@ -173,17 +226,19 @@ onUnmounted(() => document.removeEventListener('click', closeProfile))
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-200/60 dark:border-surface-850/60 py-5 text-xs text-gray-450 dark:text-gray-500 bg-white/40 dark:bg-surface-900/40 transition-colors">
+    <footer class="border-t border-gray-200/60 dark:border-surface-850/60 py-5 text-xs text-gray-400 dark:text-gray-500 bg-white/40 dark:bg-surface-900/40 transition-colors">
       <div class="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-6">
         <span>&copy; {{ new Date().getFullYear() }} {{ siteName }} {{ t('Help Center') }}. All rights reserved.</span>
 
         <div class="flex flex-col sm:flex-row items-center gap-6">
-          <div class="flex gap-4">
+          <div v-if="footerMenuItems.length" class="flex flex-wrap items-center justify-center gap-4">
+            <template v-for="(item, i) in footerMenuItems" :key="item.id">
+              <a :href="item.final_url" :target="item.target || '_self'" class="hover:text-primary-500 transition-colors">{{ item.label }}</a>
+              <span v-if="i < footerMenuItems.length - 1" class="text-gray-300 dark:text-gray-800">|</span>
+            </template>
+          </div>
+          <div v-else class="flex gap-4">
             <a href="/" class="hover:text-primary-500 transition-colors">{{ t('Back to Site') }}</a>
-            <span class="text-gray-300 dark:text-gray-800">|</span>
-            <a href="/contact" class="hover:text-primary-500 transition-colors">{{ t('Contact') }}</a>
-            <span class="text-gray-300 dark:text-gray-800">|</span>
-            <a :href="page.props.branding?.site_privacy_url || '/privacy'" class="hover:text-primary-500 transition-colors">{{ t('Privacy Policy') }}</a>
           </div>
 
           <SocialFollow displayMode="icons" />

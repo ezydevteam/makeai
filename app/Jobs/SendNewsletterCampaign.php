@@ -249,8 +249,9 @@ class SendNewsletterCampaign implements ShouldQueue
         $variables = [
             'site_name' => settings('app_name', config('app.name')),
             'site_url' => settings('app_url', config('app.url')),
-            'site_logo_url' => settings('site_logo_url', ''),
-            'support_email' => settings('support_email', settings('mail_from_address', '')),
+            'site_logo_url' => settings('site_logo_light', ''),
+            // ?: so a seeded-but-empty site_support_email falls back to from-address.
+            'support_email' => settings('site_support_email') ?: settings('mail_from_address', ''),
             'current_year' => now()->year,
             'year' => now()->year,
             'user_name' => $recipientData['name'] ?: $recipientData['email'],

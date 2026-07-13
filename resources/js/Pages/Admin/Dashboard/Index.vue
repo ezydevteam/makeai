@@ -4,19 +4,22 @@ import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick, type Ref } 
 import type { TooltipItem } from 'chart.js'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import ChartCard from '@/Components/UI/ChartCard.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminNotesModal from '@/Pages/Admin/Dashboard/AdminNotesModal.vue'
 import AdminNotesListModal from '@/Pages/Admin/Dashboard/AdminNotesListModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
+import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { usePage } from '@inertiajs/vue3'
 
 defineOptions({ layout: AdminLayout })
 
 const { t } = useTranslate()
 const toast = useToastr()
+const { formatCurrency, currencySymbol } = useNumberFormat()
 const page = usePage()
 
 interface AppProps {
@@ -32,21 +35,8 @@ const isDemo = computed(() => (page.props.app as AppProps | undefined)?.demo ?? 
 const blogEnabled = computed(() => Boolean(page.props.blogEnabled))
 const ticketsEnabled = computed(() => Boolean(page.props.ticketsEnabled))
 
-interface DashboardStats {
-    totalUsers: number; newUsersToday: number; newUsersThisMonth: number; newUsersLastMonth: number
-    activeUsers: number; bannedUsers: number
-    totalRevenue: number; revenueToday: number; revenueThisMonth: number; revenueLastMonth: number; mrr: number
-    totalAiRequests: number; aiRequestsToday: number; totalCreditsUsed: number; creditsUsedToday: number
-    creditsUsedThisMonth: number; totalCost: number; costToday: number; tokensUsedToday: number; totalOutputTokens: number; outputTokensToday: number
-    internalAiRequests: number; internalAiThisMonth: number; internalAiCost: number
-    activeSubscriptions: number; trialingSubscriptions: number; pastDueSubscriptions: number; activePlans: number
-    openTickets: number; pendingComments: number
-}
-
 interface TimeSeriesPoint { date: string; value: number }
 interface DualSeriesPoint { date: string; revenue: number; cost: number }
-interface HealthSeriesPoint { date: string; retained: number; churned: number }
-interface FailureSeriesPoint { date: string; total: number; failed: number }
 interface LabelValue { label: string; credits?: number; cost?: number; tokens?: number; logins?: number; count?: number; country?: string }
 interface DashboardMetricItem {
     label: string
@@ -74,7 +64,6 @@ interface PopularBlogPost {
 interface RecentProSubscription {
     id: number
     status: string
-    gateway: string | null
     billing_cycle: string | null
     created_at: string | null
     user: {
@@ -90,7 +79,6 @@ interface RecentProSubscription {
 type ChartPeriod = 'today' | '7d' | '30d' | '90d' | 'lifetime'
 
 const props = defineProps<{
-    dashboardStats: DashboardStats
     dashboardPeriod: ChartPeriod
     dashboardCharts: {
         signupsChart: Record<ChartPeriod, TimeSeriesPoint[]>
@@ -133,7 +121,6 @@ const props = defineProps<{
     addonStats: { total: number; active: number; recently_activated: number }
 }>()
 
-const s = computed(() => props.dashboardStats)
 const dashboardCharts = computed(() => props.dashboardCharts)
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 const affiliateEnabled = computed(() => Boolean(page.props.affiliateEnabled))
@@ -153,12 +140,14 @@ const showExportMenu = ref(false)
 const exporting = ref(false)
 const exportEl = ref<HTMLElement | null>(null)
 
-const exportTypes = [
+const exportTypes = computed(() => [
     { value: 'users', label: 'Users' },
     { value: 'ai-usage', label: 'AI Usage' },
-    { value: 'revenue', label: 'Revenue' },
-    { value: 'affiliates', label: 'Affiliate' },
-]
+    // Revenue export is Pro-only (mirrors ExportCenterController gate); hide it otherwise.
+    ...(isProAvailable.value ? [{ value: 'revenue', label: 'Revenue' }] : []),
+    // Affiliate export needs Extended license + affiliate_enabled (shared prop).
+    ...(affiliateEnabled.value ? [{ value: 'affiliates', label: 'Affiliate' }] : []),
+])
 
 function periodDateRange(): { dateFrom: string; dateTo: string } {
     const now = new Date()
@@ -199,6 +188,8 @@ async function doDashboardExport(type: string, format: string) {
             const json = await res.json()
             if (json.queued) {
                 toast.info(json.message ?? t('Export queued.'))
+            } else if (!res.ok) {
+                toast.error(json.message ?? t('Export failed'))
             }
         } else {
             const blob = await res.blob()
@@ -324,12 +315,19 @@ function formatPreviousMonthLabel(): string {
     return new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(date)
 }
 
-const periodLabels: Record<ChartPeriod, string> = { today: 'Today', '7d': 'This Week', '30d': formatCurrentMonthLabel(), '90d': 'This Quarter', lifetime: 'All Time' }
+const periodLabels: Record<ChartPeriod, string> = { today: 'Today', '7d': 'Last 7 days', '30d': formatCurrentMonthLabel(), '90d': 'Last 90 days', lifetime: 'All Time' }
 const comparisonWindowLabels: Record<Exclude<ChartPeriod, 'lifetime'>, string> = {
     today: 'vs yesterday',
     '7d': 'vs last week',
     '30d': 'vs last month',
     '90d': 'vs last 90 days',
+}
+const periodShortLabels: Record<ChartPeriod, string> = {
+    today: '1D',
+    '7d': '7D',
+    '30d': '1M',
+    '90d': '90D',
+    lifetime: 'All',
 }
 const periodOptions: ChartPeriod[] = ['today', '7d', '30d', '90d', 'lifetime']
 const periodSelectOptions = computed(() => periodOptions.map((period) => ({
@@ -375,7 +373,7 @@ function formatRangeNumber(value: number): string {
 }
 
 function formatRangeMoney(value: number): string {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(value)
+    return formatCurrency(value)
 }
 
 function formatComparisonPercent(current: number, previous: number): { label: string; type: 'up' | 'down' | 'neutral' } {
@@ -519,7 +517,7 @@ const cards = computed<StatSeriesCard[]>(() => {
             color: 'success',
             icon: 'dollar',
             metric: 'revenue',
-            visible: true,
+            visible: isProAvailable.value,
         },
     ]
 })
@@ -687,7 +685,7 @@ async function drawAllCharts() {
 
     await drawChart('signups', chartRefs.signups, () => ({
         type: 'bar', data: { labels: timeLabels(getPeriodSeries(dashboardCharts.value.signupsChart, period)), datasets: [{ data: getPeriodSeries(dashboardCharts.value.signupsChart, period).map(d => d.value), backgroundColor: 'rgba(31, 117, 254, 0.62)', borderColor: 'rgba(31, 117, 254, 0.92)', borderWidth: 1, borderRadius: 4, barPercentage: 0.6, categoryPercentage: 0.72, maxBarThickness: 18 }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor, drawBorder: false }, ticks: { callback: (value: string | number) => (typeof value === 'number' && value % 1 === 0 ? value : ''), stepSize: 1 } }, x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true } } },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor }, border: { display: false }, ticks: { callback: (value: string | number) => (typeof value === 'number' && value % 1 === 0 ? value : ''), stepSize: 1 } }, x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true } } },
     }))
 
     await drawChart('revenue', chartRefs.revenue, () => ({
@@ -700,16 +698,16 @@ async function drawAllCharts() {
                 legend: { display: false },
                 tooltip: {
                     callbacks: {
-                        label: (context: TooltipItem<'line'>) => ` $${Number(context.parsed.y || 0).toLocaleString()}`,
+                        label: (context: TooltipItem<'line'>) => ` ${currencySymbol.value}${Number(context.parsed.y || 0).toLocaleString()}`,
                     },
                 },
             },
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: chartGridColor, drawBorder: false },
+                    grid: { color: chartGridColor }, border: { display: false },
                     ticks: {
-                        callback: (value: string | number) => `$${Number(value).toLocaleString()}`,
+                        callback: (value: string | number) => `${currencySymbol.value}${Number(value).toLocaleString()}`,
                     },
                 },
                 x: { border: { display: false }, grid: { display: false }, ...xAxis },
@@ -754,7 +752,7 @@ async function drawAllCharts() {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: chartGridColor, drawBorder: false },
+                        grid: { color: chartGridColor }, border: { display: false },
                         ticks: { callback: (value: string | number) => Number(value).toLocaleString() },
                     },
                     x: { border: { display: false }, grid: { display: false }, ...xAxis },
@@ -780,7 +778,7 @@ async function drawAllCharts() {
                 labels: timeLabels(retainedSeries),
                 datasets: [
                     {
-                        label: t('Retention'),
+                        label: t('New'),
                         data: retainedBars,
                         backgroundColor: 'rgba(124, 58, 237, 0.78)',
                         borderColor: 'rgba(124, 58, 237, 0.98)',
@@ -833,7 +831,7 @@ async function drawAllCharts() {
                         min: -(scaleMax + gap),
                         max: scaleMax + gap,
                         beginAtZero: true,
-                        grid: { color: chartGridColor, drawBorder: false },
+                        grid: { color: chartGridColor }, border: { display: false },
                         ticks: { callback: (value: string | number) => Number(value).toLocaleString() },
                     },
                 },
@@ -909,7 +907,7 @@ async function drawAllCharts() {
                     x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true },
                     y: {
                         beginAtZero: true,
-                        grid: { color: chartGridColor, drawBorder: false },
+                        grid: { color: chartGridColor }, border: { display: false },
                         ticks: { callback: (value: string | number) => Number(value).toLocaleString() },
                     },
                 },
@@ -1023,13 +1021,13 @@ async function drawAllCharts() {
                     x: { border: { display: false }, grid: { display: false }, ...xAxis },
                     y: {
                         beginAtZero: true,
-                        grid: { color: chartGridColor, drawBorder: false },
+                        grid: { color: chartGridColor }, border: { display: false },
                         ticks: { callback: (value: string | number) => Number(value).toLocaleString() },
                     },
                     y1: {
                         beginAtZero: true,
                         position: 'right',
-                        grid: { drawOnChartArea: false, drawBorder: false },
+                        grid: { drawOnChartArea: false }, border: { display: false },
                         ticks: { callback: (value: string | number) => `${Number(value).toFixed(0)}%` },
                     },
                 },
@@ -1042,16 +1040,9 @@ async function drawAllCharts() {
             const signupsSeries = getPeriodSeries(dashboardCharts.value.signupsChart, period)
             const conversionsSeries = getPeriodSeries(dashboardCharts.value.subscriptionConversionsChart, period)
             const signupsValues = signupsSeries.map((d) => Number(d.value) || 0)
-            const conversionRates = conversionsSeries.map((point, index) => {
-                const conversions = Number(point.value) || 0
-                const signups = signupsValues[index] || 0
-
-                if (signups <= 0) {
-                    return 0
-                }
-
-                return (conversions / signups) * 100
-            })
+            const proValues = conversionsSeries.map((point) => Number(point.value) || 0)
+            // Free = signups that did not convert to a paid plan in the same bucket.
+            const freeValues = signupsValues.map((signups, index) => Math.max(0, signups - (proValues[index] || 0)))
 
             return {
                 type: 'bar',
@@ -1059,29 +1050,26 @@ async function drawAllCharts() {
                     labels: timeLabels(signupsSeries),
                     datasets: [
                         {
-                            label: t('Signups'),
-                            data: signupsValues,
-                            type: 'bar',
+                            label: t('Free'),
+                            data: freeValues,
                             backgroundColor: 'rgba(34, 197, 94, 0.68)',
                             borderColor: 'rgba(34, 197, 94, 0.95)',
                             borderWidth: 1,
                             borderRadius: 6,
-                            yAxisID: 'y',
+                            barPercentage: 0.72,
+                            categoryPercentage: 0.68,
+                            maxBarThickness: 18,
                         },
                         {
-                            type: 'line',
-                            label: t('Conversion Rate'),
-                            data: conversionRates,
-                            borderColor: 'rgba(249, 115, 22, 0.96)',
-                            backgroundColor: (context: { chart: { ctx: CanvasRenderingContext2D; chartArea?: { top: number; bottom: number } } }) => createVerticalAreaGradient(context, 'rgba(249, 115, 22, 0.42)', 'rgba(249, 115, 22, 0.14)', 'rgba(255, 255, 255, 0.02)', 'rgba(249, 115, 22, 0.28)'),
-                            fill: false,
-                            tension: 0.36,
-                            pointRadius: 0,
-                            pointHoverRadius: 0,
-                            pointBackgroundColor: 'rgba(249, 115, 22, 0.96)',
-                            pointBorderColor: 'rgba(249, 115, 22, 0.96)',
-                            borderWidth: 2.25,
-                            yAxisID: 'y1',
+                            label: t('Pro'),
+                            data: proValues,
+                            backgroundColor: 'rgba(99, 102, 241, 0.72)',
+                            borderColor: 'rgba(99, 102, 241, 0.96)',
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            barPercentage: 0.72,
+                            categoryPercentage: 0.68,
+                            maxBarThickness: 18,
                         },
                     ],
                 },
@@ -1107,28 +1095,17 @@ async function drawAllCharts() {
                         },
                         tooltip: {
                             callbacks: {
-                                label: (context: TooltipItem<'bar'> | TooltipItem<'line'>) => {
-                                    if (context.datasetIndex === 1) {
-                                        return ` ${context.dataset.label}: ${Number(context.parsed.y || 0).toFixed(1)}%`
-                                    }
-
-                                    return ` ${context.dataset.label}: ${Number(context.parsed.y || 0).toLocaleString()}`
-                                },
+                                label: (context: TooltipItem<'bar'>) => ` ${context.dataset.label}: ${Number(context.parsed.y || 0).toLocaleString()}`,
                             },
                         },
                     },
                     scales: {
-                        x: { border: { display: false }, grid: { display: false }, ...xAxis, offset: true },
+                        x: { stacked: true, border: { display: false }, grid: { display: false }, ...xAxis, offset: true },
                         y: {
+                            stacked: true,
                             beginAtZero: true,
-                            grid: { color: chartGridColor, drawBorder: false },
+                            grid: { color: chartGridColor }, border: { display: false },
                             ticks: { callback: (value: string | number) => Number(value).toLocaleString() },
-                        },
-                        y1: {
-                            beginAtZero: true,
-                            position: 'right',
-                            grid: { drawOnChartArea: false, drawBorder: false },
-                            ticks: { callback: (value: string | number) => `${Number(value).toFixed(0)}%` },
                         },
                     },
                 },
@@ -1187,7 +1164,7 @@ async function drawAllCharts() {
                                 const point = series[index]
                                 if (!point) return ''
                                 const value = context.datasetIndex === 0 ? (Number(point.revenue) || 0) : (Number(point.cost) || 0)
-                                return ` ${context.dataset.label}: $${value.toLocaleString()}`
+                                return ` ${context.dataset.label}: ${currencySymbol.value}${value.toLocaleString()}`
                             },
                         },
                     },
@@ -1200,9 +1177,9 @@ async function drawAllCharts() {
                     },
                     y: {
                         beginAtZero: true,
-                        grid: { color: chartGridColor, drawBorder: false },
+                        grid: { color: chartGridColor }, border: { display: false },
                         ticks: {
-                            callback: (value: string | number) => `$${Math.round(Number(value)).toLocaleString()}`,
+                            callback: (value: string | number) => `${currencySymbol.value}${Math.round(Number(value)).toLocaleString()}`,
                         },
                     },
                 },
@@ -1213,7 +1190,7 @@ async function drawAllCharts() {
     if (isProAvailable.value) {
         await drawChart('proSubs', chartRefs.proSubs, () => ({
             type: 'line', data: { labels: timeLabels(getPeriodSeries(dashboardCharts.value.proSubs, period)), datasets: [{ data: getPeriodSeries(dashboardCharts.value.proSubs, period).map(d => d.value), borderColor: '#8b5cf6', backgroundColor: (context: { chart: { ctx: CanvasRenderingContext2D; chartArea?: { top: number; bottom: number } } }) => createVerticalAreaGradient(context, 'rgba(139, 92, 246, 0.26)', 'rgba(139, 92, 246, 0.08)', 'rgba(255, 255, 255, 0.02)', 'rgba(139,92,246,0.1)'), fill: true, tension: 0.3 }] },
-            options: { responsive: true, maintainAspectRatio: false, elements: { point: { radius: 0, hoverRadius: 0 } }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor, drawBorder: false } }, x: { border: { display: false }, grid: { display: false }, ...xAxis } } },
+            options: { responsive: true, maintainAspectRatio: false, elements: { point: { radius: 0, hoverRadius: 0 } }, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: chartGridColor }, border: { display: false } }, x: { border: { display: false }, grid: { display: false }, ...xAxis } } },
         }))
     }
 
@@ -1238,6 +1215,11 @@ async function drawAllCharts() {
                     borderColor: providerColors,
                     borderWidth: 1,
                     borderRadius: 4,
+                    // Cap thickness so a handful of providers render as slim bars
+                    // instead of stretching to fill the whole chart height.
+                    maxBarThickness: 28,
+                    categoryPercentage: 0.7,
+                    barPercentage: 0.9,
                 }],
             },
             options: {
@@ -1248,7 +1230,7 @@ async function drawAllCharts() {
                     legend: { display: false },
                     tooltip: {
                         callbacks: {
-                            label: (context: TooltipItem<'bar'>) => ` ${context.label}: $${Number(context.parsed.x || 0).toLocaleString()}`,
+                            label: (context: TooltipItem<'bar'>) => ` ${context.label}: ${currencySymbol.value}${Number(context.parsed.x || 0).toLocaleString()}`,
                         },
                     },
                 },
@@ -1258,10 +1240,10 @@ async function drawAllCharts() {
                         border: { display: false },
                         grid: { display: false },
                         ticks: {
-                            callback: (value: string | number) => `$${Number(value).toLocaleString()}`,
+                            callback: (value: string | number) => `${currencySymbol.value}${Number(value).toLocaleString()}`,
                         },
                     },
-                    y: { grid: { color: chartGridColor, drawBorder: false } },
+                    y: { grid: { color: chartGridColor }, border: { display: false } },
                 },
             },
         }))
@@ -1269,14 +1251,21 @@ async function drawAllCharts() {
 }
 
 watch(chartPeriod, (period, previous) => {
-    drawAllCharts()
-    if (period !== previous) {
-        router.get(route('admin.dashboard'), { period }, {
-            preserveScroll: true,
-            preserveState: true,
-            replace: true,
-        })
+    if (period === previous) {
+        drawAllCharts()
+        return
     }
+    // Redraw only AFTER the partial reload settles. Drawing immediately races with
+    // Inertia's re-render of the canvas subtree (which leaves the chart showing the
+    // prior period), so we defer to onFinish — it fires on success, cancel, or error,
+    // and drawAllCharts reads chartPeriod.value live, so rapid switching self-corrects
+    // to whichever period ends up selected.
+    router.get(route('admin.dashboard'), { period }, {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+        onFinish: () => nextTick(() => drawAllCharts()),
+    })
 })
 onMounted(() => { drawAllCharts(); fetchReminders() })
 onBeforeUnmount(() => Object.keys(chartInstances).forEach(k => destroyChart(k)))
@@ -1318,6 +1307,7 @@ function subscriptionStatusClasses(status: string): string {
 function formatSubscriptionMeta(subscription: RecentProSubscription): string {
     const parts = [
         subscription.plan?.name ?? t('Unknown plan'),
+        subscription.billing_cycle ? t(subscription.billing_cycle) : null,
         subscription.created_at ? timeAgo(subscription.created_at) : t('Just now'),
     ].filter(Boolean)
 
@@ -1349,20 +1339,35 @@ const activityTypeLabels: Record<string, string> = {
                 <h1 class="flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
                     <span>{{ t('Welcome back!') }}{{ adminFirstName ? ` ${adminFirstName}` : '' }} 👏</span>
                 </h1>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Overview of your platform') }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Overview of your platform') }} · <span class="font-medium text-gray-600 dark:text-gray-300">{{ t('Showing') }}: {{ t(periodLabels[chartPeriod]) }}</span></p>
             </div>
-
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div class="min-w-40">
-                    <AppSelect v-model="chartPeriod" :options="periodSelectOptions" />
+                <div class="inline-flex rounded-xl border border-gray-200 bg-white p-1 dark:bg-surface-800 dark:border-surface-700 shrink-0">
+                    <Tooltip
+                        v-for="period in periodOptions"
+                        :key="period"
+                        :content="t(periodLabels[period])"
+                        placement="top"
+                    >
+                        <button
+                            type="button"
+                            class="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150"
+                            :class="chartPeriod === period
+                                ? 'bg-gray-100 text-gray-900 shadow-sm dark:bg-surface-700 dark:text-white'
+                                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:!text-white'"
+                            @click="chartPeriod = period"
+                        >
+                            {{ t(periodShortLabels[period]) }}
+                        </button>
+                    </Tooltip>
                 </div>
                 <div ref="exportEl" class="relative">
                     <button @click.stop="showExportMenu = !showExportMenu" :disabled="exporting"
-                        class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400 dark:hover:bg-surface-700">
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300">
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                         </svg>
-                        {{ exporting ? t('Exporting...') : t('Export XLSX') }}
+                        {{ exporting ? t('Exporting...') : t('Export') }}
                     </button>
                     <div v-if="showExportMenu"
                         class="absolute right-0 top-full z-50 mt-1 w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-surface-700 dark:bg-surface-900">
@@ -1436,8 +1441,7 @@ const activityTypeLabels: Record<string, string> = {
         <!-- Row 1: Quick Actions + Revenue -->
         <div class="grid grid-cols-1 lg:grid-cols-3 items-stretch gap-6">
             <div class="flex flex-col gap-6">
-                <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{{ t('Quick Actions') }}</h3>
+                <ChartCard :title="t('Quick Actions')">
                     <div class="space-y-2">
                         <Link v-if="can('ai.tools')" :href="route('admin.ai.tools.create')" class="w-full text-left px-4 py-3 rounded-xl bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 hover:border-primary-200 transition-all flex items-center gap-3">
                             <svg class="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 4.5v15m7.5-7.5h-15" /></svg>{{ t('Add AI Tool') }}</Link>
@@ -1446,10 +1450,9 @@ const activityTypeLabels: Record<string, string> = {
                         <Link v-if="can('support.tickets') && ticketsEnabled" :href="route('admin.support.tickets.index')" class="w-full text-left px-4 py-3 rounded-xl bg-white dark:bg-surface-800 border border-gray-200 dark:border-surface-700 text-sm text-gray-700 dark:text-gray-300 hover:bg-danger-50 dark:hover:bg-danger-900/20 hover:border-danger-200 transition-all flex items-center gap-3">
                             <svg class="w-4 h-4 text-danger-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>{{ t('Support Tickets') }}</Link>
                     </div>
-                </div>
-                <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('My Notes') }}</h3>
+                </ChartCard>
+                <ChartCard :title="t('My Notes')">
+                    <template #action>
                     <div class="flex items-center gap-1.5">
                         <Tooltip :content="t('Create note')" placement="top">
                             <button @click="editingNoteId = undefined; showNotesFormModal = true" class="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary-600 hover:bg-primary-50 hover:text-primary-500 dark:text-primary-400 dark:hover:bg-primary-900/20" :aria-label="t('Create note')">
@@ -1462,7 +1465,7 @@ const activityTypeLabels: Record<string, string> = {
                             </button>
                         </Tooltip>
                     </div>
-                </div>
+                    </template>
                 <div v-if="allNotes.length" class="space-y-2">
                     <div v-for="note in allNotes.slice(0, 2)" :key="note.id" class="rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-surface-800 dark:bg-surface-800/50 group">
                         <div class="flex items-start justify-between gap-2">
@@ -1488,109 +1491,112 @@ const activityTypeLabels: Record<string, string> = {
                         <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
                         <p class="text-xs">{{ t('No notes yet') }}</p>
                     </div>
-                </div>
+                </ChartCard>
             </div>
-            <div class="lg:col-span-2 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm flex h-full min-h-0 flex-col">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Revenue') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
-                <div v-if="!isEmptySeries(dashboardCharts.revenueChart[chartPeriod])" class="relative min-h-0 flex-1"><canvas ref="revenueCanvas" class="h-full w-full" /></div>
-                <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center text-gray-400 dark:text-gray-500">
-                    <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
-                    <p class="text-sm">{{ t('No revenue data for this period') }}</p>
-                </div>
-            </div>
+            <ChartCard :title="isProAvailable ? t('Revenue') : t('User Registrations')" class="lg:col-span-2 flex h-full min-h-0 flex-col">
+                <!-- Revenue is premium (Extended license + subscriptions). Non-pro installs
+                     get User Registrations as the hero chart so the panel is never empty. -->
+                <template v-if="isProAvailable">
+                    <div v-if="!isEmptySeries(dashboardCharts.revenueChart[chartPeriod])" class="relative min-h-0 flex-1"><canvas ref="revenueCanvas" class="h-full w-full" /></div>
+                    <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                        <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
+                        <p class="text-sm">{{ t('No revenue data for this period') }}</p>
+                    </div>
+                </template>
+                <template v-else>
+                    <div v-if="!isEmptySeries(dashboardCharts.signupsChart[chartPeriod])" class="relative min-h-0 flex-1"><canvas ref="signupsCanvas" class="h-full w-full" /></div>
+                    <div v-else class="flex min-h-0 flex-1 flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                        <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
+                        <p class="text-sm">{{ t('No signup data for this period') }}</p>
+                    </div>
+                </template>
+            </ChartCard>
         </div>
 
-        <!-- Row 2: User Registrations + Cost vs Revenue -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm flex flex-col">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 shrink-0">{{ t('User Registrations') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+        <!-- Section: Growth & Revenue -->
+        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Growth & Revenue') }}</h2>
+
+        <!-- Row 2: User Registrations + Cost vs Revenue — pro-only (non-pro shows signups as the hero above) -->
+        <div v-if="isProAvailable" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartCard :title="t('User Registrations')" class="flex flex-col">
                 <div v-if="!isEmptySeries(dashboardCharts.signupsChart[chartPeriod])" class="relative flex-1 min-h-48"><canvas ref="signupsCanvas" /></div>
-                <div v-else class="flex-1 min-h-48 flex flex-col justify-end">
-                    <div class="mb-3 grid h-full min-h-36 grid-cols-7 items-end gap-2 opacity-50">
-                        <div v-for="bar in 7" :key="bar" class="rounded-t-md bg-primary-200 dark:bg-primary-900/30">
-                            <div
-                                class="w-full rounded-t-md bg-primary-600/25 dark:bg-primary-400/20"
-                                :style="{ height: `${18 + (bar % 4) * 14}px` }"
-                            />
-                        </div>
-                    </div>
-                    <p class="text-center text-sm text-gray-400 dark:text-gray-500">{{ t('No signup data for this period') }}</p>
+                <div v-else class="flex-1 min-h-48 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                    <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
+                    <p class="text-sm">{{ t('No signup data for this period') }}</p>
                 </div>
-            </div>
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Cost vs Revenue') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Cost vs Revenue')">
                 <div v-if="!isEmptySeries(dashboardCharts.revenueVsCost[chartPeriod])" class="relative h-48"><canvas ref="revenueVsCostCanvas" /></div>
                 <div v-else class="h-48 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
                     <p class="text-sm">{{ t('No data for this period') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
 
         <!-- Row 3: Growth & Health -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Newsletter Subscribers') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            <ChartCard :title="t('Newsletter Subscribers')" :class="{ 'lg:col-span-2': !isProAvailable }">
                 <div v-if="!isEmptySeries(dashboardCharts.newsletterSubscribersChart[chartPeriod])" class="relative h-72"><canvas ref="newsletterSubscribersCanvas" /></div>
                 <div v-else class="h-72 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
                     <p class="text-sm">{{ t('No newsletter subscriber data for this period') }}</p>
                 </div>
-            </div>
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('User Retention') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
-                <div v-if="!isEmptySeries(dashboardCharts.subscriptionRetainedChart[chartPeriod]) || !isEmptySeries(dashboardCharts.subscriptionChurnedChart[chartPeriod])" class="relative h-56"><canvas ref="churnRetentionCanvas" /></div>
-                <div v-else class="h-56 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+            </ChartCard>
+            <ChartCard v-if="isProAvailable" :title="t('Subscription Health')" class="flex flex-col">
+                <div v-if="!isEmptySeries(dashboardCharts.subscriptionRetainedChart[chartPeriod]) || !isEmptySeries(dashboardCharts.subscriptionChurnedChart[chartPeriod])" class="relative flex-1 min-h-[14rem]"><canvas ref="churnRetentionCanvas" /></div>
+                <div v-else class="flex flex-1 min-h-[14rem] flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
                     <p class="text-sm">{{ t('No subscription health data for this period') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
+
+        <!-- Section: AI Usage & Cost -->
+        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('AI Usage & Cost') }}</h2>
 
         <!-- Row 4: AI Credits by Tool + Cost by Provider -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Credit Usage by Tool') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            <ChartCard :title="t('Credit Usage by Tool')" class="lg:col-span-5">
                 <div v-if="aiByTool.length" class="relative h-56"><canvas ref="aiByToolCanvas" /></div>
                 <div v-else class="h-72 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     <p class="text-sm">{{ t('No AI tool data yet') }}</p>
                 </div>
-            </div>
-            <div class="lg:col-span-7 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Cost by Provider') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Cost by Provider')" class="lg:col-span-7">
                 <div v-if="hasCostData" class="relative h-56"><canvas ref="costByProviderCanvas" /></div>
                 <div v-else class="h-56 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     <p class="text-sm">{{ t('No cost data yet') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
 
         <!-- Row 5: AI Usage + Failure Rate -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('AI Usage by Provider') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            <ChartCard :title="t('AI Usage by Provider')" class="lg:col-span-5">
                 <div v-if="providerUsageByCount.length" class="relative h-56"><canvas ref="providerUsageCanvas" /></div>
                 <div v-else class="h-56 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     <p class="text-sm">{{ t('No provider usage data yet') }}</p>
                 </div>
-            </div>
-            <div class="lg:col-span-7 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Failure Rate') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Failure Rate')" class="lg:col-span-7">
                 <div v-if="!isEmptySeries(dashboardCharts.aiRequestsTotalChart[chartPeriod])" class="relative h-56"><canvas ref="failureRateCanvas" /></div>
                 <div v-else class="h-56 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
                     <p class="text-sm">{{ t('No AI request data for this period') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
+
+        <!-- Section: Acquisition -->
+        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Acquisition') }}</h2>
 
         <!-- Row 6: Acquisition -->
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Traffic Sources') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            <ChartCard :title="t('Traffic Sources')">
                 <div v-if="trafficSources.length" class="space-y-2">
                     <div v-for="src in trafficSources.slice(0, 9)" :key="src.label" class="flex items-center justify-between text-sm">
                         <span class="text-gray-600 dark:text-gray-400">{{ src.label }}</span>
@@ -1601,9 +1607,8 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>
                     <p class="text-xs">{{ t('No data') }}</p>
                 </div>
-            </div>
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Top AI Tools') }} <span class="text-xs font-normal text-gray-400">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Top AI Tools')">
                 <div v-if="topToolsByUsage.length" class="space-y-2">
                     <div v-for="tool in topToolsByUsage.slice(0, 9)" :key="tool.tool_slug" class="flex items-center justify-between text-sm">
                         <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ tool.tool_name ?? tool.tool_slug }}</span>
@@ -1614,9 +1619,8 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     <p class="text-xs">{{ t('No data') }}</p>
                 </div>
-            </div>
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Top AI Models') }} <span class="text-xs font-normal text-gray-400">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Top AI Models')">
                 <div v-if="topModelsByUsage.length" class="space-y-2">
                     <div v-for="model in topModelsByUsage.slice(0, 9)" :key="model.model" class="flex items-center justify-between text-sm">
                         <span class="text-gray-600 dark:text-gray-400 truncate mr-2">{{ model.model_name ?? model.model }}</span>
@@ -1627,9 +1631,8 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                     <p class="text-xs">{{ t('No data') }}</p>
                 </div>
-            </div>
-            <div class="bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Recent Users') }} <span class="text-xs font-normal text-gray-400">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Recent Users')">
                 <div v-if="recentUsers.length" class="space-y-2">
                     <div v-for="user in recentUsers" :key="user.ulid" class="text-sm">
                         <p class="font-medium text-gray-900 dark:text-white truncate">{{ user.name }}</p>
@@ -1640,26 +1643,27 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="w-8 h-8 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
                     <p class="text-xs">{{ t('No users yet') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
+
+        <!-- Section: Engagement & Activity -->
+        <h2 class="pt-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('Engagement & Activity') }}</h2>
 
         <!-- Row 7: Referral + Conversion -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div v-if="affiliateEnabled" :class="blogEnabled ? 'lg:col-span-8' : 'lg:col-span-12'" class="flex h-full flex-col bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Affiliate Performance') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            <ChartCard v-if="affiliateEnabled" :class="blogEnabled ? 'lg:col-span-8' : 'lg:col-span-12'" :title="t('Affiliate Performance')" class="flex h-full flex-col">
                 <div v-if="!isEmptySeries(dashboardCharts.referralChart[chartPeriod])" class="relative min-h-[20rem] flex-1"><canvas ref="referralCanvas" /></div>
                 <div v-else class="flex min-h-[20rem] flex-1 flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
                     <p class="text-sm">{{ t('No referral data for this period') }}</p>
                 </div>
-            </div>
-            <div v-if="blogEnabled" :class="affiliateEnabled ? 'lg:col-span-4' : 'lg:col-span-12'" class="flex h-full flex-col bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Popular Blog Posts') }}</h3>
+            </ChartCard>
+            <ChartCard v-if="blogEnabled" :class="affiliateEnabled ? 'lg:col-span-4' : 'lg:col-span-12'" :title="t('Popular Blog Posts')" class="flex h-full flex-col">
+                <template #action>
                     <Link :href="route('admin.blog.posts.index')" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">
                         {{ t('View all') }}
                     </Link>
-                </div>
+                </template>
                 <div v-if="popularBlogPosts.length" class="space-y-2">
                     <Link
                         v-for="post in popularBlogPosts.slice(0, 5)"
@@ -1680,25 +1684,23 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="mb-2 h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M19.5 21a1.5 1.5 0 001.5-1.5V6.848a1.5 1.5 0 00-.44-1.06l-3.348-3.348A1.5 1.5 0 0016.152 2H6a3 3 0 00-3 3v14a2 2 0 002 2h14.5z" /><path d="M17 21v-8a2 2 0 00-2-2H9a2 2 0 00-2 2v8" /><path d="M9 7h6" /></svg>
                     <p class="text-sm">{{ t('No popular blog posts yet') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
 
         <div v-if="isProAvailable" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-8 flex h-full flex-col bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Free vs Pro Conversion') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            <ChartCard :title="t('Free vs Pro Conversion')" class="lg:col-span-8 flex h-full flex-col">
                 <div v-if="!isEmptySeries(dashboardCharts.signupsChart[chartPeriod]) || !isEmptySeries(dashboardCharts.subscriptionConversionsChart[chartPeriod])" class="relative min-h-[20rem] flex-1"><canvas ref="conversionCanvas" /></div>
                 <div v-else class="flex min-h-[20rem] flex-1 flex-col items-center justify-center text-gray-400 dark:text-gray-500">
                     <svg class="w-10 h-10 mb-2 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M3 3v18h18" /><path d="M3 12l5-5 4 4 5-7" /></svg>
                     <p class="text-sm">{{ t('No conversion data for this period') }}</p>
                 </div>
-            </div>
-            <div class="lg:col-span-4 flex h-full flex-col bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Recent Subscriptions') }}</h3>
+            </ChartCard>
+            <ChartCard :title="t('Recent Subscriptions')" class="lg:col-span-4 flex h-full flex-col">
+                <template #action>
                     <Link :href="route('admin.users.index')" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">
                         {{ t('View all') }}
                     </Link>
-                </div>
+                </template>
                 <div v-if="recentProSubscriptions.length" class="space-y-2">
                     <Link
                         v-for="subscription in recentProSubscriptions.slice(0, 5)"
@@ -1721,18 +1723,17 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="mb-2 h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M12 6v12m6-6H6" /><path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <p class="text-sm">{{ t('No recent pro subscriptions yet') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
 
         <!-- Activity Feed + Countries -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div class="lg:col-span-7 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <div class="mb-4 flex items-center justify-between gap-3">
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Recent Activity') }}</h3>
+            <ChartCard :title="t('Recent Activity')" class="lg:col-span-7">
+                <template #action>
                     <Link :href="route('admin.activity.user-logs.index')" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">
                         {{ t('View more') }}
                     </Link>
-                </div>
+                </template>
                 <div v-if="activity.length" class="space-y-1">
                     <div v-for="(item, i) in activity.slice(0, 5)" :key="i" class="flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gray-50 dark:hover:bg-surface-800 transition-colors">
                         <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :class="{
@@ -1758,9 +1759,8 @@ const activityTypeLabels: Record<string, string> = {
                     <p class="text-sm">{{ t('No activity yet') }}</p>
                     <p class="text-xs mt-1">{{ t('Activity will appear here as users interact with your platform') }}</p>
                 </div>
-            </div>
-            <div class="lg:col-span-5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-800 rounded-2xl p-5 shadow-sm">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{{ t('Usage by Countries') }} <span class="text-xs text-gray-400 font-normal">({{ periodLabels[chartPeriod] }})</span></h3>
+            </ChartCard>
+            <ChartCard :title="t('Usage by Countries')" class="lg:col-span-5">
                 <div v-if="geoUsage.length" class="space-y-2">
                     <div v-for="g in geoUsage.slice(0, 10)" :key="g.country" class="flex items-center justify-between text-sm">
                         <span class="text-gray-600 dark:text-gray-400">{{ g.country }}</span>
@@ -1771,7 +1771,7 @@ const activityTypeLabels: Record<string, string> = {
                     <svg class="w-10 h-10 mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
                     <p class="text-sm">{{ t('No geo data yet') }}</p>
                 </div>
-            </div>
+            </ChartCard>
         </div>
     </div>
 

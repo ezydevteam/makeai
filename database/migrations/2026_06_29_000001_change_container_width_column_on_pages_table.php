@@ -12,8 +12,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. Change the column type from enum to varchar(50)
-        DB::statement("ALTER TABLE pages MODIFY COLUMN container_width VARCHAR(50) NOT NULL DEFAULT '1280px'");
+        // 1. Change the column type from enum to varchar(50). MySQL only — SQLite
+        //    stores enums as free text, so there is no column type to widen.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE pages MODIFY COLUMN container_width VARCHAR(50) NOT NULL DEFAULT '1280px'");
+        }
 
         // 2. Migrate legacy values to new width keys
         DB::table('pages')->where('container_width', 'default')->update(['container_width' => '1280px']);
@@ -31,7 +34,9 @@ return new class extends Migration
         DB::table('pages')->where('container_width', '1080px')->update(['container_width' => 'narrow']);
         DB::table('pages')->where('container_width', '1536px')->update(['container_width' => 'wide']);
 
-        // Change the column back to enum
-        DB::statement("ALTER TABLE pages MODIFY COLUMN container_width ENUM('default', 'wide', 'full', 'narrow') NOT NULL DEFAULT 'default'");
+        // Change the column back to enum (MySQL only).
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE pages MODIFY COLUMN container_width ENUM('default', 'wide', 'full', 'narrow') NOT NULL DEFAULT 'default'");
+        }
     }
 };

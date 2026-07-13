@@ -24,11 +24,18 @@ class AddonServiceProvider extends ServiceProvider
                 return null;
             }
 
+            $logo = addon_setting('public-knowledge-base', 'logo');
+
             return [
                 'enabled'      => (bool) addon_setting('public-knowledge-base', 'enabled', true),
                 'public_slug'  => addon_setting('public-knowledge-base', 'public_slug', 'help'),
                 'page_title'   => addon_setting('public-knowledge-base', 'page_title', 'Help Center'),
                 'page_description' => addon_setting('public-knowledge-base', 'page_description', ''),
+                // Root-relative URL so it resolves against the current origin (avoids
+                // http/https mismatch from an absolute Storage::url()). See ai-chatbot.
+                'logo' => media_url($logo) ?: null,
+                'header_menu' => addon_setting('public-knowledge-base', 'header_menu', 'main'),
+                'footer_menu' => addon_setting('public-knowledge-base', 'footer_menu', 'footer'),
                 'show_vote_buttons' => (bool) addon_setting('public-knowledge-base', 'show_vote_buttons', true),
                 'allow_guest_search' => (bool) addon_setting('public-knowledge-base', 'allow_guest_search', true),
                 'widget_enabled' => (bool) addon_setting('public-knowledge-base', 'widget_enabled', false),

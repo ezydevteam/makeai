@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -352,7 +353,7 @@ onBeforeUnmount(() => {
 
     <AdminLayout>
         <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         {{ t('Roles & Permissions') }}
@@ -362,19 +363,19 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="shrink-0 flex gap-3">
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                         @click="router.visit(route('admin.admins.index'))"
                     >
                         <i class="ti ti-arrow-left text-base"></i>
-                        {{ t('Back to Admins') }}
+                        {{ t('Back') }}
                     </button>
 
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary"
+                        class="inline-flex items-center justify-center gap-2 btn-primary-admin"
                         @click="openModal()"
                     >
                         <i class="ti ti-plus text-base"></i>
@@ -386,7 +387,7 @@ onBeforeUnmount(() => {
             <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="w-full sm:max-w-xs md:max-w-sm lg:max-w-md">
+                        <div class="flex-1 min-w-[240px] md:max-w-sm">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -429,7 +430,7 @@ onBeforeUnmount(() => {
 
                 <div class="overflow-hidden rounded-b-2xl">
                     <div v-if="filteredRoles.length > 0" class="p-4 sm:p-6">
-                        <div class="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
                             <div
                                 v-for="role in filteredRoles"
                                 :key="role.id"
@@ -542,159 +543,126 @@ onBeforeUnmount(() => {
             @confirm="runConfirmedAction"
         />
 
-        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm" @click.self="closeModal()">
-            <div class="flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-surface-900">
-                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-700">
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                            {{ isEditing ? t('Edit Role') : t('Create Role') }}
-                        </h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ isEditing ? t('Update role details and permission coverage.') : t('Create a new role and assign its permission set.') }}
-                        </p>
-                    </div>
-
-                    <button
-                        type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                        :aria-label="t('Close modal')"
-                        @click="() => closeModal()"
-                    >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
+        <AppModal
+            :open="showModal"
+            max-width="max-w-6xl"
+            :title="isEditing ? t('Edit Role') : t('Create Role')"
+            :subtitle="isEditing ? t('Update role details and permission coverage.') : t('Create a new role and assign its permission set.')"
+            has-form
+            :confirm-text="isEditing ? t('Save Role') : t('Create Role')"
+            :confirm-loading="form.processing"
+            confirm-loading-text="Saving..."
+            @close="closeModal"
+            @submit="submit"
+        >
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Role Name') }}
+                    </label>
+                    <input
+                        v-model="form.name"
+                        type="text"
+                        :disabled="currentRole?.is_system"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        :placeholder="t('Enter role name')"
+                    />
+                    <p v-if="form.errors.name" class="mt-1 text-sm text-red-500">{{ form.errors.name }}</p>
                 </div>
 
-                <div class="overflow-y-auto p-6">
-                    <form class="space-y-6" @submit.prevent="submit">
-                        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-                            <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Role Name') }}
-                                </label>
-                                <input
-                                    v-model="form.name"
-                                    type="text"
-                                    :disabled="currentRole?.is_system"
-                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Enter role name')"
-                                />
-                                <p v-if="form.errors.name" class="mt-1 text-sm text-red-500">{{ form.errors.name }}</p>
-                            </div>
+                <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ t('Description') }}
+                    </label>
+                    <input
+                        v-model="form.description"
+                        type="text"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        :placeholder="t('Enter a short description')"
+                    />
+                    <p v-if="form.errors.description" class="mt-1 text-sm text-red-500">{{ form.errors.description }}</p>
+                </div>
+            </div>
 
-                            <div>
-                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    {{ t('Description') }}
-                                </label>
-                                <input
-                                    v-model="form.description"
-                                    type="text"
-                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Enter a short description')"
-                                />
-                                <p v-if="form.errors.description" class="mt-1 text-sm text-red-500">{{ form.errors.description }}</p>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/40 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Permission Actions') }}</h4>
-                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {{ t('Use quick actions to select all permissions or restore the seeded default set for built-in roles.') }}
-                                </p>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2">
-                                <button
-                                    type="button"
-                                    class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
-                                    @click="toggleAllPermissions"
-                                >
-                                    {{ areAllPermissionsSelected ? t('Deselect All') : t('Select All') }}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    v-if="currentRole?.has_default_permissions"
-                                    class="rounded-xl px-3 py-2 text-sm font-medium transition-colors"
-                                    :class="restoreDefaultApplied
-                                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30'
-                                        : 'border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300 dark:hover:bg-primary-900/30'"
-                                    @click="restoreDefaultPermissions"
-                                >
-                                    {{ restoreDefaultApplied ? t('Default Restored') : t('Restore Default') }}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div
-                            v-if="currentRole?.slug === 'super-admin'"
-                            class="rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-indigo-700 dark:border-indigo-900/30 dark:bg-indigo-900/20 dark:text-indigo-300"
-                        >
-                            <p class="text-sm font-medium">{{ t('Super Admin bypasses all permission checks automatically.') }}</p>
-                            <p class="mt-1 text-xs">{{ t('The permission grid remains visible for reference, but this role already has full access.') }}</p>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-                            <div
-                                v-for="group in permissionGroups"
-                                :key="group.key"
-                                class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900"
-                            >
-                                <div class="mb-3 flex items-center justify-between">
-                                    <h5 class="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">
-                                        {{ group.label }}
-                                    </h5>
-                                    <span class="text-xs text-gray-400 dark:text-gray-500">
-                                        {{ group.items.length }}
-                                    </span>
-                                </div>
-
-                                <div class="space-y-3">
-                                    <label
-                                        v-for="permission in group.items"
-                                        :key="permission.id"
-                                        class="flex cursor-pointer items-start gap-3"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
-                                            :checked="isPermissionSelected(permission.id)"
-                                            :disabled="currentRole?.slug === 'super-admin'"
-                                            @change="togglePermission(permission.id)"
-                                        />
-                                        <div class="min-w-0">
-                                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                                {{ permission.name }}
-                                            </p>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">
-                                                {{ permission.slug }}
-                                            </p>
-                                        </div>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
+            <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/40 md:flex-row md:items-center md:justify-between mt-6">
+                <div>
+                    <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Permission Actions') }}</h4>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ t('Use quick actions to select all permissions or restore the seeded default set for built-in roles.') }}
+                    </p>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900/40">
+                <div class="flex flex-wrap gap-2">
                     <button
                         type="button"
-                        class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                        @click="() => closeModal()"
+                        class="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                        @click="toggleAllPermissions"
                     >
-                        {{ t('Cancel') }}
+                        {{ areAllPermissionsSelected ? t('Deselect All') : t('Select All') }}
                     </button>
+
                     <button
                         type="button"
-                        class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-                        :disabled="form.processing"
-                        @click="submit"
+                        v-if="currentRole?.has_default_permissions"
+                        class="rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+                        :class="restoreDefaultApplied
+                            ? 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-300 dark:hover:bg-emerald-900/30'
+                            : 'border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/20 dark:text-primary-300 dark:hover:bg-primary-900/30'"
+                        @click="restoreDefaultPermissions"
                     >
-                        {{ form.processing ? t('Saving...') : t('Save Role') }}
+                        {{ restoreDefaultApplied ? t('Default Restored') : t('Restore Default') }}
                     </button>
                 </div>
             </div>
-        </div>
+
+            <div
+                v-if="currentRole?.slug === 'super-admin'"
+                class="rounded-xl border border-indigo-100 bg-indigo-50 p-4 text-indigo-700 dark:border-indigo-900/30 dark:bg-indigo-900/20 dark:text-indigo-300 mt-6"
+            >
+                <p class="text-sm font-medium">{{ t('Super Admin bypasses all permission checks automatically.') }}</p>
+                <p class="mt-1 text-xs">{{ t('The permission grid remains visible for reference, but this role already has full access.') }}</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 mt-6">
+                <div
+                    v-for="group in permissionGroups"
+                    :key="group.key"
+                    class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-surface-800 dark:bg-surface-900"
+                >
+                    <div class="mb-3 flex items-center justify-between">
+                        <h5 class="text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-200">
+                            {{ group.label }}
+                        </h5>
+                        <span class="text-xs text-gray-400 dark:text-gray-500">
+                            {{ group.items.length }}
+                        </span>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label
+                            v-for="permission in group.items"
+                            :key="permission.id"
+                            class="flex cursor-pointer items-start gap-3"
+                        >
+                            <input
+                                type="checkbox"
+                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+                                :checked="isPermissionSelected(permission.id)"
+                                :disabled="currentRole?.slug === 'super-admin'"
+                                @change="togglePermission(permission.id)"
+                            />
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                    {{ permission.name }}
+                                </p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    {{ permission.slug }}
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </AppModal>
     </AdminLayout>
 </template>

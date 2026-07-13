@@ -8,9 +8,11 @@ use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
 use App\Services\AffiliateService;
 use App\Services\CaptchaService;
+use App\Services\EmailValidationService;
 use App\Services\NotificationEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class RegisterController extends Controller
@@ -28,12 +30,24 @@ class RegisterController extends Controller
     {
         CaptchaService::fromSettings()->ensureValidToken($request->string('captcha_token')->toString(), $request->ip());
 
+        // Block disposable/undeliverable signups when the Email Validation extension
+        // is on, per the admin's "what to block" setting. shouldReject() fails open,
+        // so an outage or disabled extension never blocks a legitimate registration.
+        if (EmailValidationService::fromSettings()->shouldReject($request->email)) {
+            throw ValidationException::withMessages([
+                'email' => [translate('This email address could not be verified. Please use a different email.')],
+            ]);
+        }
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $request->password,
             'ip_address' => $request->ip(),
         ]);
+
+        // Apply the admin's "new user gets" choice (Pricing Settings).
+        $user->applyRegistrationDefault();
 
         $affiliate->attachReferralToUser($request, $user);
 

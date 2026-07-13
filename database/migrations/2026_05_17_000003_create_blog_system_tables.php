@@ -18,7 +18,6 @@ return new class extends Migration
             $table->string('color', 20)->nullable();
             $table->string('meta_title')->nullable();
             $table->text('meta_description')->nullable();
-            $table->string('og_image', 500)->nullable();
             $table->boolean('is_active')->default(true)->index();
             $table->integer('sort_order')->default(0)->index();
             $table->unsignedInteger('posts_count')->default(0);
@@ -63,7 +62,6 @@ return new class extends Migration
             $table->string('canonical_url', 500)->nullable();
             $table->enum('schema_type', ['Article', 'BlogPosting', 'NewsArticle'])->default('BlogPosting');
             $table->boolean('no_index')->default(false);
-            $table->enum('template', ['default', 'full_width', 'sidebar_left', 'sidebar_right', 'no_sidebar'])->default('default');
             $table->boolean('show_author')->default(true);
             $table->boolean('show_date')->default(true);
             $table->boolean('show_reading_time')->default(true);

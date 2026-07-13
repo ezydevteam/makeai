@@ -4,12 +4,12 @@ import { usePage, Link, router } from '@inertiajs/vue3'
 import { useTheme } from '@/Composables/useTheme'
 import { useFlashToasts } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import LiveSearch from '@/Components/LiveSearch.vue'
-import NotificationBell from '@/Components/NotificationBell.vue'
-import AdminSidebar from '@/Components/AdminSidebar.vue'
-import AiAssistantLoader from '@/Components/Addons/AiAssistantLoader.vue'
-import LanguageSwitcher from '@/Components/LanguageSwitcher.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import LiveSearch from '@/Components/Utility/LiveSearch.vue'
+import NotificationBell from '@themes/default/js/Components/NotificationBell.vue'
+import AdminSidebar from '@/Components/Admin/AdminSidebar.vue'
+import AiAssistantLoader from '../../../addons/ai-assistant/resources/js/Components/AiAssistantLoader.vue'
+import LanguageSwitcher from '@/Components/Utility/LanguageSwitcher.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 
 const { isDark, toggleDark } = useTheme()
@@ -107,6 +107,24 @@ const permissions = computed(() => (page.props.admin as any)?.permissions ?? [])
 const cronStatus = computed(() => page.props.cronStatus as { is_configured?: boolean; setup_url?: string; last_run_at?: string | null } | undefined)
 const showCronBanner = computed(() => Boolean(admin.value && cronStatus.value && cronStatus.value.is_configured === false))
 const shellInsetClass = 'px-8 sm:px-11 lg:px-11 xl:px-14 2xl:px-16'
+
+const coreUpdate = computed(() => (page.props.admin as any)?.coreUpdate as { available?: boolean; version?: string; changelog?: string | null; show_banner?: boolean; updates_url?: string } | undefined)
+const showUpdateBanner = computed(() => Boolean(coreUpdate.value?.show_banner))
+const updateBannerBusy = ref(false)
+function snoozeUpdate() {
+    updateBannerBusy.value = true
+    router.post(route('admin.system.update-banner.snooze'), {}, {
+        preserveScroll: true,
+        onFinish: () => { updateBannerBusy.value = false },
+    })
+}
+function dismissUpdate() {
+    updateBannerBusy.value = true
+    router.post(route('admin.system.update-banner.dismiss'), {}, {
+        preserveScroll: true,
+        onFinish: () => { updateBannerBusy.value = false },
+    })
+}
 const contentInsetClass = 'p-4 sm:p-5 lg:p-5 xl:p-6 2xl:p-6'
 const hasHeaderTitle = computed(() => Boolean(slots.header || slots.title))
 const headerIconButtonClass = 'admin-header-icon-button inline-flex h-10 w-10 items-center justify-center rounded-full bg-transparent shadow-none transition-all duration-300 ease-out focus:!outline-none focus:outline-none focus:ring-0 focus-visible:!outline-none focus-visible:outline-none focus-visible:ring-0'
@@ -261,6 +279,26 @@ onUnmounted(() => {
                 </div>
             </div>
 
+            <div v-if="showUpdateBanner" :class="shellInsetClass" class="border-b border-blue-200 bg-blue-50 py-3 text-blue-900 dark:border-blue-900/40 dark:bg-blue-900/20 dark:text-blue-100">
+                <div class="flex flex-col gap-3 text-sm lg:flex-row lg:items-center lg:justify-between">
+                    <div class="flex items-center gap-2 font-medium">
+                        <i class="ti ti-rocket text-base"></i>
+                        <span>{{ t('A new version (v:version) is available.', { version: coreUpdate?.version ?? '' }) }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Link :href="coreUpdate?.updates_url || route('admin.system.updates')" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500">
+                            {{ t('View Update') }}
+                        </Link>
+                        <button type="button" :disabled="updateBannerBusy" @click="snoozeUpdate" class="inline-flex items-center justify-center rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-60 dark:border-blue-700 dark:text-blue-200 dark:hover:bg-blue-900/40">
+                            {{ t('Remind me later') }}
+                        </button>
+                        <button type="button" :disabled="updateBannerBusy" @click="dismissUpdate" class="inline-flex items-center justify-center rounded-lg px-2 py-1.5 text-xs font-medium text-blue-700/70 hover:text-blue-900 disabled:opacity-60 dark:text-blue-200/70 dark:hover:text-white" :title="t('Don\'t show again for this version')">
+                            {{ t('Dismiss') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Header -->
             <header :class="shellInsetClass" class="admin-shell-header sticky top-0 z-30 flex h-[60px] items-center justify-between border-b backdrop-blur-sm shrink-0 transition-colors duration-300">
                 <div class="flex min-w-0 items-center gap-3">
@@ -282,6 +320,13 @@ onUnmounted(() => {
 
                 <!-- Profile -->
                 <div class="flex items-center gap-1.5 lg:gap-3">
+                    <!-- Teleport target for the AI Assistant header button (Widget Position =
+                         "header-button"). Empty unless that addon is active and configured
+                         for it; the addon renders into it rather than us importing it here.
+                         The teleported button inherits this colour, so it matches the other
+                         header icons. -->
+                    <div id="ai-assistant-header-slot" class="flex items-center text-gray-600 dark:text-gray-300"></div>
+
                     <div class="relative" @click.stop>
                         <Tooltip :content="adminActionsLabel" placement="bottom">
                             <button

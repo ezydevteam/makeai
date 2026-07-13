@@ -1,15 +1,18 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref } from 'vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue';
-import AppSelect from '@/Components/AppSelect.vue';
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue';
+import AppModal from '@/Components/UI/AppModal.vue';
+import AppSelect from '@/Components/UI/AppSelect.vue';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { useDateFormat } from '@/Composables/useDateFormat';
 import { useTranslate } from '@/Composables/useTranslate';
+import { useNumberFormat } from '@/Composables/useNumberFormat';
 import { useAdminCan } from '@/Composables/useAdminCan';
 
 defineOptions({ layout: AdminLayout });
 const { formatDateTime } = useDateFormat();
+const { formatCurrency } = useNumberFormat();
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 const { t } = useTranslate();
 const { canAny } = useAdminCan();
@@ -92,6 +95,25 @@ const handleStatusToggle = () => {
     statusModalOpen.value = true;
 };
 
+const isTogglingBan = ref(false);
+const banModalOpen = ref(false);
+const banForm = useForm({ ban_reason: '' });
+
+const handleBanToggle = () => {
+    banForm.clearErrors();
+    banForm.ban_reason = '';
+    banModalOpen.value = true;
+};
+
+const toggleUserBan = () => {
+    banForm.post(route('admin.users.toggle-ban', props.user.ulid), {
+        preserveScroll: true,
+        onBefore: () => { isTogglingBan.value = true; },
+        onSuccess: () => { banModalOpen.value = false; },
+        onFinish: () => { isTogglingBan.value = false; },
+    });
+};
+
 const planOptions = computed(() => [
     { value: '', label: t('No Plan') },
     ...props.plans.map((plan) => ({
@@ -165,7 +187,7 @@ const disableTwoFactor = () => {
 
             <Link
                 :href="route('admin.users.index')"
-                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
                 <i class="ti ti-arrow-left text-base"></i>
                 {{ t('Back') }}
@@ -233,7 +255,7 @@ const disableTwoFactor = () => {
                     </div>
                     <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 dark:bg-surface-800/40 dark:border-gray-800">
                         <Link :href="route('admin.users.index')" class="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">{{ t('Cancel') }}</Link>
-                        <button v-if="canAny(['users.edit', 'users.manage'])" type="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary rounded-xl text-sm font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
+                        <button v-if="canAny(['users.edit', 'users.manage'])" type="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary-admin rounded-xl text-sm font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
                             {{ form.processing ? t('Saving...') : t('Update User') }}
                         </button>
                     </div>
@@ -270,6 +292,20 @@ const disableTwoFactor = () => {
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i :class="user.is_active ? 'ti ti-user-off text-base' : 'ti ti-user-check text-base'"></i>
                                 {{ isTogglingStatus ? $t('Processing...') : (user.is_active ? $t('Deactivate Account') : $t('Activate Account')) }}
+                            </span>
+                        </button>
+                        <button
+                            v-if="canAny(['users.edit', 'users.manage'])"
+                            type="button"
+                            :disabled="isTogglingBan"
+                            @click="handleBanToggle"
+                            :class="user.is_banned
+                                ? 'w-full py-3 bg-green-50 border border-green-200 text-green-700 font-bold text-sm rounded-xl hover:bg-green-100 dark:bg-green-950/20 dark:border-green-900/30 dark:text-green-400 dark:hover:bg-green-900/30 transition-colors disabled:opacity-50'
+                                : 'w-full py-3 bg-orange-50 border border-orange-200 text-orange-700 font-bold text-sm rounded-xl hover:bg-orange-100 dark:bg-orange-950/20 dark:border-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/30 transition-colors disabled:opacity-50'"
+                        >
+                            <span class="inline-flex items-center justify-center gap-2">
+                                <i :class="user.is_banned ? 'ti ti-lock-open text-base' : 'ti ti-ban text-base'"></i>
+                                {{ isTogglingBan ? $t('Processing...') : (user.is_banned ? $t('Unban User') : $t('Ban User')) }}
                             </span>
                         </button>
                         <button
@@ -331,7 +367,7 @@ const disableTwoFactor = () => {
             </div>
             <div>
                 <p class="text-[10px] font-bold text-gray-400 uppercase mb-1 dark:text-gray-500">Referral Earned</p>
-                <p class="text-xl font-bold text-gray-900 dark:text-white">${{ parseFloat(user.referral_earnings).toFixed(2) }}</p>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ formatCurrency(parseFloat(user.referral_earnings)) }}</p>
             </div>
         </div>
 
@@ -362,7 +398,7 @@ const disableTwoFactor = () => {
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                             <tr v-for="item in usageHistory" :key="item.id" class="hover:bg-gray-50/60 dark:hover:bg-gray-800/40 transition-colors">
                                 <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ item.tool_slug || t('Direct') }}</td>
-                                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ item.model || '—' }}</td>
+                                <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ item.model || 'â€”' }}</td>
                                 <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ item.provider }}</td>
                                 <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ totalTokens(item).toLocaleString() }}</td>
                                 <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ formatCredits(item.credits_used) }}</td>
@@ -382,7 +418,7 @@ const disableTwoFactor = () => {
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.tool_slug || t('Direct') }}</p>
-                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ item.model || '—' }} · {{ item.provider }}</p>
+                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ item.model || 'â€”' }} Â· {{ item.provider }}</p>
                             </div>
                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize" :class="statusBadgeClass(item.status)">
                                 {{ item.status }}
@@ -433,81 +469,82 @@ const disableTwoFactor = () => {
             @confirm="toggleUserStatus"
         />
 
-        <Teleport to="body">
-            <Transition
-                enter-active-class="transition duration-200 ease-out"
-                enter-from-class="opacity-0"
-                enter-to-class="opacity-100"
-                leave-active-class="transition duration-150 ease-in"
-                leave-from-class="opacity-100"
-                leave-to-class="opacity-0"
-            >
-                <div
-                    v-if="notificationModalOpen"
-                    class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-                    @click.self="notificationModalOpen = false"
-                >
-                    <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-surface-900">
-                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Send Notification') }}</h3>
-                            <button
-                                type="button"
-                                class="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
-                                :aria-label="t('Close')"
-                                @click="notificationModalOpen = false"
-                            >
-                                <i class="ti ti-x text-base"></i>
-                            </button>
-                        </div>
+        <ActionConfirmModal
+            :open="banModalOpen"
+            :title="user.is_banned ? t('Unban User?') : t('Ban User?')"
+            :message="user.is_banned
+                ? t('Are you sure you want to unban :name? This restores their access across the application immediately.', { name: user.name })
+                : t('Are you sure you want to ban :name? This blocks their access across the entire application â€” login, AI usage, comments, reviews and support â€” immediately.', { name: user.name })"
+            :confirm-label="user.is_banned ? t('Unban') : t('Ban User')"
+            :processing-label="user.is_banned ? t('Unbanning...') : t('Banning...')"
+            :processing="isTogglingBan"
+            :variant="user.is_banned ? 'primary' : 'danger'"
+            @cancel="banModalOpen = false"
+            @confirm="toggleUserBan"
+        >
+            <div v-if="!user.is_banned" class="mt-4 text-left">
+                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('Ban reason') }} <span class="text-gray-400">({{ t('optional') }})</span>
+                </label>
+                <textarea
+                    v-model="banForm.ban_reason"
+                    rows="3"
+                    maxlength="500"
+                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                    :placeholder="t('Visible to admins only. e.g. Spam / abuse / chargeback.')"
+                ></textarea>
+                <p v-if="banForm.errors.ban_reason" class="mt-1 text-xs text-danger-600">{{ banForm.errors.ban_reason }}</p>
+            </div>
+            <p v-else-if="user.ban_reason" class="mt-4 text-left text-xs text-gray-500 dark:text-gray-400">
+                <span class="font-semibold">{{ t('Current reason') }}:</span> {{ user.ban_reason }}
+            </p>
+        </ActionConfirmModal>
 
-                        <div class="max-h-[70vh] overflow-y-auto p-6">
-                            <div class="space-y-4 text-left">
-                                <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</span>
-                                    <input v-model="notificationForm.title" type="text" maxlength="120" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('e.g. System maintenance update')">
-                                    <p v-if="notificationForm.errors.title" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.title }}</p>
-                                </label>
-                                <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Message') }}</span>
-                                    <textarea v-model="notificationForm.message" rows="4" maxlength="1000" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('Enter the details of the notification here...')"></textarea>
-                                    <p v-if="notificationForm.errors.message" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.message }}</p>
-                                </label>
-                                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                    <AppSelect v-model="notificationForm.level" :label="t('Type')" :options="[
-                                        { value: 'info', label: t('Info') },
-                                        { value: 'success', label: t('Success') },
-                                        { value: 'warning', label: t('Warning') },
-                                        { value: 'error', label: t('Error') },
-                                    ]" />
-                                    <AppSelect v-model="notificationForm.deliver_via" :label="t('Deliver via')" :options="[
-                                        { value: 'in_app', label: t('In-app only') },
-                                        { value: 'in_app_email', label: t('In-app + email') },
-                                        { value: 'email', label: t('Email only') },
-                                    ]" />
-                                </div>
-                                <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Schedule') }}</span>
-                                    <input v-model="notificationForm.scheduled_at" type="datetime-local" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white">
-                                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ t('Leave blank to send now.') }}</p>
-                                </label>
-                                <label class="block">
-                                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Action URL') }}</span>
-                                    <input v-model="notificationForm.action_url" type="text" maxlength="500" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('e.g. https://example.com/billing (Optional)')">
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-surface-800/40">
-                            <button type="button" class="px-4 py-2 text-sm font-semibold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors" :disabled="notificationForm.processing" @click="notificationModalOpen = false">
-                                {{ t('Cancel') }}
-                            </button>
-                            <button type="button" class="btn-primary rounded-xl px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" :disabled="notificationForm.processing" @click="sendNotification">
-                                {{ notificationForm.processing ? t('Sending...') : t('Send Notification') }}
-                            </button>
-                        </div>
-                    </div>
+        <AppModal
+            :open="notificationModalOpen"
+            max-width="max-w-2xl"
+            :title="t('Send Notification')"
+            has-form
+            :confirm-text="t('Send Notification')"
+            :confirm-loading="notificationForm.processing"
+            confirm-loading-text="Sending..."
+            @close="notificationModalOpen = false"
+            @submit="sendNotification"
+        >
+            <div class="space-y-4 text-left">
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Title') }}</span>
+                    <input v-model="notificationForm.title" type="text" maxlength="120" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('e.g. System maintenance update')">
+                    <p v-if="notificationForm.errors.title" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.title }}</p>
+                </label>
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Message') }}</span>
+                    <textarea v-model="notificationForm.message" rows="4" maxlength="1000" required class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('Enter the details of the notification here...')"></textarea>
+                    <p v-if="notificationForm.errors.message" class="mt-1 text-xs text-danger-600">{{ notificationForm.errors.message }}</p>
+                </label>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <AppSelect v-model="notificationForm.level" :label="t('Type')" :options="[
+                        { value: 'info', label: t('Info') },
+                        { value: 'success', label: t('Success') },
+                        { value: 'warning', label: t('Warning') },
+                        { value: 'error', label: t('Error') },
+                    ]" />
+                    <AppSelect v-model="notificationForm.deliver_via" :label="t('Deliver via')" :options="[
+                        { value: 'in_app', label: t('In-app only') },
+                        { value: 'in_app_email', label: t('In-app + email') },
+                        { value: 'email', label: t('Email only') },
+                    ]" />
                 </div>
-            </Transition>
-        </Teleport>
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Schedule') }}</span>
+                    <input v-model="notificationForm.scheduled_at" type="datetime-local" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">{{ t('Leave blank to send now.') }}</p>
+                </label>
+                <label class="block">
+                    <span class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Action URL') }}</span>
+                    <input v-model="notificationForm.action_url" type="text" maxlength="500" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" :placeholder="t('e.g. https://example.com/billing (Optional)')">
+                </label>
+            </div>
+        </AppModal>
     </div>
 </template>

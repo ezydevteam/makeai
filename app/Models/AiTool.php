@@ -29,12 +29,17 @@ class AiTool extends Model
         'output_type', 'model_override', 'max_tokens_override',
         'temperature', 'max_variants',
 
-        // Access control
-        'access_level', 'requires_pro',
+        // Generation source: llm | integration | integration_llm_fallback.
+        // integration_slug names the backing integration (config/external-tools.php).
+        'generation_mode', 'integration_slug',
+
+        // Access control — access_level is the single source of truth; the pro/plan
+        // requirement is derived from it via isProRequired(), not a stored flag.
+        'access_level',
         'is_active', 'is_featured', 'is_system', 'is_embeddable', 'supports_brand_voice', 'show_header', 'show_footer',
 
         // Stats
-        'sort_order', 'usage_count', 'views_count', 'avg_output_tokens', 'avg_latency_ms',
+        'sort_order', 'usage_count', 'views_count', 'avg_output_tokens',
         'avg_rating', 'review_count',
 
         // SEO
@@ -44,7 +49,7 @@ class AiTool extends Model
         'about_content', 'how_it_works', 'usage_examples', 'faq_items',
         'show_about', 'show_how_it_works', 'show_usage_examples',
         'show_faqs', 'show_reviews', 'show_related_tools',
-        'show_regenerate', 'show_improve', 'show_editor',
+        'show_improve',
     ];
 
     protected function casts(): array
@@ -63,7 +68,6 @@ class AiTool extends Model
             'is_embeddable' => 'boolean',
             'show_header' => 'boolean',
             'show_footer' => 'boolean',
-            'requires_pro' => 'boolean',
             'supports_brand_voice' => 'boolean',
             'show_about' => 'boolean',
             'show_how_it_works' => 'boolean',
@@ -71,12 +75,38 @@ class AiTool extends Model
             'show_faqs' => 'boolean',
             'show_reviews' => 'boolean',
             'show_related_tools' => 'boolean',
-            'show_regenerate' => 'boolean',
             'show_improve' => 'boolean',
-            'show_editor' => 'boolean',
             'views_count' => 'integer',
             'max_variants' => 'integer',
         ];
+    }
+
+    /**
+     * Whether this tool should try an external integration before (or instead of)
+     * the LLM.
+     */
+    public function usesIntegration(): bool
+    {
+        return in_array($this->generation_mode, ['integration', 'integration_llm_fallback'], true)
+            && filled($this->integration_slug);
+    }
+
+    /**
+     * Whether the tool may fall back to the LLM (pure LLM, or integration+fallback).
+     * `integration` mode is strict: no fallback.
+     */
+    public function allowsLlmFallback(): bool
+    {
+        return $this->generation_mode !== 'integration';
+    }
+
+    /**
+     * The model used for the LLM (fallback) path: the tool's own override when the
+     * admin picked one on the edit page, otherwise the global default.
+     */
+    public function fallbackModel(): string
+    {
+        return $this->model_override ?: settings('default_ai_model', 'gpt-4o-mini');
     }
 
     public function getFieldsAttribute($value)

@@ -17,7 +17,7 @@ class FeatureSettingsController extends Controller
             'features' => [
                 'favorites_enabled' => (bool) settings('favorites_enabled', true),
                 'subscriptions_enabled' => is_extended_license() && (bool) settings('subscriptions_enabled', false),
-                'affiliate_enabled' => (bool) settings('affiliate_enabled', false),
+                'affiliate_enabled' => is_extended_license() && (bool) settings('affiliate_enabled', false),
                 'tickets_enabled' => (bool) settings('tickets_enabled', true),
                 'contact_enabled' => (bool) settings('contact_enabled', true),
                 'blog_enabled' => (bool) settings('blog_enabled', true),
@@ -34,7 +34,6 @@ class FeatureSettingsController extends Controller
         $this->authorizeSettings();
 
         $features = [
-            'affiliate_enabled',
             'tickets_enabled',
             'contact_enabled',
             'blog_enabled',
@@ -48,10 +47,14 @@ class FeatureSettingsController extends Controller
             settings_set($feature, (bool) $request->validated($feature), 'boolean', 'features');
         }
 
-        // Premium subscriptions require an Extended License. Enforced server-side —
-        // hiding the toggle in the UI alone would not stop a direct POST.
+        // Premium subscriptions AND the affiliate program require an Extended
+        // License (both are monetization features). Enforced server-side — hiding
+        // the toggle in the UI alone would not stop a direct POST.
         $subscriptionsEnabled = is_extended_license() && (bool) $request->validated('subscriptions_enabled', false);
         settings_set('subscriptions_enabled', $subscriptionsEnabled, 'boolean', 'features');
+
+        $affiliateEnabled = is_extended_license() && (bool) $request->validated('affiliate_enabled', false);
+        settings_set('affiliate_enabled', $affiliateEnabled, 'boolean', 'features');
 
         return back()->with('success', translate('Feature settings updated.'));
     }

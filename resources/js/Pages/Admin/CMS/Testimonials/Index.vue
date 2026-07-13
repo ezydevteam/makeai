@@ -1,9 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useToastr } from '@/Composables/useToastr'
@@ -373,40 +375,38 @@ const generateTestimonials = async () => {
     <Head :title="t('Testimonials - Admin')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                <div class="space-y-2">
-                    <div>
-                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Testimonials') }}</h1>
-                        <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-                            {{ t('Manage customer proof for your homepage and marketing sections from one consistent admin workspace.') }}
-                        </p>
-                    </div>
-                </div>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Testimonials') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('Manage customer proof for your homepage and marketing sections from one consistent admin workspace.') }}
+                </p>
+            </div>
 
-                <div class="flex flex-wrap items-center gap-3">
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
-                        @click="showAiForm = true"
-                    >
-                        <i class="ti ti-sparkles text-base"></i>
-                        {{ t('AI Generate') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 btn-primary px-4 py-2 text-sm font-semibold"
-                        @click="openCreate"
-                    >
-                        <i class="ti ti-plus text-base"></i>
-                        {{ t('Add Testimonial') }}
-                    </button>
-                </div>
-        </section>
+            <div class="flex items-center gap-3 shrink-0">
+                <button
+                    type="button"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 dark:border-violet-900/20 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
+                    @click="showAiForm = true"
+                >
+                    <i class="ti ti-sparkles text-base"></i>
+                    {{ t('AI Generate') }}
+                </button>
+                <button
+                    type="button"
+                    class="btn-primary-admin grow inline-flex items-center justify-center gap-2"
+                    @click="openCreate"
+                >
+                    <i class="ti ti-plus text-base"></i>
+                    {{ t('Add Testimonial') }}
+                </button>
+            </div>
+        </div>
 
         <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
-            <div class="border-b border-gray-100 py-4 dark:border-gray-800 sm:px-6">
-                <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+            <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
+                <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+                    <div class="flex-1 w-full lg:max-w-xs lg:min-w-[280px] relative">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -416,7 +416,7 @@ const generateTestimonials = async () => {
                                 v-model="searchQuery"
                                 type="text"
                                 :placeholder="t('Search testimonials, company, role, or review')"
-                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                             >
                             <div class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                                 <span v-if="!searchQuery" class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white text-xs font-medium text-gray-400 shadow-sm dark:bg-surface-900 dark:text-gray-500">/</span>
@@ -433,15 +433,15 @@ const generateTestimonials = async () => {
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                    <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end shrink-0">
+                        <div class="w-[calc(50%-6px)] sm:w-44">
                             <AppSelect
                                 v-model="selectedStatus"
                                 :options="statusOptions"
                                 :placeholder="t('All Status')"
                             />
                         </div>
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                        <div class="w-[calc(50%-6px)] sm:w-44">
                             <AppSelect
                                 v-model="selectedSource"
                                 :options="filterSourceOptions"
@@ -466,10 +466,11 @@ const generateTestimonials = async () => {
                     </p>
                     <button
                         type="button"
-                        class="btn-primary mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                        class="btn-primary-admin mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
                         @click="hasActiveFilters ? clearFilters() : openCreate()"
                     >
-                        {{ hasActiveFilters ? t('Clear Filters') : t('Add First Testimonial') }}
+                        <i :class="hasActiveFilters ? 'ti ti-x' : 'ti ti-plus'"></i>
+                        <span>{{ hasActiveFilters ? t('Clear Filters') : t('Add First Testimonial') }}</span>
                     </button>
             </div>
 
@@ -513,7 +514,7 @@ const generateTestimonials = async () => {
                                         <div class="min-w-0">
                                             <div class="font-medium text-gray-900 dark:text-white">{{ testimonial.name }}</div>
                                             <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                {{ [testimonial.role, testimonial.company].filter(Boolean).join(' · ') || t('No role or company') }}
+                                                {{ [testimonial.role, testimonial.company].filter(Boolean).join(' Â· ') || t('No role or company') }}
                                             </div>
                                         </div>
                                     </div>
@@ -564,7 +565,7 @@ const generateTestimonials = async () => {
                                             <template #default="{ close }">
                                                 <button
                                                     type="button"
-                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                     @click="openEdit(testimonial); close()"
                                                 >
                                                     <i class="ti ti-edit text-base"></i>
@@ -604,227 +605,174 @@ const generateTestimonials = async () => {
                 </div>
             </div>
         </div>
-
-        <div v-if="showForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeForm">
-            <div class="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                                {{ editingId ? t('Edit Testimonial') : t('Create Testimonial') }}
-                            </h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                {{ t('Shape customer proof with clean content, trusted identity details, and clear publishing controls.') }}
-                            </p>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                            :aria-label="t('Close modal')"
-                            @click="closeForm"
-                        >
-                            <i class="ti ti-x text-base"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="flex-1 overflow-y-auto p-6">
-                    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
-                        <div class="space-y-6">
-                            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                                <div class="mb-5">
-                                    <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Customer Details') }}</h4>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Define who said it and how that identity should appear on the site.') }}</p>
-                                </div>
-
-                                <div class="grid gap-5 md:grid-cols-2">
-                                    <div>
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Name') }} *</label>
-                                        <input
-                                            v-model="form.name"
-                                            type="text"
-                                            :placeholder="t('e.g. Sarah Khan')"
-                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        >
-                                        <p v-if="form.errors.name" class="mt-2 text-xs text-red-500">{{ form.errors.name }}</p>
-                                    </div>
-
-                                    <div>
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Role') }}</label>
-                                        <input
-                                            v-model="form.role"
-                                            type="text"
-                                            :placeholder="t('CEO, Developer, Founder...')"
-                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company') }}</label>
-                                        <input
-                                            v-model="form.company"
-                                            type="text"
-                                            :placeholder="t('e.g. PixelForge Studio')"
-                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        >
-                                    </div>
-
-                                    <div>
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
-                                        <input
-                                            v-model.number="form.sort_order"
-                                            type="number"
-                                            min="0"
-                                            :placeholder="t('e.g. 1')"
-                                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                        >
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                                <div class="mb-5 flex items-start justify-between gap-4">
-                                    <div>
-                                        <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Review Content') }}</h4>
-                                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Keep the quote clear, believable, and easy to scan in cards or sliders.') }}</p>
-                                    </div>
-                                    <div class="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-500 dark:bg-surface-800 dark:text-gray-300">
-                                        {{ t(':count chars', { count: String(form.content.length) }) }}
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Review') }} *</label>
-                                    <textarea
-                                        v-model="form.content"
-                                        rows="8"
-                                        :placeholder="t('Write the testimonial in a natural, specific tone that feels believable and useful.')"
-                                        class="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    ></textarea>
-                                    <p v-if="form.errors.content" class="mt-2 text-xs text-red-500">{{ form.errors.content }}</p>
-                                </div>
-                            </section>
+        <AppModal
+            :open="showForm"
+            max-width="max-w-5xl"
+            :title="editingId ? t('Edit Testimonial') : t('Create Testimonial')"
+            :subtitle="t('Shape customer proof with clean content, trusted identity details, and clear publishing controls.')"
+            has-form
+            @close="closeForm"
+        >
+            <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
+                <div class="space-y-6">
+                    <section class="rounded-2xl border border-gray-200 bg-white px-5 py-3 dark:border-surface-700 dark:bg-surface-900">
+                        <div class="mb-5">
+                            <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Customer Details') }}</h4>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Define who said it and how that identity should appear on the site.') }}</p>
                         </div>
 
-                        <div class="space-y-6">
-                            <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                                <div class="border-b border-gray-200 px-5 py-4 dark:border-surface-700">
-                                    <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Preview') }}</h4>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Quick look at how the testimonial identity may feel in the UI.') }}</p>
-                                </div>
-                                <div class="space-y-5 p-5">
-                                    <div class="rounded-2xl border border-gray-200 bg-gray-50 p-5 dark:border-surface-700 dark:bg-surface-800">
-                                        <div class="mb-4 flex items-center gap-3">
-                                            <div class="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-lg font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                                                <img v-if="avatarPreview" :src="avatarPreview" class="h-full w-full object-cover">
-                                                <span v-else>{{ initials(form.name) }}</span>
-                                            </div>
-                                            <div class="min-w-0">
-                                                <div class="truncate font-semibold text-gray-900 dark:text-white">{{ form.name || t('Customer Name') }}</div>
-                                                <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                                    {{ [form.role, form.company].filter(Boolean).join(' · ') || t('Role and company') }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">
-                                            {{ form.content || t('Your testimonial preview will appear here as you type.') }}
-                                        </p>
-                                    </div>
+                        <div class="grid gap-5 md:grid-cols-2">
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Name') }} *</label>
+                                <input
+                                    v-model="form.name"
+                                    type="text"
+                                    :placeholder="t(' Sarah Khan')"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                >
+                                <p v-if="form.errors.name" class="mt-2 text-xs text-red-500">{{ form.errors.name }}</p>
+                            </div>
 
-                                    <label class="inline-flex cursor-pointer items-center rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Role') }}</label>
+                                <input
+                                    v-model="form.role"
+                                    type="text"
+                                    :placeholder="t('CEO, Developer, Founder...')"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company') }}</label>
+                                <input
+                                    v-model="form.company"
+                                    type="text"
+                                    :placeholder="t('e.g. PixelForge Studio')"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                >
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Sort Order') }}</label>
+                                <input
+                                    v-model.number="form.sort_order"
+                                    type="number"
+                                    min="0"
+                                    :placeholder="t('e.g. 1')"
+                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="mt-5 border-t border-gray-100 px-5 py-3 dark:border-surface-800">
+                            <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Photo') }}</label>
+                            <div class="flex items-center gap-4">
+                                <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-lg font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                    <img v-if="avatarPreview" :src="avatarPreview" class="h-full w-full object-cover">
+                                    <span v-else>{{ initials(form.name) }}</span>
+                                </div>
+                                <div class="flex flex-col gap-2">
+                                    <label class="cursor-pointer inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
                                         <input type="file" accept="image/*" class="hidden" @change="handleAvatarChange">
                                         <i class="ti ti-upload text-base"></i>
                                         {{ t('Upload Photo') }}
                                     </label>
                                     <p v-if="form.errors.avatar_file" class="text-xs text-red-500">{{ form.errors.avatar_file }}</p>
                                 </div>
-                            </section>
-
-                            <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-                                <div class="mb-5">
-                                    <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Publishing Settings') }}</h4>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control rating, source, and whether this testimonial should be visible or featured.') }}</p>
-                                </div>
-
-                                <div class="space-y-4">
-                                    <div>
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Rating') }}</label>
-                                        <AppSelect
-                                            v-model.number="form.rating"
-                                            :options="ratingOptions"
-                                            :placeholder="t('Select rating')"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Source') }}</label>
-                                        <AppSelect
-                                            v-model="form.source"
-                                            :options="sourceOptions"
-                                            :placeholder="t('Select source')"
-                                        />
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        class="flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10"
-                                        @click="form.is_active = !form.is_active"
-                                    >
-                                        <div>
-                                            <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Active') }}</div>
-                                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show this testimonial on public-facing sections that consume active items.') }}</div>
-                                        </div>
-                                        <span
-                                            class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors"
-                                            :class="form.is_active ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-surface-600'"
-                                        >
-                                            <span
-                                                class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-                                                :class="form.is_active ? 'translate-x-5' : 'translate-x-0.5'"
-                                            ></span>
-                                        </span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        class="flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-amber-200 hover:bg-amber-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-amber-900/40 dark:hover:bg-amber-900/10"
-                                        @click="form.is_featured = !form.is_featured"
-                                    >
-                                        <div>
-                                            <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Featured') }}</div>
-                                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Use this for priority placement in hero, spotlight, or premium testimonial sections.') }}</div>
-                                        </div>
-                                        <span
-                                            class="relative mt-0.5 inline-flex h-6 w-11 shrink-0 rounded-full transition-colors"
-                                            :class="form.is_featured ? 'bg-amber-500' : 'bg-gray-300 dark:bg-surface-600'"
-                                        >
-                                            <span
-                                                class="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
-                                                :class="form.is_featured ? 'translate-x-5' : 'translate-x-0.5'"
-                                            ></span>
-                                        </span>
-                                    </button>
-                                </div>
-                            </section>
+                            </div>
                         </div>
-                    </div>
+                    </section>
+
+                    <section class="rounded-2xl border border-gray-200 bg-white px-5 py-3 dark:border-surface-700 dark:bg-surface-900">
+                        <div class="mb-5">
+                            <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Review Content') }}</h4>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Keep the quote clear, believable, and easy to scan in cards or sliders.') }}</p>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Review') }} *</label>
+                            <textarea
+                                v-model="form.content"
+                                rows="6"
+                                :placeholder="t('Write the testimonial in a natural, specific tone that feels believable and useful.')"
+                                class="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm leading-6 text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            ></textarea>
+                            <p v-if="form.errors.content" class="mt-2 text-xs text-red-500">{{ form.errors.content }}</p>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
+                <div class="space-y-6">
+                    <section class="rounded-2xl border border-gray-200 bg-white px-5 py-3 dark:border-surface-700 dark:bg-surface-900">
+                        <div class="mb-5">
+                            <h4 class="font-heading text-lg font-semibold text-gray-900 dark:text-white">{{ t('Publishing Settings') }}</h4>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Control rating, source, and whether this testimonial should be visible or featured.') }}</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Rating') }}</label>
+                                <AppSelect
+                                    v-model.number="form.rating"
+                                    :options="ratingOptions"
+                                    :placeholder="t('Select rating')"
+                                />
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Source') }}</label>
+                                <AppSelect
+                                    v-model="form.source"
+                                    :options="sourceOptions"
+                                    :placeholder="t('Select source')"
+                                />
+                            </div>
+
+                            <button
+                                type="button"
+                                class="flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/10"
+                                @click="form.is_active = !form.is_active"
+                            >
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Active') }}</div>
+                                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Show this testimonial on public-facing sections that consume active items.') }}</div>
+                                </div>
+                                <AppSwitch :model-value="form.is_active" />
+                            </button>
+
+                            <button
+                                type="button"
+                                class="flex w-full items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-left transition hover:border-amber-200 hover:bg-amber-50/70 dark:border-surface-700 dark:bg-surface-800 dark:hover:border-amber-900/40 dark:hover:bg-amber-900/10"
+                                @click="form.is_featured = !form.is_featured"
+                            >
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Featured') }}</div>
+                                    <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Use this for priority placement in hero, spotlight, or premium testimonial sections.') }}</div>
+                                </div>
+                                <AppSwitch :model-value="form.is_featured" />
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-between gap-3 w-full">
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Required fields are marked with *') }}
                     </div>
                     <div class="flex items-center gap-3">
                         <button
                             type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
+                            class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
                             @click="closeForm"
                         >
                             {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
-                            class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="form.processing"
                             @click="submit"
                         >
@@ -833,86 +781,62 @@ const generateTestimonials = async () => {
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </AppModal>
 
-        <div v-if="showAiForm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="showAiForm = false">
-            <div class="w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="flex items-start justify-between gap-4 border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('AI Generate Testimonials') }}</h3>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Generate demo-friendly testimonials with a consistent admin flow.') }}</p>
-                    </div>
-                    <button
-                        type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                        :aria-label="t('Close modal')"
-                        @click="showAiForm = false"
+        <AppModal
+            :open="showAiForm"
+            max-width="max-w-xl"
+            :title="t('AI Generate Testimonials')"
+            :subtitle="t('Generate demo-friendly testimonials with a consistent admin flow.')"
+            has-form
+            :confirm-text="t('Generate')"
+            :confirm-loading="aiGenerating"
+            confirm-loading-text="Generating..."
+            @close="showAiForm = false"
+            @submit="generateTestimonials"
+        >
+            <div class="space-y-5">
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company Type') }}</label>
+                    <input
+                        v-model="aiForm.company_type"
+                        type="text"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                     >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
                 </div>
 
-                <div class="space-y-5 p-6">
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Company Type') }}</label>
-                        <input
-                            v-model="aiForm.company_type"
-                            type="text"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Tone') }}</label>
-                        <AppSelect
-                            v-model="aiForm.tone"
-                            :options="toneOptions"
-                            :placeholder="t('Select tone')"
-                        />
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Prompt') }}</label>
-                        <textarea
-                            v-model="aiForm.prompt"
-                            rows="4"
-                            :placeholder="t('Mention audience, positioning, product wins, or phrases to avoid...')"
-                            class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        ></textarea>
-                    </div>
-
-                    <div>
-                        <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Count') }}</label>
-                        <input
-                            v-model.number="aiForm.count"
-                            type="number"
-                            min="1"
-                            max="10"
-                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                        >
-                    </div>
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Tone') }}</label>
+                    <AppSelect
+                        v-model="aiForm.tone"
+                        :options="toneOptions"
+                        :placeholder="t('Select tone')"
+                    />
                 </div>
 
-                <div class="flex items-center justify-end gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
-                    <button
-                        type="button"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
-                        @click="showAiForm = false"
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Prompt') }}</label>
+                    <textarea
+                        v-model="aiForm.prompt"
+                        rows="4"
+                        :placeholder="t('Mention audience, positioning, product wins, or phrases to avoid...')"
+                        class="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                    ></textarea>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('Count') }}</label>
+                    <input
+                        v-model.number="aiForm.count"
+                        type="number"
+                        min="1"
+                        max="10"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                     >
-                        {{ t('Cancel') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn-primary inline-flex items-center rounded-lg px-5 py-2 text-sm font-semibold transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="aiGenerating"
-                        @click="generateTestimonials"
-                    >
-                        {{ aiGenerating ? t('Generating...') : t('Generate') }}
-                    </button>
                 </div>
             </div>
-        </div>
+        </AppModal>
 
         <ActionConfirmModal
             :open="deleteTargetId !== null"

@@ -3,7 +3,7 @@ import { Head, useForm, usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import DOMPurify from 'dompurify'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 

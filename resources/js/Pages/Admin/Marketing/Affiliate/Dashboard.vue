@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -78,23 +78,18 @@ const confirmApprove = () => {
 </script>
 
 <template>
-    <Head :title="t('Affiliate Dashboard')" />
+    <Head :title="t('Affiliate Overview')" />
 
     <AdminLayout>
                 <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Affiliate Dashboard') }}</h1>
+            <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div class="flex-1">
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Affiliate Overview') }}</h1>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Overview of commissions, payouts, and affiliate performance.') }}</p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <Link :href="route('admin.affiliate.settings.edit')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
-                        <i class="ti ti-settings text-base"></i>{{ t('Settings') }}
-                    </Link>
-                    <a :href="route('admin.reports.export-center') + '?type=affiliates'" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700">
-                        <i class="ti ti-download text-base"></i>{{ t('Export') }}
-                    </a>
-                </div>
+                <a :href="route('admin.reports.export-center') + '?type=affiliates'" class="shrink-0 inline-flex inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300">
+                    <i class="ti ti-download text-base"></i>{{ t('Export') }}
+                </a>
             </div>
 
             <!-- Stats Grid -->
@@ -128,9 +123,6 @@ const confirmApprove = () => {
                 <StatsCard
                     :title="t('Pending Payouts')"
                     :value="stats.pending_payouts.value"
-                    :comparison="stats.pending_payouts.comparison.label"
-                    :comparison-detail="t('vs last week')"
-                    :comparison-type="stats.pending_payouts.comparison.type"
                     color="warning"
                 >
                     <template #icon>
@@ -141,9 +133,6 @@ const confirmApprove = () => {
                 <StatsCard
                     :title="t('Pending Commissions')"
                     :value="stats.pending_commissions.value"
-                    :comparison="stats.pending_commissions.comparison.label"
-                    :comparison-detail="t('vs last week')"
-                    :comparison-type="stats.pending_commissions.comparison.type"
                     color="accent"
                 >
                     <template #icon>
@@ -167,10 +156,6 @@ const confirmApprove = () => {
                             <div class="flex items-center gap-3">
                                 <span class="text-sm font-semibold text-gray-900 dark:text-white">{{ formatCurrency(c.amount) }}</span>
                                 <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium" :class="commissionBadgeClass(c.status)">{{ t(c.status) }}</span>
-                                <button v-if="c.status === 'pending'" type="button" :disabled="processing[c.id]" class="btn-primary rounded-lg px-2 py-.25 text-xs font-medium text-white disabled:opacity-50" @click="requestApprove(c.id)">
-                                    <span v-if="processing[c.id]"><i class="ti ti-loader-2 animate-spin text-xs"></i></span>
-                                    <span v-else>{{ t('Approve') }}</span>
-                                </button>
                             </div>
                         </div>
                         <p v-if="recentCommissions.length === 0" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{{ t('No commissions yet.') }}</p>
@@ -229,7 +214,7 @@ const confirmApprove = () => {
                 </div>
             </section>
         </div>
-    
+
 
         <ActionConfirmModal :open="approveModal.open" :title="t('Approve commission?')" :message="t('Are you sure you want to approve this commission?')" :confirm-label="t('Approve')" :processing-label="t('Approving...')" :processing="approveModal.processing" variant="primary" @confirm="confirmApprove" @cancel="approveModal.open = false" />
     </AdminLayout>

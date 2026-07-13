@@ -20,7 +20,10 @@ class AffiliateService
 
     public function isEnabled(): bool
     {
-        return (bool) settings('affiliate_enabled', false);
+        // Affiliate is a monetization feature (commissions on paid purchases,
+        // gateway payouts), so it requires the Extended License like the rest of
+        // the paid system — on top of the admin toggle.
+        return is_extended_license() && (bool) settings('affiliate_enabled', false);
     }
 
     /**
@@ -170,31 +173,42 @@ class AffiliateService
             return null;
         }
 
-        $amount = $this->calculateCommissionAmount((float) $payment->amount, $program);
+        // Normalize the order amount to the store base currency before taking a
+        // percentage, so per-country (foreign-currency) payments don't produce
+        // commissions that are later summed/paid as if they were base currency.
+        $orderAmountBase = $this->orderAmountInBaseCurrency($payment);
+        $amount = $this->calculateCommissionAmount($orderAmountBase, $program);
 
         if ($amount <= 0) {
             return null;
         }
 
-        return DB::transaction(function () use ($payment, $user, $referrer, $program, $amount) {
-            $commission = AffiliateCommission::create([
-                'referrer_id' => $referrer->id,
-                'referred_id' => $user->id,
-                'order_id' => $payment->id,
-                'amount' => $amount,
-                'status' => $program->auto_approve_commissions ? 'approved' : 'pending',
-                'approved_at' => $program->auto_approve_commissions ? now() : null,
-            ]);
+        try {
+            return DB::transaction(function () use ($payment, $user, $referrer, $program, $amount) {
+                $commission = AffiliateCommission::create([
+                    'referrer_id' => $referrer->id,
+                    'referred_id' => $user->id,
+                    'order_id' => $payment->id,
+                    'amount' => $amount,
+                    'status' => $program->auto_approve_commissions ? 'approved' : 'pending',
+                    'approved_at' => $program->auto_approve_commissions ? now() : null,
+                ]);
 
-            $referrer->increment('referral_count');
+                // Recompute the cached totals from the ledger (the single source of
+                // truth) rather than incrementing — see syncReferralTotals.
+                $this->syncReferralTotals($referrer->id);
 
-            if ($program->auto_approve_commissions) {
-                $referrer->increment('referral_earnings', $amount);
-                app(NotificationEventService::class)->referralEarned($commission);
-            }
+                if ($program->auto_approve_commissions) {
+                    $this->notifySafely(fn () => app(NotificationEventService::class)->referralEarned($commission));
+                }
 
-            return $commission;
-        });
+                return $commission;
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            // A concurrent activation already created this order's commission — the
+            // unique(order_id) index is the source of truth, so treat this as a no-op.
+            return null;
+        }
     }
 
     public function awardReferralCreditsForPayment(Payment $payment): void
@@ -245,6 +259,11 @@ class AffiliateService
                 'referred_user_id' => $user->id,
             ]
         );
+
+        app(NotificationEventService::class)->referralCreditsEarned(
+            $referrer,
+            (float) $program->referral_credits_amount
+        );
     }
 
     public function approveCommission(AffiliateCommission $commission): void
@@ -264,8 +283,8 @@ class AffiliateService
                 'approved_at' => now(),
             ]);
 
-            User::whereKey($locked->referrer_id)->increment('referral_earnings', (float) $locked->amount);
-            app(NotificationEventService::class)->referralEarned($locked->fresh('referrer'));
+            $this->syncReferralTotals($locked->referrer_id);
+            $this->notifySafely(fn () => app(NotificationEventService::class)->referralEarned($locked->fresh('referrer')));
         });
     }
 
@@ -284,34 +303,25 @@ class AffiliateService
                 return;
             }
 
-            $wasApproved = in_array($locked->status, ['approved', 'paid'], true);
-
             $locked->update([
                 'status' => 'rejected',
                 'approved_at' => null,
             ]);
 
-            if ($wasApproved) {
-                $referrer = User::find($locked->referrer_id);
-                if ($referrer) {
-                    $earnings = max(0, (float) $referrer->referral_earnings - (float) $locked->amount);
-                    $count = max(0, (int) $referrer->referral_count - 1);
-                    $referrer->forceFill([
-                        'referral_earnings' => $earnings,
-                        'referral_count' => $count,
-                    ])->save();
-                }
-            }
+            // Recompute the cached totals from the ledger. This also self-heals the
+            // old drift where rejecting a PENDING commission left the count inflated.
+            $this->syncReferralTotals($locked->referrer_id);
 
-            app(NotificationEventService::class)->commissionRejected($locked->fresh('referrer'));
+            $this->notifySafely(fn () => app(NotificationEventService::class)->commissionRejected($locked->fresh('referrer')));
         });
     }
 
     /**
-     * Reverse a commission when the underlying payment is refunded/cancelled.
-     * Paid commissions cannot be simply reversed (the money already left); they
-     * are marked `cancelled` and earnings are clawed back so the referrer does
-     * not keep rewards from a reversed order.
+     * Reverse affiliate rewards when the underlying payment is refunded/cancelled.
+     * Pending/approved commissions are rejected and any credited earnings clawed
+     * back; already-PAID commissions are left untouched because the payout money
+     * already left the platform (an admin must handle those manually). Also
+     * reverses any first-purchase referral wallet credits granted for the order.
      */
     public function clawbackCommissionForPayment(Payment $payment): void
     {
@@ -323,6 +333,90 @@ class AffiliateService
         foreach ($commissions as $commission) {
             $this->rejectCommission($commission);
         }
+
+        $this->clawbackReferralCreditsForPayment($payment);
+    }
+
+    /**
+     * Reverse first-purchase referral credits granted for a payment that was later
+     * refunded — otherwise a referred user could buy, hand their referrer wallet
+     * credits, then refund and keep them. Claws back only what is still available
+     * (never drives the wallet negative), logs an audit transaction, and is
+     * idempotent per payment.
+     */
+    protected function clawbackReferralCreditsForPayment(Payment $payment): void
+    {
+        DB::transaction(function () use ($payment) {
+            $grant = CreditTransaction::query()
+                ->where('type', 'referral')
+                ->where('meta->payment_id', $payment->id)
+                ->where('meta->reward', 'first_purchase_referral_credit')
+                ->first();
+
+            if (! $grant) {
+                return;
+            }
+
+            // Idempotency: a prior clawback tags the audit row with this reward key.
+            $alreadyReversed = CreditTransaction::query()
+                ->where('meta->payment_id', $payment->id)
+                ->where('meta->reward', 'first_purchase_referral_credit_reversed')
+                ->exists();
+
+            if ($alreadyReversed) {
+                return;
+            }
+
+            $referrer = User::query()->whereKey($grant->user_id)->lockForUpdate()->first();
+
+            if (! $referrer) {
+                return;
+            }
+
+            // Claw back at most the current balance so the wallet never goes negative.
+            $reversible = min((float) $grant->amount, (float) $referrer->credits);
+
+            if ($reversible > 0) {
+                $referrer->decrement('credits', $reversible);
+            }
+
+            $referrer->creditTransactions()->create([
+                'amount' => -$reversible,
+                'balance_after' => (float) $referrer->fresh()->credits,
+                'type' => 'admin_adjust',
+                'description' => translate('Referral credits reversed (order refunded)'),
+                'meta' => [
+                    'reward' => 'first_purchase_referral_credit_reversed',
+                    'payment_id' => $payment->id,
+                    'granted_amount' => (float) $grant->amount,
+                    'reversed_amount' => $reversible,
+                ],
+            ]);
+        });
+    }
+
+    /**
+     * Recompute a referrer's cached referral_earnings + referral_count directly from
+     * the commission ledger — the single source of truth — instead of maintaining
+     * them with increment/decrement (which drifted, e.g. a rejected PENDING commission
+     * left the count inflated, and paid-out commissions could desync earnings).
+     *
+     * Both reflect commissions that actually earned: status approved or paid. This is
+     * the LIFETIME gross earned; the withdrawable figure is availableBalance(), which
+     * derives from the same ledger minus payouts, so the two can never disagree.
+     */
+    public function syncReferralTotals(int $referrerId): void
+    {
+        $totals = AffiliateCommission::query()
+            ->where('referrer_id', $referrerId)
+            ->whereIn('status', ['approved', 'paid'])
+            ->selectRaw('COALESCE(SUM(amount), 0) as earnings, COUNT(*) as cnt')
+            ->first();
+
+        User::whereKey($referrerId)->update([
+            'referral_earnings' => round((float) ($totals->earnings ?? 0), 4),
+            'referral_count' => (int) ($totals->cnt ?? 0),
+        ]);
     }
 
     /**
@@ -408,6 +502,23 @@ class AffiliateService
         return round(($paymentAmount * (float) $program->commission_value) / 100, 4);
     }
 
+    /**
+     * The payment's amount converted to the store base currency. Commissions,
+     * balances, and payouts are all denominated in the base currency, so an order
+     * charged in a foreign per-country currency must be converted first.
+     */
+    protected function orderAmountInBaseCurrency(Payment $payment): float
+    {
+        $amount = (float) $payment->amount;
+        $currency = $payment->currency ?: base_currency();
+
+        if ($currency === base_currency()) {
+            return $amount;
+        }
+
+        return round(convert_currency($amount, $currency, base_currency()), 4);
+    }
+
     protected function hasEarlierCompletedPayment(Payment $payment): bool
     {
         return Payment::query()
@@ -415,5 +526,20 @@ class AffiliateService
             ->where('status', 'completed')
             ->where('id', '!=', $payment->id)
             ->exists();
+    }
+
+    /**
+     * Run a notification/broadcast side-effect without ever letting it break the
+     * surrounding financial transaction. A queued broadcast to a down/misconfigured
+     * Pusher (common on QUEUE=sync self-hosted installs) must not roll back a
+     * commission approval or credit grant — the money is what matters, the ping isn't.
+     */
+    protected function notifySafely(callable $notify): void
+    {
+        try {
+            $notify();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Affiliate notification failed', ['error' => $e->getMessage()]);
+        }
     }
 }

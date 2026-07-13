@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -53,8 +53,8 @@ const runCronTask = (taskKey: string) => {
 <template>
     <Head :title="t('Cron Jobs')" />
 
-        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Cron Jobs') }}</h1>
@@ -65,18 +65,16 @@ const runCronTask = (taskKey: string) => {
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Cron jobs, environment info, and platform logs.') }}</p>
             </div>
 
-            <div class="flex flex-wrap gap-3">
-                <Link
-                    :href="route('admin.system.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                >
-                    <i class="ti ti-arrow-left text-base"></i>
-                    {{ t('Back') }}
-                </Link>
-            </div>
+            <Link
+                :href="route('admin.system.index')"
+                class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+                <i class="ti ti-arrow-left text-base"></i>
+                {{ t('Back') }}
+            </Link>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Cron Jobs') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Configure Laravel scheduler so renewals, reminders, counters, and automation run on time.') }}</p>
@@ -106,7 +104,7 @@ const runCronTask = (taskKey: string) => {
                         <h3 class="text-sm font-semibold">{{ t('Required Cron Entry') }}</h3>
                         <p class="mt-1 text-xs text-gray-400">{{ t('Add this command in hosting cron jobs and run it every minute.') }}</p>
                     </div>
-                    <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary transition-colors" @click="copyCronEntry">
+                    <button type="button" class="inline-flex items-center justify-center rounded-lg btn-primary-admin transition-colors" @click="copyCronEntry">
                         {{ cronCopied ? t('Copied') : t('Copy Command') }}
                     </button>
                 </div>
@@ -145,7 +143,8 @@ const runCronTask = (taskKey: string) => {
                         <div class="text-sm text-gray-700 dark:text-gray-300">{{ task.last_run_at || t('Not run manually') }}</div>
                     </div>
                     <div class="col-span-12 flex items-center justify-end md:col-span-4 lg:col-span-2">
-                        <button type="button" :disabled="cronRunForm.processing" class="inline-flex items-center justify-center rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 disabled:opacity-60 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-200" @click="runCronTask(task.key)">
+                        <button type="button" :disabled="cronRunForm.processing" class="inline-flex items-center justify-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 disabled:opacity-60 dark:border-primary-900/50 dark:bg-primary-900/20 dark:hover:border-primary-900/40 dark:hover:bg-primary-900/40 dark:text-primary-200" @click="runCronTask(task.key)">
+                            <i class="ti ti-refresh text-base"></i>
                             {{ cronRunForm.processing && cronRunForm.task === task.key ? t('Running...') : t('Run Now') }}
                         </button>
                     </div>

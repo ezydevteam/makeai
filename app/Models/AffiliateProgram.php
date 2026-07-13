@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Schema;
 class AffiliateProgram extends Model
 {
     protected $fillable = [
-        'is_active',
         'commission_type',
         'commission_value',
         'commission_on',
@@ -25,14 +24,12 @@ class AffiliateProgram extends Model
         'marketing_banners',
         'promotional_emails',
         'social_posts',
-        'terms',
         'terms_page_slug',
     ];
 
     protected function casts(): array
     {
         return [
-            'is_active' => 'boolean',
             'commission_value' => 'decimal:2',
             'cookie_days' => 'integer',
             'min_payout' => 'decimal:2',
@@ -64,7 +61,6 @@ class AffiliateProgram extends Model
     private static function defaults(): array
     {
         return [
-            'is_active' => false,
             'commission_type' => 'percentage',
             'commission_value' => 20,
             'commission_on' => 'first_purchase',
@@ -81,7 +77,6 @@ class AffiliateProgram extends Model
             'marketing_banners' => [],
             'promotional_emails' => [],
             'social_posts' => [],
-            'terms' => '',
             'terms_page_slug' => null,
         ];
     }

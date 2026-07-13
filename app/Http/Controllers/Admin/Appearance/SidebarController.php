@@ -25,9 +25,7 @@ class SidebarController extends Controller
                 ['id' => 'b2', 'type' => 'categories_list', 'config' => ['title' => translate('Categories'), 'show_count' => true]],
                 ['id' => 'b3', 'type' => 'recent_posts', 'config' => ['title' => translate('Recent Posts'), 'count' => 3]],
             ],
-            'position' => 'right',
             'sticky' => true,
-            'show_on_pages' => [],
         ];
 
         return Inertia::render('Admin/Appearance/SidebarBuilder', [

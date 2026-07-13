@@ -7,6 +7,7 @@ use App\Http\Requests\Admin\CronTaskRunRequest;
 use App\Http\Requests\Admin\MaintenanceSettingsRequest;
 use App\Services\BroadcastingService;
 use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -145,9 +146,12 @@ class SystemController extends Controller
             $this->deleteMaintenanceBackground();
             $settings['maintenance_background_image'] = null;
         } elseif ($request->hasFile('maintenance_background_image')) {
-            $this->deleteMaintenanceBackground();
-            $settings['maintenance_background_image'] = $request->file('maintenance_background_image')
-                ->store('maintenance', 'public');
+            // Store first; the old background is removed only after the new write succeeds.
+            $settings['maintenance_background_image'] = store_public_upload(
+                $request->file('maintenance_background_image'),
+                'maintenance',
+                settings('maintenance_background_image'),
+            );
         } else {
             unset($settings['maintenance_background_image']);
         }
@@ -489,43 +493,13 @@ class SystemController extends Controller
     {
         $this->authorizeSystem();
 
-        $itemId = config('license.item_id');
-        $apiToken = config('license.api_token');
-
-        if (blank($itemId) || blank($apiToken)) {
-            return back()->with('error', translate('Envato credentials not configured yet, please contact the author.'));
-        }
-
         try {
-            $response = Http::withToken($apiToken)
-                ->timeout(15)
-                ->get("https://api.envato.com/v3/market/catalog/item?id={$itemId}");
-
-            if (!$response->successful()) {
-                Log::warning('CheckUpdates: Envato API returned status '.$response->status());
-
-                return back()->with('error', translate('Could not reach Envato API. Status: :status', ['status' => $response->status()]));
-            }
-
-            $data = $response->json();
-            $latestVersion = $data['version'] ?? null;
-
-            if (blank($latestVersion)) {
-                return back()->with('error', translate('Could not determine latest version from Envato API response.'));
-            }
-
+            $manifest = app(\App\Services\UpdateService::class)->checkForUpdate();
             $currentVersion = settings('app_version', '1.0.0');
-            $updateAvailable = version_compare($latestVersion, $currentVersion, '>');
 
-            settings_set('update_version', $latestVersion, 'string', 'system');
-            settings_set('update_available', $updateAvailable, 'boolean', 'system');
-            settings_set('update_last_checked', now()->toDateTimeString(), 'string', 'system');
-
-            Cache::forget('update_available');
-
-            if ($updateAvailable) {
+            if (! empty($manifest['update_available'])) {
                 return back()->with('success', translate('Update available! Version :version (current: :current)', [
-                    'version' => $latestVersion,
+                    'version' => $manifest['latest_version'] ?? '?',
                     'current' => $currentVersion,
                 ]));
             }
@@ -533,15 +507,10 @@ class SystemController extends Controller
             return back()->with('success', translate('You are up to date. Version :current is the latest.', [
                 'current' => $currentVersion,
             ]));
-
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            Log::warning('CheckUpdates: Could not connect to Envato API.', ['error' => $e->getMessage()]);
-
-            return back()->with('error', translate('Could not connect to Envato API. Please try again later.'));
         } catch (\Throwable $e) {
-            Log::error('CheckUpdates: Unexpected error', ['error' => $e->getMessage()]);
+            Log::warning('CheckUpdates: ' . $e->getMessage());
 
-            return back()->with('error', translate('An unexpected error occurred while checking for updates.'));
+            return back()->with('error', translate($e->getMessage()));
         }
     }
 
@@ -556,6 +525,50 @@ class SystemController extends Controller
             Log::error('Update failed: ' . $e->getMessage());
             return back()->with('error', translate('Update failed: :message', ['message' => $e->getMessage()]));
         }
+    }
+
+    public function uploadUpdate(Request $request)
+    {
+        $this->authorizeSystem();
+
+        $request->validate([
+            'package' => ['required', 'file', 'mimetypes:application/zip,application/x-zip-compressed', 'max:307200'],
+        ], [
+            'package.max' => translate('The update package may not be larger than 300 MB.'),
+        ]);
+
+        $stored = $request->file('package')->store('temp');
+        $absolute = Storage::disk('local')->path($stored);
+
+        try {
+            app(\App\Services\UpdateService::class)->applyUpdateFromZip($absolute);
+            return back()->with('success', translate('Update applied successfully from the uploaded package.'));
+        } catch (\Exception $e) {
+            Log::error('Manual update failed: ' . $e->getMessage());
+            return back()->with('error', translate('Update failed: :message', ['message' => $e->getMessage()]));
+        } finally {
+            Storage::disk('local')->delete($stored);
+        }
+    }
+
+    public function snoozeUpdateBanner()
+    {
+        $this->authorizeSystem();
+
+        // Remind again in 24h (the sidebar badge stays regardless).
+        settings_set('core_update_snoozed_until', now()->addHours(24)->toDateTimeString(), 'string', 'system');
+
+        return back();
+    }
+
+    public function dismissUpdateBanner()
+    {
+        $this->authorizeSystem();
+
+        // Never show the banner again for this specific version.
+        settings_set('core_update_dismissed_version', (string) settings('update_version', ''), 'string', 'system');
+
+        return back();
     }
 
     public function rollbackUpdate()
@@ -589,6 +602,7 @@ class SystemController extends Controller
             'current_version' => settings('app_version', '1.0.0'),
             'latest_version' => settings('update_version'),
             'update_available' => (bool) settings('update_available'),
+            'changelog' => settings('update_changelog'),
             'last_checked' => settings('update_last_checked'),
             'rollback_available' => $rollbackAvailable,
             'rollback_time' => $rollbackTime,
@@ -921,12 +935,22 @@ class SystemController extends Controller
     private function storageWriteTest(): bool
     {
         try {
-            $path = 'health-check-test.txt';
-            Storage::disk('public')->put($path, 'test');
-            Storage::disk('public')->delete($path);
+            $disk = Storage::disk('public');
+            $path = 'health-check-'.\Illuminate\Support\Str::random(16).'.txt';
+            $payload = 'ok-'.\Illuminate\Support\Str::random(8);
 
-            return true;
-        } catch (\Exception) {
+            // put() returns false (not throws) on the throw=>false public disk, so the
+            // boolean must be checked — and the content round-tripped — or a broken/cloud
+            // misconfigured disk would be reported healthy.
+            if ($disk->put($path, $payload) === false) {
+                return false;
+            }
+
+            $readBack = $disk->get($path);
+            $disk->delete($path);
+
+            return $readBack === $payload;
+        } catch (\Throwable) {
             return false;
         }
     }

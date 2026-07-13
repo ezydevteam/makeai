@@ -2,8 +2,8 @@
 import axios from 'axios'
 import { Head, Link } from '@inertiajs/vue3'
 import { computed, onMounted, ref, watch } from 'vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserDashboardLayout })

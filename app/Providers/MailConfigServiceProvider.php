@@ -31,13 +31,9 @@ class MailConfigServiceProvider extends ServiceProvider
                 'mail_encryption' => settings('mail_encryption', 'tls'),
                 'mail_from_address' => settings('mail_from_address'),
                 'mail_from_name' => settings('mail_from_name'),
-                'mailgun_domain' => settings('mailgun_domain'),
-                'mailgun_secret' => settings('mailgun_secret'),
-                'mailgun_endpoint' => settings('mailgun_endpoint', 'api.mailgun.net'),
                 'ses_key' => settings('ses_key'),
                 'ses_secret' => settings('ses_secret'),
                 'ses_region' => settings('ses_region', 'us-east-1'),
-                'postmark_token' => settings('postmark_token'),
                 'sendgrid_api_key' => settings('sendgrid_api_key'),
             ];
 
@@ -45,25 +41,21 @@ class MailConfigServiceProvider extends ServiceProvider
                 return;
             }
 
+            // "None" is stored as the literal string 'null' — convert it to a real
+            // null so the SMTP transport doesn't treat a truthy string as encryption.
+            $encryption = $settings['mail_encryption'] ?? 'tls';
+            $encryption = $encryption === 'null' ? null : $encryption;
+
             $config = [
                 'transport' => $settings['mail_driver'],
                 'host' => $settings['mail_host'] ?? '',
                 'port' => $settings['mail_port'] ?? 587,
-                'encryption' => $settings['mail_encryption'] ?? 'tls',
+                'encryption' => $encryption,
                 'username' => $settings['mail_username'] ?? '',
                 'password' => $settings['mail_password'] ?? '',
                 'timeout' => null,
                 'local_domain' => env('MAIL_EHLO_DOMAIN'),
             ];
-
-            if ($settings['mail_driver'] === 'mailgun') {
-                Config::set('services.mailgun', [
-                    'domain' => $settings['mailgun_domain'] ?? '',
-                    'secret' => $settings['mailgun_secret'] ?? '',
-                    'endpoint' => $settings['mailgun_endpoint'] ?? 'api.mailgun.net',
-                ]);
-                Config::set('mail.mailers.mailgun', ['transport' => 'mailgun']);
-            }
 
             if ($settings['mail_driver'] === 'ses') {
                 Config::set('services.ses', [
@@ -71,10 +63,6 @@ class MailConfigServiceProvider extends ServiceProvider
                     'secret' => $settings['ses_secret'] ?? '',
                     'region' => $settings['ses_region'] ?? 'us-east-1',
                 ]);
-            }
-
-            if ($settings['mail_driver'] === 'postmark') {
-                Config::set('services.postmark.key', $settings['postmark_token'] ?? '');
             }
 
             if ($settings['mail_driver'] === 'sendgrid') {
@@ -90,7 +78,13 @@ class MailConfigServiceProvider extends ServiceProvider
                 ]);
             }
 
-            Config::set('mail.mailers.smtp', array_merge(Config::get('mail.mailers.smtp', []), $config));
+            // Only overlay the SMTP credentials onto the smtp mailer when SMTP is
+            // actually the selected driver — otherwise the smtp mailer's transport
+            // would be corrupted with e.g. 'ses'/'sendgrid'.
+            if ($settings['mail_driver'] === 'smtp') {
+                Config::set('mail.mailers.smtp', array_merge(Config::get('mail.mailers.smtp', []), $config));
+            }
+
             Config::set('mail.default', $settings['mail_driver']);
 
             Config::set('mail.from', [

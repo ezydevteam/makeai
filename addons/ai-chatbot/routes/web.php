@@ -7,6 +7,10 @@ use Inertia\Inertia;
 
 Route::middleware(['web'])->group(function () {
     Route::get('/chat/{ulid?}', function (?string $ulid = null) {
+        // The "Enable Chatbot" admin toggle gates user-facing chat access. Previously
+        // this setting was dead (read nowhere); honoring it here makes it meaningful.
+        abort_unless((bool) addon_setting('ai-chatbot', 'enabled', true), 404);
+
         return Inertia::render('Addons/ai-chatbot/Chat/Index', [
             'hide_header' => true,
             'hide_footer' => true,
@@ -19,7 +23,8 @@ Route::middleware(['web'])->group(function () {
             'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
             'chat_credits_low_threshold' => (int) settings('chat_credits_low_threshold', 100),
             'active_chat_ulid' => $ulid,
-            'kb_available' => class_exists(\Addons\PublicKnowledgeBase\Services\KbSearchService::class),
+            // KB availability is shared globally as chatbot.kbAvailable (see
+            // AddonServiceProvider) so every chat surface uses the same gate.
         ]);
     })->name('chat.index');
 

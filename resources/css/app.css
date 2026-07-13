@@ -333,8 +333,8 @@ input[type="checkbox"]:disabled {
 }
 
 .dark .app-switch {
-    border-color: var(--color-surface-700) !important;
-    background: var(--color-surface-800) !important;
+    border-color: #313030;
+    background: #474545;
 }
 
 .dark .app-switch[aria-checked="true"] {
@@ -1088,15 +1088,16 @@ input[type="checkbox"]:disabled {
 }
 
 /* Button utilities */
+/* Button utilities */
 .btn-primary-admin,
-.btn-primary {
+.btn-primary,
+.btn-danger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   min-height: 2.5rem;
   border: 1px solid transparent;
-  border-radius: var(--radius-interactive);
   padding: 0.5rem 1.25rem;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -1107,6 +1108,15 @@ input[type="checkbox"]:disabled {
     color 0.15s ease,
     box-shadow 0.15s ease,
     transform 0.15s ease;
+}
+
+.btn-primary-admin {
+    border-radius: var(--radius-interactive);
+}
+
+.btn-primary,
+.btn-danger {
+   border-radius: var(--radius-full);
 }
 
 .btn-primary-admin,
@@ -1128,8 +1138,6 @@ input[type="checkbox"]:disabled {
   transform: translateY(0);
   box-shadow: var(--shadow-sm);
 }
-
-
 
 .btn-primary-admin:focus-visible,
 .btn-primary:focus-visible {
@@ -1154,7 +1162,47 @@ input[type="checkbox"]:disabled {
   box-shadow: 0 0 0 3px rgb(255 255 255 / 0.12), var(--shadow-sm);
 }
 
-/* Chat composer input/textarea should stay flat inside the pill */
+.btn-danger {
+  background: linear-gradient(135deg, var(--color-danger-500), var(--color-danger-600));
+  color: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, var(--color-danger-600), var(--color-danger-500));
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-danger:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 0.18), var(--shadow-sm);
+}
+
+.dark .btn-danger {
+  color: #f9fafb;
+  box-shadow: var(--shadow-sm);
+  background: linear-gradient(135deg, var(--color-danger-500), var(--color-danger-600));
+}
+
+.dark .btn-danger:hover {
+  background: linear-gradient(135deg, var(--color-danger-600), var(--color-danger-500));
+}
+
+.dark .btn-danger:focus-visible {
+  box-shadow: 0 0 0 3px rgb(255 255 255 / 0.12), var(--shadow-sm);
+}
+
+/* Composer controls stay flat inside their card: no chrome of their own, so the
+   card's own border and radius are the only ones you see. Used by the chat
+   composers and by the AI Image Studio / landing prompt boxes. Also the opt-out
+   from the global form-control rules above (radius, and the dark-mode !important
+   background) — those are unlayered, so a Tailwind `bg-transparent` cannot win. */
 .chat-input,
 .chat-input:focus,
 .chat-input:focus-visible,
@@ -1211,3 +1259,47 @@ input[type="checkbox"]:disabled {
     background-color: var(--admin-surface) !important;
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25) !important;
 }
+
+/* ── Sidebar notification dot (primary color, animated ping) ────────────────
+   Shown on group headers that have submenus needing attention, replacing the
+   old numeric aggregate badges. Positioned over the group icon so it's visible
+   even when the sidebar is collapsed. */
+.sidebar-dot {
+    position: absolute;
+    left: 26px;
+    top: 6px;
+    display: inline-flex;
+    height: 0.55rem;
+    width: 0.55rem;
+    pointer-events: none;
+}
+.sidebar-dot-ping {
+    position: absolute;
+    inset: 0;
+    display: inline-flex;
+    height: 100%;
+    width: 100%;
+    border-radius: 9999px;
+    background: var(--color-primary-500);
+    opacity: 0.75;
+    animation: sidebar-dot-ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.sidebar-dot-core {
+    position: relative;
+    display: inline-flex;
+    height: 0.55rem;
+    width: 0.55rem;
+    border-radius: 9999px;
+    background: var(--color-primary-500);
+    box-shadow: 0 0 0 2px var(--admin-sidebar-bg, #0f172a);
+}
+@keyframes sidebar-dot-ping {
+    75%, 100% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sidebar-dot-ping { animation: none; }
+}
+

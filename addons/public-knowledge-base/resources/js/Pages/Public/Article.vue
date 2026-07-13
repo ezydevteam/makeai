@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTranslate } from '@/Composables/useTranslate'
-import { Link, usePage } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import { ref, computed } from 'vue'
 import DOMPurify from 'dompurify'
 import KbLayout from './KbLayout.vue'
@@ -79,9 +79,29 @@ const percent = computed(() => {
   const total = helpfulCount.value + notHelpfulCount.value
   return total > 0 ? Math.round((helpfulCount.value / total) * 100) : 0
 })
+
+// SEO: schema.org structured data so search engines can surface this article as a
+// rich help/support result. Rendered as a JSON-LD script in the document.
+const jsonLd = computed(() => JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: props.article.title,
+  description: props.meta.description || props.article.excerpt || '',
+  datePublished: props.article.published_at,
+  ...(props.article.category ? { articleSection: props.article.category.name } : {}),
+}))
 </script>
 
 <template>
+  <Head :title="props.meta.title">
+    <meta name="description" :content="props.meta.description || ''" head-key="description" />
+    <meta property="og:title" :content="props.meta.title" head-key="ogtitle" />
+    <meta property="og:description" :content="props.meta.description || ''" head-key="ogdescription" />
+    <meta property="og:type" content="article" head-key="ogtype" />
+  </Head>
+
+  <component :is="'script'" type="application/ld+json" v-html="jsonLd" />
+
   <div class="max-w-4xl mx-auto space-y-8">
     <!-- Breadcrumbs Navigation -->
     <nav class="flex items-center flex-wrap gap-2 text-xs tracking-wider text-gray-400 dark:text-gray-500">
@@ -107,7 +127,7 @@ const percent = computed(() => {
         </h1>
 
         <!-- Metadata Row -->
-        <div class="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs font-medium text-gray-450 dark:text-gray-500">
+        <div class="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs font-medium text-gray-400 dark:text-gray-500">
           <span class="flex items-center gap-1">
             <i class="ti ti-calendar"></i>
             {{ new Date(props.article.published_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) }}
@@ -140,7 +160,7 @@ const percent = computed(() => {
             <button
               @click="vote(-1)"
               :disabled="voting"
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-650 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-500/30 text-sm font-semibold transition-all cursor-pointer"
+              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-300 dark:hover:border-red-500/30 text-sm font-semibold transition-all cursor-pointer"
             >
               <i class="ti ti-thumb-down"></i>
               <span>{{ t('No') }}</span>
@@ -158,7 +178,7 @@ const percent = computed(() => {
           <div class="w-full bg-gray-200/60 dark:bg-surface-800 rounded-full h-2 mt-4 overflow-hidden">
             <div class="bg-primary-600 dark:bg-primary-500 h-2 rounded-full transition-all duration-500" :style="{ width: percent + '%' }" />
           </div>
-          <p class="text-[11px] text-gray-450 dark:text-gray-500 mt-2 font-medium">{{ percent }}% {{ t('of readers found this helpful') }}</p>
+          <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-2 font-medium">{{ percent }}% {{ t('of readers found this helpful') }}</p>
         </div>
       </div>
     </article>
@@ -174,7 +194,7 @@ const percent = computed(() => {
           class="group block p-5 bg-white dark:bg-surface-900 border border-gray-200 dark:border-surface-850 hover:border-primary-300 dark:hover:border-primary-500/40 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300"
         >
           <p class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors line-clamp-1 mb-1">{{ r.title }}</p>
-          <p class="text-xs text-gray-550 dark:text-gray-400 line-clamp-2 leading-relaxed">{{ r.excerpt }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">{{ r.excerpt }}</p>
         </a>
       </div>
     </aside>

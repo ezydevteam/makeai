@@ -57,10 +57,10 @@ class PageController extends Controller
         $validated['created_by'] = auth('admin')->id();
 
         if ($request->hasFile('featured_image')) {
-            $validated['featured_image'] = $request->file('featured_image')->store('pages', 'public');
+            $validated['featured_image'] = store_public_upload($request->file('featured_image'), 'pages');
         }
         if ($request->hasFile('og_image')) {
-            $validated['og_image'] = $request->file('og_image')->store('pages', 'public');
+            $validated['og_image'] = store_public_upload($request->file('og_image'), 'pages');
         }
 
         Page::create($validated);
@@ -95,7 +95,7 @@ class PageController extends Controller
             }
             $validated['featured_image'] = null;
         } elseif ($request->hasFile('featured_image')) {
-            $validated['featured_image'] = $request->file('featured_image')->store('pages', 'public');
+            $validated['featured_image'] = store_public_upload($request->file('featured_image'), 'pages', $page->featured_image);
         }
 
         if ($request->boolean('remove_og_image')) {
@@ -104,7 +104,7 @@ class PageController extends Controller
             }
             $validated['og_image'] = null;
         } elseif ($request->hasFile('og_image')) {
-            $validated['og_image'] = $request->file('og_image')->store('pages', 'public');
+            $validated['og_image'] = store_public_upload($request->file('og_image'), 'pages', $page->og_image);
         }
 
         $page->update($validated);
@@ -136,15 +136,7 @@ class PageController extends Controller
             ], 422);
         }
 
-        $user = User::firstOrCreate(
-            ['email' => User::internalAiEmail()],
-            [
-                'name' => User::internalAiName(),
-                'password' => bcrypt(Str::random(32)),
-                'is_active' => true,
-                'is_banned' => false,
-            ]
-        );
+        $user = User::internalAi();
 
         $result = $aiService->complete(
             $user,
@@ -172,7 +164,7 @@ class PageController extends Controller
                 'keywords' => $page->meta_keywords,
                 'canonical' => route('page.show', $page->slug),
                 'robots' => 'noindex,nofollow',
-                'og_image' => $page->og_image ? asset('storage/'.$page->og_image) : null,
+                'og_image' => $page->og_image ? url(media_url($page->og_image)) : null,
                 'schema' => [],
             ],
             'contactSettings' => null,

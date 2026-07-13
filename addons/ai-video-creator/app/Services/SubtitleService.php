@@ -18,7 +18,7 @@ class SubtitleService
 
         $credits = (int) addon_setting('ai-video-creator', 'credits_subtitles', 10);
 
-        if ($render->user->credits < $credits) {
+        if (! credit_quota_mode() && $render->user->credits < $credits) {
             throw new \App\Exceptions\AI\InsufficientCreditsException(
                 $render->user->credits, $credits,
             );

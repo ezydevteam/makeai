@@ -18,6 +18,13 @@ class Setting extends Model
     private const CACHE_TTL = null; // forever, invalidated on write
 
     /**
+     * Cached in place of a missing row. The cache key is derived from the setting key
+     * alone, so caching a caller's $default would serve that caller's fallback to every
+     * other caller of the same missing key. NUL bytes keep it distinct from any real value.
+     */
+    private const MISSING = "\0__setting_missing__\0";
+
+    /**
      * Legacy aliases for renamed keys (PART 02 branding normalization).
      * Canonical keys use site_* prefix. app_* is backward-compat.
      */
@@ -45,15 +52,22 @@ class Setting extends Model
         // Resolve legacy alias
         $resolvedKey = self::ALIASES[$key] ?? $key;
 
-        return Cache::rememberForever(self::CACHE_PREFIX.$resolvedKey, function () use ($resolvedKey, $default) {
+        $cached = Cache::rememberForever(self::CACHE_PREFIX.$resolvedKey, function () use ($resolvedKey) {
             $setting = static::where('key', $resolvedKey)->first();
 
-            if (! $setting) {
-                return $default;
-            }
-
-            return $setting->castValue();
+            return $setting ? $setting->castValue() : self::MISSING;
         });
+
+        return $cached === self::MISSING ? $default : $cached;
+    }
+
+    /**
+     * Whether a key has actually been persisted. Distinct from getValue() returning a
+     * non-null result, which cannot tell a stored value apart from a caller's fallback.
+     */
+    public static function isPersisted(string $key): bool
+    {
+        return static::where('key', self::ALIASES[$key] ?? $key)->exists();
     }
 
     /**

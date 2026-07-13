@@ -83,27 +83,12 @@ class DemoSeeder extends Seeder
             'sort_order' => 1,
         ]);
 
-        $proPlan = Plan::where('slug', 'professional')->first() ?? Plan::firstOrCreate(['slug' => 'pro'], [
-            'name' => 'Professional',
-            'description' => 'For teams and growing businesses',
-            'price_monthly' => 29.99,
-            'price_yearly' => 287.88,
-            'credits' => 10000,
-            'max_chats' => 999999,
-            'features' => json_encode(['All AI templates', 'All AI models', 'Unlimited chats', 'Priority support', 'API access']),
-            'is_active' => true,
-            'is_free' => false,
-            'is_featured' => true,
-            'sort_order' => 2,
-        ]);
-
-        $unlimitedPlan = Plan::firstOrCreate(['slug' => 'unlimited'], [
-            'name' => 'Unlimited',
+        $professionalPlan = Plan::firstOrCreate(['slug' => 'professional'], [
+            'name' => 'professional',
             'description' => 'Power user access',
             'price_monthly' => 49.99,
             'price_yearly' => 499.99,
             'credits' => 99999,
-            'max_chats' => 999999,
             'features' => json_encode(['All AI templates', 'All AI models', 'Unlimited chats', 'Priority support', 'API access']),
             'is_active' => true,
             'is_free' => false,
@@ -111,8 +96,19 @@ class DemoSeeder extends Seeder
             'sort_order' => 3,
         ]);
 
-        $plans = [$freePlan->id, $proPlan->id, $unlimitedPlan->id];
-        $planNames = ['free', 'pro', 'unlimited'];
+        /**
+         * The plans demo users are spread across, and what a user on each should look like.
+         *
+         * Kept as ONE structure on purpose. This was previously three parallel things — an
+         * array of ids, an array of names, and a match() on the name — which had drifted:
+         * the match still handled 'pro' and 'unlimited', plans that no longer exist, so the
+         * first 'professional' user threw UnhandledMatchError. Adding a plan here now updates
+         * the id, the name and the credits together, so they cannot fall out of step.
+         */
+        $demoPlans = [
+            ['id' => $freePlan->id, 'name' => 'free', 'credits' => fn () => random_int(10, 100)],
+            ['id' => $professionalPlan->id, 'name' => 'professional', 'credits' => fn () => random_int(1000, 5000)],
+        ];
 
         AffiliateProgram::current()->update([
             'allow_custom_alias' => true,
@@ -129,20 +125,18 @@ class DemoSeeder extends Seeder
         for ($i = 0; $i < 50; $i++) {
             $name = $firstNames[$i];
             $email = strtolower($name) . ($i + 1) . '@demo.com';
-            $planIdx = $i % 3;
-            $planId = $plans[$planIdx];
+            // Modulo the real plan count. It was hardcoded to 3 against a 2-plan array, so
+            // every third user indexed past the end of it.
+            $plan = $demoPlans[$i % count($demoPlans)];
+            $isFree = $plan['name'] === 'free';
 
             $user = User::updateOrCreate(['email' => $email], [
                 'name' => $name . ' Demo',
                 'password' => Hash::make('demo12345'),
-                'credits' => match ($planNames[$planIdx]) {
-                    'free' => random_int(10, 100),
-                    'pro' => random_int(1000, 5000),
-                    'unlimited' => 99999,
-                },
-                'plan_id' => $planId,
-                'subscription_status' => $planNames[$planIdx] === 'free' ? 'none' : 'active',
-                'subscription_ends_at' => $planNames[$planIdx] === 'free' ? null : now()->addMonths(random_int(1, 12)),
+                'credits' => ($plan['credits'])(),
+                'plan_id' => $plan['id'],
+                'subscription_status' => $isFree ? 'none' : 'active',
+                'subscription_ends_at' => $isFree ? null : now()->addMonths(random_int(1, 12)),
                 'credits_used_month' => random_int(0, 5000),
                 'is_active' => true,
                 'email_verified_at' => now()->subDays(random_int(1, 365)),
@@ -216,7 +210,7 @@ class DemoSeeder extends Seeder
         $showcaseUser = User::where('email', 'demo@demo.com')->first();
 
         if ($showcaseUser) {
-            $this->seedShowcaseUserExperience($showcaseUser, $unlimitedPlan, $toolSlugs);
+            $this->seedShowcaseUserExperience($showcaseUser, $professionalPlan, $toolSlugs);
         }
 
         // ─── 6. AI Chats (10 chatbots with messages) ────────────────────
@@ -239,7 +233,6 @@ class DemoSeeder extends Seeder
                 'user_id' => $user->id,
                 'title' => $topic['title'],
                 'model' => 'gpt-4o-mini',
-                'category' => $topic['category'],
                 'is_pinned' => $i < 3,
                 'created_at' => now()->subDays(random_int(0, 90)),
             ]);
@@ -382,15 +375,15 @@ class DemoSeeder extends Seeder
         }
 
         $paymentRows = [
-            ['user' => $adminUser, 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 199.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Pro annual renewal', 'days' => 1],
-            ['user' => $demoUsers[2], 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly subscription', 'days' => 2],
+            ['user' => $adminUser, 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 199.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Pro annual renewal', 'days' => 1],
+            ['user' => $demoUsers[2], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly subscription', 'days' => 2],
             ['user' => $demoUsers[4], 'plan' => $freePlan, 'gateway' => 'paypal', 'amount' => 49.00, 'type' => 'credit_topup', 'status' => 'completed', 'label' => 'Credit top-up', 'days' => 0],
-            ['user' => $demoUsers[7], 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 29.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'One-time tool bundle', 'days' => 4],
-            ['user' => $demoUsers[9], 'plan' => $unlimitedPlan, 'gateway' => 'stripe', 'amount' => 499.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Unlimited annual plan', 'days' => 9],
-            ['user' => $demoUsers[12], 'plan' => $proPlan, 'gateway' => 'stripe', 'amount' => 99.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly renewal', 'days' => 17],
+            ['user' => $demoUsers[7], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 29.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'One-time tool bundle', 'days' => 4],
+            ['user' => $demoUsers[9], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 499.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Unlimited annual plan', 'days' => 9],
+            ['user' => $demoUsers[12], 'plan' => $professionalPlan, 'gateway' => 'stripe', 'amount' => 99.00, 'type' => 'subscription', 'status' => 'completed', 'label' => 'Monthly renewal', 'days' => 17],
             ['user' => $demoUsers[15], 'plan' => null, 'gateway' => 'manual', 'amount' => 24.00, 'type' => 'credit_topup', 'status' => 'completed', 'label' => 'Wallet refill', 'days' => 21],
             ['user' => $demoUsers[18], 'plan' => $freePlan, 'gateway' => 'stripe', 'amount' => 39.00, 'type' => 'one_time', 'status' => 'completed', 'label' => 'Premium export pack', 'days' => 26],
-            ['user' => $demoUsers[21], 'plan' => $proPlan, 'gateway' => 'paypal', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'failed', 'label' => 'Failed monthly charge', 'days' => 3],
+            ['user' => $demoUsers[21], 'plan' => $professionalPlan, 'gateway' => 'paypal', 'amount' => 19.99, 'type' => 'subscription', 'status' => 'failed', 'label' => 'Failed monthly charge', 'days' => 3],
         ];
 
         foreach ($paymentRows as $index => $row) {
@@ -598,28 +591,11 @@ class DemoSeeder extends Seeder
             );
         }
 
-        // ─── 10. Revenue / Subscription Data (last 12 months) ───────────
-        for ($m = 0; $m < 12; $m++) {
-            $month = now()->subMonths(11 - $m);
-            DB::table('settings')->updateOrInsert(
-                ['key' => 'demo_revenue_' . $month->format('Y_m')],
-                [
-                    'value' => (string) random_int(1500, 9000),
-                    'type' => 'integer',
-                    'group' => 'demo_revenue',
-                ]
-            );
-            DB::table('settings')->updateOrInsert(
-                ['key' => 'demo_signups_' . $month->format('Y_m')],
-                [
-                    'value' => (string) random_int(20, 150),
-                    'type' => 'integer',
-                    'group' => 'demo_revenue',
-                ]
-            );
-        }
+        // Revenue and signup charts are computed directly from the seeded
+        // payments/users rows above (see AdminDashboardController), so no
+        // synthetic demo_revenue_*/demo_signups_* settings keys are needed.
 
-        // ─── 11. Newsletter Campaigns (5 sample) ────────────────────────
+        // ─── 10. Newsletter Campaigns (5 sample) ────────────────────────
         $campaigns = [
             ['subject' => 'Welcome to MakeAI — Start Creating with AI', 'status' => 'sent'],
             ['subject' => 'New Feature: Advanced Chat Mode Is Here', 'status' => 'sent'],
@@ -838,7 +814,8 @@ class DemoSeeder extends Seeder
                     'rating' => $rating,
                     'comment' => $comment,
                     'is_approved' => ($i % 5 !== 0), // 80% approved, 20% pending approval
-                    'is_featured' => ($rating === 5 && $i % 3 === 0),
+                    // No 'is_featured' here: tool_reviews has no such column (plans,
+                    // blog_posts and user_collections do — this one does not).
                     'helpful_count' => 0,
                     'created_at' => now()->subDays(random_int(1, 45))->subHours(random_int(0, 23)),
                 ]
@@ -955,14 +932,16 @@ class DemoSeeder extends Seeder
             'timezone' => 'America/New_York',
         ])->save();
 
-        // Seed api keys
-        $user->apiKeys()->delete();
-        $user->apiKeys()->create([
+        // Seed the user's BYOK provider keys. The relation is byok() — there is no
+        // apiKeys(); App\Models\AiKey is the PLATFORM's own key pool, a different thing.
+        // UserByok encrypts api_key on write, so these are stored the same way a real one is.
+        $user->byok()->delete();
+        $user->byok()->create([
             'provider' => 'openai',
             'api_key' => 'sk-proj-DEMOOPENAIKEY1234567890abcdefghijklmnopqrstuv',
             'is_active' => true,
         ]);
-        $user->apiKeys()->create([
+        $user->byok()->create([
             'provider' => 'anthropic',
             'api_key' => 'sk-ant-api03-DEMOANTHROPICKEY1234567890abcdefghijklmnopqrstuv',
             'is_active' => true,
@@ -1048,8 +1027,8 @@ class DemoSeeder extends Seeder
                     'amount' => $entry['commission'],
                     'status' => $entry['status'],
                     'approved_at' => in_array($entry['status'], ['approved', 'paid'], true) ? $convertedAt->copy()->addHours(2) : null,
+                    // No 'notes' here: affiliate_commissions has no such column.
                     'paid_at' => $entry['status'] === 'paid' ? $convertedAt->copy()->addDays(3) : null,
-                    'notes' => 'Demo showcase affiliate commission #' . $commissionIndex,
                     'created_at' => $convertedAt,
                     'updated_at' => $convertedAt,
                 ]
@@ -1255,7 +1234,6 @@ class DemoSeeder extends Seeder
                     'model' => $conversationRow['model'],
                     'message_count' => $conversationRow['message_count'],
                     'total_tokens' => 3200 + ($conversationRow['days'] * 180),
-                    'total_credits' => 120 + ($conversationRow['days'] * 12),
                     'last_message_at' => $lastMessageAt,
                     'is_pinned' => $conversationRow['days'] === 0,
                 ]
@@ -1365,7 +1343,6 @@ class DemoSeeder extends Seeder
                     'collection_id' => $collection->id,
                     'tool_slug' => $toolSlug,
                     'sort_order' => $index,
-                    'added_at' => now()->subDays(5 - min($index, 4)),
                 ]);
             }
         }

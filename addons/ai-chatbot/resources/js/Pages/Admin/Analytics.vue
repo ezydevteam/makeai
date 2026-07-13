@@ -188,7 +188,7 @@ const formatDate = (dateStr: string) => {
 
     <div class="admin-layout w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <!-- Header -->
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ t('Chatbot Analytics') }}
@@ -198,15 +198,13 @@ const formatDate = (dateStr: string) => {
                 </p>
             </div>
 
-            <div class="flex items-center gap-3">
-                <Link
-                    :href="route('admin.addons.settings', { slug: 'ai-chatbot' })"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                >
-                    <i class="ti ti-settings text-base"></i>
-                    {{ t('Settings') }}
-                </Link>
-            </div>
+            <Link
+                :href="route('admin.addons.settings', { slug: 'ai-chatbot' })"
+                class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
+            >
+                <i class="ti ti-settings text-base"></i>
+                {{ t('Settings') }}
+            </Link>
         </div>
 
         <!-- Stats Grid -->

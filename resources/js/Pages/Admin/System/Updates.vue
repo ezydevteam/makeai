@@ -1,7 +1,8 @@
-<script setup lang="ts">
-import { computed } from 'vue'
+﻿<script setup lang="ts">
+import { ref, computed } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
 
@@ -13,6 +14,7 @@ type UpdateStatus = {
     current_version: string
     latest_version: string | null
     update_available: boolean
+    changelog: string | null
     last_checked: string | null
     rollback_available: boolean
     rollback_time: string | null
@@ -27,6 +29,22 @@ const { formatDateTime } = useDateFormat()
 const checkUpdatesForm = useForm({})
 const applyUpdateForm = useForm({})
 const rollbackForm = useForm({})
+const uploadForm = useForm<{ package: File | null }>({ package: null })
+
+const showApplyConfirmModal = ref(false)
+
+function confirmApplyUpdate() {
+    showApplyConfirmModal.value = false
+    applyUpdateForm.post(route('admin.system.apply-update'), { preserveScroll: true })
+}
+
+function submitUpload() {
+    uploadForm.post(route('admin.system.upload-update'), {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => uploadForm.reset('package'),
+    })
+}
 
 const summaryCards = computed(() => [
     {
@@ -58,8 +76,8 @@ const summaryCards = computed(() => [
 <template>
     <Head :title="t('One-Click Updates')" />
 
-        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('One-Click Updates') }}</h1>
@@ -80,7 +98,7 @@ const summaryCards = computed(() => [
             <button
                 type="button"
                 :disabled="checkUpdatesForm.processing"
-                class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                class="shrink-0 btn-primary-admin inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-60"
                 @click="checkUpdatesForm.post(route('admin.system.check-updates'), { preserveScroll: true })"
             >
                 <svg v-if="checkUpdatesForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -92,7 +110,7 @@ const summaryCards = computed(() => [
             </button>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Update Status') }}</h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Review the installed version, latest release, and recovery window before making changes.') }}</p>
@@ -103,7 +121,7 @@ const summaryCards = computed(() => [
                     <article
                         v-for="card in summaryCards"
                         :key="card.key"
-                        class="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900"
+                        class="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900"
                     >
                         <div class="flex items-start justify-between gap-4">
                             <div>
@@ -119,9 +137,9 @@ const summaryCards = computed(() => [
 
                 <div
                     v-if="update.update_available"
-                    class="rounded-xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-900/40 dark:bg-blue-900/20"
+                    class="rounded-2xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-900/40 dark:bg-blue-900/20"
                 >
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div class="flex items-start gap-3">
                             <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                                 <i class="ti ti-arrow-up-right text-xl"></i>
@@ -137,8 +155,8 @@ const summaryCards = computed(() => [
                         <button
                             type="button"
                             :disabled="applyUpdateForm.processing"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
-                            @click="applyUpdateForm.post(route('admin.system.apply-update'), { preserveScroll: true })"
+                            class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-60"
+                            @click="showApplyConfirmModal = true"
                         >
                             <svg v-if="applyUpdateForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
@@ -152,7 +170,7 @@ const summaryCards = computed(() => [
 
                 <div
                     v-if="update.rollback_available"
-                    class="rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/40 dark:bg-amber-900/20"
+                    class="rounded-2xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900/40 dark:bg-amber-900/20"
                 >
                     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div class="flex items-start gap-3">
@@ -173,7 +191,7 @@ const summaryCards = computed(() => [
                         <button
                             type="button"
                             :disabled="rollbackForm.processing"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 disabled:opacity-60"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 disabled:opacity-60"
                             @click="rollbackForm.post(route('admin.system.rollback-update'), { preserveScroll: true })"
                         >
                             <svg v-if="rollbackForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -185,8 +203,54 @@ const summaryCards = computed(() => [
                         </button>
                     </div>
                 </div>
+
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900/40">
+                    <div class="flex items-start gap-3">
+                        <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                            <i class="ti ti-upload text-xl"></i>
+                        </span>
+                        <div class="flex-1">
+                            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ t('Manual Update') }}</p>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                {{ t('If automatic updates are unavailable, download the latest release .zip from CodeCanyon and upload it here. A database backup and rollback point are created automatically before it is applied.') }}
+                            </p>
+
+                            <form class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center" @submit.prevent="submitUpload">
+                                <input
+                                    type="file"
+                                    accept=".zip"
+                                    class="block w-full text-sm text-gray-700 file:mr-3 file:rounded-xl file:border-0 file:bg-gray-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-gray-700 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-200"
+                                    @change="uploadForm.package = ($event.target as HTMLInputElement).files?.[0] ?? null"
+                                >
+                                <button
+                                    type="submit"
+                                    :disabled="uploadForm.processing || !uploadForm.package"
+                                    class="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-gray-900 disabled:opacity-60 dark:bg-gray-700 dark:hover:bg-gray-600"
+                                >
+                                    <svg v-if="uploadForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                    </svg>
+                                    <i v-else class="ti ti-upload text-base"></i>
+                                    <span>{{ uploadForm.processing ? t('Uploading & Installing...') : t('Upload & Install') }}</span>
+                                </button>
+                            </form>
+                            <p v-if="uploadForm.errors.package" class="mt-2 text-xs text-red-600 dark:text-red-400">{{ uploadForm.errors.package }}</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
 
+    <ActionConfirmModal
+        :open="showApplyConfirmModal"
+        :title="t('Confirm Update')"
+        :message="t('Are you sure you want to download and install the update? A backup and database migrations will be run automatically.')"
+        :confirm-label="t('Download & Install')"
+        :cancel-label="t('Cancel')"
+        :processing="applyUpdateForm.processing"
+        @confirm="confirmApplyUpdate"
+        @cancel="showApplyConfirmModal = false"
+    />
 </template>

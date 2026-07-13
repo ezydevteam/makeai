@@ -1,10 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -281,7 +281,7 @@ onMounted(() => {
 
             <button
                 type="button"
-                class="inline-flex items-center gap-2 rounded-lg btn-primary disabled:opacity-60"
+                class="inline-flex items-center gap-2 rounded-lg btn-primary-admin disabled:opacity-60"
                 @click="createArticle"
             >
                 <i class="ti ti-plus text-base"></i>
@@ -359,7 +359,7 @@ onMounted(() => {
                                 <span v-if="article.helpful_percent !== null">
                                     {{ article.helpful_percent }}% {{ t('helpful') }}
                                 </span>
-                                <span v-else class="text-gray-400 dark:text-gray-500">—</span>
+                                <span v-else class="text-gray-400 dark:text-gray-500">â€”</span>
                             </td>
                             <td class="px-5 py-4 text-sm text-gray-500 dark:text-gray-400">
                                 {{ new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(article.updated_at)) }}

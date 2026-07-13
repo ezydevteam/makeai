@@ -1,9 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdController;
-use App\Http\Controllers\AffiliateController;
-use App\Http\Controllers\AI\DocumentController;
-use App\Http\Controllers\AI\TemplateController;
+use App\Http\Controllers\AiToolController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -14,41 +12,39 @@ use App\Http\Controllers\Billing\PaymentWebhookController;
 use App\Http\Controllers\Billing\StripeController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\CheckoutController;
-use App\Http\Controllers\CreditTopupController;
-use App\Http\Controllers\ChainController;
-use App\Http\Controllers\CollectionController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ContactController;
-use App\Http\Controllers\EmbedController;
-use App\Http\Controllers\FavoriteController;
-use App\Http\Controllers\HistoryController;
-use App\Http\Controllers\HomepageController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LiveSearchController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OutputRatingController;
+use App\Http\Controllers\PageController;
 use App\Http\Controllers\PricingController;
-use App\Http\Controllers\PlaygroundController;
-use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\User\ProfileController;
 use App\Http\Controllers\SubscriptionController;
-use App\Http\Controllers\SupportTicketController;
-use App\Http\Controllers\ToolEmbedController;
-use App\Http\Controllers\ToolFavoriteController;
-use App\Http\Controllers\UsageDashboardController;
-use App\Http\Controllers\UserExportController;
+use App\Http\Controllers\User\AffiliateController;
+use App\Http\Controllers\User\ChainController;
+use App\Http\Controllers\User\CollectionController;
+use App\Http\Controllers\User\CreditTopupController;
 use App\Http\Controllers\User\DashboardController;
+use App\Http\Controllers\User\EmbedController;
+use App\Http\Controllers\User\FavoriteController;
+use App\Http\Controllers\User\HistoryController;
 use App\Http\Controllers\User\OnboardingController;
+use App\Http\Controllers\User\PlaygroundController;
 use App\Http\Controllers\User\PrivacyController;
 use App\Http\Controllers\User\SettingsController as UserSettingsController;
+use App\Http\Controllers\User\SupportTicketController;
+use App\Http\Controllers\User\ToolEmbedController;
+use App\Http\Controllers\User\ToolFavoriteController;
+use App\Http\Controllers\User\UsageDashboardController;
+use App\Http\Controllers\User\UserExportController;
+use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Middleware\EmbedCorsMiddleware;
-use App\Models\AiTool;
-use App\Models\Page;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Broadcast;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -75,30 +71,12 @@ Route::get('/support/attachments/{attachment}/download', [SupportTicketControlle
     ->name('support.attachments.download');
 
 // ─── Public ─────────────────────────────────
-Route::get('/', function () {
-    $slug = settings('homepage_template', 'default');
-
-    if ($slug === 'ai-chatbot' && is_addon_active('ai-chatbot')) {
-        return Inertia::render('Addons/ai-chatbot/Chat/Index', [
-            'hide_header' => (bool) addon_setting('ai-chatbot', 'hide_site_header', false),
-            'hide_footer' => (bool) addon_setting('ai-chatbot', 'hide_site_footer', false),
-            'default_chat_model' => addon_setting('ai-chatbot', 'default_chat_model', 'gpt-4o-mini'),
-            'allow_model_select' => (bool) addon_setting('ai-chatbot', 'allow_model_select', true),
-            'show_provider_models' => (bool) addon_setting('ai-chatbot', 'show_provider_models', true),
-            'show_custom_models' => (bool) addon_setting('ai-chatbot', 'show_custom_models', false),
-            'custom_models' => addon_setting('ai-chatbot', 'custom_models', []),
-            'allow_guest_messages' => (bool) addon_setting('ai-chatbot', 'allow_guest_messages', false),
-            'available_models' => app(\App\Services\AI\ProviderRegistry::class)->availableModels(),
-        ]);
-    }
-
-    return app(HomepageController::class)->show();
-})->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/pricing', [PricingController::class, 'index'])->middleware('premium')->name('pricing');
 Route::get('/ref/{code}', [AffiliateController::class, 'capture'])->middleware('throttle:public,30,60')->name('affiliate.capture');
 Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch');
 Route::get('/live-search', LiveSearchController::class)->middleware('throttle:public,60,60')->name('live-search');
-Route::get('/css/theme-variables.css', \App\Http\Controllers\ThemeCssController::class)->name('theme-variables.css');
+Route::get('/css/theme-variables.css', [HomeController::class, 'themeCss'])->name('theme-variables.css');
 
 // ─── Guest Auth ─────────────────────────────
 Route::middleware('guest')->group(function () {
@@ -164,6 +142,9 @@ Route::middleware('auth')->group(function () {
             Route::get('/billing-portal', [StripeController::class, 'billingPortal'])->name('billing.portal');
             Route::post('/subscription/cancel', [SubscriptionController::class, 'cancel'])->name('subscription.cancel');
             Route::post('/subscription/resume', [SubscriptionController::class, 'resume'])->name('subscription.resume');
+            Route::post('/subscription/downgrade', [SubscriptionController::class, 'downgrade'])->name('subscription.downgrade');
+            Route::post('/subscription/upgrade', [SubscriptionController::class, 'upgrade'])->name('subscription.upgrade');
+            Route::post('/subscription/cancel-scheduled', [SubscriptionController::class, 'cancelScheduledChange'])->name('subscription.cancel-scheduled');
         });
 
         Route::get('/documents/{document}/edit', [DocumentController::class, 'edit'])->name('documents.edit');
@@ -190,21 +171,16 @@ Route::middleware('auth')->group(function () {
             Route::post('/privacy/sessions/revoke', [PrivacyController::class, 'revokeSession'])->name('privacy.sessions.revoke');
             Route::post('/privacy/sign-out-all', [PrivacyController::class, 'signOutAllDevices'])->name('privacy.sign-out-all');
 
-            // Notification Preferences
-            Route::middleware('notifications')->group(function () {
-                Route::get('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'index'])->name('notifications.preferences');
-                Route::put('/notifications/preferences', [\App\Http\Controllers\User\NotificationPreferencesController::class, 'update'])->name('notifications.preferences.update');
-            });
 
             // Profile actions (PUT endpoints, no UI page)
             Route::put('/profile', [UserSettingsController::class, 'updateProfile'])->name('profile.update');
             Route::put('/profile/password', [UserSettingsController::class, 'updatePassword'])->name('password.update');
             Route::post('/profile/avatar', [UserSettingsController::class, 'updateAvatar'])->name('avatar.update');
 
-            // API Keys
-            Route::get('/api-keys', [UserSettingsController::class, 'apiKeys'])->name('api-keys');
-            Route::post('/api-keys', [UserSettingsController::class, 'storeApiKey'])->name('api-keys.store');
-            Route::delete('/api-keys/{key}', [UserSettingsController::class, 'destroyApiKey'])->name('api-keys.destroy');
+            // BYOK (bring-your-own-key)
+            Route::get('/byok', [UserSettingsController::class, 'byok'])->name('byok');
+            Route::post('/byok', [UserSettingsController::class, 'storeByok'])->name('byok.store');
+            Route::delete('/byok/{key}', [UserSettingsController::class, 'destroyByok'])->name('byok.destroy');
 
             // Billing
             Route::get('/billing', [\App\Http\Controllers\Billing\BillingController::class, 'index'])->name('billing');
@@ -216,8 +192,6 @@ Route::middleware('auth')->group(function () {
                 Route::post('/credit-topup/checkout', [CreditTopupController::class, 'checkout'])->name('credit-topup.checkout');
             });
 
-            // Search
-            Route::get('/search', [\App\Http\Controllers\User\SearchController::class, 'index'])->name('search');
 
             // Account Deletion
             Route::post('/account/delete', [UserSettingsController::class, 'requestAccountDeletion'])->name('account.delete');
@@ -315,12 +289,16 @@ Route::middleware('auth')->group(function () {
                 Route::post('/tooltip/dismiss', [OnboardingController::class, 'dismissTooltip'])->name('tooltip.dismiss');
             });
 
+            // UI preferences bag (credit-low banner dismissal, etc.)
+            Route::put('/ui-preferences', [OnboardingController::class, 'updatePreferences'])->name('preferences.patch');
+
             // Notifications
             Route::prefix('notifications')->name('notifications.')->middleware('notifications')->group(function () {
                 Route::get('/', [NotificationController::class, 'index'])->name('index');
                 Route::get('/latest', [NotificationController::class, 'latest'])->name('latest');
                 Route::post('/read-all', [NotificationController::class, 'markAllRead'])->name('read-all');
                 Route::post('/{notification}/read', [NotificationController::class, 'markRead'])->name('read');
+                Route::put('/preferences', [NotificationController::class, 'updatePreferences'])->name('preferences.update');
             });
         });
 
@@ -332,9 +310,9 @@ Route::middleware('auth')->group(function () {
 });
 
 // ─── AI Tools ───────────────────────────────
-Route::get('/ai-tools', [TemplateController::class, 'index'])->name('ai.tools.index');
-Route::get('/ai-tools/category/{slug}', [TemplateController::class, 'category'])->name('ai.tools.category');
-Route::get('/ai-tools/{slug}', [TemplateController::class, 'show'])->name('ai.tools.show');
+Route::get('/ai-tools', [AiToolController::class, 'index'])->name('ai.tools.index');
+Route::get('/ai-tools/category/{slug}', [AiToolController::class, 'category'])->name('ai.tools.category');
+Route::get('/ai-tools/{slug}', [AiToolController::class, 'show'])->name('ai.tools.show');
 
 // ─── RAG Tools Suite ────────────────────────
 Route::middleware(['auth', 'verified'])->prefix('tools/rag')->name('rag.')->group(function () {
@@ -413,25 +391,7 @@ Route::match(['get', 'post'], '/webhooks/2checkout', [PaymentWebhookController::
 
 
 // ─── Dynamic CMS Pages ──────────────────────
-Route::post('/{slug}/password', function (Request $request, string $slug) {
-    $page = Page::query()->where('slug', $slug)->published()->firstOrFail();
-
-    $request->validate([
-        'password' => ['required', 'string'],
-    ]);
-
-    $password = (string) $page->getAttribute('password');
-    $validPassword = Hash::check($request->string('password')->toString(), $password)
-        || hash_equals($password, $request->string('password')->toString());
-
-    if (! $validPassword) {
-        return back()->withErrors(['password' => translate('The password is incorrect.')]);
-    }
-
-    $request->session()->put("page_unlocked_{$page->id}", true);
-
-    return redirect()->route('page.show', $page->slug);
-})->middleware('throttle:public,10,60')->name('page.password');
+Route::post('/{slug}/password', [PageController::class, 'unlock'])->middleware('throttle:public,10,60')->name('page.password');
 
 // ─── Voiceover Studio (addon — must be before CMS catch-all) ──────────
 Route::middleware(['web', 'auth'])->prefix('voiceover-studio')->name('addon.vo.user.')->group(function () {
@@ -469,54 +429,4 @@ Route::middleware(['web', 'auth'])->prefix('content-repurposer')->name('addon.rp
     Route::delete('/{job}', [\Addons\AiRepurposer\Http\Controllers\RepurposerController::class, 'destroy'])->name('destroy');
 });
 
-Route::get('/{slug}', function (string $slug) {
-    $page = Page::query()->with('parent')->where('slug', $slug)->published()->firstOrFail();
-    $isPasswordProtected = filled($page->getAttribute('password'));
-    $isUnlocked = ! $isPasswordProtected || session()->has("page_unlocked_{$page->id}");
-
-    if (! $isUnlocked) {
-        return Inertia::render('PagePassword', [
-            'page' => $page->only(['id', 'title', 'slug', 'meta_title', 'meta_description']),
-        ]);
-    }
-
-    $canonical = route('page.show', $page->slug);
-    $ogImage = $page->og_image ?: $page->featured_image;
-    $description = $page->meta_description ?: $page->excerpt;
-
-    return Inertia::render('Page', [
-        'page' => $page,
-        'seo' => [
-            'title' => $page->meta_title ?: $page->title,
-            'description' => $description,
-            'keywords' => $page->meta_keywords,
-            'canonical' => $canonical,
-            'robots' => $isPasswordProtected ? 'noindex,nofollow' : 'index,follow',
-            'og_image' => $ogImage ? asset('storage/'.$ogImage) : null,
-            'schema' => [
-                '@context' => 'https://schema.org',
-                '@type' => 'WebPage',
-                'name' => $page->title,
-                'description' => $description,
-                'url' => $canonical,
-                'breadcrumb' => [
-                    '@type' => 'BreadcrumbList',
-                    'itemListElement' => [
-                        ['@type' => 'ListItem', 'position' => 1, 'name' => settings('app_name', 'Application'), 'item' => route('home')],
-                        ['@type' => 'ListItem', 'position' => 2, 'name' => $page->title, 'item' => $canonical],
-                    ],
-                ],
-            ],
-        ],
-        'contactSettings' => $page->slug === 'contact' ? [
-            'enabled' => (bool) settings('contact_enabled', true),
-            'subject_mode' => settings('contact_subject_mode', 'text'),
-            'subject_options' => collect(explode("\n", (string) settings('contact_subject_options', '')))
-                ->map(fn ($subject) => trim($subject))
-                ->filter()
-                ->values()
-                ->all(),
-            'success_message' => settings('contact_success_message', 'Your message has been sent successfully. We will get back to you soon!'),
-        ] : null,
-    ]);
-})->where('slug', '^(?!admin|api|install|chat|ai-tools|blog|help|image-editor|social|video|video-creator).*$')->name('page.show');
+Route::get('/{slug}', [PageController::class, 'show'])->where('slug', '^(?!admin|api|install|chat|ai-tools|blog|help|image-editor|ai-image|social|video|video-creator).*$')->name('page.show');

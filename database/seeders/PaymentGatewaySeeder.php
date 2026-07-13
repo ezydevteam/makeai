@@ -16,7 +16,6 @@ class PaymentGatewaySeeder extends Seeder
                     'name' => $gateway['name'],
                     'description' => $gateway['description'] ?? null,
                     'sort_order' => array_search($index, array_keys(config('payment-gateways', [])), true) + 1,
-                    'processing_fee_currency' => settings('pricing_currency_code', 'USD'),
                 ]
             );
         }

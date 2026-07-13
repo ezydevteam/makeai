@@ -7,8 +7,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SupportCannedResponse extends Model
 {
-    protected $connection = 'mysql';
-
     protected $fillable = [
         'title',
         'content',

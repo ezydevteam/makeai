@@ -119,6 +119,8 @@ class AddonService
         $manifest['license_ok'] = $this->checkLicenseRequirement($manifest);
         $manifest['envato_item_id'] = $manifest['envato_item_id'] ?? null;
         $manifest['has_logo'] = $this->hasLogo($addon->slug);
+        $manifest['installed_at'] = $addon->installed_at?->toDateString();
+        $manifest['activated_at'] = $addon->activated_at?->toDateString();
 
         return $manifest;
     }
@@ -204,6 +206,12 @@ class AddonService
         ]);
 
         Cache::forget('active_addons_list');
+
+        // Bundled addons ship in addons/ (not installed via zip), so their migrations
+        // and seeders never run unless we do it here on activation. migrateAddon() only
+        // applies pending migrations and addon seeders are written idempotently, so this
+        // is safe to run on every (re)activation.
+        $this->installAddonSchema($slug);
 
         return true;
     }
@@ -385,12 +393,29 @@ class AddonService
         $settingsMap = collect($settings)->keyBy('key');
 
         foreach ($values as $key => $value) {
-            $type = $settingsMap[$key]['type'] ?? 'string';
-            if (($settingsMap[$key]['type'] ?? null) === 'encrypted') {
-                $type = 'encrypted';
-            }
-            settings_set("addon_{$slug}_{$key}", $value, $type, 'addon');
+            settings_set(
+                "addon_{$slug}_{$key}",
+                $value,
+                $this->storableType($settingsMap[$key]['type'] ?? 'string'),
+                'addon'
+            );
         }
+    }
+
+    /**
+     * Map a manifest setting type onto the settings.type enum
+     * (string|boolean|integer|json|encrypted). Manifest types outside that set —
+     * 'file', 'select', 'color', 'icon', 'textarea' — must be persisted as a
+     * compatible enum value or MySQL rejects the row. Each of those only ever holds
+     * a scalar string and casts as a plain string on read, so 'string' is the correct
+     * storage type; the file-upload and widget handling key off the addon.json
+     * manifest type, not this column.
+     */
+    private function storableType(string $manifestType): string
+    {
+        $storable = ['string', 'boolean', 'integer', 'json', 'encrypted'];
+
+        return in_array($manifestType, $storable, true) ? $manifestType : 'string';
     }
 
     // ─── menu items ──────────────────────────────────────────
@@ -480,6 +505,102 @@ class AddonService
         }
     }
 
+    /**
+     * Bring an addon's schema + reference data up to date: run its migrations, then its
+     * seeders. Used by both the zip-install path and activation of bundled addons so a
+     * fresh Envato install ends up with the addon's tables created AND seeded. Best-effort:
+     * failures are logged, not thrown, so a seeding hiccup doesn't abort activation.
+     */
+    public function installAddonSchema(string $slug): void
+    {
+        try {
+            $this->migrateAddon($slug);
+        } catch (\Throwable $e) {
+            // migrateAddon already logged; keep going so the operator can retry.
+        }
+
+        $this->seedAddon($slug);
+        $this->seedDefaultSettings($slug);
+    }
+
+    /**
+     * Persist each manifest-declared setting's default value if it has never been saved.
+     * Addon settings are only written when the operator first hits Save, so before that
+     * `addon_setting()` calls fall through to whatever hardcoded fallback the consuming
+     * code passed — which can disagree with the advertised default (e.g. guest max tokens
+     * declared 1000 but read with a 4096 fallback). Seeding the declared defaults on
+     * activation makes runtime behavior match the manifest from the first request, and
+     * makes the admin settings form show real values immediately. Never clobbers a value
+     * the operator has already set.
+     */
+    public function seedDefaultSettings(string $slug): void
+    {
+        foreach ($this->getAddonSettings($slug) as $setting) {
+            if (! isset($setting['key'])) {
+                continue;
+            }
+
+            $storageKey = "addon_{$slug}_{$setting['key']}";
+
+            // Ask the table, not settings(): a read can't distinguish a stored value from
+            // the fallback the caller passed, so it would report unsaved keys as persisted.
+            if (Setting::isPersisted($storageKey)) {
+                continue; // respect the operator's value
+            }
+
+            settings_set(
+                $storageKey,
+                $setting['default'] ?? null,
+                $this->storableType($setting['type'] ?? 'string'),
+                'addon'
+            );
+        }
+    }
+
+    /**
+     * Run every seeder shipped in an addon's database/seeders directory. Addon seeders
+     * must be idempotent (e.g. updateOrCreate + a Schema::hasTable guard). The file is
+     * required before class_exists so it works even for addons whose seeder namespace
+     * isn't pre-mapped in composer's PSR-4 autoload.
+     */
+    private function seedAddon(string $slug): void
+    {
+        $seedersPath = $this->addonsPath . '/' . $slug . '/database/seeders';
+        if (! File::isDirectory($seedersPath)) {
+            return;
+        }
+
+        $namespace = str_replace('-', '', ucwords($slug, '-'));
+
+        // Prefer a single addon-level DatabaseSeeder if present (it orchestrates the rest);
+        // otherwise run each discovered seeder file.
+        $files = collect(File::files($seedersPath))
+            ->filter(fn ($f) => $f->getExtension() === 'php');
+
+        $dbSeeder = $files->first(fn ($f) => $f->getFilenameWithoutExtension() === 'DatabaseSeeder');
+        $targets = $dbSeeder ? collect([$dbSeeder]) : $files;
+
+        foreach ($targets as $file) {
+            $class = "Addons\\{$namespace}\\Database\\Seeders\\" . $file->getFilenameWithoutExtension();
+
+            try {
+                if (! class_exists($class)) {
+                    require_once $file->getPathname();
+                }
+                if (! class_exists($class)) {
+                    continue;
+                }
+
+                \Artisan::call('db:seed', [
+                    '--class' => $class,
+                    '--force' => true,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to seed addon '{$slug}' with {$class}: " . $e->getMessage());
+            }
+        }
+    }
+
     // ─── helpers ─────────────────────────────────────────────
 
     private function checkLicenseRequirement(array $config): bool
@@ -494,18 +615,26 @@ class AddonService
     }
 
     /**
-     * GATE: addons with requires_license must have a verified addon license from AddonLicenseService.
+     * GATE: addons sold as their own Envato item must have a verified addon license.
+     *
+     * Keyed on `envato_item_id`, NOT `requires_license`. The two mean different things
+     * and conflating them made every bundled addon impossible to activate:
+     *
+     *   requires_license → the minimum main-app license TYPE (1 = Regular, 2 = Extended).
+     *                      Enforced in checkLicenseRequirement() as get_license_type() >= n.
+     *   envato_item_id   → this addon is a separate marketplace purchase, so it needs its
+     *                      own purchase code registered in `addon_licenses`.
+     *
+     * A bundled addon carries no item id, so it ships with the app and needs no second
+     * code — only the main license, which checkLicenseRequirement() has already verified.
      */
     private function checkAddonLicense(string $slug, array $manifest): bool
     {
-        $requiresLicense = $manifest['requires_license'] ?? false;
-        if (! $requiresLicense) {
-            return true; // no separate license needed
+        if (empty($manifest['envato_item_id'])) {
+            return true; // bundled with the app — no separate purchase code
         }
 
-        $licenseService = app(\App\Services\AddonLicenseService::class);
-
-        return $licenseService->isLicensed($slug);
+        return app(\App\Services\AddonLicenseService::class)->isLicensed($slug);
     }
 
     private function dropAddonTables(string $slug): void

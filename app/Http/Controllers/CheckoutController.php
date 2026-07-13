@@ -5,15 +5,18 @@ namespace App\Http\Controllers;
 use App\Http\Requests\BankPaymentProofRequest;
 use App\Http\Requests\CheckoutSessionRequest;
 use App\Models\Coupon;
+use App\Models\GatewaySubscription;
 use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\NotificationEventService;
+use App\Services\Payment\GatewaySubscriptionModifier;
 use App\Services\Payment\PaymentActivationService;
 use App\Services\Payment\PaymentGatewayManager;
 use App\Services\Pricing\PlanPriceResolver;
 use App\Services\Subscription\SubscriptionLifecycleService;
+use App\Services\Subscription\SubscriptionProrationService;
 use App\Support\CountryCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -43,6 +46,13 @@ class CheckoutController extends Controller
         $amount = (float) $cycle['amount'];
         $currency = $pricing['currency_code'];
 
+        // Upgrade proration: show the unused-credit deduction and charge the net.
+        // Only one-time gateways prorate through checkout — recurring (Stripe/PayPal)
+        // upgrades swap in place and let the gateway charge the prorated difference.
+        $currentSub = $this->activeSubscription($request->user());
+        $prorationCredit = $this->upgradeProrationCredit($currentSub, $plan, $validated['billing'], (bool) $cycle['is_trial']);
+        $netAmount = max(0, round($amount - $prorationCredit, 2));
+
         return Inertia::render('Checkout', [
             'plan' => [
                 'id' => $plan->id,
@@ -53,10 +63,19 @@ class CheckoutController extends Controller
                 'features' => $plan->features ?: [],
             ],
             'billing' => $validated['billing'],
+            'proration' => [
+                'credit_amount' => $prorationCredit,
+                'credit_formatted' => CountryCatalog::formatMoney($prorationCredit, $currency),
+                'from_plan' => $prorationCredit > 0 ? $currentSub?->plan?->name : null,
+                'net_amount' => $netAmount,
+                'net_formatted' => CountryCatalog::formatMoney($netAmount, $currency),
+            ],
             'pricing' => [
                 'country_code' => $pricing['country_code'],
                 'country_name' => $pricing['country_name'],
                 'currency_code' => $currency,
+                'display_currency_code' => $pricing['display_currency_code'],
+                'is_localized' => $pricing['is_localized'],
                 'source' => $pricing['source'],
                 'cycle' => $cycle,
             ],
@@ -68,11 +87,10 @@ class CheckoutController extends Controller
                 'is_test_mode' => $gateway->is_test_mode,
                 'processing_fee_type' => $gateway->processing_fee_type,
                 'processing_fee_value' => $gateway->processing_fee_value,
-                'processing_fee_currency' => $gateway->processing_fee_currency,
-                'fee_amount' => $gateways->processingFee($gateway, $amount),
-                'total_amount' => $gateways->totalWithFee($gateway, $amount),
-                'fee_formatted' => CountryCatalog::formatMoney($gateways->processingFee($gateway, $amount), $currency),
-                'total_formatted' => CountryCatalog::formatMoney($gateways->totalWithFee($gateway, $amount), $currency),
+                'fee_amount' => $gateways->processingFee($gateway, $netAmount),
+                'total_amount' => $gateways->totalWithFee($gateway, $netAmount),
+                'fee_formatted' => CountryCatalog::formatMoney($gateways->processingFee($gateway, $netAmount), $currency),
+                'total_formatted' => CountryCatalog::formatMoney($gateways->totalWithFee($gateway, $netAmount), $currency),
             ])->values(),
         ]);
     }
@@ -91,12 +109,57 @@ class CheckoutController extends Controller
             ->where('slug', $data['plan'])
             ->firstOrFail();
 
+        // Plan-change routing for a user who already holds a paid plan. These
+        // redirects only apply to RECURRING subscriptions (a card on file that
+        // auto-renews) — a one-time payer must be able to re-purchase the same
+        // plan (renew) or buy another plan through normal checkout.
+        $currentSub = $this->activeSubscription($request->user());
+        $isRecurring = (bool) $currentSub?->gateway_subscription_id;
+        $isUpgrade = false;
+        if ($currentSub && $currentSub->plan && ! $currentSub->plan->is_free) {
+            $change = app(SubscriptionProrationService::class)->classifyChange($currentSub->plan, $currentSub->billing_cycle, $plan, $data['billing']);
+
+            if ($isRecurring && $change === SubscriptionProrationService::SAME) {
+                return redirect()->route('user.dashboard.billing')
+                    ->with('info', translate('You are already on this plan.'));
+            }
+
+            if ($isRecurring && $change === SubscriptionProrationService::DOWNGRADE) {
+                return redirect()->route('user.dashboard.billing')
+                    ->with('info', translate('To move to a lower plan, schedule a downgrade from your billing page.'));
+            }
+
+            // A recurring, in-place-capable upgrade must NOT go through checkout: the
+            // gateway swaps the plan and charges the prorated difference itself. If it
+            // fell through here it would create a second subscription at the FULL
+            // recurring price, silently dropping the proration credit. Route it to the
+            // billing page where the in-place upgrade action lives.
+            if ($isRecurring && $change === SubscriptionProrationService::UPGRADE
+                && app(GatewaySubscriptionModifier::class)->supportsInPlace($currentSub)) {
+                return redirect()->route('user.dashboard.billing')
+                    ->with('info', translate('You already have an active subscription. Upgrade from your billing page to keep your renewal date and pay only the prorated difference.'));
+            }
+
+            $isUpgrade = $change === SubscriptionProrationService::UPGRADE;
+        }
+
         $countryCode = $request->attributes->get('pricing_country', session('pricing_country'));
         $pricing = $resolver->resolve($plan, $countryCode);
         $cycle = $pricing[$data['billing']];
         $coupon = $this->validCoupon($data['coupon'] ?? null, $plan, $request->user());
         $cycle = $this->discountedCycle($cycle, $coupon);
         $amount = (float) $cycle['amount'];
+
+        // Upgrade proration: credit the unused value of the current plan against
+        // today's charge (never below zero). Recurring, in-place-capable upgrades
+        // were already redirected above, so this only fires for one-time gateways.
+        $prorationCredit = $isUpgrade
+            ? $this->upgradeProrationCredit($currentSub, $plan, $data['billing'], (bool) $cycle['is_trial'])
+            : 0.0;
+        if ($prorationCredit > 0) {
+            $amount = max(0, round($amount - $prorationCredit, 2));
+        }
+
         $fee = $gateways->processingFee($gateway, $amount);
         $total = $gateways->totalWithFee($gateway, $amount);
 
@@ -133,6 +196,13 @@ class CheckoutController extends Controller
         // A 100%-off coupon leaves nothing to charge — gateways reject zero-amount
         // sessions, so activate the subscription directly.
         if ($amount <= 0) {
+            // Claim a global coupon slot before activating (prevents over-redemption of
+            // a max_uses-limited free coupon under concurrency). Reserved here, counted
+            // once — activation skips its own increment via 'coupon_global_reserved'.
+            if ($coupon && ! $coupon->reserveGlobalUse()) {
+                return back()->with('error', translate('This coupon has reached its usage limit.'));
+            }
+
             $payment = Payment::create([
                 'user_id' => $request->user()->id,
                 'plan_id' => $plan->id,
@@ -141,7 +211,10 @@ class CheckoutController extends Controller
                 'currency' => $pricing['currency_code'],
                 'status' => 'pending',
                 'type' => 'subscription',
-                'metadata' => $this->paymentMetadata($data['billing'], $pricing, $cycle, $gateway, $fee, $total, $coupon),
+                'metadata' => array_merge(
+                    $this->paymentMetadata($data['billing'], $pricing, $cycle, $gateway, $fee, $total, $coupon, $prorationCredit),
+                    $coupon ? ['coupon_global_reserved' => true] : [],
+                ),
             ]);
 
             // Hard-block duplicate free activations: unlike a paid checkout, there
@@ -149,6 +222,7 @@ class CheckoutController extends Controller
             // per-user coupon slot BEFORE granting anything. If the user already
             // redeemed it (or a concurrent request won the race), abort.
             if ($coupon && ! app(PaymentActivationService::class)->claimCouponRedemption($coupon, $payment)) {
+                $coupon->releaseGlobalUse();
                 $payment->update(['status' => 'failed']);
 
                 return back()->with('error', translate('You have already used this coupon.'));
@@ -159,8 +233,31 @@ class CheckoutController extends Controller
             return redirect()->route('user.dashboard')->with('success', translate('Subscription activated successfully.'));
         }
 
-        // Ensure payment_gateways table exists by creating payment with zero gateway metadata via DB
-        // (payment_gateways is created by an earlier migration)
+        // Concurrency guard for per-user-limited coupons on PAID checkouts. The DB
+        // redemption row is only written at activation, so two checkouts opened
+        // before either completes would both pass validCoupon() and both get the
+        // discount. Atomically reserve a per-user slot now (self-expiring), and
+        // release it if the checkout fails. The zero-amount path above is already
+        // guarded by the locking claimCouponRedemption().
+        $couponReservationKey = null;
+        if ($coupon && $coupon->per_user_limit !== null) {
+            $couponReservationKey = $coupon->reserveForUser($request->user());
+            if ($couponReservationKey === null) {
+                return back()->with('error', translate('You have already used this coupon.'));
+            }
+        }
+
+        // Claim a GLOBAL coupon slot before charging so a max_uses-limited coupon can't
+        // be over-redeemed by concurrent checkouts. Released on gateway failure below /
+        // on payment fail/reject; activation skips its own increment ('coupon_global_reserved').
+        if ($coupon) {
+            if (! $coupon->reserveGlobalUse()) {
+                Coupon::releaseReservation($couponReservationKey);
+
+                return back()->with('error', translate('This coupon has reached its usage limit.'));
+            }
+        }
+
         $payment = Payment::create([
             'user_id' => $request->user()->id,
             'plan_id' => $plan->id,
@@ -169,8 +266,16 @@ class CheckoutController extends Controller
             'currency' => $pricing['currency_code'],
             'status' => 'pending',
             'type' => 'subscription',
-            'metadata' => $this->paymentMetadata($data['billing'], $pricing, $cycle, $gateway, $fee, $total, $coupon),
+            'metadata' => array_merge(
+                $this->paymentMetadata($data['billing'], $pricing, $cycle, $gateway, $fee, $total, $coupon, $prorationCredit),
+                $couponReservationKey ? ['coupon_reservation_key' => $couponReservationKey] : [],
+                $coupon ? ['coupon_global_reserved' => true] : [],
+            ),
         ]);
+
+        if ($gateway->slug === 'stripe') {
+            return $this->createStripeSession($request, $payment, $plan, $data['billing']);
+        }
 
         if ($gateway->slug === 'bank_transfer') {
             app(NotificationEventService::class)->transactionPending($payment);
@@ -232,6 +337,14 @@ class CheckoutController extends Controller
         $currency = $pricing['currency_code'];
         $planTotal = (float) $cycle['amount'];
 
+        // Keep proration consistent with the charge computed in createSession —
+        // one-time gateways only (recurring upgrades never reach checkout).
+        $currentSub = $this->activeSubscription($request->user());
+        $prorationCredit = $this->upgradeProrationCredit($currentSub, $plan, $data['billing'], (bool) $cycle['is_trial']);
+        if ($prorationCredit > 0) {
+            $planTotal = max(0, round($planTotal - $prorationCredit, 2));
+        }
+
         return response()->json([
             'success' => true,
             'coupon' => $coupon ? [
@@ -244,6 +357,8 @@ class CheckoutController extends Controller
                 'discount_formatted' => CountryCatalog::formatMoney((float) $cycle['discount_amount'], $currency),
                 'vat_amount' => (float) $cycle['vat_amount'],
                 'vat_formatted' => CountryCatalog::formatMoney((float) $cycle['vat_amount'], $currency),
+                'proration_credit' => $prorationCredit,
+                'proration_formatted' => CountryCatalog::formatMoney($prorationCredit, $currency),
                 'plan_total_formatted' => CountryCatalog::formatMoney($planTotal, $currency),
             ],
             'gateways' => $gateways->enabled()->mapWithKeys(fn ($gateway) => [
@@ -321,6 +436,25 @@ class CheckoutController extends Controller
                 ->with('error', translate('PayPal payment could not be captured.'));
         }
 
+        // Recurring subscription: confirm it is active, then activate locally. The
+        // BILLING.SUBSCRIPTION.ACTIVATED webhook is the reliable server-side path;
+        // this handles the common case where the buyer returns to the browser.
+        if (data_get($payment->metadata, 'is_subscription')) {
+            $subscriptionId = $payment->gateway_payment_id;
+            $subscription = Http::withToken($token)->acceptJson()
+                ->get($this->payPalBaseUrl($gateway).'/v1/billing/subscriptions/'.$subscriptionId);
+
+            if ($subscription->successful() && in_array($subscription->json('status'), ['ACTIVE', 'APPROVED'], true)) {
+                $activation->activateFromPayment($payment, $subscriptionId, $subscriptionId);
+
+                return redirect()->route('checkout.pending', $payment)
+                    ->with('success', translate('Subscription activated successfully.'));
+            }
+
+            return redirect()->route('checkout.pending', $payment)
+                ->with('info', translate('Your PayPal subscription is being confirmed. This can take a moment.'));
+        }
+
         $response = Http::withToken($token)
             ->acceptJson()
             ->withBody('{}', 'application/json')
@@ -338,13 +472,32 @@ class CheckoutController extends Controller
             ->with('success', translate('Payment confirmed successfully.'));
     }
 
-    private function paymentMetadata(string $billing, array $pricing, array $cycle, PaymentGateway $gateway, float $fee, float $total, ?Coupon $coupon = null): array
+    /**
+     * The user's current active (or trialing) paid subscription, if any — used
+     * to route/prorate plan changes.
+     */
+    private function activeSubscription(?User $user): ?GatewaySubscription
+    {
+        if (! $user) {
+            return null;
+        }
+
+        return GatewaySubscription::query()
+            ->where('user_id', $user->id)
+            ->whereIn('status', [GatewaySubscription::STATUS_ACTIVE, GatewaySubscription::STATUS_TRIALING])
+            ->with('plan')
+            ->latest()
+            ->first();
+    }
+
+    private function paymentMetadata(string $billing, array $pricing, array $cycle, PaymentGateway $gateway, float $fee, float $total, ?Coupon $coupon = null, float $prorationCredit = 0.0): array
     {
         return [
             'billing_cycle' => $billing,
             'pricing_country' => $pricing['country_code'],
             'pricing_source' => $pricing['source'],
             'discount_amount' => $cycle['discount_amount'] ?? 0,
+            'proration_credit' => round($prorationCredit, 2),
             // Flat key read by activateFromPayment (usage counting) and by
             // renewFromGatewaySubscription (recurring discounts).
             'coupon_code' => $coupon?->code,
@@ -402,7 +555,14 @@ class CheckoutController extends Controller
     private function createPayPalOrder(Request $request, Payment $payment, PaymentGateway $gateway): RedirectResponse
     {
         $token = $this->payPalAccessToken($gateway);
-        if (! $token) { $payment->update(['status' => 'failed']); return back()->with('error', translate('PayPal is not configured.')); }
+        if (! $token) { $this->releaseCouponReservation($payment); $payment->update(['status' => 'failed']); return back()->with('error', translate('PayPal is not configured.')); }
+
+        // Recurring: when the plan has a PayPal plan id for this cycle (and no
+        // coupon / country-price override forces a one-time charge), create a
+        // real PayPal subscription instead of a one-time order.
+        if ($paypalPlanId = $this->paypalRecurringPlanId($payment)) {
+            return $this->createPayPalSubscription($request, $payment, $gateway, $token, $paypalPlanId);
+        }
 
         $baseUrl = $this->payPalBaseUrl($gateway);
         $response = Http::withToken($token)->acceptJson()->post($baseUrl.'/v2/checkout/orders', [
@@ -429,6 +589,124 @@ class CheckoutController extends Controller
         $payment->update(['gateway_payment_id' => $response->json('id'), 'metadata' => [...($payment->metadata ?: []), 'gateway_order_id' => $response->json('id')]]);
 
         if (! $approveUrl) { return redirect()->route('checkout.pending', $payment)->with('warning', translate('PayPal order was created, but approval URL was not returned.')); }
+        return redirect()->away($approveUrl);
+    }
+
+    /**
+     * Whether a payment qualifies for a recurring gateway subscription. Fixed-price
+     * recurring plans can't honour coupons or country-specific prices, and lifetime
+     * is one-time — those all fall back to a one-time charge.
+     */
+    private function isRecurringEligible(Payment $payment): bool
+    {
+        $meta = $payment->metadata ?: [];
+        $cycle = $meta['billing_cycle'] ?? 'monthly';
+
+        return in_array($cycle, ['monthly', 'yearly'], true)
+            && empty($meta['coupon_code'])
+            && ($meta['pricing_source'] ?? 'default') === 'default';
+    }
+
+    /**
+     * The PayPal plan id to subscribe this payment to, or null for a one-time order.
+     */
+    private function paypalRecurringPlanId(Payment $payment): ?string
+    {
+        if (! $this->isRecurringEligible($payment)) {
+            return null;
+        }
+
+        $plan = $payment->plan;
+
+        return ($payment->metadata['billing_cycle'] ?? 'monthly') === 'yearly'
+            ? $plan?->paypal_plan_yearly_id
+            : $plan?->paypal_plan_monthly_id;
+    }
+
+    /**
+     * The Stripe recurring price id for this payment, or null for a one-time charge.
+     */
+    private function stripeRecurringPriceId(Payment $payment): ?string
+    {
+        if (! $this->isRecurringEligible($payment)) {
+            return null;
+        }
+
+        $plan = $payment->plan;
+
+        return ($payment->metadata['billing_cycle'] ?? 'monthly') === 'yearly'
+            ? $plan?->stripe_price_yearly_id
+            : $plan?->stripe_price_monthly_id;
+    }
+
+    /**
+     * Create a Stripe Checkout session (Cashier). A recurring price when the plan
+     * has one and no coupon/country override applies; otherwise a one-time charge
+     * for the payment total (which already includes any processing fee/coupon).
+     */
+    private function createStripeSession(Request $request, Payment $payment, Plan $plan, string $billing): RedirectResponse
+    {
+        if (! config('cashier.secret')) {
+            $this->releaseCouponReservation($payment);
+            $payment->update(['status' => 'failed']);
+
+            return back()->with('error', translate('Stripe is not configured.'));
+        }
+
+        $user = $request->user();
+        $options = [
+            'success_url' => route('user.dashboard').'?checkout=success',
+            'cancel_url' => route('checkout.show', ['plan' => $plan->slug, 'billing' => $billing]),
+            'metadata' => [
+                'plan_slug' => $plan->slug,
+                'billing_cycle' => $billing,
+                'payment_id' => $payment->ulid,
+            ],
+        ];
+
+        $priceId = $this->stripeRecurringPriceId($payment);
+
+        $checkout = $priceId
+            ? $user->checkout([$priceId => 1], $options)
+            : $user->checkout([strtolower($payment->currency ?: 'usd') => (int) round((float) $payment->amount * 100)], $options);
+
+        return $checkout->redirect();
+    }
+
+    private function createPayPalSubscription(Request $request, Payment $payment, PaymentGateway $gateway, string $token, string $planId): RedirectResponse
+    {
+        $response = Http::withToken($token)->acceptJson()->post($this->payPalBaseUrl($gateway).'/v1/billing/subscriptions', [
+            'plan_id' => $planId,
+            'custom_id' => $payment->ulid,
+            'subscriber' => ['email_address' => $request->user()->email],
+            'application_context' => [
+                'brand_name' => settings('app_name', config('app.name')),
+                'return_url' => $this->absoluteUrl($request, '/checkout/paypal/return/'.$payment->ulid),
+                'cancel_url' => $this->absoluteUrl($request, '/checkout?plan='.$payment->plan?->slug.'&billing='.data_get($payment->metadata, 'billing_cycle', 'monthly')),
+                'user_action' => 'SUBSCRIBE_NOW',
+                'shipping_preference' => 'NO_SHIPPING',
+            ],
+        ]);
+
+        if ($response->failed()) {
+            $payment->update(['status' => 'failed', 'metadata' => [...($payment->metadata ?: []), 'gateway_error' => $response->json('message', 'PayPal subscription failed.')]]);
+
+            return back()->with('error', $response->json('message', translate('PayPal subscription could not be created.')));
+        }
+
+        $subscriptionId = (string) $response->json('id');
+        $approveLink = collect($response->json('links', []))->firstWhere('rel', 'approve');
+        $approveUrl = is_array($approveLink) ? ($approveLink['href'] ?? null) : null;
+
+        $payment->update([
+            'gateway_payment_id' => $subscriptionId,
+            'metadata' => [...($payment->metadata ?: []), 'paypal_subscription_id' => $subscriptionId, 'is_subscription' => true],
+        ]);
+
+        if (! $approveUrl) {
+            return redirect()->route('checkout.pending', $payment)->with('warning', translate('PayPal subscription was created, but the approval URL was not returned.'));
+        }
+
         return redirect()->away($approveUrl);
     }
 
@@ -570,8 +848,52 @@ class CheckoutController extends Controller
 
     private function failGatewaySession(Payment $payment, string $message): RedirectResponse
     {
+        $this->releaseCouponReservation($payment);
         $payment->update(['status' => 'failed', 'metadata' => [...($payment->metadata ?: []), 'gateway_error' => $message]]);
         return back()->with('error', translate($message));
+    }
+
+    /**
+     * Release a paid checkout's held coupon slot (see reserveForUser) so an
+     * abandoned/failed checkout doesn't lock the buyer out of retrying. Reservations
+     * self-expire, so this is a best-effort early release.
+     */
+    private function releaseCouponReservation(Payment $payment): void
+    {
+        if ($key = data_get($payment->metadata, 'coupon_reservation_key')) {
+            Coupon::releaseReservation((string) $key);
+        }
+
+        // Also return the global slot claimed at checkout, so a failed gateway session
+        // doesn't permanently consume one of a max_uses-limited coupon's uses.
+        if (data_get($payment->metadata, 'coupon_global_reserved') && ($code = data_get($payment->metadata, 'coupon_code'))) {
+            Coupon::where('code', $code)->first()?->releaseGlobalUse();
+        }
+    }
+
+    /**
+     * The unused-plan credit to deduct from a checkout upgrade, or 0.0 when it
+     * doesn't apply. Returns 0.0 for recurring, in-place-capable subscriptions:
+     * those upgrade through the gateway's own proration (Stripe prorated
+     * difference / PayPal revise), never through a checkout charge.
+     */
+    private function upgradeProrationCredit(?GatewaySubscription $currentSub, Plan $plan, string $billing, bool $isTrial): float
+    {
+        if ($isTrial || ! $currentSub || ! $currentSub->plan || $currentSub->plan->is_free) {
+            return 0.0;
+        }
+
+        if (app(GatewaySubscriptionModifier::class)->supportsInPlace($currentSub)) {
+            return 0.0;
+        }
+
+        $proration = app(SubscriptionProrationService::class);
+
+        if ($proration->classifyChange($currentSub->plan, $currentSub->billing_cycle, $plan, $billing) !== SubscriptionProrationService::UPGRADE) {
+            return 0.0;
+        }
+
+        return $proration->prorationCredit($currentSub);
     }
 
     private function minorAmount(float $amount, string $currency): int
@@ -598,13 +920,19 @@ class CheckoutController extends Controller
 
     private function discountedCycle(array $cycle, ?Coupon $coupon): array
     {
-        $discount = $coupon ? $coupon->calculateDiscount((float) $cycle['subtotal_amount']) : 0.0;
-        $discountedSubtotal = max(0, (float) $cycle['subtotal_amount'] - $discount);
+        $subtotal = (float) $cycle['subtotal_amount'];
+        $discount = $coupon ? $coupon->calculateDiscount($subtotal) : 0.0;
+        $discountedSubtotal = max(0, $subtotal - $discount);
         $vatAmount = round(($discountedSubtotal * (float) $cycle['vat_percentage']) / 100, 2);
 
         return [
             ...$cycle,
-            'subtotal_amount' => $discountedSubtotal,
+            // Keep the ORIGINAL subtotal for display — the discount is shown as its
+            // own line, so overwriting the subtotal with the net made the breakdown
+            // read inconsistently (Subtotal 8 / Discount 2 / Total 8). VAT and the
+            // charge total are still computed on the post-discount base below.
+            'subtotal_amount' => $subtotal,
+            'discounted_subtotal_amount' => $discountedSubtotal,
             'vat_amount' => $vatAmount,
             'amount' => $cycle['is_trial'] ? 0.0 : round($discountedSubtotal + $vatAmount, 2),
             'discount_amount' => $discount,

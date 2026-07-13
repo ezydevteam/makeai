@@ -15,9 +15,7 @@ class MailController extends Controller
 {
     private const SECRET_KEYS = [
         'mail_password',
-        'mailgun_secret',
         'ses_secret',
-        'postmark_token',
         'sendgrid_api_key',
     ];
 
@@ -31,7 +29,7 @@ class MailController extends Controller
             unset($settings[$key]);
         }
 
-        return Inertia::render('Admin/Mail/Index', [
+        return Inertia::render('Admin/Mail/Settings', [
             'settings' => $settings,
             'configuredSecrets' => $configuredSecrets,
         ]);
@@ -95,17 +93,10 @@ class MailController extends Controller
                 'mail_username' => translate('Username'),
                 'mail_password' => translate('Password'),
             ],
-            'mailgun' => [
-                'mailgun_domain' => translate('Domain'),
-                'mailgun_secret' => translate('Secret key'),
-            ],
             'ses' => [
                 'ses_key' => translate('Access key ID'),
                 'ses_secret' => translate('Secret access key'),
                 'ses_region' => translate('Region'),
-            ],
-            'postmark' => [
-                'postmark_token' => translate('Server token'),
             ],
             'sendgrid' => [
                 'sendgrid_api_key' => translate('API key'),

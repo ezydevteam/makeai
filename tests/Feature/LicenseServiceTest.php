@@ -383,6 +383,11 @@ class LicenseServiceTest extends TestCase
 
     public function test_install_wizard_step_4_checks_license_without_writing_to_database(): void
     {
+        // The installer is gated by InstallationMiddleware, which 404s /install/*
+        // once the app is installed. The local .env has INSTALLED=true, so force it
+        // off for this test to exercise the wizard.
+        config(['app.installed' => false]);
+
         $payload = [
             'valid' => true,
             'license_type' => 1,

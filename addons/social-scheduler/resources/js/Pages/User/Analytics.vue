@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3'
 import { computed } from 'vue'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: UserDashboardLayout })

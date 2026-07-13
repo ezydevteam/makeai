@@ -10,6 +10,7 @@ use App\Models\AiUsageLog;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\InAppNotificationService;
+use App\Services\MailService;
 use App\Services\NotificationEventService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -24,7 +25,10 @@ class UserManagementController extends Controller
      */
     public function index(Request $request)
     {
-        $query = User::query()->with('plan');
+        // The internal AI system account is not a customer — it is the account admin AI
+        // features bill against. It is excluded from the table and from every stat below, so
+        // "Total users" means what an admin thinks it means.
+        $query = User::query()->excludingInternal()->with('plan');
 
         // Status Filter
         if ($request->status !== null && $request->status !== '') {
@@ -55,20 +59,28 @@ class UserManagementController extends Controller
         $fourteenDaysAgo = $now->copy()->subDays(14);
 
         // 1. Total Users
-        $totalUsersCurrent = User::count();
-        $totalUsersPrevious = User::where('created_at', '<', $sevenDaysAgo)->count();
+        $totalUsersCurrent = User::excludingInternal()->count();
+        $totalUsersPrevious = User::excludingInternal()->where('created_at', '<', $sevenDaysAgo)->count();
 
         // 2. New Users (Last 7 Days)
-        $newUsersCurrent = User::where('created_at', '>=', $sevenDaysAgo)->count();
-        $newUsersPrevious = User::whereBetween('created_at', [$fourteenDaysAgo, $sevenDaysAgo])->count();
+        $newUsersCurrent = User::excludingInternal()->where('created_at', '>=', $sevenDaysAgo)->count();
+        $newUsersPrevious = User::excludingInternal()->whereBetween('created_at', [$fourteenDaysAgo, $sevenDaysAgo])->count();
 
-        // 3. Active Users
-        $activeUsersCurrent = User::where('is_active', true)->where('is_banned', false)->count();
-        $activeUsersPrevious = User::where('is_active', true)->where('is_banned', false)->where('created_at', '<', $sevenDaysAgo)->count();
+        // 3. Active (7d): users who actually logged in within the last 7 days,
+        //    compared against the prior 7-day window — a real engagement trend
+        //    (the old "is_active filtered by created_at" measured account age).
+        $activeUsersCurrent = User::excludingInternal()->where('last_login_at', '>=', $sevenDaysAgo)->count();
+        $activeUsersPrevious = User::excludingInternal()->whereBetween('last_login_at', [$fourteenDaysAgo, $sevenDaysAgo])->count();
 
-        // 4. Banned Users
-        $bannedUsersCurrent = User::where('is_banned', true)->count();
-        $bannedUsersPrevious = User::where('is_banned', true)->where('created_at', '<', $sevenDaysAgo)->count();
+        // 4. Banned Users: point-in-time total, trended against the total as it
+        //    stood a week ago. banned_at drives the flow; legacy bans (null
+        //    banned_at) are treated as pre-existing so they don't skew the delta.
+        $bannedUsersCurrent = User::excludingInternal()->where('is_banned', true)->count();
+        $bannedUsersPrevious = User::excludingInternal()->where('is_banned', true)
+            ->where(function ($q) use ($sevenDaysAgo) {
+                $q->whereNull('banned_at')->orWhere('banned_at', '<', $sevenDaysAgo);
+            })
+            ->count();
 
         $stats = [
             'total_users' => [
@@ -128,7 +140,9 @@ class UserManagementController extends Controller
      */
     public function trash(Request $request)
     {
-        $query = User::onlyTrashed()->with('plan');
+        // It can never be trashed (see User::booted), but an install that trashed it before
+        // that guard existed would still surface it here — and offer a Force Delete button.
+        $query = User::onlyTrashed()->excludingInternal()->with('plan');
 
         if ($request->status !== null && $request->status !== '') {
             $query->where('is_active', $request->status);
@@ -248,6 +262,9 @@ class UserManagementController extends Controller
 
         $data = $request->only(['name', 'email', 'credits', 'plan_id', 'is_active', 'country', 'profession']);
 
+        // Capture the pre-update state so we only notify on an actual transition.
+        $wasActive = (bool) $user->is_active;
+
         if ($request->filled('password')) {
             // Check password history (prevent reuse of last 3 passwords)
             $recentPasswords = $user->passwordHistory()->latest()->limit(3)->pluck('password')->toArray();
@@ -268,6 +285,16 @@ class UserManagementController extends Controller
 
         if ($request->filled('password')) {
             app(NotificationEventService::class)->passwordChanged($user);
+        }
+
+        // Email the user when their account is activated or suspended by an admin.
+        $isActive = (bool) $user->is_active;
+        if ($wasActive !== $isActive) {
+            app(MailService::class)->send(
+                $isActive ? 'account_activated' : 'account_suspended',
+                $user->email,
+                ['user_name' => $user->name]
+            );
         }
 
         return back()->with('success', translate('User updated successfully.'));
@@ -336,6 +363,12 @@ class UserManagementController extends Controller
      */
     public function destroy(User $user)
     {
+        // User::booted() already cancels this delete, but that would be a silent no-op with a
+        // "moved to trash" success message on top of it. Say what happened instead.
+        if ($user->isInternalAi()) {
+            return back()->with('error', translate('The internal AI account is a system account and cannot be deleted.'));
+        }
+
         $userName = $user->name;
         $user->delete();
 
@@ -359,6 +392,10 @@ class UserManagementController extends Controller
      */
     public function forceDelete(User $user)
     {
+        if ($user->isInternalAi()) {
+            return back()->with('error', translate('The internal AI account is a system account and cannot be deleted.'));
+        }
+
         $userName = $user->name;
         $user->forceDelete();
 
@@ -377,7 +414,11 @@ class UserManagementController extends Controller
             'value' => 'nullable|numeric|min:0|required_if:action,add_credits',
         ]);
 
-        $users = User::whereIn('id', $request->ids);
+        // excludingInternal() is load-bearing here, not belt-and-braces: these are mass-update
+        // and mass-delete QUERIES, which do not fire Eloquent model events — so the deleting()
+        // guard on the model cannot see them. The system account is filtered out of the set
+        // instead, which also stops a hand-crafted POST deactivating or crediting it.
+        $users = User::whereIn('id', $request->ids)->excludingInternal();
 
         switch ($request->action) {
             case 'activate':
@@ -415,7 +456,9 @@ class UserManagementController extends Controller
             abort(403, translate('This action is restricted to Super Admins.'));
         }
 
-        $query = User::onlyTrashed()->whereIn('id', $request->ids);
+        // forceDelete() on a query builder bypasses model events too — same reasoning as
+        // bulkAction(). The system account is excluded from the set rather than guarded.
+        $query = User::onlyTrashed()->whereIn('id', $request->ids)->excludingInternal();
 
         if ($request->action === 'restore') {
             $query->restore();
@@ -433,6 +476,12 @@ class UserManagementController extends Controller
      */
     public function impersonate(User $user)
     {
+        // Nobody signs in as the system account. It has a random password, no owner, and a
+        // session as it would be a live login to an account that bypasses credit limits.
+        if ($user->isInternalAi()) {
+            return back()->with('error', translate('The internal AI account is a system account and cannot be impersonated.'));
+        }
+
         if (! $user->is_active || $user->is_banned) {
             return back()->with('error', translate('You cannot impersonate a deactivated or banned user.'));
         }
@@ -501,7 +550,7 @@ class UserManagementController extends Controller
             fputcsv($file, $columns);
 
             // Stream in chunks so exporting a large user base never exhausts memory.
-            User::query()->with('plan')->orderBy('id')->lazy(500)->each(function (User $user) use ($file) {
+            User::query()->excludingInternal()->with('plan')->orderBy('id')->lazy(500)->each(function (User $user) use ($file) {
                 fputcsv($file, [
                     $user->ulid,
                     $user->name,
@@ -527,5 +576,28 @@ class UserManagementController extends Controller
         $user->update(['is_active' => !$user->is_active]);
         $statusText = $user->is_active ? translate('User account activated successfully.') : translate('User account deactivated successfully.');
         return back()->with('success', $statusText);
+    }
+
+    /**
+     * Ban or unban a user. A ban is an app-wide lockout enforced by the
+     * NotBanned middleware, TokenGuard, and the comment/review/ticket guards.
+     * `banned_at` is stamped/cleared automatically by the User model saving hook.
+     */
+    public function toggleBan(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'ban_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $banning = ! $user->is_banned;
+
+        $user->update([
+            'is_banned' => $banning,
+            'ban_reason' => $banning ? ($validated['ban_reason'] ?? null) : null,
+        ]);
+
+        return back()->with('success', $banning
+            ? translate('User banned successfully.')
+            : translate('User unbanned successfully.'));
     }
 }

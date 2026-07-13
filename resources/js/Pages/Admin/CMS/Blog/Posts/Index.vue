@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
@@ -135,7 +135,7 @@ const bulkActionOptions = computed<SelectOption[]>(() => {
         return [
             { value: '', label: t('Bulk Actions') },
             { value: 'restore', label: t('Restore Selected') },
-            // Permanent deletion is irreversible — Super Admins only.
+            // Permanent deletion is irreversible â€” Super Admins only.
             ...(isSuperAdmin.value ? [{ value: 'force-delete', label: t('Delete Permanently') }] : []),
         ]
     }
@@ -379,9 +379,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <Head :title="isTrashed ? t('Blog Trash') : t('Blog Posts')" />    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
+    <Head :title="isTrashed ? t('Blog Trash') : t('Blog Posts')" />
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                     {{ isTrashed ? t('Blog Trash') : t('Blog Posts') }}
                 </h1>
@@ -390,11 +391,11 @@ onBeforeUnmount(() => {
                 </p>
             </div>
 
-            <div class="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
+            <div class="flex items-center gap-3 shrink-0">
                 <template v-if="isTrashed">
                     <Link
                         :href="route('admin.blog.posts.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 w-full sm:w-auto"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                     >
                         <i class="ti ti-arrow-left text-base"></i>
                         {{ t('Back to Posts') }}
@@ -404,14 +405,14 @@ onBeforeUnmount(() => {
                     <Link
                         v-if="hasTrashedPosts"
                         :href="route('admin.blog.posts.trash')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 w-full sm:w-auto"
+                        class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:!border-red-900/30 dark:hover:!bg-red-900/30 dark:hover:!text-red-300"
                     >
                         <i class="ti ti-trash text-base"></i>
                         {{ t('Trash') }}
                     </Link>
                     <Link
                         :href="route('admin.blog.posts.create')"
-                        class="btn-primary inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition w-full sm:w-auto"
+                        class="grow btn-primary-admin inline-flex items-center justify-center gap-2"
                     >
                         <i class="ti ti-plus text-base"></i>
                         {{ t('Create Post') }}
@@ -464,9 +465,6 @@ onBeforeUnmount(() => {
             <StatsCard
                 :title="t('Total Views')"
                 :value="stats.views.value"
-                :comparison="stats.views.comparison.label"
-                :comparison-detail="t('vs last week')"
-                :comparison-type="stats.views.comparison.type"
                 color="accent"
             >
                 <template #icon>
@@ -478,7 +476,7 @@ onBeforeUnmount(() => {
         <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
             <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+                    <div class="flex-1 min-w-[220px] md:max-w-sm">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -564,7 +562,7 @@ onBeforeUnmount(() => {
                             <button
                                 type="button"
                                 :disabled="!bulkAction || selected.length === 0"
-                                class="btn-primary inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto"
+                                class="btn-primary-admin inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto"
                                 @click="runBulkAction"
                             >
                                 {{ t('Apply') }}

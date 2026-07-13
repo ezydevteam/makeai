@@ -2,13 +2,14 @@
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onClickOutside } from '@vueuse/core'
-import AppSelect from '@/Components/AppSelect.vue'
-import TagsInput from '@/Components/TagsInput.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import TagsInput from '@/Components/UI/TagsInput.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -43,7 +44,6 @@ interface BlogPost {
     canonical_url: string | null
     schema_type: 'Article' | 'BlogPosting' | 'NewsArticle'
     no_index: boolean
-    template: 'default' | 'full_width' | 'sidebar_left' | 'sidebar_right' | 'no_sidebar'
     show_author: boolean
     show_date: boolean
     show_reading_time: boolean
@@ -121,7 +121,6 @@ const form = useForm({
     canonical_url: props.post?.canonical_url ?? '',
     schema_type: props.post?.schema_type ?? 'BlogPosting',
     no_index: props.post?.no_index ?? false,
-    template: props.post?.template ?? 'default',
     show_author: props.post?.show_author ?? true,
     show_date: props.post?.show_date ?? true,
     show_reading_time: props.post?.show_reading_time ?? props.defaults.show_reading_time,
@@ -209,14 +208,6 @@ const schemaTypeOptions = computed<SelectOption[]>(() => [
     { value: 'NewsArticle', label: 'News Article' },
 ])
 
-const templateOptions = computed<SelectOption[]>(() => [
-    { value: 'default', label: t('Default') },
-    { value: 'full_width', label: t('Full Width') },
-    { value: 'sidebar_left', label: t('Sidebar Left') },
-    { value: 'sidebar_right', label: t('Sidebar Right') },
-    { value: 'no_sidebar', label: t('No Sidebar') },
-])
-
 const publishMenuOpen = ref(false)
 const publishMenuRef = ref<HTMLElement | null>(null)
 
@@ -288,7 +279,6 @@ const editorPayload = () => ({
     canonical_url: form.canonical_url,
     schema_type: form.schema_type,
     no_index: form.no_index,
-    template: form.template,
     show_author: form.show_author,
     show_date: form.show_date,
     show_reading_time: form.show_reading_time,
@@ -440,9 +430,9 @@ onBeforeUnmount(() => {
 <template>
     <Head :title="isEditing ? t('Edit Blog Post') : t('Create Blog Post')" />
 
-    <div class="max-w-7xl mx-auto px-6">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+    <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
+        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="flex-1">
                 <div class="flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditing ? t('Edit Blog Post') : t('Create Blog Post') }}</h1>
                     <span v-if="isAutosaving" class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">{{ t('Auto-saving...') }}</span>
@@ -452,64 +442,64 @@ onBeforeUnmount(() => {
                 </div>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Write content and configure SEO, layout, and publishing details.') }}</p>
             </div>
-                <div class="flex flex-col gap-3 sm:flex-row">
-                    <Link :href="route('admin.blog.posts.index')" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-primary-300 dark:bg-surface-900 dark:border-surface-800 dark:text-gray-300">
-                        <i class="ti ti-arrow-left text-base"></i>
-                        {{ t('Back') }}
-                    </Link>
-                    <a v-if="currentPostUlid" :href="route('admin.blog.posts.preview', currentPostUlid)" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:border-primary-300 dark:bg-surface-900 dark:border-surface-800 dark:text-gray-300">
-                        <i class="ti ti-eye text-base"></i>
-                        {{ t('Preview') }}
-                    </a>
-                    <div ref="publishMenuRef" class="relative">
-                        <div class="inline-flex overflow-hidden rounded-lg shadow-sm ring-1 ring-primary-600/20">
-                            <button @click="submit" :disabled="form.processing" type="button" class="bg-primary-500 inline-flex items-center justify-center gap-2 !rounded-l-lg !rounded-r-none px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
-                                <i class="ti ti-device-floppy text-base"></i>
-                                {{ form.processing ? t('Saving...') : primaryActionLabel }}
-                            </button>
-                            <button
-                                type="button"
-                                class="bg-primary-500 inline-flex items-center justify-center !rounded-r-lg !rounded-l-none px-2 text-white disabled:opacity-60"
-                                :aria-label="t('Change post status')"
-                                @click="publishMenuOpen = !publishMenuOpen"
-                            >
-                                <i class="ti ti-chevron-down text-base"></i>
-                            </button>
-                        </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <Link :href="route('admin.blog.posts.index')" class="inline-flex items-center justify-center gap-2 rounded-xl transition px-3 py-2 border border-gray-200 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-gray-800 dark:hover:bg-gray-900/20 dark:hover:text-gray-300">
+                    <i class="ti ti-arrow-left text-base"></i>
+                    {{ t('Back') }}
+                </Link>
+                <a v-if="currentPostUlid" :href="route('admin.blog.posts.preview', currentPostUlid)" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl transition px-3 py-2 border border-gray-200 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
+                    <i class="ti ti-eye text-base"></i>
+                    {{ t('Preview') }}
+                </a>
+                <div ref="publishMenuRef" class="relative">
+                    <div class="inline-flex overflow-hidden rounded-xl shadow-sm ring-1 ring-primary-600/20">
+                        <button @click="submit" :disabled="form.processing" type="button" class="bg-primary-500 inline-flex items-center justify-center gap-2 !rounded-l-xl !rounded-r-none px-3 py-2.5 text-sm font-medium text-white disabled:opacity-60">
+                            <i class="ti ti-device-floppy text-base"></i>
+                            {{ form.processing ? t('Saving...') : primaryActionLabel }}
+                        </button>
+                        <button
+                            type="button"
+                            class="bg-primary-500 inline-flex items-center justify-center !rounded-r-xl !rounded-l-none px-2 text-white disabled:opacity-60"
+                            :aria-label="t('Change post status')"
+                            @click="publishMenuOpen = !publishMenuOpen"
+                        >
+                            <i class="ti ti-chevron-down text-base"></i>
+                        </button>
+                    </div>
 
-                        <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Save as Draft') }}
-                                </span>
-                                <i v-if="form.status === 'draft'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('scheduled')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-calendar-time text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Schedule Post') }}
-                                </span>
-                                <i v-if="form.status === 'scheduled'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('private')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-lock-star text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Save as Private') }}
-                                </span>
-                                <i v-if="form.status === 'private'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('published')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-rocket text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Publish Now') }}
-                                </span>
-                                <i v-if="form.status === 'published'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                        </div>
+                    <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Save as Draft') }}
+                            </span>
+                            <i v-if="form.status === 'draft'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('scheduled')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-calendar-time text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Schedule Post') }}
+                            </span>
+                            <i v-if="form.status === 'scheduled'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('private')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-lock-star text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Save as Private') }}
+                            </span>
+                            <i v-if="form.status === 'private'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('published')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-rocket text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Publish Now') }}
+                            </span>
+                            <i v-if="form.status === 'published'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
                     </div>
                 </div>
             </div>
+        </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
             <main class="space-y-5">
@@ -581,14 +571,10 @@ onBeforeUnmount(() => {
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div v-for="field in toggles" :key="field.key" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/60">
                             <div class="flex items-center gap-3">
-                                <button
-                                    type="button"
-                                    class="relative h-6 w-12 rounded-full transition-colors"
-                                    :class="form[field.key] ? 'bg-emerald-500 dark:bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'"
-                                    @click="form[field.key] = !form[field.key]"
-                                >
-                                    <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform" :class="form[field.key] ? 'translate-x-6' : 'translate-x-0'"></span>
-                                </button>
+                                <AppSwitch
+                                    :model-value="Boolean(form[field.key])"
+                                    @update:model-value="val => form[field.key] = val"
+                                />
                                 <div>
                                     <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t(field.label) }}</p>
                                 </div>
@@ -608,9 +594,6 @@ onBeforeUnmount(() => {
                         </div>
                         <div>
                             <AppSelect v-model="form.author_id" :options="authorOptions" :label="t('Author')" :placeholder="t('Select author')" />
-                        </div>
-                        <div>
-                            <AppSelect v-model="form.template" :options="templateOptions" :label="t('Template')" />
                         </div>
                     </div>
                 </section>

@@ -22,11 +22,8 @@ return new class extends Migration
             if (! Schema::hasColumn('pages', 'og_image')) {
                 $table->string('og_image', 500)->nullable()->after('meta_keywords');
             }
-            if (! Schema::hasColumn('pages', 'template')) {
-                $table->enum('template', ['default', 'full_width', 'blank', 'landing'])->default('default')->after('og_image');
-            }
             if (! Schema::hasColumn('pages', 'featured_image')) {
-                $table->string('featured_image', 500)->nullable()->after('template');
+                $table->string('featured_image', 500)->nullable()->after('og_image');
             }
             if (! Schema::hasColumn('pages', 'show_title')) {
                 $table->boolean('show_title')->default(true)->after('featured_image');
@@ -90,7 +87,6 @@ return new class extends Migration
                 'excerpt',
                 'meta_keywords',
                 'og_image',
-                'template',
                 'featured_image',
                 'show_title',
                 'show_breadcrumbs',

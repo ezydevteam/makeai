@@ -44,7 +44,6 @@ return new class extends Migration
             $table->enum('status', ['pending', 'approved', 'spam'])->default('pending');
             $table->string('guest_name')->nullable();
             $table->string('guest_email')->nullable();
-            $table->string('ip_address', 45)->nullable();
             $table->integer('likes_count')->default(0);
             $table->timestamps();
             $table->softDeletes();

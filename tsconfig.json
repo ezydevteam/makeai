@@ -14,7 +14,8 @@
         "isolatedModules": true,
         "noEmit": true,
         "paths": {
-            "@/*": ["./resources/js/*"]
+            "@/*": ["./resources/js/*"],
+            "@themes/*": ["./resources/themes/*"]
         },
         "types": ["vite/client", "node"]
     },
@@ -22,6 +23,9 @@
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
         "resources/js/**/*.vue",
+        "resources/themes/**/*.ts",
+        "resources/themes/**/*.d.ts",
+        "resources/themes/**/*.vue",
         "addons/**/*.ts",
         "addons/**/*.d.ts",
         "addons/**/*.vue"

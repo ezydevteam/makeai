@@ -13,7 +13,6 @@ class Document extends Model
         'content',
         'tool_slug',
         'word_count',
-        'folder_id',
     ];
 
     public function user()

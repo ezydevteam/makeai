@@ -17,9 +17,7 @@ return new class extends Migration
             $table->boolean('is_test_mode')->default(true);
             $table->enum('processing_fee_type', ['none', 'percentage', 'fixed'])->default('none');
             $table->decimal('processing_fee_value', 10, 2)->default(0);
-            $table->string('processing_fee_currency', 3)->default('USD');
             $table->json('credentials')->nullable();
-            $table->json('settings')->nullable();
             $table->integer('sort_order')->default(0);
             $table->timestamps();
 

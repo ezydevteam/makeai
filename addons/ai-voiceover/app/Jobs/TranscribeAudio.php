@@ -36,7 +36,7 @@ class TranscribeAudio implements ShouldQueue
         $credits = (int) addon_setting('ai-voiceover', 'credits_stt', 10);
         $user = User::find($episode->user_id);
 
-        if (! $user || $user->credits < $credits) {
+        if (! $user || (! credit_quota_mode() && $user->credits < $credits)) {
             return; // Silent skip — insufficient credits
         }
 

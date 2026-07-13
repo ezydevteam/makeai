@@ -37,16 +37,40 @@ class PlanPriceResolver
             ? $plan->countryPrices->first(fn ($price) => $price->country_code === $countryCode && $price->is_active)
             : null;
 
-        $currencyCode = strtoupper($countryPrice?->currency_code ?: settings('pricing_currency_code', $plan->currency_code ?: 'USD'));
+        // CHARGE currency: a country-specific price's currency (an explicit, intended
+        // local price), else the single store base currency. This is what the customer
+        // is actually billed — checkout re-resolves and charges this, never a display value.
+        $currencyCode = strtoupper($countryPrice?->currency_code ?: base_currency());
+
+        // DISPLAY currency: when there is NO explicit country price and auto-localize is
+        // on, convert the base charge to the visitor's local currency for display only
+        // (billing still happens in the base currency — the confirmed "charge base unless
+        // per-country" rule). rate 1.0 / same currency ⇒ not localized.
+        $displayCurrency = $currencyCode;
+        $displayRate = 1.0;
+        if (! $countryPrice && (bool) settings('pricing_auto_localize', true)) {
+            $local = CountryCatalog::currencyForCountry($countryCode);
+            if ($local && strtoupper($local) !== $currencyCode) {
+                $rate = convert_currency(1.0, $currencyCode, strtoupper($local));
+                if ($rate > 0 && abs($rate - 1.0) > 1e-9) {
+                    $displayCurrency = strtoupper($local);
+                    $displayRate = $rate;
+                }
+            }
+        }
+
+        $isLocalized = $displayCurrency !== $currencyCode;
 
         return [
             'country_code' => $countryCode,
             'country_name' => CountryCatalog::countryName($countryCode),
-            'currency_code' => $currencyCode,
+            'currency_code' => $currencyCode,          // charge currency
+            'display_currency_code' => $displayCurrency, // localized display currency
+            'is_localized' => $isLocalized,
             'source' => $countryPrice ? 'country' : 'default',
-            'monthly' => $this->cycle($plan, $countryPrice, 'monthly', $currencyCode),
-            'yearly' => $this->cycle($plan, $countryPrice, 'yearly', $currencyCode),
-            'lifetime' => $this->cycle($plan, $countryPrice, 'lifetime', $currencyCode),
+            'monthly' => $this->cycle($plan, $countryPrice, 'monthly', $currencyCode, $displayCurrency, $displayRate),
+            'yearly' => $this->cycle($plan, $countryPrice, 'yearly', $currencyCode, $displayCurrency, $displayRate),
+            'lifetime' => $this->cycle($plan, $countryPrice, 'lifetime', $currencyCode, $displayCurrency, $displayRate),
         ];
     }
 
@@ -66,6 +90,7 @@ class PlanPriceResolver
                 'is_featured' => $plan->is_featured,
                 'is_free' => $plan->is_free,
                 'is_active' => $plan->is_active,
+                'sort_order' => (int) $plan->sort_order,
                 'trial_all_countries' => $plan->trial_all_countries,
                 'yearly_savings' => $this->yearlySavings($resolved),
                 'pricing' => $resolved,
@@ -73,8 +98,9 @@ class PlanPriceResolver
         });
     }
 
-    private function cycle(Plan $plan, mixed $countryPrice, string $cycle, string $currencyCode): array
+    private function cycle(Plan $plan, mixed $countryPrice, string $cycle, string $currencyCode, ?string $displayCurrency = null, float $displayRate = 1.0): array
     {
+        $displayCurrency ??= $currencyCode;
         $priceColumn = 'price_'.$cycle;
         $originalColumn = 'original_price_'.$cycle;
         $trialColumn = 'trial_'.$cycle.'_days';
@@ -95,12 +121,16 @@ class PlanPriceResolver
             'amount' => $isTrial ? 0.0 : $totalAmount,
             'subtotal_amount' => $isTrial ? 0.0 : $subtotal,
             'original_amount' => $originalValue === null ? null : (float) $originalValue,
-            'vat_percentage' => $vatPercentage,
-            'vat_amount' => $vatAmount,
+            // A trial period is free — no VAT is charged, so don't surface a VAT line.
+            'vat_percentage' => $isTrial ? 0.0 : $vatPercentage,
+            'vat_amount' => $isTrial ? 0.0 : $vatAmount,
             'formatted' => CountryCatalog::formatMoney($isTrial ? 0 : $totalAmount, $currencyCode),
             'subtotal_formatted' => CountryCatalog::formatMoney($isTrial ? 0 : $subtotal, $currencyCode),
             'original_formatted' => $originalValue === null ? null : CountryCatalog::formatMoney($originalValue, $currencyCode),
-            'vat_formatted' => CountryCatalog::formatMoney($vatAmount, $currencyCode),
+            'vat_formatted' => CountryCatalog::formatMoney($isTrial ? 0 : $vatAmount, $currencyCode),
+            // Localized DISPLAY of the total (billing still happens in currency_code).
+            'display_amount' => $isTrial ? 0.0 : round($totalAmount * $displayRate, 2),
+            'display_formatted' => CountryCatalog::formatMoney($isTrial ? 0 : round($totalAmount * $displayRate, 2), $displayCurrency),
             'uses_default' => $countryValue === null,
             'is_trial' => $isTrial,
             'trial_days' => $trialDays,

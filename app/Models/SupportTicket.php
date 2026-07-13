@@ -11,8 +11,6 @@ class SupportTicket extends Model
 {
     use SoftDeletes;
 
-    protected $connection = 'mysql';
-
     protected $fillable = [
         'ticket_number',
         'user_id',

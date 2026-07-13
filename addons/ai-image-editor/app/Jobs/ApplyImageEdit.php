@@ -27,10 +27,13 @@ class ApplyImageEdit implements ShouldQueue
     public int $timeout = 600;
     public int $tries = 3;
     public array $backoff = [60, 300, 600];
-    public string $queue = 'media';
 
     public function __construct(public readonly int $editId)
     {
+        // Set here, not as a property default: Queueable already declares $queue
+        // with no default, and redeclaring it with one is a fatal trait-composition
+        // error — this is what made this addon's test suite unloadable.
+        $this->queue = 'media';
     }
 
     public function handle(ImageEditorService $service): void
@@ -46,6 +49,22 @@ class ApplyImageEdit implements ShouldQueue
         try {
             $outputPath = $service->apply($edit);
             $outputUrl = Storage::disk('public')->url($outputPath);
+
+            // Post-generation safety gate: discard unsafe output before it is
+            // saved or served, and refund the credits charged up front. No-op
+            // unless Content Moderation is on in `block` mode; flag mode logs only.
+            if (\App\Services\ContentModerationService::fromSettings()->imageViolates($outputUrl, 'image-editor')) {
+                Storage::disk('public')->delete($outputPath);
+                $this->refundCredits($edit, 'Image edit blocked by content safety — refund');
+                $edit->update([
+                    'status' => 'failed',
+                    'error_message' => 'This edit was blocked by content safety filters.',
+                ]);
+
+                event(new ImageEditCompleted($edit));
+
+                return;
+            }
 
             $absPath = Storage::disk('public')->path($outputPath);
             [$width, $height] = file_exists($absPath) ? getimagesize($absPath) : [null, null];
@@ -75,24 +94,37 @@ class ApplyImageEdit implements ShouldQueue
                 'error_message' => Str::limit($e->getMessage(), 500),
             ]);
 
-            if ($edit->credits_deducted > 0) {
-                DB::table('users')
-                    ->where('id', $edit->user_id)
-                    ->increment('credits', $edit->credits_deducted);
-
-                $user = $edit->session->user;
-                DB::table('credit_transactions')->insert([
-                    'user_id' => $edit->user_id,
-                    'amount' => $edit->credits_deducted,
-                    'balance_after' => $user?->credits,
-                    'type' => 'refund',
-                    'description' => 'Image edit failed — refund: ' . $edit->ulid,
-                    'created_at' => now(),
-                ]);
-            }
+            $this->refundCredits($edit, 'Image edit failed — refund');
 
             event(new ImageEditCompleted($edit));
         }
+    }
+
+    /**
+     * Refund the credits deducted up front for this edit and record the
+     * transaction. No-op when nothing was charged.
+     */
+    private function refundCredits(IeEdit $edit, string $reason): void
+    {
+        if ($edit->credits_deducted <= 0) {
+            return;
+        }
+
+        $user = $edit->session->user;
+        if (! $user) {
+            return;
+        }
+
+        // Mode-correct: metered mode (Extended + billing) returns wallet credits;
+        // quota mode (Regular license) winds back the consumed daily/monthly allowance
+        // instead — the up-front charge went through the mode-aware deduct_credits()
+        // helper, so the refund must match it (a raw credits increment would hand a
+        // quota-mode user free wallet balance and leave their allowance spent).
+        $user->refundCredits(
+            (float) $edit->credits_deducted,
+            $reason . ': ' . $edit->ulid,
+            ['edit_ulid' => $edit->ulid],
+        );
     }
 
     public function failed(\Throwable $e): void
@@ -108,11 +140,8 @@ class ApplyImageEdit implements ShouldQueue
             'error_message' => Str::limit($e->getMessage(), 500),
         ]);
 
-        if ($edit->credits_deducted > 0) {
-            DB::table('users')
-                ->where('id', $edit->user_id)
-                ->increment('credits', $edit->credits_deducted);
-        }
+        // Mode-aware refund (see refundCredits()) — never raw-increment the wallet.
+        $this->refundCredits($edit, 'Image edit failed — refund');
     }
 
     public function saveToLibrary(IeEdit $edit): void

@@ -12,14 +12,13 @@ class ToolChainRun extends Model
 
     protected $fillable = [
         'chain_id', 'user_id', 'status', 'step_outputs',
-        'total_tokens', 'total_credits', 'started_at', 'completed_at',
+        'total_tokens', 'started_at', 'completed_at',
     ];
 
     protected function casts(): array
     {
         return [
             'step_outputs' => 'array',
-            'total_credits' => 'decimal:4',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];

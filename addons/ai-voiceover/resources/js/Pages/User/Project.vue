@@ -4,7 +4,7 @@ import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 
 defineOptions({ layout: UserDashboardLayout })
 

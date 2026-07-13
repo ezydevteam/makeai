@@ -25,10 +25,10 @@ class SidebarBuilderRequest extends FormRequest
             'blocks.*.config.description' => ['nullable', 'string', 'max:300'],
             'blocks.*.config.zone_id' => ['nullable', 'string', 'max:120'],
             'blocks.*.config.content' => ['nullable', 'string', 'max:10000'],
-            'position' => ['required', 'string', 'in:left,right'],
+            // Placement is controlled per-page (page.sidebar_position), and the
+            // sidebar only renders on custom pages with show_sidebar, so a global
+            // position / show_on_pages control here did nothing — removed.
             'sticky' => ['required', 'boolean'],
-            'show_on_pages' => ['present', 'array'],
-            'show_on_pages.*' => ['string', 'max:100'],
         ];
     }
 
@@ -44,8 +44,6 @@ class SidebarBuilderRequest extends FormRequest
             ])
             ->values()
             ->all();
-
-        $data['show_on_pages'] = $data['show_on_pages'] ?? [];
 
         return $data;
     }

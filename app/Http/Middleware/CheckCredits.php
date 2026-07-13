@@ -83,7 +83,7 @@ class CheckCredits
                     $user,
                     settings('default_ai_provider', 'openai'),
                     $model,
-                    'template',
+                    'tool',
                     0,
                     0,
                     [

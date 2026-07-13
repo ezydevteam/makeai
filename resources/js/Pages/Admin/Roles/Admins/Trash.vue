@@ -1,9 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -107,7 +107,7 @@ const roleOptions = computed(() => [
 
 const bulkActionOptions = computed(() => [
     { value: 'restore', label: t('Restore Administrators') },
-    // Permanent deletion is irreversible — Super Admins only.
+    // Permanent deletion is irreversible â€” Super Admins only.
     ...(isSuperAdmin.value ? [{ value: 'force_delete', label: t('Permanently Delete Administrators') }] : []),
 ])
 
@@ -295,7 +295,7 @@ const forceDeleteAdmin = (admin: AdminItem) => {
 
                 <Link
                     :href="route('admin.admins.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back to Admins') }}
@@ -305,7 +305,7 @@ const forceDeleteAdmin = (admin: AdminItem) => {
             <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                        <div class="flex-1 min-w-[240px]">
+                        <div class="flex-1 min-w-[240px] md:max-w-sm">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -364,7 +364,7 @@ const forceDeleteAdmin = (admin: AdminItem) => {
                                 <div :title="applyDisabledReason" class="w-full sm:w-auto">
                                     <button
                                         type="button"
-                                        class="btn-primary w-full sm:w-auto rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                        class="btn-primary-admin w-full sm:w-auto rounded-xl px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                                         :disabled="isApplyDisabled"
                                         @click="applyBulkAction"
                                     >

@@ -156,7 +156,6 @@ class AdminSeeder extends Seeder
                 'password' => Hash::make('admin123'),
                 'role_id' => $superAdmin->id,
                 'is_active' => true,
-                'must_change_password' => false,
             ]
         );
     }

@@ -8,11 +8,10 @@ use Illuminate\Support\Str;
 class Plan extends Model
 {
     protected $fillable = [
-        'name', 'slug', 'description', 'bottom_info_text', 'price_monthly', 'price_yearly', 'price_lifetime', 'currency_code',
+        'name', 'slug', 'description', 'bottom_info_text', 'price_monthly', 'price_yearly', 'price_lifetime',
         'original_price_monthly', 'original_price_yearly', 'original_price_lifetime', 'vat_percentage',
         'trial_all_countries',
-        'credits', 'features', 'ai_models', 'max_tokens_per_request',
-        'daily_token_limit', 'max_images_per_day', 'max_chats',
+        'credits', 'features',
         'is_featured', 'is_active', 'is_free', 'trial_days', 'sort_order',
         'stripe_price_monthly_id', 'stripe_price_yearly_id',
         'paypal_plan_monthly_id', 'paypal_plan_yearly_id',
@@ -30,7 +29,6 @@ class Plan extends Model
             'vat_percentage' => 'decimal:2',
             'credits' => 'decimal:2',
             'features' => 'array',
-            'ai_models' => 'array',
             'is_featured' => 'boolean',
             'is_active' => 'boolean',
             'is_free' => 'boolean',

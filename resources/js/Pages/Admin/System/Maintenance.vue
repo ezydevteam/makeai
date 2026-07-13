@@ -2,9 +2,10 @@
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import { defineAsyncComponent, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -74,15 +75,15 @@ const removeBackground = () => {
 <template>
     <Head :title="t('Maintenance Mode')" />
 
-        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <div class="flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Maintenance Mode') }}</h1>
                     <span
                         :class="status.is_maintenance
                             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                            : 'bg-white text-gray-600 dark:bg-surface-800 dark:text-gray-300'"
+                            : 'bg-gray-200 text-gray-700 dark:bg-surface-800 dark:text-gray-300'"
                         class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em]"
                     >
                         {{ status.is_maintenance ? t('On') : t('Off') }}
@@ -91,11 +92,36 @@ const removeBackground = () => {
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Customize the page visitors see while the platform is temporarily unavailable.') }}</p>
             </div>
 
-            <div class="flex flex-wrap gap-3">
+            <button
+                type="button"
+                :class="status.is_maintenance
+                    ? 'btn-primary-admin'
+                    : 'bg-red-600 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:bg-red-600 dark:hover:bg-red-500'"
+                class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-60"
+                :disabled="toggleForm.processing"
+                @click="confirmOpen = true"
+            >
+                <svg v-if="toggleForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                <span v-else>
+                    <i :class="status.is_maintenance ? 'ti ti-tools' : 'ti ti-tools-off'" class="mr-1"></i>
+                    {{ status.is_maintenance ? t('Go Live') : t('Go Maintenance') }}
+                </span>
+            </button>
+        </section>
+
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Settings') }}</h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the maintenance page content and access controls.') }}</p>
+                </div>
                 <button
                     type="button"
                     :disabled="maintenanceForm.processing"
-                    class="btn-primary inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                    class="shrink-0 btn-primary-admin inline-flex items-center justify-center gap-2 disabled:opacity-60"
                     @click="saveMaintenance"
                 >
                     <svg v-if="maintenanceForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -105,31 +131,6 @@ const removeBackground = () => {
                     <i v-else class="ti ti-device-floppy text-base"></i>
                     <span>{{ maintenanceForm.processing ? t('Saving...') : t('Save Settings') }}</span>
                 </button>
-                <button
-                    type="button"
-                    :class="status.is_maintenance
-                        ? 'btn-primary'
-                        : 'bg-danger-600 hover:bg-danger-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-300 dark:bg-danger-600 dark:hover:bg-danger-500'"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-60"
-                    :disabled="toggleForm.processing"
-                    @click="confirmOpen = true"
-                >
-                    <svg v-if="toggleForm.processing" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    <span v-else>
-                        <i :class="status.is_maintenance ? 'ti ti-tools' : 'ti ti-tools-off'" class="mr-1"></i>
-                        {{ status.is_maintenance ? t('Go Live') : t('Go Maintenance') }}
-                    </span>
-                </button>
-            </div>
-        </section>
-
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Settings') }}</h2>
-                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Configure the maintenance page content and access controls.') }}</p>
             </div>
 
             <div class="p-6">
@@ -144,7 +145,7 @@ const removeBackground = () => {
                         <input v-model="maintenanceForm.maintenance_estimated_restoration_time" type="datetime-local" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                         <span v-if="maintenanceForm.errors.maintenance_estimated_restoration_time" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_estimated_restoration_time }}</span>
                     </label>
-                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label class="col-span-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
                         {{ t('Allowed IPs') }}
                         <input v-model="maintenanceForm.maintenance_allowed_ips" type="text" :placeholder="t('Comma-separated IP addresses')" class="mt-2 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-surface-700 dark:bg-surface-800 dark:text-white">
                         <span v-if="maintenanceForm.errors.maintenance_allowed_ips" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_allowed_ips }}</span>
@@ -153,7 +154,7 @@ const removeBackground = () => {
 
                 <div class="mt-5">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Maintenance message') }}</label>
-                    <RichEditor v-model="maintenanceForm.maintenance_message" variant="full" />
+                    <RichEditor v-model="maintenanceForm.maintenance_message" variant="comment" />
                     <span v-if="maintenanceForm.errors.maintenance_message" class="mt-1 block text-xs text-danger-600">{{ maintenanceForm.errors.maintenance_message }}</span>
                 </div>
 
@@ -164,11 +165,11 @@ const removeBackground = () => {
                             <p class="mt-1 text-xs text-gray-500">{{ t('Optional image used behind the standalone maintenance page.') }}</p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <label class="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-300 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200">
+                            <label class="cursor-pointer rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-300 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200">
                                 {{ t('Choose Image') }}
                                 <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="selectBackground">
                             </label>
-                            <button v-if="backgroundPreview" type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-danger-600 hover:bg-danger-50" @click="removeBackground">{{ t('Remove') }}</button>
+                            <button v-if="backgroundPreview" type="button" class="rounded-xl px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50" @click="removeBackground">{{ t('Remove') }}</button>
                         </div>
                     </div>
                     <img v-if="backgroundPreview" :src="backgroundPreview" :alt="t('Maintenance background preview')" class="mt-4 h-36 w-full rounded-lg object-cover">
@@ -179,20 +180,14 @@ const removeBackground = () => {
     </div>
 
 
-    <Teleport to="body">
-        <div v-if="confirmOpen" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm" @click.self="confirmOpen = false">
-            <div class="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="p-6">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ status.is_maintenance ? t('Disable maintenance mode?') : t('Enable maintenance mode?') }}</h2>
-                    <p class="mt-2 text-sm text-gray-500">{{ status.is_maintenance ? t('Visitors will be able to access the platform again.') : t('Visitors will see the maintenance page while the admin panel remains available.') }}</p>
-                </div>
-                <div class="flex items-center justify-end gap-3 rounded-b-xl border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-surface-700 dark:bg-surface-800">
-                    <button type="button" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-surface-700" @click="confirmOpen = false">{{ t('Cancel') }}</button>
-                    <button type="button" :disabled="toggleForm.processing" class="rounded-lg btn-primary disabled:opacity-60" @click="toggleMaintenance">
-                        {{ status.is_maintenance ? t('Go Live') : t('Enter Maintenance') }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </Teleport>
+        <AppModal
+            :open="confirmOpen"
+            :title="status.is_maintenance ? t('Disable maintenance mode?') : t('Enable maintenance mode?')"
+            :subtitle="status.is_maintenance ? t('Visitors will be able to access the platform again.') : t('Visitors will see the maintenance page while the admin panel remains available.')"
+            :confirm-text="status.is_maintenance ? t('Go Live') : t('Enter Maintenance')"
+            :confirm-loading="toggleForm.processing"
+            confirm-variant="admin"
+            @close="confirmOpen = false"
+            @confirm="toggleMaintenance"
+        />
 </template>

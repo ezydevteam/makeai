@@ -1,8 +1,9 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -218,7 +219,7 @@ const save = () => form.post(route('admin.addons.settings.save', { slug: props.a
 </script>
 
 <template>
-    <Head :title="`${addon.name} ${t('Settings')} — Admin`" />
+    <Head :title="`${addon.name} ${t('Settings')} â€” Admin`" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -239,7 +240,7 @@ const save = () => form.post(route('admin.addons.settings.save', { slug: props.a
                 <button
                     type="button"
                     :disabled="form.processing"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary-admin px-5 py-2.5 text-sm font-semibold disabled:opacity-60"
                     @click="save"
                 >
                     <i class="ti ti-device-floppy text-base"></i>
@@ -260,20 +261,12 @@ const save = () => form.post(route('admin.addons.settings.save', { slug: props.a
                         <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ group.title }}</h2>
                         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ group.description }}</p>
                         </div>
-                        <button
+                        <AppSwitch
                             v-if="guestToggleSetting(group)"
-                            type="button"
-                            role="switch"
-                            :aria-checked="guestAccessEnabled(group)"
-                            class="relative mt-1 inline-flex h-6 w-11 shrink-0 rounded-full transition"
-                            :class="guestAccessEnabled(group) ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                            @click="setBooleanValue(guestToggleSetting(group)!.key)"
-                        >
-                            <span
-                                class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
-                                :class="guestAccessEnabled(group) ? 'translate-x-5' : 'translate-x-0.5'"
-                            ></span>
-                        </button>
+                            :model-value="guestAccessEnabled(group)"
+                            @update:model-value="setBooleanValue(guestToggleSetting(group)!.key)"
+                            class="mt-1"
+                        />
                     </div>
                 </div>
 
@@ -289,19 +282,10 @@ const save = () => form.post(route('admin.addons.settings.save', { slug: props.a
                                 <p v-if="setting.description" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ setting.description }}</p>
                                 <p v-else class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Enable or disable this behavior for the addon.') }}</p>
                             </div>
-                            <button
-                                type="button"
-                                role="switch"
-                                :aria-checked="resolveBoolean(getFormValue(setting.key))"
-                                class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition"
-                                :class="resolveBoolean(getFormValue(setting.key)) ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                                @click="setBooleanValue(setting.key)"
-                            >
-                                <span
-                                    class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
-                                    :class="resolveBoolean(getFormValue(setting.key)) ? 'translate-x-5' : 'translate-x-0.5'"
-                                ></span>
-                            </button>
+                            <AppSwitch
+                                :model-value="resolveBoolean(getFormValue(setting.key))"
+                                @update:model-value="setBooleanValue(setting.key)"
+                            />
                         </div>
 
                         <p v-if="formErrors[setting.key]" class="mt-2 text-xs text-danger-600">{{ formErrors[setting.key] }}</p>

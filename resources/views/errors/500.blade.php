@@ -1,7 +1,7 @@
 @php
     $appName = settings('app_name', 'Application');
     $primaryColor = settings('primary_color', '#ef4444');
-    $logoUrl = settings('app_logo_light') ? Storage::url(settings('app_logo_light')) : null;
+    $logoUrl = media_url(settings('site_logo_light')) ?: null;
     $isAdminError = request()->is('admin') || request()->is('admin/*');
     $pageTitle = translate('Server Error');
     $primaryActionUrl = $isAdminError ? route('admin.dashboard') : url('/');
@@ -82,7 +82,7 @@
         @if($logoUrl)
             <img src="{{ $logoUrl }}" alt="{{ $appName }}" class="logo-img">
         @else
-            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 2)->upper() }}</div>
+            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 1)->upper() }}</div>
         @endif
     </div>
     <div class="code" aria-label="500">
@@ -94,7 +94,7 @@
     <p>{{ translate("We're having trouble processing your request. Our team has been notified and we're working on a fix.") }}</p>
     <div class="actions">
         <a href="{{ $primaryActionUrl }}" class="btn btn-primary">🏠 {{ $primaryActionLabel }}</a>
-        <a href="mailto:{{ settings('contact_email', 'support@example.com') }}" class="btn btn-outline">📧 {{ translate('Contact Support') }}</a>
+        <a href="mailto:{{ settings('site_support_email', 'support@example.com') }}" class="btn btn-outline">📧 {{ translate('Contact Support') }}</a>
     </div>
     @if(config('app.debug'))
         @isset($exception)

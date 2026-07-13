@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import UserDashboardLayout from '@/Layouts/UserDashboardLayout.vue'
+import UserDashboardLayout from '@themes/default/js/Layouts/UserDashboardLayout.vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 

@@ -11,7 +11,7 @@ class AiOutputRating extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'user_id', 'tool_slug', 'document_id', 'generation_history_id',
+        'user_id', 'tool_slug', 'generation_history_id',
         'rating', 'feedback_text', 'model', 'provider', 'created_at',
     ];
 
@@ -30,11 +30,6 @@ class AiOutputRating extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function document(): BelongsTo
-    {
-        return $this->belongsTo(Document::class);
     }
 
     public function generationHistory(): BelongsTo

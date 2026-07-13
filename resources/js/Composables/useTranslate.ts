@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/vue3'
+import { usePage, router } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
 type TranslationReplacements = Record<string, string | number>
@@ -31,6 +31,18 @@ function applyReplacements(text: string, replace?: TranslationReplacements): str
 }
 
 /**
+ * Standalone translation function.
+ * Safe to call anywhere (even outside Vue components/setup context).
+ */
+let clientCache: Record<string, string> | null = null
+
+export function t(key: string, replace?: TranslationReplacements): string {
+    const props = ((router as any).page?.props?.translations as Record<string, string> | null) || clientCache
+    const text = props?.[key] ?? key
+    return applyReplacements(text, replace)
+}
+
+/**
  * Translation composable — uses translations shared via Inertia.
  *
  * Supports pluralization with pipe syntax:
@@ -41,8 +53,6 @@ function applyReplacements(text: string, replace?: TranslationReplacements): str
  * const { t } = useTranslate()
  * t('Welcome back, :name', { name: user.name })
  */
-let clientCache: Record<string, string> | null = null
-
 export function useTranslate(): TranslateComposable {
     const page = usePage()
 
@@ -55,10 +65,10 @@ export function useTranslate(): TranslateComposable {
         return clientCache ?? ({} as Record<string, string>)
     })
 
-    const t: TranslateComposable['t'] = (key, replace) => {
+    const tReactive: TranslateComposable['t'] = (key, replace) => {
         const text = translations.value[key] ?? key
         return applyReplacements(text, replace)
     }
 
-    return { t }
+    return { t: tReactive }
 }

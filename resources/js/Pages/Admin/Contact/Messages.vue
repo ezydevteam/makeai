@@ -1,14 +1,16 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -323,26 +325,26 @@ onBeforeUnmount(() => {
     <Head :title="t('Contact Messages')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Contact Messages') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Review inbound messages, reply to senders, and keep the contact inbox organized from one place.') }}
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="shrink-0 flex items-center gap-3">
                 <a
                     :href="route('admin.contact.messages.export')"
-                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
                 >
                     <i class="ti ti-file-export text-base"></i>
-                    {{ t('Export CSV') }}
+                    {{ t('Export') }}
                 </a>
                 <button
                     v-if="canManageSettings"
                     type="button"
-                    class="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
+                    class="grow btn-primary-admin inline-flex items-center gap-2"
                     @click="openSettingsModal"
                 >
                     <i class="ti ti-settings text-base"></i>
@@ -353,13 +355,13 @@ onBeforeUnmount(() => {
 
         <section class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(360px,0.85fr)]">
             <div class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                <div class="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between dark:border-surface-800">
-                    <div class="relative w-full max-w-xl">
+                <div class="flex flex-col gap-4 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-surface-800">
+                    <div class="flex-1 w-full sm:max-w-xs relative">
                         <i class="ti ti-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-gray-400"></i>
                         <input
                             ref="searchInput"
                             v-model="search"
-                            :placeholder="t('Search by name, email, or subject')"
+                            :placeholder="t('Search contact messages...')"
                             type="text"
                             class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-700 transition focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                             @focus="searchFocused = true"
@@ -379,8 +381,8 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
+                    <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end shrink-0">
+                        <div class="w-full sm:w-44">
                             <AppSelect
                                 v-model="status"
                                 :options="statusOptions"
@@ -463,7 +465,7 @@ onBeforeUnmount(() => {
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ selected.subject || t('No subject') }}</h2>
-                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ selected.name }} · {{ selected.email }}</p>
+                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ selected.name }} Â· {{ selected.email }}</p>
                             </div>
                             <span class="inline-flex rounded-full bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-500 dark:bg-surface-900/20 dark:text-gray-500">
                                 {{ new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(selected.created_at)) }}
@@ -495,7 +497,7 @@ onBeforeUnmount(() => {
                         <button
                             type="submit"
                             :disabled="replyForm.processing"
-                            class="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <i class="ti ti-send text-base"></i>
                             {{ replyForm.processing ? t('Sending...') : t('Send Reply') }}
@@ -513,146 +515,120 @@ onBeforeUnmount(() => {
             </aside>
         </section>
 
-        <div v-if="showSettingsModal && canManageSettings" class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]" @click.self="closeSettingsModal">
-            <div class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
-                <div class="border-b border-gray-200 px-6 py-3 dark:border-surface-700">
-                    <div class="flex items-start justify-between gap-4">
+        <AppModal
+            :open="showSettingsModal && canManageSettings"
+            max-width="max-w-4xl"
+            :title="t('Contact Settings')"
+            :subtitle="t('Configure the public contact form, routing emails, and the automatic reply experience for visitors.')"
+            has-form
+            @close="closeSettingsModal"
+        >
+            <div class="space-y-6">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-5">
+                        <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Form Setup') }}</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control how the contact form is displayed and what options visitors can select.') }}</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Contact Settings') }}</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">
-                                {{ t('Configure the public contact form, routing emails, and the automatic reply experience for visitors.') }}
-                            </p>
+                            <AppSelect
+                                v-model="settingsForm.contact_subject_mode"
+                                :options="subjectModeOptions"
+                                :label="t('Subject field')"
+                            />
                         </div>
-                        <button
-                            type="button"
-                            class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-surface-800"
-                            :aria-label="t('Close modal')"
-                            @click="closeSettingsModal"
-                        >
-                            <i class="ti ti-x text-base"></i>
-                        </button>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Success message') }}</label>
+                            <input
+                                v-model="settingsForm.contact_success_message"
+                                :placeholder="t('Enter the success message shown after submit')"
+                                type="text"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                        </div>
+
+                        <div v-if="settingsForm.contact_subject_mode === 'dropdown'" class="md:col-span-2">
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Dropdown subject options') }}</label>
+                            <textarea
+                                v-model="settingsForm.contact_subject_options"
+                                rows="6"
+                                :placeholder="t('Add one subject option per line')"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            ></textarea>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('One option per line. These options are used only when the subject field is set to dropdown mode.') }}</p>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="flex-1 overflow-y-auto p-6">
-                    <div class="space-y-6">
-                        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <div class="mb-5">
-                                <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Form Setup') }}</h4>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control how the contact form is displayed and what options visitors can select.') }}</p>
-                            </div>
-
-                            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div>
-                                    <AppSelect
-                                        v-model="settingsForm.contact_subject_mode"
-                                        :options="subjectModeOptions"
-                                        :label="t('Subject field')"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Success message') }}</label>
-                                    <input
-                                        v-model="settingsForm.contact_success_message"
-                                        :placeholder="t('Enter the success message shown after submit')"
-                                        type="text"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                </div>
-
-                                <div v-if="settingsForm.contact_subject_mode === 'dropdown'" class="md:col-span-2">
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Dropdown subject options') }}</label>
-                                    <textarea
-                                        v-model="settingsForm.contact_subject_options"
-                                        rows="6"
-                                        :placeholder="t('Add one subject option per line')"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    ></textarea>
-                                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('One option per line. These options are used only when the subject field is set to dropdown mode.') }}</p>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                            <div class="mb-5">
-                                <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Email Routing') }}</h4>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set the destination address and configure the automatic reply sent back to the visitor.') }}</p>
-                            </div>
-
-                            <div class="grid grid-cols-1 gap-4">
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Notification email') }}</label>
-                                    <input
-                                        v-model="settingsForm.contact_notification_email"
-                                        :placeholder="t('Enter the inbox email for contact notifications')"
-                                        type="email"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                </div>
-
-                                <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800">
-                                    <div class="flex items-start justify-between gap-4">
-                                        <div>
-                                            <h5 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Send auto reply') }}</h5>
-                                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Automatically send a confirmation email after a visitor submits the contact form.') }}</p>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            :aria-checked="settingsForm.contact_auto_reply_enabled"
-                                            class="relative inline-flex h-6 w-11 shrink-0 rounded-full transition"
-                                            :class="settingsForm.contact_auto_reply_enabled ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'"
-                                            @click="settingsForm.contact_auto_reply_enabled = !settingsForm.contact_auto_reply_enabled"
-                                        >
-                                            <span
-                                                class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition"
-                                                :class="settingsForm.contact_auto_reply_enabled ? 'translate-x-5' : 'translate-x-0.5'"
-                                            ></span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Auto reply subject') }}</label>
-                                    <input
-                                        v-model="settingsForm.contact_auto_reply_subject"
-                                        :placeholder="t('Enter the subject line for the reply email')"
-                                        type="text"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    >
-                                </div>
-
-                                <div>
-                                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Auto reply message') }}</label>
-                                    <textarea
-                                        v-model="settingsForm.contact_auto_reply_message"
-                                        rows="8"
-                                        :placeholder="t('Write the auto reply email body sent to visitors')"
-                                        class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
-                                    ></textarea>
-                                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Available variables: {name}, {email}, {subject}') }}</p>
-                                </div>
-                            </div>
-                        </section>
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-5">
+                        <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Email Routing') }}</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set the destination address and configure the automatic reply sent back to the visitor.') }}</p>
                     </div>
-                </div>
 
-                <div class="flex items-center justify-between gap-3 border-t border-gray-200 bg-gray-50 px-6 py-3 dark:border-surface-700 dark:bg-surface-800/80">
+                    <div class="grid grid-cols-1 gap-4">
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Notification email') }}</label>
+                            <input
+                                v-model="settingsForm.contact_notification_email"
+                                :placeholder="t('Enter the inbox email for contact notifications')"
+                                type="email"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                        </div>
+
+                        <div class="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800">
+                            <div class="flex items-start justify-between gap-4">
+                                <div>
+                                    <h5 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Send auto reply') }}</h5>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Automatically send a confirmation email after a visitor submits the contact form.') }}</p>
+                                </div>
+                                <AppSwitch v-model="settingsForm.contact_auto_reply_enabled" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Auto reply subject') }}</label>
+                            <input
+                                v-model="settingsForm.contact_auto_reply_subject"
+                                :placeholder="t('Enter the subject line for the reply email')"
+                                type="text"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            >
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Auto reply message') }}</label>
+                            <textarea
+                                v-model="settingsForm.contact_auto_reply_message"
+                                rows="8"
+                                :placeholder="t('Write the auto reply email body sent to visitors')"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            ></textarea>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Available variables: {name}, {email}, {subject}') }}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-between gap-3 w-full">
                     <div class="text-sm text-gray-500 dark:text-gray-400">
                         {{ t('Changes apply to the public contact form and automatic replies.') }}
                     </div>
                     <div class="flex items-center gap-3">
                         <button
                             type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
+                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
                             @click="closeSettingsModal"
                         >
                             {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
-                            class="btn-primary inline-flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="settingsForm.processing"
                             @click="submitSettings"
                         >
@@ -661,8 +637,8 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
                 </div>
-            </div>
-        </div>
+            </template>
+        </AppModal>
 
         <ActionConfirmModal
             :open="!!deleteTarget"

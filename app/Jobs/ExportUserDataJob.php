@@ -31,7 +31,11 @@ class ExportUserDataJob implements ShouldQueue
 
         try {
             $zipPath = $this->buildZip();
-            $expiresAt = now()->addHours(48);
+            // Align the download window with the file-retention window: the
+            // scheduled `exports:cleanup` deletes files under storage/app/exports
+            // after 24h, so advertising a 48h window would leave a 24h gap where
+            // the row looks downloadable but the file is already gone.
+            $expiresAt = now()->addHours(24);
 
             $this->exportRequest->update([
                 'status' => 'ready',

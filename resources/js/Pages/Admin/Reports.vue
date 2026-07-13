@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -20,14 +21,49 @@ interface ExportFile {
     format: string
 }
 
+interface ExportColumnMeta {
+    key: string
+    label: string
+}
+
+interface ExportTypeMeta {
+    value: string
+    label: string
+    filters?: string[]
+    columns?: ExportColumnMeta[]
+}
+
+interface ExportPreset {
+    id: number
+    name: string
+    dataset: string
+    format: string
+    filters: Record<string, string | string[]>
+    columns: string[]
+}
+
+interface ScheduledExport {
+    id: number
+    name: string
+    dataset: string
+    format: string
+    frequency: string
+    is_active: boolean
+    last_run_at: string | null
+    next_run_at: string | null
+    available: boolean
+}
+
 const props = defineProps<{
     recentExports: ExportFile[]
-    exportTypes: { value: string; label: string }[]
+    exportTypes: ExportTypeMeta[]
     isProAvailable: boolean
     plans: { value: string; label: string }[]
     gateways: { value: string; label: string }[]
     providers: { value: string; label: string }[]
     toolSlugs: { value: string; label: string }[]
+    presets: ExportPreset[]
+    schedules: ScheduledExport[]
 }>()
 
 const type = ref('users')
@@ -55,6 +91,212 @@ const estimatedRows = ref<number | null>(null)
 const estimateMessage = ref('')
 const estimateMessageTone = ref<'success' | 'error' | ''>('')
 const estimating = ref(false)
+
+// Column selection — driven by the dataset's column metadata from the registry.
+const selectedColumns = ref<string[]>([])
+const selectedTypeMeta = computed<ExportTypeMeta | undefined>(() =>
+    props.exportTypes.find((et) => et.value === type.value),
+)
+const availableColumns = computed<ExportColumnMeta[]>(() => selectedTypeMeta.value?.columns ?? [])
+
+// Default every column on, and re-sync whenever the dataset changes.
+watch(type, () => {
+    selectedColumns.value = availableColumns.value.map((c) => c.key)
+}, { immediate: true })
+
+function toggleColumn(key: string) {
+    const idx = selectedColumns.value.indexOf(key)
+    if (idx === -1) {
+        selectedColumns.value.push(key)
+    } else {
+        selectedColumns.value.splice(idx, 1)
+    }
+}
+function allColumnsSelected(): boolean {
+    return availableColumns.value.length > 0 && selectedColumns.value.length === availableColumns.value.length
+}
+function toggleAllColumns() {
+    selectedColumns.value = allColumnsSelected() ? [] : availableColumns.value.map((c) => c.key)
+}
+
+// --- Saved presets ---------------------------------------------------------
+const localPresets = ref<ExportPreset[]>([...props.presets])
+const presetName = ref('')
+const savingPreset = ref(false)
+const deletingPresetId = ref<number | null>(null)
+
+function jsonHeaders(): Record<string, string> {
+    return {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+    }
+}
+
+function currentFilters(): Record<string, string | string[]> {
+    const f: Record<string, string | string[]> = {}
+    const from = datePreset.value === 'custom' ? customDateFrom.value : dateFrom.value
+    const to = datePreset.value === 'custom' ? customDateTo.value : dateTo.value
+    if (from) f.date_from = from
+    if (to) f.date_to = to
+    if (statusFilter.value) f.status = statusFilter.value
+    if (planFilter.value) f.plan_id = planFilter.value
+    if (userFilter.value) f.user_id = userFilter.value
+    if (providerFilter.value.length) f.provider = providerFilter.value
+    if (gatewayFilter.value.length) f.gateway = gatewayFilter.value
+    if (toolFilter.value.length) f.tool_slug = toolFilter.value
+    return f
+}
+
+async function saveCurrentPreset() {
+    if (!presetName.value.trim() || savingPreset.value) return
+    savingPreset.value = true
+    try {
+        const columns = (selectedColumns.value.length && selectedColumns.value.length < availableColumns.value.length)
+            ? selectedColumns.value
+            : []
+        const res = await fetch(route('admin.reports.export.presets.store'), {
+            method: 'POST',
+            headers: jsonHeaders(),
+            body: JSON.stringify({ name: presetName.value.trim(), dataset: type.value, format: format.value, filters: currentFilters(), columns }),
+        })
+        const json = await res.json()
+        if (res.ok && json.preset) {
+            localPresets.value.unshift(json.preset)
+            presetName.value = ''
+        }
+    } finally {
+        savingPreset.value = false
+    }
+}
+
+async function applyPreset(preset: ExportPreset) {
+    // Set the dataset first, then let its change-watchers (reset filters +
+    // default columns) run before we lay the preset's values on top.
+    type.value = preset.dataset
+    await nextTick()
+    format.value = preset.format
+    const f = preset.filters || {}
+    statusFilter.value = (f.status as string) || ''
+    planFilter.value = (f.plan_id as string) || ''
+    userFilter.value = (f.user_id as string) || ''
+    providerFilter.value = Array.isArray(f.provider) ? [...f.provider] : []
+    gatewayFilter.value = Array.isArray(f.gateway) ? [...f.gateway] : []
+    toolFilter.value = Array.isArray(f.tool_slug) ? [...f.tool_slug] : []
+    if (f.date_from || f.date_to) {
+        datePreset.value = 'custom'
+        customDateFrom.value = (f.date_from as string) || ''
+        customDateTo.value = (f.date_to as string) || ''
+    }
+    if (preset.columns && preset.columns.length) {
+        selectedColumns.value = [...preset.columns]
+    }
+}
+
+async function deletePreset(id: number) {
+    if (deletingPresetId.value) return
+    deletingPresetId.value = id
+    try {
+        const res = await fetch(route('admin.reports.export.presets.destroy', { preset: id }), {
+            method: 'DELETE',
+            headers: jsonHeaders(),
+        })
+        if (res.ok) {
+            localPresets.value = localPresets.value.filter((p) => p.id !== id)
+        }
+    } finally {
+        deletingPresetId.value = null
+    }
+}
+
+// --- Scheduled exports ------------------------------------------------------
+const localSchedules = ref<ScheduledExport[]>([...props.schedules])
+const scheduleName = ref('')
+const scheduleFrequency = ref('weekly')
+const savingSchedule = ref(false)
+const togglingScheduleId = ref<number | null>(null)
+const deletingScheduleId = ref<number | null>(null)
+
+const frequencyOptions = [
+    { value: 'daily', label: t('Daily') },
+    { value: 'weekly', label: t('Weekly') },
+    { value: 'monthly', label: t('Monthly') },
+]
+
+function datasetLabel(key: string): string {
+    return props.exportTypes.find((e) => e.value === key)?.label ?? key
+}
+function frequencyLabel(value: string): string {
+    return frequencyOptions.find((f) => f.value === value)?.label ?? value
+}
+function formatDateTime(iso: string | null): string {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleString()
+}
+
+async function createSchedule() {
+    if (!scheduleName.value.trim() || savingSchedule.value) return
+    savingSchedule.value = true
+    try {
+        const columns = (selectedColumns.value.length && selectedColumns.value.length < availableColumns.value.length)
+            ? selectedColumns.value
+            : []
+        const res = await fetch(route('admin.reports.export.schedules.store'), {
+            method: 'POST',
+            headers: jsonHeaders(),
+            body: JSON.stringify({
+                name: scheduleName.value.trim(),
+                dataset: type.value,
+                format: format.value,
+                frequency: scheduleFrequency.value,
+                filters: currentFilters(),
+                columns,
+            }),
+        })
+        const json = await res.json()
+        if (res.ok && json.schedule) {
+            localSchedules.value.unshift(json.schedule)
+            scheduleName.value = ''
+        }
+    } finally {
+        savingSchedule.value = false
+    }
+}
+
+async function toggleSchedule(schedule: ScheduledExport) {
+    if (togglingScheduleId.value) return
+    togglingScheduleId.value = schedule.id
+    try {
+        const res = await fetch(route('admin.reports.export.schedules.toggle', { schedule: schedule.id }), {
+            method: 'PATCH',
+            headers: jsonHeaders(),
+        })
+        const json = await res.json()
+        if (res.ok && json.schedule) {
+            const idx = localSchedules.value.findIndex((s) => s.id === schedule.id)
+            if (idx !== -1) localSchedules.value[idx] = json.schedule
+        }
+    } finally {
+        togglingScheduleId.value = null
+    }
+}
+
+async function deleteSchedule(id: number) {
+    if (deletingScheduleId.value) return
+    deletingScheduleId.value = id
+    try {
+        const res = await fetch(route('admin.reports.export.schedules.destroy', { schedule: id }), {
+            method: 'DELETE',
+            headers: jsonHeaders(),
+        })
+        if (res.ok) {
+            localSchedules.value = localSchedules.value.filter((s) => s.id !== id)
+        }
+    } finally {
+        deletingScheduleId.value = null
+    }
+}
 
 const formats = [
     { value: 'xlsx', label: 'XLSX' },
@@ -138,6 +380,10 @@ async function doExport() {
         if (providerFilter.value.length) body.provider = providerFilter.value
         if (gatewayFilter.value.length) body.gateway = gatewayFilter.value
         if (toolFilter.value.length) body.tool_slug = toolFilter.value
+        // Only send a column whitelist when it's a strict subset (empty/all = every column).
+        if (selectedColumns.value.length && selectedColumns.value.length < availableColumns.value.length) {
+            body.columns = selectedColumns.value
+        }
 
         const res = await fetch(route('admin.reports.export'), {
             method: 'POST',
@@ -271,20 +517,12 @@ function timeAgo(ts: number): string {
 }
 
 const exportTypes = computed(() => {
-    const types = [...props.exportTypes]
-    if (props.isProAvailable) {
-        types.push({ value: 'revenue', label: 'Revenue' })
-    }
-    return types
+    // The backend registry already filters datasets by availability (Revenue,
+    // Affiliate, etc.), so the picker mirrors the server exactly.
+    return props.exportTypes
 })
 
 const pdfLimited = computed(() => format.value === 'pdf')
-
-const userStatusOptions = computed(() => [
-    { value: '', label: t('All') },
-    { value: 'active', label: t('Active') },
-    { value: 'inactive', label: t('Inactive') },
-])
 
 const revenueStatusOptions = computed(() => [
     { value: '', label: t('All') },
@@ -292,6 +530,42 @@ const revenueStatusOptions = computed(() => [
     { value: 'pending', label: t('Pending') },
     { value: 'refunded', label: t('Refunded') },
 ])
+
+// Which filter controls a dataset supports, from its registry metadata.
+const datasetFilters = computed<string[]>(() => selectedTypeMeta.value?.filters ?? [])
+function hasFilter(name: string): boolean {
+    return datasetFilters.value.includes(name)
+}
+
+// Contextual status options per dataset (the `status` filter means different
+// things for each). Falls back to a generic Active/Inactive pair.
+const statusOptions = computed(() => {
+    const all = { value: '', label: t('All') }
+    const map: Record<string, { value: string; label: string }[]> = {
+        'users': [all, { value: 'active', label: t('Active') }, { value: 'inactive', label: t('Inactive') }],
+        'ai-tools-catalog': [all, { value: 'active', label: t('Active') }, { value: 'inactive', label: t('Inactive') }],
+        'revenue': revenueStatusOptions.value,
+        'subscriptions': [all, { value: 'active', label: t('Active') }, { value: 'cancelled', label: t('Cancelled') }, { value: 'past_due', label: t('Past due') }],
+        'support-tickets': [all, { value: 'open', label: t('Open') }, { value: 'pending', label: t('Pending') }, { value: 'resolved', label: t('Resolved') }, { value: 'closed', label: t('Closed') }],
+        'affiliates': [all, { value: 'pending', label: t('Pending') }, { value: 'approved', label: t('Approved') }, { value: 'paid', label: t('Paid') }, { value: 'rejected', label: t('Rejected') }],
+        'affiliate-payouts': [all, { value: 'pending', label: t('Pending') }, { value: 'paid', label: t('Paid') }, { value: 'rejected', label: t('Rejected') }],
+        'affiliate-referrals': [all, { value: 'converted', label: t('Converted') }, { value: 'pending', label: t('Pending') }],
+        'newsletter-subscribers': [all, { value: 'subscribed', label: t('Subscribed') }, { value: 'unsubscribed', label: t('Unsubscribed') }, { value: 'pending', label: t('Pending') }],
+        'contact-messages': [all, { value: 'read', label: t('Read') }, { value: 'unread', label: t('Unread') }],
+        'login-history': [all, { value: 'success', label: t('Success') }, { value: 'failed', label: t('Failed') }],
+    }
+    return map[type.value] ?? [all, { value: 'active', label: t('Active') }, { value: 'inactive', label: t('Inactive') }]
+})
+
+// Reset filter selections when switching datasets so stale values don't leak.
+watch(type, () => {
+    statusFilter.value = ''
+    planFilter.value = ''
+    userFilter.value = ''
+    providerFilter.value = []
+    gatewayFilter.value = []
+    toolFilter.value = []
+})
 
 const planOptions = computed(() => [
     { value: '', label: t('All plans') },
@@ -372,14 +646,14 @@ onBeforeUnmount(() => {
     <Head :title="t('Export Center')" />
 
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
                 <h1 class="mb-1 text-2xl font-bold text-gray-900 dark:text-white">{{ t('Export Center') }}</h1>
                 <p class="max-w-3xl text-sm text-gray-500 dark:text-gray-400">{{ t('Build downloadable reports for users, subscriptions, support, and operational data from one admin workspace.') }}</p>
             </div>
             <button
                 type="button"
-                class="btn-primary inline-flex items-center justify-center gap-2 self-start rounded-xl px-4 py-2 text-sm font-medium"
+                class="btn-primary-admin shrink-0 inline-flex items-center justify-center gap-2"
                 @click="builderOpen = true"
             >
                 <i class="ti ti-file-export text-base"></i>
@@ -387,199 +661,328 @@ onBeforeUnmount(() => {
             </button>
         </div>
 
-        <div
-            v-if="builderOpen"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 px-4 py-6 backdrop-blur-sm"
-            @click.self="builderOpen = false"
+        <AppModal
+            :open="builderOpen"
+            max-width="max-w-5xl"
+            :title="t('Export Builder')"
+            :subtitle="t('Choose the dataset, time range, and file format before generating a downloadable report.')"
+            @close="builderOpen = false"
         >
-            <section class="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
-                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-gray-700">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Export Builder') }}</h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Choose the dataset, time range, and file format before generating a downloadable report.') }}</p>
+            <div class="space-y-6">
+                <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('Saved Presets') }}</label>
                     </div>
-                    <button
-                        type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                        :aria-label="t('Close modal')"
-                        @click="builderOpen = false"
-                    >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
-
-                <div class="space-y-6 overflow-y-auto p-6">
-                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Data Type') }}</label>
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                v-for="exportType in exportTypes"
-                                :key="exportType.value"
-                                type="button"
-                                @click="type = exportType.value"
-                                :class="type === exportType.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
-                            >
-                                {{ t(exportType.label) }}
-                            </button>
-                        </div>
-                    </section>
-
-                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Date Range') }}</label>
-                        <div class="mb-3 flex flex-wrap gap-2">
-                            <button
-                                v-for="preset in datePresets"
-                                :key="preset.value"
-                                type="button"
-                                @click="setDatePreset(preset.value)"
-                                :class="datePreset === preset.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                class="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
-                            >
-                                {{ preset.label }}
-                            </button>
-                        </div>
-                        <div v-if="datePreset === 'custom'" class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-                            <input
-                                v-model="customDateFrom"
-                                type="date"
-                                class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
-                            />
-                            <span class="self-center text-center text-sm text-gray-400">{{ t('to') }}</span>
-                            <input
-                                v-model="customDateTo"
-                                type="date"
-                                class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
-                            />
-                        </div>
-                    </section>
-
-                    <section
-                        v-if="type === 'ai-usage' || type === 'revenue' || type === 'users'"
-                        class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900"
-                    >
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Filters') }}</h3>
-                        <div class="mt-4 space-y-3">
-                            <template v-if="type === 'ai-usage'">
-                                <AppSelect
-                                    v-model="providerFilter"
-                                    :options="providerOptions"
-                                    :placeholder="t('All providers')"
-                                    :label="t('Provider')"
-                                    :live-search="true"
-                                    :multiple="true"
-                                    :compact-multiple="true"
-                                />
-                                <AppSelect
-                                    v-model="toolFilter"
-                                    :options="toolOptions"
-                                    :placeholder="t('All tools')"
-                                    :label="t('Tool')"
-                                    :live-search="true"
-                                    :multiple="true"
-                                    :compact-multiple="true"
-                                />
-                            </template>
-
-                            <template v-if="type === 'revenue'">
-                                <AppSelect
-                                    v-model="statusFilter"
-                                    :options="revenueStatusOptions"
-                                    :placeholder="t('All')"
-                                    :label="t('Status')"
-                                />
-                                <AppSelect
-                                    v-model="gatewayFilter"
-                                    :options="gatewayOptions"
-                                    :placeholder="t('All gateways')"
-                                    :label="t('Gateway')"
-                                    :live-search="true"
-                                    :multiple="true"
-                                    :compact-multiple="true"
-                                />
-                            </template>
-
-                            <template v-if="type === 'users'">
-                                <AppSelect
-                                    v-model="statusFilter"
-                                    :options="userStatusOptions"
-                                    :placeholder="t('All')"
-                                    :label="t('Status')"
-                                />
-                                <AppSelect
-                                    v-model="planFilter"
-                                    :options="planOptions"
-                                    :placeholder="t('All plans')"
-                                    :label="t('Plan')"
-                                />
-                            </template>
-                        </div>
-                    </section>
-
-                    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                        <label class="mb-3 block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Format') }}</label>
-                        <div class="flex flex-wrap gap-2">
-                            <button
-                                v-for="fileFormat in formats"
-                                :key="fileFormat.value"
-                                type="button"
-                                @click="format = fileFormat.value"
-                                :class="format === fileFormat.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
-                                class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
-                            >
-                                {{ fileFormat.label }}
-                            </button>
-                        </div>
-                        <p v-if="pdfLimited" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-                            {{ t('PDF limited to 5,000 rows. Use XLSX/CSV for full data.') }}
-                        </p>
-                    </section>
-
-                    <section class="rounded-xl border border-primary-100 bg-primary-50 p-5 dark:border-primary-900/40 dark:bg-primary-900/20">
-                        <h3 class="text-sm font-semibold text-primary-900 dark:text-primary-100">{{ t('Ready to export') }}</h3>
-                        <p v-if="exportMessage" class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ exportMessage }}</p>
-                        <p v-else class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ t('Generate a fresh export file using the selected filters.') }}</p>
-                        <p
-                            v-if="estimateMessage"
-                            :class="estimateMessageTone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-primary-700 dark:text-primary-200'"
-                            class="mt-2 text-xs font-medium"
+                    <div v-if="localPresets.length" class="mb-3 flex flex-wrap gap-2">
+                        <div
+                            v-for="preset in localPresets"
+                            :key="preset.id"
+                            class="group inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white py-1.5 pl-3 pr-1.5 text-sm text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
                         >
-                            {{ estimateMessage }}
-                        </p>
-                        <p v-if="estimatedRows !== null" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            ~{{ estimatedRows.toLocaleString() }} {{ t('rows match current filters') }}
-                        </p>
-                    </section>
-                </div>
+                            <button type="button" @click="applyPreset(preset)" class="font-medium">
+                                {{ preset.name }}
+                            </button>
+                            <button
+                                type="button"
+                                @click="deletePreset(preset.id)"
+                                :disabled="deletingPresetId === preset.id"
+                                class="rounded-xl p-0.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                                :title="t('Delete preset')"
+                            >
+                                <i class="ti ti-x text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p v-else class="mb-3 text-xs text-gray-400 dark:text-gray-500">{{ t('No saved presets yet. Configure an export below and save it for one-click reuse.') }}</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input
+                            v-model="presetName"
+                            type="text"
+                            :placeholder="t('Name this preset…')"
+                            maxlength="80"
+                            class="min-w-0 flex-1 border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                            @keyup.enter="saveCurrentPreset"
+                        />
+                        <button
+                            type="button"
+                            @click="saveCurrentPreset"
+                            :disabled="!presetName.trim() || savingPreset"
+                            class="inline-flex shrink-0 items-center gap-1.5 btn-primary-admin disabled:opacity-60"
+                        >
+                            <i class="ti ti-bookmark text-sm"></i>
+                            {{ savingPreset ? t('Saving…') : t('Save') }}
+                        </button>
+                    </div>
+                </section>
 
-                <div class="flex items-center justify-between gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-700 dark:bg-gray-900/40">
+                <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Data Type') }}</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="exportType in exportTypes"
+                            :key="exportType.value"
+                            type="button"
+                            @click="type = exportType.value"
+                            :class="type === exportType.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                            class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
+                        >
+                            {{ t(exportType.label) }}
+                        </button>
+                    </div>
+                </section>
+
+                <section class="rounded-xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Date Range') }}</label>
+                    <div class="mb-3 flex flex-wrap gap-2">
+                        <button
+                            v-for="preset in datePresets"
+                            :key="preset.value"
+                            type="button"
+                            @click="setDatePreset(preset.value)"
+                            :class="datePreset === preset.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                            class="rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors"
+                        >
+                            {{ preset.label }}
+                        </button>
+                    </div>
+                    <div v-if="datePreset === 'custom'" class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                        <input
+                            v-model="customDateFrom"
+                            type="date"
+                            class="border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                        />
+                        <span class="self-center text-center text-sm text-gray-400">{{ t('to') }}</span>
+                        <input
+                            v-model="customDateTo"
+                            type="date"
+                            class="border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                        />
+                    </div>
+                </section>
+
+                <section
+                    v-if="hasFilter('status') || hasFilter('plan_id') || hasFilter('provider') || hasFilter('gateway') || hasFilter('tool_slug')"
+                    class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900"
+                >
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-white">{{ t('Filters') }}</h3>
+                    <div class="mt-4 space-y-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <AppSelect
+                            v-if="hasFilter('status')"
+                            v-model="statusFilter"
+                            :options="statusOptions"
+                            :placeholder="t('All')"
+                            :label="t('Status')"
+                        />
+                        <AppSelect
+                            v-if="hasFilter('plan_id')"
+                            v-model="planFilter"
+                            :options="planOptions"
+                            :placeholder="t('All plans')"
+                            :label="t('Plan')"
+                        />
+                        <AppSelect
+                            v-if="hasFilter('provider')"
+                            v-model="providerFilter"
+                            :options="providerOptions"
+                            :placeholder="t('All providers')"
+                            :label="t('Provider')"
+                            :live-search="true"
+                            :multiple="true"
+                            :compact-multiple="true"
+                        />
+                        <AppSelect
+                            v-if="hasFilter('tool_slug')"
+                            v-model="toolFilter"
+                            :options="toolOptions"
+                            :placeholder="t('All tools')"
+                            :label="t('Tool')"
+                            :live-search="true"
+                            :multiple="true"
+                            :compact-multiple="true"
+                        />
+                        <AppSelect
+                            v-if="hasFilter('gateway')"
+                            v-model="gatewayFilter"
+                            :options="gatewayOptions"
+                            :placeholder="t('All gateways')"
+                            :label="t('Gateway')"
+                            :live-search="true"
+                            :multiple="true"
+                            :compact-multiple="true"
+                        />
+                    </div>
+                </section>
+
+                <section v-if="availableColumns.length" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Columns') }}</label>
+                        <button type="button" @click="toggleAllColumns" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                            {{ allColumnsSelected() ? t('Deselect all') : t('Select all') }}
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="col in availableColumns"
+                            :key="col.key"
+                            type="button"
+                            @click="toggleColumn(col.key)"
+                            :class="selectedColumns.includes(col.key) ? 'border-primary-200 bg-primary-100 text-primary-600 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400'"
+                            class="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors"
+                        >
+                            <i :class="selectedColumns.includes(col.key) ? 'ti ti-check' : 'ti ti-plus'" class="text-[0.7rem]"></i>
+                            {{ t(col.label) }}
+                        </button>
+                    </div>
+                    <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                        {{ t(':selected of :total columns selected', { selected: selectedColumns.length || availableColumns.length, total: availableColumns.length }) }}
+                    </p>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Format') }}</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="fileFormat in formats"
+                            :key="fileFormat.value"
+                            type="button"
+                            @click="format = fileFormat.value"
+                            :class="format === fileFormat.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                            class="rounded-xl border px-4 py-2 text-sm font-medium transition-colors"
+                        >
+                            {{ fileFormat.label }}
+                        </button>
+                    </div>
+                    <p v-if="pdfLimited" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                        {{ t('PDF limited to 5,000 rows. Use XLSX/CSV for full data.') }}
+                    </p>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Recurring Schedule') }}</label>
+
+                    <div v-if="localSchedules.length" class="mb-4 space-y-2">
+                        <div
+                            v-for="s in localSchedules"
+                            :key="s.id"
+                            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 dark:border-surface-800 dark:bg-surface-800/50"
+                        >
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span class="truncate text-sm font-medium text-gray-800 dark:text-gray-200">{{ s.name }}</span>
+                                    <span class="rounded bg-gray-200 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-gray-600 dark:bg-surface-700 dark:text-gray-300">{{ s.format }}</span>
+                                    <span v-if="!s.is_active" class="rounded bg-gray-200 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-gray-500 dark:bg-surface-700 dark:text-gray-400">{{ t('Paused') }}</span>
+                                    <span v-if="!s.available" class="rounded bg-amber-100 px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">{{ t('Unavailable') }}</span>
+                                </div>
+                                <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                                    {{ t(datasetLabel(s.dataset)) }} · {{ frequencyLabel(s.frequency) }} · {{ t('Next') }}: {{ formatDateTime(s.next_run_at) }}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    @click="toggleSchedule(s)"
+                                    :disabled="togglingScheduleId === s.id"
+                                    class="rounded-xl border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:border-primary-300 disabled:opacity-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                                >
+                                    {{ s.is_active ? t('Pause') : t('Resume') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="deleteSchedule(s.id)"
+                                    :disabled="deletingScheduleId === s.id"
+                                    class="rounded-xl p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-50 dark:hover:bg-red-900/20"
+                                    :title="t('Delete schedule')"
+                                >
+                                    <i class="ti ti-trash text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p v-else class="mb-4 text-xs text-gray-400 dark:text-gray-500">{{ t('No schedules yet. Automate the current export below — it runs on a rolling window and lands in Recent Exports.') }}</p>
+
+                    <div class="space-y-3">
+                        <input
+                            v-model="scheduleName"
+                            type="text"
+                            :placeholder="t('Schedule name…')"
+                            maxlength="80"
+                            class="w-full border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300"
+                            @keyup.enter="createSchedule"
+                        />
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ t('Frequency') }}:</span>
+                                <button
+                                    v-for="f in frequencyOptions"
+                                    :key="f.value"
+                                    type="button"
+                                    @click="scheduleFrequency = f.value"
+                                    :class="scheduleFrequency === f.value ? 'border-primary-200 bg-primary-100 text-primary-500 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300' : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300'"
+                                    class="border rounded-xl px-3 py-1.5 text-xs font-medium transition-colors"
+                                >
+                                    {{ f.label }}
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                @click="createSchedule"
+                                :disabled="!scheduleName.trim() || savingSchedule"
+                                class="inline-flex shrink-0 items-center gap-1.5 btn-primary-admin disabled:opacity-60"
+                            >
+                                <i class="ti ti-calendar-plus text-sm"></i>
+                                {{ savingSchedule ? t('Scheduling…') : t('Schedule') }}
+                            </button>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ t('Recurring exports use a rolling date range (e.g. weekly = last 7 days) and notify you in-app when ready.') }}</p>
+                </section>
+
+                <section v-if="estimateMessage || estimatedRows !== null" class="rounded-2xl border border-primary-100 bg-primary-50 p-5 dark:border-primary-900/40 dark:bg-primary-900/20">
+                    <h3 class="text-sm font-semibold text-primary-700 dark:text-primary-100">{{ t('Ready to export') }}</h3>
+                    <p v-if="exportMessage" class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ exportMessage }}</p>
+                    <p v-else class="mt-1 text-sm text-primary-700 dark:text-primary-200">{{ t('Generate a fresh export file using the selected filters.') }}</p>
+                    <p
+                        v-if="estimateMessage"
+                        :class="estimateMessageTone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-primary-700 dark:text-primary-200'"
+                        class="mt-2 text-xs font-medium"
+                    >
+                        {{ estimateMessage }}
+                    </p>
+                    <p v-if="estimatedRows !== null" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        ~{{ estimatedRows.toLocaleString() }} {{ t('rows match current filters') }}
+                    </p>
+                </section>
+            </div>
+
+            <template #footer>
+                <div class="flex items-center justify-between gap-3 w-full">
                     <button
                         type="button"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                        @click="builderOpen = false"
+                        :disabled="estimating"
+                        class="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 disabled:opacity-50"
+                        @click="estimateRows"
                     >
-                        {{ t('Cancel') }}
+                        <svg v-if="estimating" class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        {{ estimating ? t('Estimating...') : t('Estimate rows') }}
                     </button>
                     <div class="flex items-center gap-2">
                         <button
                             type="button"
-                            :disabled="estimating"
-                            class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 disabled:opacity-50"
-                            @click="estimateRows"
+                            class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                            @click="builderOpen = false"
                         >
-                            <svg v-if="estimating" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
-                            {{ estimating ? t('Estimating...') : t('Estimate rows') }}
+                            {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
                             :disabled="exporting"
-                            class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                            class="btn-primary-admin"
                             @click="doExport"
                         >
-                            <svg v-if="exporting" class="mr-2 inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <svg v-if="exporting" class="inline h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                             </svg>
@@ -587,13 +990,13 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
                 </div>
-            </section>
-        </div>
+            </template>
+        </AppModal>
 
-        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-4 dark:border-surface-800 lg:flex-row lg:items-center lg:justify-between">
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Recent Exports') }}</h2>
-                <div class="w-full lg:max-w-sm">
+        <section class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+            <div class="flex flex-col gap-4 border-b border-gray-100 px-6 py-4 dark:border-surface-800 md:flex-row md:items-center md:justify-between">
+                <h2 class="shrink-0 text-lg font-bold text-gray-900 dark:text-white">{{ t('Recent Exports') }}</h2>
+                <div class="w-full max-w-sm">
                     <div class="relative">
                         <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                             <i class="ti ti-search text-base"></i>
@@ -602,7 +1005,7 @@ onBeforeUnmount(() => {
                             ref="searchInputRef"
                             v-model="exportSearch"
                             type="text"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            class="w-full border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                             :placeholder="t('Search exports...')"
                         >
                         <span
@@ -653,7 +1056,7 @@ onBeforeUnmount(() => {
                                         <a
                                             :href="route('admin.reports.export.download', { file: file.filename })"
                                             target="_blank"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
                                         >
                                             <i class="ti ti-download text-base"></i>
                                         </a>
@@ -662,7 +1065,7 @@ onBeforeUnmount(() => {
                                         <button
                                             type="button"
                                             :disabled="deletingPath === file.path"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
                                             @click="deleteTarget = file"
                                         >
                                             <i class="ti ti-trash text-base"></i>

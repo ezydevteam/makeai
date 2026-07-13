@@ -40,7 +40,6 @@ class BlogPost extends Model
         'canonical_url',
         'schema_type',
         'no_index',
-        'template',
         'show_author',
         'show_date',
         'show_reading_time',

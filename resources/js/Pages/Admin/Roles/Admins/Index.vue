@@ -1,10 +1,12 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import Pagination from '@/Components/Pagination.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useDateFormat } from '@/Composables/useDateFormat'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -25,6 +27,7 @@ interface AdminItem {
     role: Role | null
     profession?: string | null
     country?: string | null
+    two_factor_enabled?: boolean
 }
 
 interface PaginationLink {
@@ -242,6 +245,35 @@ const submit = () => {
     })
 }
 
+const disabling2fa = ref(false)
+const forceDisable2fa = () => {
+    if (!currentAdmin.value) return
+
+    openConfirmModal({
+        title: t('Disable 2FA?'),
+        message: t('Are you sure you want to force-disable two-factor authentication for :name?', { name: currentAdmin.value.name }),
+        confirmLabel: t('Disable 2FA'),
+        processingLabel: t('Disabling...'),
+        variant: 'danger',
+        action: () => {
+            disabling2fa.value = true
+            router.post(route('admin.admins.2fa.disable', currentAdmin.value!.id), {}, {
+                preserveScroll: true,
+                onSuccess: () => {
+                    if (currentAdmin.value) {
+                        currentAdmin.value.two_factor_enabled = false
+                    }
+                    closeModal(true)
+                },
+                onFinish: () => {
+                    disabling2fa.value = false
+                    closeConfirmModal(true)
+                }
+            })
+        }
+    })
+}
+
 const openConfirmModal = (config: Omit<ConfirmModalState, 'open' | 'processing'>) => {
     confirmModal.value = {
         ...config,
@@ -304,7 +336,7 @@ onBeforeUnmount(() => {
 
     <AdminLayout>
         <div class="w-full px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-            <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
                         {{ t('Administrators') }}
@@ -314,11 +346,11 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="shrink-0 flex gap-3">
                     <Link
                         v-if="hasTrashedAdmins"
                         :href="route('admin.admins.trash')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:hover:!border-red-900/30 dark:hover:!bg-red-900/30 dark:hover:!text-red-300"
                     >
                         <i class="ti ti-trash text-base"></i>
                         {{ t('Trash') }}
@@ -326,7 +358,7 @@ onBeforeUnmount(() => {
 
                     <Link
                         :href="route('admin.roles.index')"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
                     >
                         <i class="ti ti-shield-lock text-base"></i>
                         {{ t('Manage Roles') }}
@@ -334,7 +366,7 @@ onBeforeUnmount(() => {
 
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white btn-primary-admin"
                         @click="openModal()"
                     >
                         <i class="ti ti-plus text-base"></i>
@@ -347,7 +379,7 @@ onBeforeUnmount(() => {
             <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
                     <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                        <div class="flex-1 min-w-[240px]">
+                        <div class="flex-1 min-w-[220px] md:max-w-sm">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -357,7 +389,7 @@ onBeforeUnmount(() => {
                                     v-model="searchQuery"
                                     type="text"
                                     class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Filter this table by name, email, or role...')"
+                                    :placeholder="t('Search admins...')"
                                 />
                                 <span
                                     v-if="!searchQuery"
@@ -510,160 +542,143 @@ onBeforeUnmount(() => {
             @confirm="runConfirmedAction"
         />
 
-        <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm" @click.self="closeModal()">
-            <div class="flex max-h-[90vh] w-full flex-col overflow-visible rounded-2xl bg-white shadow-xl sm:max-w-2xl dark:bg-gray-800">
-                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                            {{ isEditing ? t('Edit Administrator') : t('Add Administrator') }}
-                        </h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                            {{ isEditing ? t('Update administrator details and access role.') : t('Create a new administrator account and assign a role.') }}
-                        </p>
+        <AppModal
+            :open="showModal"
+            max-width="max-w-2xl"
+            :title="isEditing ? t('Edit Administrator') : t('Add Administrator')"
+            :subtitle="isEditing ? t('Update administrator details and access role.') : t('Create a new administrator account and assign a role.')"
+            has-form
+            :confirm-text="isEditing ? t('Save Changes') : t('Add Administrator')"
+            :confirm-loading="form.processing"
+            confirm-loading-text="Saving..."
+            @close="closeModal"
+            @submit="submit"
+        >
+            <div class="grid gap-6 md:grid-cols-2">
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ t('Name') }}
+                    </label>
+                    <input
+                        v-model="form.name"
+                        type="text"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        :placeholder="t('Enter full name')"
+                    />
+                    <p v-if="form.errors.name" class="mt-1 text-xs text-danger-600">{{ form.errors.name }}</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ t('Email') }}
+                    </label>
+                    <input
+                        v-model="form.email"
+                        type="email"
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                        :placeholder="t('Enter email address')"
+                    />
+                    <p v-if="form.errors.email" class="mt-1 text-xs text-danger-600">{{ form.errors.email }}</p>
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ t('Role') }}
+                    </label>
+                    <AppSelect
+                        v-model="form.role_id"
+                        :options="roleOptions"
+                        :placeholder="t('Select a role')"
+                        live-search
+                        dropdown-placement="bottom"
+                    />
+                    <p v-if="form.errors.role_id" class="mt-1 text-xs text-danger-600">{{ form.errors.role_id }}</p>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ t('Password') }}
+                    </label>
+                    <div class="relative">
+                        <input
+                            v-model="form.password"
+                            :type="showPassword ? 'text' : 'password'"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            :placeholder="t('Enter password')"
+                        />
+                        <button
+                            type="button"
+                            class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            :aria-label="showPassword ? t('Hide password') : t('Show password')"
+                            @click="showPassword = !showPassword"
+                        >
+                            <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
+                        </button>
                     </div>
-
-                    <button
-                        type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                        :aria-label="t('Close modal')"
-                        @click="() => closeModal()"
-                    >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
+                    <p v-if="isEditing" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Leave blank to keep the current password.') }}</p>
+                    <p v-if="form.errors.password" class="mt-1 text-xs text-danger-600">{{ form.errors.password }}</p>
                 </div>
 
-                <div class="overflow-y-auto p-6">
-                    <form class="space-y-6" @submit.prevent="submit">
-                        <div class="grid gap-6 md:grid-cols-2">
-                            <div class="md:col-span-2">
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ t('Name') }}
-                                </label>
-                                <input
-                                    v-model="form.name"
-                                    type="text"
-                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Enter full name')"
-                                />
-                                <p v-if="form.errors.name" class="mt-1 text-xs text-danger-600">{{ form.errors.name }}</p>
-                            </div>
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                        {{ t('Confirm Password') }}
+                    </label>
+                    <div class="relative">
+                        <input
+                            v-model="form.password_confirmation"
+                            :type="showPasswordConfirmation ? 'text' : 'password'"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                            :placeholder="t('Confirm password')"
+                        />
+                        <button
+                            type="button"
+                            class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            :aria-label="showPasswordConfirmation ? t('Hide password confirmation') : t('Show password confirmation')"
+                            @click="showPasswordConfirmation = !showPasswordConfirmation"
+                        >
+                            <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
+                        </button>
+                    </div>
+                </div>
 
-                            <div class="md:col-span-2">
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ t('Email') }}
-                                </label>
-                                <input
-                                    v-model="form.email"
-                                    type="email"
-                                    class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                    :placeholder="t('Enter email address')"
-                                />
-                                <p v-if="form.errors.email" class="mt-1 text-xs text-danger-600">{{ form.errors.email }}</p>
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ t('Role') }}
-                                </label>
-                                <AppSelect
-                                    v-model="form.role_id"
-                                    :options="roleOptions"
-                                    :placeholder="t('Select a role')"
-                                    live-search
-                                    dropdown-placement="bottom"
-                                />
-                                <p v-if="form.errors.role_id" class="mt-1 text-xs text-danger-600">{{ form.errors.role_id }}</p>
-                            </div>
-
-                            <div>
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ t('Password') }}
-                                </label>
-                                <div class="relative">
-                                    <input
-                                        v-model="form.password"
-                                        :type="showPassword ? 'text' : 'password'"
-                                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        :placeholder="t('Enter password')"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                        :aria-label="showPassword ? t('Hide password') : t('Show password')"
-                                        @click="showPassword = !showPassword"
-                                    >
-                                        <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
-                                    </button>
-                                </div>
-                                <p v-if="isEditing" class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Leave blank to keep the current password.') }}</p>
-                                <p v-if="form.errors.password" class="mt-1 text-xs text-danger-600">{{ form.errors.password }}</p>
-                            </div>
-
-                            <div>
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ t('Confirm Password') }}
-                                </label>
-                                <div class="relative">
-                                    <input
-                                        v-model="form.password_confirmation"
-                                        :type="showPasswordConfirmation ? 'text' : 'password'"
-                                        class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                                        :placeholder="t('Confirm password')"
-                                    />
-                                    <button
-                                        type="button"
-                                        class="absolute inset-y-0 right-0 inline-flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
-                                        :aria-label="showPasswordConfirmation ? t('Hide password confirmation') : t('Show password confirmation')"
-                                        @click="showPasswordConfirmation = !showPasswordConfirmation"
-                                    >
-                                        <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
-                                <div class="flex items-center justify-between gap-3">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
-                                            {{ form.is_active ? t('Administrator account is active') : t('Administrator account is disabled') }}
-                                        </p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            {{ t('Inactive administrators cannot sign in until you enable their account.') }}
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        class="app-switch shrink-0"
-                                        :aria-checked="form.is_active"
-                                        @click="form.is_active = !form.is_active"
-                                    >
-                                        <span class="app-switch__thumb"></span>
-                                    </button>
-                                </div>
-                            </div>
+                <!-- Two-Factor Authentication Section -->
+                <div v-if="isEditing && currentAdmin?.two_factor_enabled && isSuperAdmin" class="md:col-span-2 rounded-xl border border-red-200 bg-red-50/50 p-4 dark:border-red-900/30 dark:bg-red-900/10">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="space-y-1">
+                            <p class="text-sm font-semibold text-red-800 dark:text-red-300">
+                                {{ t('Two-Factor Authentication (2FA) is Enabled') }}
+                            </p>
+                            <p class="text-xs text-red-600 dark:text-red-400 leading-relaxed">
+                                {{ t('For security reasons, you can force-disable 2FA for this administrator if they lose access to their authenticator device.') }}
+                            </p>
                         </div>
-                    </form>
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:bg-red-50 dark:border-red-900/40 dark:bg-surface-800 dark:text-red-400 dark:hover:bg-red-900/20 shrink-0"
+                            :disabled="disabling2fa"
+                            @click="forceDisable2fa"
+                        >
+                            <i class="ti ti-shield-off text-sm"></i>
+                            {{ disabling2fa ? t('Disabling...') : t('Disable 2FA') }}
+                        </button>
+                    </div>
                 </div>
 
-                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-800/50">
-                    <button
-                        type="button"
-                        class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                        @click="() => closeModal()"
-                    >
-                        {{ t('Cancel') }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn-primary rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-colors disabled:opacity-50"
-                        :disabled="form.processing"
-                        @click="submit"
-                    >
-                        {{ form.processing ? t('Saving...') : t('Save Changes') }}
-                    </button>
+                <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                {{ form.is_active ? t('Administrator account is active') : t('Administrator account is disabled') }}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ t('Inactive administrators cannot sign in until you enable their account.') }}
+                            </p>
+                        </div>
+
+                        <AppSwitch v-model="form.is_active" />
+                    </div>
                 </div>
             </div>
-        </div>
+        </AppModal>
     </AdminLayout>
 </template>

@@ -17,31 +17,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        if (! file_exists(base_path('.env')) && file_exists(base_path('.env.example'))) {
-            try {
-                $content = file_get_contents(base_path('.env.example'));
-                $key = 'base64:' . base64_encode(random_bytes(32));
-                
-                // Replace APP_KEY= or APP_KEY=SomeRandomString
-                if (preg_match('/^APP_KEY=/m', $content)) {
-                    $content = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . $key, $content);
-                } else {
-                    $content .= "\nAPP_KEY=" . $key . "\n";
-                }
-                
-                file_put_contents(base_path('.env'), $content);
-                config(['app.key' => $key]);
-
-                if (str_contains($content, 'LICENSE_TEST_MODE=true') || str_contains($content, 'LICENSE_TEST_MODE="true"')) {
-                    config(['app.license_test_mode' => true]);
-                }
-            } catch (\Throwable $e) {
-                // Safe fallback if random_bytes or file writing fails
-                if (file_exists(base_path('.env.example'))) {
-                    @copy(base_path('.env.example'), base_path('.env'));
-                }
-            }
-        }
+        $this->ensureEnvironmentFileExists();
+        $this->registerThemeServiceProvider();
     }
 
     /**
@@ -49,8 +26,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register the default theme's views directory as a fallback in Laravel's view lookup paths
+        if (is_dir(resource_path('themes/default/views'))) {
+            \Illuminate\Support\Facades\View::addLocation(resource_path('themes/default/views'));
+        }
+
         $this->configureInfrastructureFallbacks();
         $this->configureStripeFromAdminPanel();
+        $this->configureCloudStorage();
         $this->configureBroadcasting();
         $this->syncAddonsFromFilesystem();
         $this->registerAddons();
@@ -64,6 +47,40 @@ class AppServiceProvider extends ServiceProvider
 
         if (config('app.license_test_mode') && app()->environment('production')) {
             \Illuminate\Support\Facades\Log::critical('LICENSE_TEST_MODE is enabled in a production environment! This must be disabled immediately.');
+        }
+    }
+
+    /**
+     * Ensure the .env file exists, generate APP_KEY, and check license test mode settings.
+     */
+    private function ensureEnvironmentFileExists(): void
+    {
+        if (file_exists(base_path('.env')) || ! file_exists(base_path('.env.example'))) {
+            return;
+        }
+
+        try {
+            $content = file_get_contents(base_path('.env.example'));
+            $key = 'base64:' . base64_encode(random_bytes(32));
+
+            // Replace APP_KEY= or APP_KEY=SomeRandomString
+            if (preg_match('/^APP_KEY=/m', $content)) {
+                $content = preg_replace('/^APP_KEY=.*$/m', 'APP_KEY=' . $key, $content);
+            } else {
+                $content .= "\nAPP_KEY=" . $key . "\n";
+            }
+
+            file_put_contents(base_path('.env'), $content);
+            config(['app.key' => $key]);
+
+            if (str_contains($content, 'LICENSE_TEST_MODE=true') || str_contains($content, 'LICENSE_TEST_MODE="true"')) {
+                config(['app.license_test_mode' => true]);
+            }
+        } catch (\Throwable) {
+            // Safe fallback if random_bytes or file writing fails
+            if (file_exists(base_path('.env.example'))) {
+                @copy(base_path('.env.example'), base_path('.env'));
+            }
         }
     }
 
@@ -152,6 +169,24 @@ class AppServiceProvider extends ServiceProvider
         }
     }
 
+    /**
+     * When the Cloud Storage extension is enabled, rebind the `public` disk to the
+     * configured S3-compatible bucket so all media reads/writes go to the cloud
+     * without touching call sites. No-op when disabled/unconfigured (stays local).
+     */
+    private function configureCloudStorage(): void
+    {
+        if (! filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        try {
+            \App\Services\CloudStorageService::fromSettings()->apply();
+        } catch (\Throwable) {
+            // Database not ready (installer, migrations pending) — keep local disk.
+        }
+    }
+
     private function registerAddons(): void
     {
         try {
@@ -194,5 +229,42 @@ class AppServiceProvider extends ServiceProvider
 
         $effectiveDriver = $broadcasting->resolveDriver();
         config(['broadcasting.default' => $effectiveDriver === 'polling' ? 'log' : $effectiveDriver]);
+    }
+
+    /**
+     * Dynamically register the active theme's Service Provider if it exists.
+     * Registers a runtime PSR-4 class autoloader for theme classes and controllers.
+     */
+    private function registerThemeServiceProvider(): void
+    {
+        if (! filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        try {
+            $activeTheme = settings('active_theme', 'default');
+            $camelTheme = ucfirst(\Illuminate\Support\Str::camel($activeTheme));
+            $themeNamespace = "Resources\\Themes\\{$camelTheme}\\";
+            $themePath = resource_path("themes/{$activeTheme}/");
+
+            // Custom autoloader to dynamically require theme classes (Controllers, ServiceProvider, etc.)
+            spl_autoload_register(function ($class) use ($themeNamespace, $themePath) {
+                if (str_starts_with($class, $themeNamespace)) {
+                    $relativeClass = substr($class, strlen($themeNamespace));
+                    $filePath = $themePath . str_replace('\\', '/', $relativeClass) . '.php';
+                    if (file_exists($filePath)) {
+                        require_once $filePath;
+                    }
+                }
+            });
+
+            $providerClass = $themeNamespace . "ThemeServiceProvider";
+
+            if (class_exists($providerClass)) {
+                $this->app->register($providerClass);
+            }
+        } catch (\Throwable) {
+            // Safe fallback during installation or migrations
+        }
     }
 }

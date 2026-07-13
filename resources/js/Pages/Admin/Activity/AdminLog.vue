@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
-import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import Pagination from '@/Components/Pagination.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
 
 defineOptions({ layout: AdminLayout })
@@ -15,9 +16,16 @@ interface AuditLog {
     admin_name: string
     admin_email: string
     action: string
+    action_label: string
+    category: string
+    category_label: string
+    category_icon: string
+    category_color: string
+    method: string
+    target: string | null
     ip_address: string
     user_agent: string | null
-    payload: string | null
+    payload: Record<string, unknown> | null
     created_at: string
 }
 
@@ -60,7 +68,7 @@ const props = defineProps<{
 const { t } = useTranslate()
 
 const showPayloadModal = ref(false)
-const selectedPayload = ref<string | null>(null)
+const selectedPayload = ref<Record<string, unknown> | null>(null)
 const searchQuery = ref(props.filters.action ?? '')
 const searchFocused = ref(false)
 const adminFilter = ref(props.filters.admin_id ?? '')
@@ -76,153 +84,51 @@ const adminOptions = computed<SelectOption[]>(() => [
     })),
 ])
 
+// Payload arrives already redacted + humanised-ready from the server (secrets
+// masked, noise stripped). We only turn snake_case keys into readable labels.
 const formattedPayload = computed(() => {
-    if (!selectedPayload.value) {
+    const data = selectedPayload.value
+    if (!data) {
         return []
     }
 
-    try {
-        const data = JSON.parse(selectedPayload.value)
-        if (!data || typeof data !== 'object') return []
-
-        return Object.entries(data)
-            .filter(([key]) => !['_token', '_method', 'password', 'password_confirmation'].includes(key))
-            .map(([key, value]) => ({
-                field: key
-                    .replace(/_/g, ' ')
-                    .replace(/\b\w/g, (char: string) => char.toUpperCase()),
-                value: typeof value === 'boolean'
-                    ? (value ? t('Yes') : t('No'))
-                    : typeof value === 'object' && value !== null
-                        ? JSON.stringify(value)
-                        : String(value ?? '-'),
-            }))
-    } catch {
-        return []
-    }
+    return Object.entries(data).map(([key, value]) => ({
+        field: key
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (char: string) => char.toUpperCase()),
+        value: typeof value === 'boolean'
+            ? (value ? t('Yes') : t('No'))
+            : value === null || value === undefined
+                ? '-'
+                : typeof value === 'object'
+                    ? JSON.stringify(value)
+                    : String(value),
+    }))
 })
 
-function viewPayload(payload: string | null) {
+function viewPayload(payload: Record<string, unknown> | null) {
     selectedPayload.value = payload
     showPayloadModal.value = true
 }
 
-function formatAction(action: string): string {
-    const [method, ...pathParts] = action.split(' ')
-    const path = pathParts.join(' ')
-
-    const actionLabels: Record<string, string> = {
-        'admin/settings/general': t('General Settings'),
-        'admin/settings/features': t('Feature Toggles'),
-        'admin/settings/notifications': t('Notification Settings'),
-        'admin/settings/oauth': t('OAuth Settings'),
-        'admin/settings/security': t('Security Settings'),
-        'admin/settings/seo': t('SEO Settings'),
-        'admin/settings/email': t('Email Settings'),
-        'admin/settings/maintenance': t('Maintenance Mode'),
-    }
-
-    const label = actionLabels[path]
-
-    if (label) {
-        switch (method) {
-            case 'POST':
-            case 'PUT':
-            case 'PATCH':
-                return t('Updated :label', { label })
-            case 'DELETE':
-                return t('Reset :label', { label })
-        }
-    }
-
-    if (/^admin\/roles\/\d+$/.test(path)) {
-        return method === 'DELETE' ? t('Deleted a Role') : t('Updated a Role')
-    }
-    if (path === 'admin/roles') {
-        return t('Created a New Role')
-    }
-    if (/^admin\/permissions\/roles(\/\d+)?$/.test(path)) {
-        return t('Updated Role Permissions')
-    }
-    if (/^admin\/users\/\d+$/.test(path)) {
-        return method === 'DELETE' ? t('Deleted a User') : t('Updated a User')
-    }
-    if (path === 'admin/users') {
-        return t('Created a New User')
-    }
-    if (/^admin\/blog\/posts\/\d+/.test(path)) {
-        return method === 'DELETE' ? t('Deleted a Blog Post') : t('Updated a Blog Post')
-    }
-    if (path === 'admin/blog/posts' || /^admin\/blog\/posts$/.test(path)) {
-        return t('Created a Blog Post')
-    }
-    if (/^admin\/blog\/categories\/\d+$/.test(path)) {
-        return method === 'DELETE' ? t('Deleted a Category') : t('Updated a Category')
-    }
-    if (path === 'admin/blog/categories') {
-        return t('Created a Category')
-    }
-    if (/^admin\/tickets\/\d+/.test(path)) {
-        return t('Updated a Support Ticket')
-    }
-    if (/^admin\/pages\/\d+/.test(path)) {
-        return method === 'DELETE' ? t('Deleted a Page') : t('Updated a Page')
-    }
-    if (path === 'admin/pages') {
-        return t('Created a New Page')
-    }
-    if (/^admin\/menu\/\d+/.test(path)) {
-        return t('Updated a Menu')
-    }
-    if (path === 'admin/system/cache') {
-        return t('Cleared System Cache')
-    }
-    if (/^admin\/system\/maintenance/.test(path)) {
-        return t('Updated Maintenance Settings')
-    }
-    if (/^admin\/mail/.test(path)) {
-        return t('Updated Mail Settings')
-    }
-    if (/^admin\/currencies/.test(path)) {
-        return t('Updated Currency Settings')
-    }
-    if (/^admin\/languages/.test(path)) {
-        return t('Updated Language Settings')
-    }
-    if (/^admin\/gateways/.test(path)) {
-        return t('Updated Payment Gateways')
-    }
-    if (/^admin\/coupons/.test(path)) {
-        return method === 'DELETE' ? t('Deleted a Coupon') : t('Updated a Coupon')
-    }
-    if (/^admin\/ai/.test(path)) {
-        return t('Updated AI Settings')
-    }
-    if (/^admin\/appearance/.test(path)) {
-        return t('Updated Appearance Settings')
-    }
-    if (/^admin\/marketing\/affiliate\/commissions\/[^\/]+\/approve$/.test(path)) {
-        return t('Approved Affiliate Commission')
-    }
-    if (/^admin\/premium\/transactions\/[^\/]+\/reject$/.test(path)) {
-        return t('Rejected Transaction')
-    }
-    if (/^admin\/premium\/transactions\/[^\/]+\/approve$/.test(path)) {
-        return t('Approved Transaction')
-    }
-    if (path === 'admin/premium/gateways/sort') {
-        return t('Updated Gateway Order')
-    }
-
-    const cleaned = path
-        .replace(/^admin\//, '')
-        .replace(/\/\d+/g, '/{id}')
-        .replace(/\/([0-9a-zA-Z-]{20,})/g, '/{id}')
-        .replace(/\//g, ' › ')
-        .replace(/-/g, ' ')
-
-    return t(':method :path', { method, path: cleaned })
+// Category chip colours. Full class strings (not interpolated) so Tailwind's
+// content scanner keeps them.
+const chipClasses: Record<string, string> = {
+    slate: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300',
+    rose: 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+    sky: 'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300',
+    indigo: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+    emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+    amber: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+    violet: 'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300',
+    pink: 'bg-pink-100 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300',
+    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
+    fuchsia: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300',
+    cyan: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300',
+    gray: 'bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-300',
 }
+
+const chipClass = (color: string): string => chipClasses[color] ?? chipClasses.gray
 
 function formatDate(date: string): string {
     return new Intl.DateTimeFormat(undefined, {
@@ -241,22 +147,6 @@ function timeAgo(time: string): string {
     if (hours < 24) return t(':count h ago', { count: String(hours) })
 
     return t(':count d ago', { count: String(days) })
-}
-
-function getMethodColor(action: string): string {
-    const method = action.split(' ')[0]
-
-    switch (method) {
-        case 'POST':
-            return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-        case 'PUT':
-        case 'PATCH':
-            return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-        case 'DELETE':
-            return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-        default:
-            return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-    }
 }
 
 function closePayloadModal() {
@@ -355,7 +245,7 @@ onBeforeUnmount(() => {
     <Head :title="t('Admin Activity Logs')" />
 
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Admin Activity Logs') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
@@ -363,10 +253,10 @@ onBeforeUnmount(() => {
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="shrink-0 flex items-center gap-3">
                 <Link
                     :href="route('admin.system.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
@@ -375,13 +265,13 @@ onBeforeUnmount(() => {
                 <div class="inline-flex gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <Link
                         :href="route('admin.activity.admin-logs.index')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition-colors dark:bg-primary-900/30 dark:text-primary-300"
+                        class="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors"
                     >
                         {{ t('Admin') }}
                     </Link>
                     <Link
                         :href="route('admin.activity.user-logs.index')"
-                        class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60"
                     >
                         {{ t('User') }}
                     </Link>
@@ -392,8 +282,8 @@ onBeforeUnmount(() => {
         <section class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
             <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
                 <form method="GET" :action="route('admin.activity.admin-logs.index')" class="flex flex-col gap-4">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="w-full xl:max-w-md">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex-1 min-w-[220px] md:max-w-sm">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -403,7 +293,7 @@ onBeforeUnmount(() => {
                                     v-model="searchQuery"
                                     type="text"
                                     name="action"
-                                    :placeholder="t('Filter by method, path, or keyword...')"
+                                    :placeholder="t('Search admin, email, IP, details...')"
                                     class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                                     @focus="searchFocused = true"
                                     @blur="searchFocused = false"
@@ -425,11 +315,11 @@ onBeforeUnmount(() => {
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap items-center gap-3 xl:justify-end">
+                        <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
                             <div class="relative" ref="filterDropdownRef">
                                 <button
                                     type="button"
-                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                                     :aria-expanded="filterDropdownOpen"
                                     @click="toggleFilterDropdown"
                                 >
@@ -486,7 +376,7 @@ onBeforeUnmount(() => {
                                         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-surface-800">
                                             <Link
                                                 :href="route('admin.activity.admin-logs.index')"
-                                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                                class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                                             >
                                                 <i class="ti ti-x text-base"></i>
                                                 {{ t('Clear Filters') }}
@@ -494,7 +384,7 @@ onBeforeUnmount(() => {
 
                                             <button
                                                 type="submit"
-                                                class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
+                                                class="grow btn-primary-admin inline-flex items-center justify-center gap-2"
                                             >
                                                 <i class="ti ti-filter text-base"></i>
                                                 {{ t('Apply Filters') }}
@@ -547,12 +437,19 @@ onBeforeUnmount(() => {
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <span
-                                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                    :class="getMethodColor(log.action)"
-                                >
-                                    {{ formatAction(log.action) }}
-                                </span>
+                                <div class="flex items-center gap-2.5">
+                                    <span
+                                        class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                                        :class="chipClass(log.category_color)"
+                                        :title="log.category_label"
+                                    >
+                                        <i :class="[log.category_icon, 'text-sm']"></i>
+                                    </span>
+                                    <div class="min-w-0">
+                                        <p class="font-medium text-gray-900 dark:text-white">{{ log.action_label }}</p>
+                                        <p v-if="log.target" class="truncate text-xs text-gray-500 dark:text-gray-400">{{ log.target }}</p>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                                 {{ log.ip_address }}
@@ -596,55 +493,30 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <div
-            v-if="showPayloadModal"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 p-4 backdrop-blur-sm"
-            @click.self="closePayloadModal"
+        <AppModal
+            :open="showPayloadModal"
+            max-width="max-w-3xl"
+            :title="t('Request Payload')"
+            :subtitle="t('Inspect the captured request payload for this audit log entry.')"
+            :cancel-text="t('Close')"
+            @close="closePayloadModal"
         >
-            <div class="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-800">
-                <div class="flex items-center justify-between rounded-t-2xl border-b border-gray-100 px-6 py-3 dark:border-surface-800">
-                    <div>
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Request Payload') }}</h3>
-                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Inspect the captured request payload for this audit log entry.') }}</p>
-                    </div>
-
-                    <button
-                        type="button"
-                        class="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800"
-                        :aria-label="t('Close modal')"
-                        @click="closePayloadModal"
+            <div v-if="formattedPayload.length" class="space-y-4">
+                <div class="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-surface-700 dark:border-surface-700">
+                    <div
+                        v-for="item in formattedPayload"
+                        :key="item.field"
+                        class="flex items-start gap-4 px-4 py-3"
                     >
-                        <i class="ti ti-x text-base"></i>
-                    </button>
-                </div>
-
-                <div v-if="formattedPayload.length" class="overflow-auto p-6">
-                    <div class="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-surface-700 dark:border-surface-700">
-                        <div
-                            v-for="item in formattedPayload"
-                            :key="item.field"
-                            class="flex items-start gap-4 px-4 py-3"
-                        >
-                            <span class="min-w-[140px] text-sm font-medium text-gray-700 dark:text-gray-300">{{ item.field }}</span>
-                            <span class="break-all text-sm text-gray-600 dark:text-gray-400">{{ item.value }}</span>
-                        </div>
+                        <span class="min-w-[140px] text-sm font-medium text-gray-700 dark:text-gray-300">{{ item.field }}</span>
+                        <span class="break-all text-sm text-gray-600 dark:text-gray-400">{{ item.value }}</span>
                     </div>
-                </div>
-                <div v-else class="overflow-auto p-6">
-                    <pre class="overflow-auto rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-200"><code>{{ selectedPayload }}</code></pre>
-                </div>
-
-                <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-gray-100 bg-gray-50 px-6 py-3 dark:border-surface-800 dark:bg-surface-800/50">
-                    <button
-                        type="button"
-                        class="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
-                        @click="closePayloadModal"
-                    >
-                        {{ t('Close') }}
-                    </button>
                 </div>
             </div>
-        </div>
+            <div v-else class="rounded-xl border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500 dark:border-surface-700 dark:text-gray-400">
+                {{ t('No payload details were captured for this action.') }}
+            </div>
+        </AppModal>
     </div>
 
 </template>

@@ -129,7 +129,7 @@ class StudioController extends \App\Http\Controllers\Controller
         $credits = $service->calculateCredits($script);
 
         $user = auth()->user();
-        if ($user->credits < $credits) {
+        if (! credit_quota_mode() && $user->credits < $credits) {
             return response()->json([
                 'success' => false,
                 'message' => translate('Insufficient credits.'),

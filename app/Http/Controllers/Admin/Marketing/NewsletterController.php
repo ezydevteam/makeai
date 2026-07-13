@@ -21,18 +21,10 @@ class NewsletterController extends Controller
     ];
 
     /**
-     * List subscribers and campaigns.
+     * List subscribers.
      */
     public function index(Request $request)
     {
-        $settings = Setting::getGroup('newsletter');
-        $configuredSecrets = [];
-
-        foreach (self::SECRET_KEYS as $key) {
-            $configuredSecrets[$key] = filled($settings[$key] ?? null);
-            unset($settings[$key]);
-        }
-
         $subscribersQuery = NewsletterSubscriber::query()->orderBy('created_at', 'desc');
 
         if ($request->filled('search')) {
@@ -47,6 +39,113 @@ class NewsletterController extends Controller
             $subscribersQuery->where('status', $request->string('status')->toString());
         }
 
+        $stats = $this->getStats();
+
+        return Inertia::render('Admin/Marketing/Newsletter/Subscribers', [
+            'subscribers' => $subscribersQuery->paginate(20)->withQueryString(),
+            'stats' => $stats,
+            'filters' => [
+                'search' => $request->input('search', ''),
+                'status' => $request->input('status', 'all'),
+            ],
+        ]);
+    }
+
+    /**
+     * List campaigns.
+     */
+    public function campaigns()
+    {
+        $stats = $this->getCampaignStats();
+
+        return Inertia::render('Admin/Marketing/Newsletter/Campaigns', [
+            'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->paginate(10),
+            'stats' => $stats,
+            'isMailConfigured' => filled(settings('mail_driver')),
+        ]);
+    }
+
+    /**
+     * Edit settings.
+     */
+    public function settings()
+    {
+        $settings = Setting::getGroup('newsletter');
+        $configuredSecrets = [];
+
+        foreach (self::SECRET_KEYS as $key) {
+            $configuredSecrets[$key] = filled($settings[$key] ?? null);
+            unset($settings[$key]);
+        }
+
+        return Inertia::render('Admin/Marketing/Newsletter/Settings', [
+            'settings' => $settings,
+            'configuredSecrets' => $configuredSecrets,
+        ]);
+    }
+
+    /**
+     * Get campaign stats.
+     */
+    private function getCampaignStats(): array
+    {
+        $now = now();
+        $sevenDaysAgo = $now->copy()->subDays(7);
+
+        // 1. Total Campaigns
+        $totalCurrent = NewsletterCampaign::count();
+        $totalPrevious = NewsletterCampaign::where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 2. Queued
+        $queuedCurrent = NewsletterCampaign::where('status', 'sending')->count();
+        $queuedPrevious = NewsletterCampaign::where('status', 'sending')->where('created_at', '<', $sevenDaysAgo)->count();
+
+        // 3. Sent — driven by sent_at (when the send ran), not when the row was created.
+        $sentCurrent = NewsletterCampaign::where('status', 'sent')->count();
+        $sentPrevious = NewsletterCampaign::whereNotNull('sent_at')->where('sent_at', '<', $sevenDaysAgo)->count();
+
+        // 4. Failed
+        $failedCurrent = NewsletterCampaign::where('failed_count', '>', 0)->count();
+        $failedPrevious = NewsletterCampaign::where('failed_count', '>', 0)->whereNotNull('sent_at')->where('sent_at', '<', $sevenDaysAgo)->count();
+
+        return [
+            'total' => [
+                'value' => $totalCurrent,
+                'comparison' => $this->calculateComparison($totalCurrent, $totalPrevious),
+            ],
+            'queued' => [
+                'value' => $queuedCurrent,
+                'comparison' => $this->calculateComparison($queuedCurrent, $queuedPrevious),
+            ],
+            'sent' => [
+                'value' => $sentCurrent,
+                'comparison' => $this->calculateComparison($sentCurrent, $sentPrevious),
+            ],
+            'failed' => [
+                'value' => $failedCurrent,
+                'comparison' => $this->calculateComparison($failedCurrent, $failedPrevious),
+            ],
+            // Include audience counts for recipientCount calculation on creation form
+            'active' => NewsletterSubscriber::where('status', 'subscribed')->count(),
+            'users_all' => User::where('email_marketing', true)->count(),
+            'users_active' => User::where('email_marketing', true)->where('last_login_at', '>=', now()->subDays(30))->count(),
+            'users_inactive' => User::where('email_marketing', true)->where(function ($query) {
+                $query->whereNull('last_login_at')->orWhere('last_login_at', '<', now()->subDays(30));
+            })->count(),
+            'users_pro' => isProAvailable()
+                ? User::where('email_marketing', true)->whereIn('subscription_status', ['active', 'trialing'])->count()
+                : 0,
+            'users_free' => User::where('email_marketing', true)->where(function ($query) {
+                $query->whereNull('subscription_status')->orWhereNotIn('subscription_status', ['active', 'trialing']);
+            })->count(),
+        ];
+    }
+
+    /**
+     * Get newsletter stats.
+     */
+    private function getStats(): array
+    {
         $now = now();
         $sevenDaysAgo = $now->copy()->subDays(7);
 
@@ -54,19 +153,22 @@ class NewsletterController extends Controller
         $subscribersCurrent = NewsletterSubscriber::count();
         $subscribersPrevious = NewsletterSubscriber::where('created_at', '<', $sevenDaysAgo)->count();
 
-        // 2. Active Subscribers
+        // 2. Active Subscribers — subscribed before T and not unsubscribed by T
+        //    (reconstructed from subscribed_at / unsubscribed_at, not created_at).
         $activeCurrent = NewsletterSubscriber::where('status', 'subscribed')->count();
-        $activePrevious = NewsletterSubscriber::where('status', 'subscribed')->where('created_at', '<', $sevenDaysAgo)->count();
+        $activePrevious = NewsletterSubscriber::where('subscribed_at', '<', $sevenDaysAgo)
+            ->where(fn ($q) => $q->whereNull('unsubscribed_at')->orWhere('unsubscribed_at', '>=', $sevenDaysAgo))
+            ->count();
 
-        // 3. Unsubscribed
+        // 3. Unsubscribed — those already unsubscribed a week ago (unsubscribed_at drives it).
         $unsubscribedCurrent = NewsletterSubscriber::where('status', 'unsubscribed')->count();
-        $unsubscribedPrevious = NewsletterSubscriber::where('status', 'unsubscribed')->where('created_at', '<', $sevenDaysAgo)->count();
+        $unsubscribedPrevious = NewsletterSubscriber::whereNotNull('unsubscribed_at')->where('unsubscribed_at', '<', $sevenDaysAgo)->count();
 
-        // 4. Sent Campaigns
+        // 4. Sent Campaigns — driven by sent_at, not created_at.
         $campaignsCurrent = NewsletterCampaign::where('status', 'sent')->count();
-        $campaignsPrevious = NewsletterCampaign::where('status', 'sent')->where('created_at', '<', $sevenDaysAgo)->count();
+        $campaignsPrevious = NewsletterCampaign::whereNotNull('sent_at')->where('sent_at', '<', $sevenDaysAgo)->count();
 
-        $stats = [
+        return [
             'total' => [
                 'value' => $subscribersCurrent,
                 'comparison' => $this->calculateComparison($subscribersCurrent, $subscribersPrevious),
@@ -95,19 +197,6 @@ class NewsletterController extends Controller
                 $query->whereNull('subscription_status')->orWhereNotIn('subscription_status', ['active', 'trialing']);
             })->count(),
         ];
-
-        return Inertia::render('Admin/Marketing/Newsletter', [
-            'subscribers' => $subscribersQuery->paginate(20)->withQueryString(),
-            'campaigns' => NewsletterCampaign::orderBy('created_at', 'desc')->paginate(10),
-            'stats' => $stats,
-            'settings' => $settings,
-            'configuredSecrets' => $configuredSecrets,
-            'isMailConfigured' => filled(settings('mail_driver')),
-            'filters' => [
-                'search' => $request->input('search', ''),
-                'status' => $request->input('status', 'all'),
-            ],
-        ]);
     }
 
     /**
@@ -277,6 +366,32 @@ class NewsletterController extends Controller
         SendNewsletterCampaign::dispatch($campaign->id, true)->onQueue('emails');
 
         return back()->with('success', translate('Retrying :count failed recipients.', ['count' => $failedCount]));
+    }
+
+    /**
+     * Return the failed recipients (with their delivery error) for a campaign so the
+     * admin can see *why* sends failed, not just the failed count. Capped to keep the
+     * payload bounded; the total is returned so the UI can note truncation.
+     */
+    public function failures(NewsletterCampaign $campaign)
+    {
+        $this->authorizeNewsletter();
+
+        $recipients = NewsletterCampaignRecipient::where('campaign_id', $campaign->id)
+            ->where('status', 'failed')
+            ->latest('updated_at')
+            ->limit(200)
+            ->get(['email', 'name', 'error_message', 'updated_at']);
+
+        return response()->json([
+            'failed_count' => (int) $campaign->failed_count,
+            'recipients' => $recipients->map(fn (NewsletterCampaignRecipient $r) => [
+                'email' => $r->email,
+                'name' => $r->name,
+                'error' => $r->error_message,
+                'failed_at' => $r->updated_at?->toIso8601String(),
+            ]),
+        ]);
     }
 
     private function authorizeNewsletter(): void

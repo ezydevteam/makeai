@@ -8,6 +8,7 @@ use App\Models\AiTool;
 use App\Models\Comment;
 use App\Models\Document;
 use App\Models\GatewaySubscription;
+use App\Models\Plan;
 use App\Models\Payment;
 use App\Models\User;
 use App\Models\ToolReview;
@@ -36,6 +37,7 @@ class NotificationEventService
             ]),
             'level' => 'success',
             'category' => 'credits',
+            'icon' => 'ti ti-coins',
             'action_url' => route('user.dashboard'),
             'action_label' => translate('View dashboard'),
             'meta' => ['amount' => $amount, 'reason' => $reason],
@@ -65,6 +67,7 @@ class NotificationEventService
                         : translate("You've run out of credits."),
                     'level' => 'error',
                     'category' => 'credits',
+                    'icon' => 'ti ti-credit-card-off',
                     'action_url' => $actionUrl,
                     'action_label' => $actionUrl ? translate('Top up') : null,
                 ]);
@@ -82,8 +85,14 @@ class NotificationEventService
                     ]),
                     'level' => 'warning',
                     'category' => 'credits',
+                    'icon' => 'ti ti-credit-card',
                     'action_url' => $actionUrl,
                     'action_label' => $actionUrl ? translate('Add credits') : null,
+                ]);
+
+                $this->mail->send('credits_low', $user->email, [
+                    'user_name' => $user->name,
+                    'credits' => $this->formatNumber($balance),
                 ]);
             });
         }
@@ -104,6 +113,7 @@ class NotificationEventService
             ]),
             'level' => 'success',
             'category' => 'subscription',
+            'icon' => 'ti ti-calendar-star',
             'action_url' => route('user.dashboard'),
             'action_label' => translate('View dashboard'),
             'meta' => ['subscription_id' => $subscription->id],
@@ -123,6 +133,7 @@ class NotificationEventService
             ]),
             'level' => 'success',
             'category' => 'subscription',
+            'icon' => 'ti ti-circle-check',
             'action_url' => route('user.dashboard'),
             'action_label' => translate('View dashboard'),
             'meta' => ['subscription_id' => $subscription->id],
@@ -144,9 +155,54 @@ class NotificationEventService
             ]),
             'level' => 'warning',
             'category' => 'subscription',
+            'icon' => 'ti ti-calendar-cancel',
             'action_url' => route('user.dashboard'),
             'action_label' => translate('View subscription'),
             'meta' => ['subscription_id' => $subscription->id],
+        ]);
+
+        $this->mail->send('subscription_canceled', $subscription->user->email, [
+            'user_name' => $subscription->user->name,
+            'plan_name' => $subscription->plan?->name ?? translate('your plan'),
+        ]);
+    }
+
+    /**
+     * Fired when an administrator ends a user's subscription immediately (access
+     * removed now). An optional reason is shown in-app.
+     */
+    public function subscriptionEndedByAdmin(GatewaySubscription $subscription, ?string $reason = null): void
+    {
+        $subscription->loadMissing(['user', 'plan']);
+
+        if (! $subscription->user) {
+            return;
+        }
+
+        $planName = $subscription->plan?->name ?? translate('your plan');
+        $message = translate('Your :plan subscription was ended by an administrator and access has been removed.', ['plan' => $planName]);
+
+        if ($reason = trim((string) $reason)) {
+            $message .= ' '.translate('Reason: :reason', ['reason' => $reason]);
+        }
+
+        $this->notifications->send($subscription->user, [
+            'title' => translate('Subscription ended'),
+            'message' => $message,
+            'level' => 'warning',
+            'category' => 'subscription',
+            'icon' => 'ti ti-calendar-off',
+            'action_url' => route('pricing'),
+            'action_label' => translate('View plans'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+
+        // $reason is the trimmed value (or '') after the block above. Pass a
+        // ready-made line so the template reads cleanly when no reason was given.
+        $this->mail->send('subscription_ended', $subscription->user->email, [
+            'user_name' => $subscription->user->name,
+            'plan_name' => $planName,
+            'reason' => $reason ? translate('Reason: :reason', ['reason' => $reason]) : '',
         ]);
     }
 
@@ -166,14 +222,200 @@ class NotificationEventService
                 ]),
                 'level' => 'warning',
                 'category' => 'subscription',
+                'icon' => 'ti ti-calendar-x',
                 'action_url' => route('pricing'),
                 'action_label' => translate('Renew'),
                 'meta' => ['subscription_id' => $subscription->id],
             ]);
+
+            $this->mail->send('subscription_expired', $subscription->user->email, [
+                'user_name' => $subscription->user->name,
+                'plan_name' => $subscription->plan?->name ?? translate('your plan'),
+            ]);
         });
     }
 
-    public function paymentSuccessful(Payment $payment): void
+    public function subscriptionRenewed(GatewaySubscription $subscription): void
+    {
+        $subscription->loadMissing(['user', 'plan']);
+
+        if (! $subscription->user || ! isProAvailable()) {
+            return;
+        }
+
+        $this->notifications->send($subscription->user, [
+            'title' => translate('Subscription renewed'),
+            'message' => translate('Your :plan subscription has been renewed.', [
+                'plan' => $subscription->plan?->name ?? translate('plan'),
+            ]),
+            'level' => 'success',
+            'category' => 'subscription',
+            'icon' => 'ti ti-calendar-share',
+            'action_url' => route('user.dashboard'),
+            'action_label' => translate('View subscription'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+
+        $this->mail->send('subscription_renewed', $subscription->user->email, [
+            'user_name' => $subscription->user->name,
+            'plan_name' => $subscription->plan?->name ?? translate('your plan'),
+        ]);
+    }
+
+    public function trialStarted(GatewaySubscription $subscription): void
+    {
+        $subscription->loadMissing(['user', 'plan']);
+
+        if (! $subscription->user) {
+            return;
+        }
+
+        $this->notifications->send($subscription->user, [
+            'title' => translate('Trial started'),
+            'message' => translate('Your :plan trial has started. Enjoy full access.', [
+                'plan' => $subscription->plan?->name ?? translate('plan'),
+            ]),
+            'level' => 'success',
+            'category' => 'subscription',
+            'icon' => 'ti ti-calendar-time',
+            'action_url' => route('user.dashboard'),
+            'action_label' => translate('View dashboard'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+
+        $this->mail->send('subscription_trial_started', $subscription->user->email, [
+            'user_name' => $subscription->user->name,
+            'plan_name' => $subscription->plan?->name ?? translate('your plan'),
+        ]);
+    }
+
+    /**
+     * Fired when a paid trial period ends (distinct from a paid subscription
+     * lapsing). Triggered from SubscriptionLifecycleService::expirePastDue when
+     * the expiring subscription was still in the trialing state.
+     */
+    public function trialEnded(GatewaySubscription $subscription): void
+    {
+        $subscription->loadMissing(['user', 'plan']);
+
+        if (! $subscription->user) {
+            return;
+        }
+
+        $this->sendOnce("trial-ended:{$subscription->id}", function () use ($subscription) {
+            $this->notifications->send($subscription->user, [
+                'title' => translate('Trial ended'),
+                'message' => translate('Your :plan trial has ended.', [
+                    'plan' => $subscription->plan?->name ?? translate('plan'),
+                ]),
+                'level' => 'warning',
+                'category' => 'subscription',
+                'icon' => 'ti ti-calendar-x',
+                'action_url' => route('pricing'),
+                'action_label' => translate('Upgrade'),
+                'meta' => ['subscription_id' => $subscription->id],
+            ]);
+
+            $this->mail->send('subscription_trial_ended', $subscription->user->email, [
+                'user_name' => $subscription->user->name,
+                'plan_name' => $subscription->plan?->name ?? translate('your plan'),
+            ]);
+        });
+    }
+
+    /**
+     * Fired when a user switches to a different plan (new checkout while an
+     * active/trialing subscription already exists). Upgrade vs downgrade is
+     * decided by the normalized monthly price of the two plans.
+     */
+    public function planChanged(User $user, ?Plan $oldPlan, ?Plan $newPlan, GatewaySubscription $subscription): void
+    {
+        if (! $user || ! isProAvailable()) {
+            return;
+        }
+
+        $isUpgrade = (float) ($newPlan?->price_monthly ?? 0) >= (float) ($oldPlan?->price_monthly ?? 0);
+        $planName = $newPlan?->name ?? $subscription->plan?->name ?? translate('your plan');
+
+        $this->notifications->send($user, [
+            'title' => $isUpgrade ? translate('Plan upgraded') : translate('Plan changed'),
+            'message' => translate('Your subscription is now on the :plan plan.', ['plan' => $planName]),
+            'level' => 'success',
+            'category' => 'subscription',
+            'icon' => 'ti ti-refresh',
+            'action_url' => route('user.dashboard'),
+            'action_label' => translate('View subscription'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+
+        $this->mail->send($isUpgrade ? 'subscription_upgraded' : 'subscription_downgraded', $user->email, [
+            'user_name' => $user->name,
+            'plan_name' => $planName,
+        ]);
+    }
+
+    /**
+     * Fired when a user schedules a downgrade to a lower plan that takes effect
+     * at the end of the current period. Sends the confirmation email now; the
+     * apply step later only posts an in-app note.
+     */
+    public function subscriptionDowngradeScheduled(GatewaySubscription $subscription, Plan $target, \Illuminate\Support\Carbon $effectiveAt): void
+    {
+        $subscription->loadMissing(['user', 'plan']);
+
+        if (! $subscription->user) {
+            return;
+        }
+
+        $planName = $target->name;
+        $dateLabel = $effectiveAt->toFormattedDateString();
+
+        $this->notifications->send($subscription->user, [
+            'title' => translate('Downgrade scheduled'),
+            'message' => translate('You will move to the :plan plan on :date. Your current features stay active until then.', [
+                'plan' => $planName,
+                'date' => $dateLabel,
+            ]),
+            'level' => 'info',
+            'category' => 'subscription',
+            'icon' => 'ti ti-calendar-minus',
+            'action_url' => route('user.dashboard.billing'),
+            'action_label' => translate('Manage subscription'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+
+        $this->mail->send('subscription_downgraded', $subscription->user->email, [
+            'user_name' => $subscription->user->name,
+            'plan_name' => $planName,
+        ]);
+    }
+
+    /**
+     * In-app note when a previously scheduled downgrade actually takes effect.
+     */
+    public function subscriptionDowngradeApplied(GatewaySubscription $subscription, ?Plan $oldPlan = null): void
+    {
+        $subscription->loadMissing(['user', 'plan']);
+
+        if (! $subscription->user) {
+            return;
+        }
+
+        $this->notifications->send($subscription->user, [
+            'title' => translate('Plan changed'),
+            'message' => translate('Your subscription is now on the :plan plan.', [
+                'plan' => $subscription->plan?->name ?? translate('your plan'),
+            ]),
+            'level' => 'info',
+            'category' => 'subscription',
+            'icon' => 'ti ti-arrow-down-circle',
+            'action_url' => route('user.dashboard.billing'),
+            'action_label' => translate('View subscription'),
+            'meta' => ['subscription_id' => $subscription->id],
+        ]);
+    }
+
+    public function paymentSuccessful(Payment $payment, bool $suppressStartedEmail = false): void
     {
         $payment->loadMissing(['user', 'plan']);
 
@@ -190,6 +432,7 @@ class NotificationEventService
             ]),
             'level' => 'success',
             'category' => 'payment',
+            'icon' => 'ti ti-receipt',
             'action_url' => route('checkout.pending', $payment),
             'action_label' => translate('View payment'),
             'meta' => ['payment_ulid' => $payment->ulid],
@@ -203,6 +446,7 @@ class NotificationEventService
             ]),
             'level' => 'success',
             'category' => 'payment',
+            'icon' => 'ti ti-receipt',
             'action_url' => route('admin.users.show', $payment->user),
             'action_label' => translate('View user'),
             'meta' => ['payment_ulid' => $payment->ulid],
@@ -218,12 +462,17 @@ class NotificationEventService
                 'site_url' => url('/'),
             ]);
 
-            $this->mail->send('subscription_started', $payment->user->email, [
-                'user_name' => $payment->user->name,
-                'plan_name' => $payment->plan?->name ?? translate('your plan'),
-                'site_name' => settings('app_name', 'MakeAI'),
-                'site_url' => url('/'),
-            ]);
+            // On a plan change the "welcome, your subscription has started" email
+            // is misleading — the receipt (invoice_paid) plus the upgrade/downgrade
+            // notice cover it. Only send it for genuinely new subscriptions.
+            if (! $suppressStartedEmail) {
+                $this->mail->send('subscription_started', $payment->user->email, [
+                    'user_name' => $payment->user->name,
+                    'plan_name' => $payment->plan?->name ?? translate('your plan'),
+                    'site_name' => settings('app_name', 'MakeAI'),
+                    'site_url' => url('/'),
+                ]);
+            }
         }
     }
 
@@ -240,6 +489,7 @@ class NotificationEventService
             'message' => translate('Payment failed for your subscription. Please update billing.'),
             'level' => 'error',
             'category' => 'payment',
+            'icon' => 'ti ti-credit-card-off',
             'action_url' => route('pricing'),
             'action_label' => translate('Update billing'),
             'meta' => ['payment_ulid' => $payment->ulid, 'reason' => $reason],
@@ -250,9 +500,15 @@ class NotificationEventService
             'message' => translate('Payment failed: :user', ['user' => $payment->user->name]),
             'level' => 'error',
             'category' => 'payment',
+            'icon' => 'ti ti-credit-card-off',
             'action_url' => route('admin.users.show', $payment->user),
             'action_label' => translate('View user'),
             'meta' => ['payment_ulid' => $payment->ulid, 'reason' => $reason],
+        ]);
+
+        $this->mail->send('subscription_payment_failed', $payment->user->email, [
+            'user_name' => $payment->user->name,
+            'plan_name' => $payment->plan?->name ?? translate('your plan'),
         ]);
     }
 
@@ -286,6 +542,7 @@ class NotificationEventService
             'message' => $message,
             'level' => 'error',
             'category' => 'payment',
+            'icon' => 'ti ti-receipt-off',
             'action_url' => route('checkout.pending', $payment),
             'action_label' => translate('View payment'),
             'meta' => ['payment_ulid' => $payment->ulid, 'reason' => $reason],
@@ -316,6 +573,7 @@ class NotificationEventService
                 ]),
                 'level' => 'warning',
                 'category' => 'payment',
+                'icon' => 'ti ti-clock-hour-4',
                 'action_url' => route('admin.users.show', $payment->user),
                 'action_label' => translate('View user'),
                 'meta' => [
@@ -343,6 +601,7 @@ class NotificationEventService
             'message' => translate('You earned :amount from a referral!', ['amount' => $amount]),
             'level' => 'success',
             'category' => 'affiliate',
+            'icon' => 'ti ti-users',
             'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['commission_id' => $commission->id],
@@ -353,6 +612,33 @@ class NotificationEventService
             'amount' => $amount,
             'site_name' => settings('app_name', 'MakeAI'),
             'site_url' => url('/'),
+        ]);
+    }
+
+    /**
+     * Fired when a referrer is granted account credits because a user they
+     * referred made their first purchase (distinct from a cash commission).
+     */
+    public function referralCreditsEarned(User $referrer, float $amount): void
+    {
+        if (! $referrer) {
+            return;
+        }
+
+        $this->notifications->send($referrer, [
+            'title' => translate('Referral reward earned'),
+            'message' => translate('You earned :amount referral credits!', [
+                'amount' => $this->formatNumber($amount),
+            ]),
+            'level' => 'success',
+            'category' => 'affiliate',
+            'icon' => 'ti ti-users-plus',
+            'action_url' => route('user.dashboard.affiliate'),
+            'action_label' => translate('View affiliate dashboard'),
+        ]);
+
+        $this->mail->send('referral_earned', $referrer->email, [
+            'user_name' => $referrer->name,
         ]);
     }
 
@@ -371,6 +657,7 @@ class NotificationEventService
             'message' => translate('A commission of :amount was rejected by the admin.', ['amount' => $amount]),
             'level' => 'warning',
             'category' => 'affiliate',
+            'icon' => 'ti ti-user-x',
             'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['commission_id' => $commission->id],
@@ -399,6 +686,7 @@ class NotificationEventService
             'message' => translate('You have a new payout request: :amount', ['amount' => $amount]),
             'level' => 'info',
             'category' => 'affiliate',
+            'icon' => 'ti ti-cash',
             'action_url' => route('admin.affiliate.index'),
             'action_label' => translate('Review payout'),
             'meta' => [
@@ -424,6 +712,7 @@ class NotificationEventService
             'message' => translate('Your payout request of :amount is being processed.', ['amount' => $amount]),
             'level' => 'info',
             'category' => 'affiliate',
+            'icon' => 'ti ti-refresh',
             'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['payout_id' => $payout->id],
@@ -445,6 +734,7 @@ class NotificationEventService
             'message' => translate('Your payout request of :amount has been paid.', ['amount' => $amount]),
             'level' => 'success',
             'category' => 'affiliate',
+            'icon' => 'ti ti-circle-check',
             'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['payout_id' => $payout->id],
@@ -474,6 +764,7 @@ class NotificationEventService
             'message' => translate('Your payout request of :amount was rejected.', ['amount' => $amount]),
             'level' => 'warning',
             'category' => 'affiliate',
+            'icon' => 'ti ti-circle-x',
             'action_url' => route('user.dashboard.affiliate'),
             'action_label' => translate('View affiliate dashboard'),
             'meta' => ['payout_id' => $payout->id],
@@ -500,6 +791,7 @@ class NotificationEventService
             'message' => translate("Your document ':name' has been processed.", ['name' => $document->title]),
             'level' => 'success',
             'category' => 'document',
+            'icon' => 'ti ti-file-text',
             'action_url' => route('documents.edit', $document),
             'action_label' => translate('Open document'),
             'meta' => ['document_id' => $document->id],
@@ -508,11 +800,19 @@ class NotificationEventService
 
     public function mediaReady(User $user, string $type, ?string $url = null): void
     {
+        $icon = 'ti ti-photo';
+        if (str_contains(strtolower($type), 'voice') || str_contains(strtolower($type), 'audio')) {
+            $icon = 'ti ti-music';
+        } elseif (str_contains(strtolower($type), 'video')) {
+            $icon = 'ti ti-video';
+        }
+
         $this->notifications->send($user, [
             'title' => translate('Media ready'),
             'message' => translate('Your :type is ready to view.', ['type' => $type]),
             'level' => 'success',
             'category' => 'media',
+            'icon' => $icon,
             'action_url' => $url,
             'action_label' => $url ? translate('View') : null,
             'meta' => ['type' => $type],
@@ -541,6 +841,7 @@ class NotificationEventService
                         'message' => $message,
                         'level' => 'info',
                         'category' => 'announcement',
+                        'icon' => 'ti ti-bell',
                         'action_url' => $url,
                         'action_label' => $url ? translate('View') : null,
                     ], $queue);
@@ -574,6 +875,7 @@ class NotificationEventService
                         'message' => translate('New tool launched: :tool', ['tool' => $tool->name]),
                         'level' => 'info',
                         'category' => 'ai_tool',
+                        'icon' => 'ti ti-rocket',
                         'action_url' => route('ai.tools.show', $tool->slug),
                         'action_label' => translate('Try now'),
                         'meta' => [
@@ -595,6 +897,7 @@ class NotificationEventService
             'message' => translate("Your password was changed. Wasn't you? Secure your account."),
             'level' => 'warning',
             'category' => 'security',
+            'icon' => 'ti ti-lock-password',
             'action_url' => route('password.request'),
             'action_label' => translate('Secure account'),
         ]);
@@ -613,6 +916,7 @@ class NotificationEventService
             ]),
             'level' => 'warning',
             'category' => 'security',
+            'icon' => 'ti ti-shield-lock',
             'action_url' => route('user.dashboard'),
             'action_label' => translate('Review account'),
             'meta' => ['ip' => $ip, 'city' => $city, 'country' => $country],
@@ -626,6 +930,7 @@ class NotificationEventService
             ]),
             'level' => 'warning',
             'category' => 'security',
+            'icon' => 'ti ti-shield-lock',
             'action_url' => route('admin.users.show', $user),
             'action_label' => translate('View user'),
             'meta' => ['ip' => $ip, 'user_ulid' => $user->ulid],
@@ -634,6 +939,11 @@ class NotificationEventService
 
     public function newUserRegistered(User $user): void
     {
+        // Welcome the new user (covers standard + social signup).
+        $this->mail->send('welcome', $user->email, [
+            'user_name' => $user->name,
+        ]);
+
         $this->notifications->notifyAdmins([
             'title' => translate('New user registered'),
             'message' => translate(':name (:email) created an account.', [
@@ -642,6 +952,7 @@ class NotificationEventService
             ]),
             'level' => 'info',
             'category' => 'users',
+            'icon' => 'ti ti-user-plus',
             'action_url' => route('admin.users.show', $user),
             'action_label' => translate('View user'),
         ]);
@@ -654,6 +965,7 @@ class NotificationEventService
             'message' => translate('New comment pending moderation.'),
             'level' => 'info',
             'category' => 'comments',
+            'icon' => 'ti ti-message-2',
             'action_url' => route('admin.comments.index'),
             'action_label' => translate('Moderate comments'),
             'meta' => ['comment_id' => $comment->id],
@@ -667,6 +979,7 @@ class NotificationEventService
             'message' => translate('License re-verification failed. :days days grace period remaining.', ['days' => $days]),
             'level' => 'warning',
             'category' => 'license',
+            'icon' => 'ti ti-key',
         ], 'super-admin');
     }
 
@@ -680,6 +993,7 @@ class NotificationEventService
             ]),
             'level' => 'info',
             'category' => 'system',
+            'icon' => 'ti ti-download',
         ], 'super-admin');
     }
 
@@ -690,6 +1004,7 @@ class NotificationEventService
             'message' => translate('Health check failed: :check', ['check' => $checkName]),
             'level' => 'error',
             'category' => 'system',
+            'icon' => 'ti ti-alert-triangle',
         ], 'super-admin');
     }
 
@@ -704,6 +1019,7 @@ class NotificationEventService
                 ]),
                 'level' => 'warning',
                 'category' => 'ai',
+                'icon' => 'ti ti-chart-bar',
                 'action_url' => route('admin.ai.logs.index'),
                 'action_label' => translate('View usage logs'),
             ], 'super-admin');
@@ -729,10 +1045,62 @@ class NotificationEventService
                         ]),
                         'level' => 'info',
                         'category' => 'billing',
+                        'icon' => 'ti ti-calendar-event',
                         'action_url' => route('billing.portal'),
                         'action_label' => translate('Manage billing'),
                     ]);
+
+                    $this->mail->send('subscription_expiring_soon', $user->email, [
+                        'user_name' => $user->name,
+                        'plan_name' => $user->plan?->name ?? translate('your plan'),
+                    ]);
                     $count++;
+                }
+            });
+
+        return $count;
+    }
+
+    /**
+     * Remind users whose free trial ends within the next ~2 days. sendOnce keys
+     * each trial so a given trial only ever gets a single "ending soon" nudge.
+     */
+    public function notifyTrialsEndingSoon(): int
+    {
+        $count = 0;
+
+        GatewaySubscription::query()
+            ->where('status', GatewaySubscription::STATUS_TRIALING)
+            ->whereNotNull('trial_ends_at')
+            ->whereBetween('trial_ends_at', [now(), now()->addDays(2)])
+            ->with(['user', 'plan'])
+            ->chunkById(100, function ($subscriptions) use (&$count) {
+                foreach ($subscriptions as $subscription) {
+                    if (! $subscription->user) {
+                        continue;
+                    }
+
+                    $this->sendOnce("trial-ending:{$subscription->id}", function () use ($subscription, &$count) {
+                        $this->notifications->send($subscription->user, [
+                            'title' => translate('Trial ending soon'),
+                            'message' => translate('Your :plan trial ends soon. Add a payment method to keep your access.', [
+                                'plan' => $subscription->plan?->name ?? translate('plan'),
+                            ]),
+                            'level' => 'warning',
+                            'category' => 'billing',
+                            'icon' => 'ti ti-calendar-time',
+                            'action_url' => route('pricing'),
+                            'action_label' => translate('Choose a plan'),
+                            'meta' => ['subscription_id' => $subscription->id],
+                        ]);
+
+                        $this->mail->send('subscription_trial_expiring', $subscription->user->email, [
+                            'user_name' => $subscription->user->name,
+                            'plan_name' => $subscription->plan?->name ?? translate('your plan'),
+                        ]);
+
+                        $count++;
+                    });
                 }
             });
 

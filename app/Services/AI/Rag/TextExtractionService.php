@@ -66,12 +66,12 @@ class TextExtractionService
         \App\Services\Security\SsrfGuard::assertPublicUrl($url);
 
         try {
-            $response = Http::timeout(30)
+            $response = Http::timeout(max(5, (int) settings('rag_scraper_timeout', 30)))
                 ->withOptions([
                     'allow_redirects' => \App\Services\Security\SsrfGuard::redirectOptions(3),
                 ])
                 ->withHeaders([
-                    'User-Agent' => 'Mozilla/5.0 (compatible; MakeAI RAG Bot/1.0)',
+                    'User-Agent' => settings('rag_scraper_user_agent', 'Mozilla/5.0 (compatible; MakeAI RAG Bot/1.0)'),
                     'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Accept-Language' => 'en-US,en;q=0.5',
                 ])

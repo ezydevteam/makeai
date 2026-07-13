@@ -1,8 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, Link, useForm, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import Pagination from '@/Components/Pagination.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -143,7 +143,7 @@ function submitReject() {
                 </Link>
                 <Link
                     :href="route('addon.social.admin.settings')"
-                    class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm font-medium"
+                    class="inline-flex items-center gap-2 rounded-lg btn-primary-admin px-4 py-2 text-sm font-medium"
                 >
                     <i class="ti ti-settings text-base"></i>
                     {{ t('Settings') }}
@@ -228,7 +228,7 @@ function submitReject() {
                                         {{ post.user?.name ?? t('Unknown') }}
                                     </p>
                                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                        {{ post.user?.email ?? '—' }}
+                                        {{ post.user?.email ?? 'â€”' }}
                                     </p>
                                 </div>
                             </td>
@@ -269,7 +269,7 @@ function submitReject() {
                             </td>
 
                             <td class="px-5 py-4 align-top text-sm text-gray-600 dark:text-gray-300">
-                                {{ post.scheduled_at ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(post.scheduled_at)) : '—' }}
+                                {{ post.scheduled_at ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(post.scheduled_at)) : 'â€”' }}
                             </td>
 
                             <td class="px-5 py-4 align-top text-right">
@@ -277,7 +277,7 @@ function submitReject() {
                                     <button
                                         type="button"
                                         :disabled="approveProcessingId === post.id"
-                                        class="inline-flex items-center gap-2 rounded-lg btn-primary px-4 py-2 text-sm disabled:opacity-60"
+                                        class="inline-flex items-center gap-2 rounded-lg btn-primary-admin px-4 py-2 text-sm disabled:opacity-60"
                                         @click="approve(post)"
                                     >
                                         <i class="ti ti-check text-base"></i>

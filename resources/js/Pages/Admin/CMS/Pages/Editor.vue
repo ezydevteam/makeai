@@ -5,10 +5,11 @@ import { onClickOutside } from '@vueuse/core'
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { useToastr } from '@/Composables/useToastr';
 import { useTranslate } from '@/Composables/useTranslate';
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue';
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue';
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
-import AppSelect from '@/Components/AppSelect.vue';
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
+import AppSelect from '@/Components/UI/AppSelect.vue';
+import AppSwitch from '@/Components/UI/AppSwitch.vue';
 
 defineOptions({ layout: AdminLayout });
 
@@ -66,7 +67,6 @@ const form = useForm({
     meta_title: props.page?.meta_title ?? '',
     meta_description: props.page?.meta_description ?? '',
     meta_keywords: props.page?.meta_keywords ?? '',
-    template: props.page?.template ?? 'default',
     status: props.page?.status ?? 'published',
     published_at: props.page?.published_at ? new Date(props.page.published_at).toISOString().slice(0, 16) : null,
     password: '',
@@ -344,75 +344,73 @@ onClickOutside(publishMenuRef, () => {
 <template>
     <Head :title="page ? t('Edit Page') : t('Create Page')" />
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <div class="mb-8">
-            <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-                <div>
-                    <h1 class="mt-3 text-2xl font-bold text-gray-900 dark:text-white">{{ page ? t('Edit Page') : t('Create Page') }}</h1>
-                    <p class="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">{{ t('Design, organize, and publish custom content for your public site from one workspace.') }}</p>
-                </div>
+        <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ page ? t('Edit Page') : t('Create Page') }}</h1>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Design, organize, and publish custom content for your public site from one workspace.') }}</p>
+            </div>
 
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <button
-                        v-if="page && !page.is_system"
-                        @click="confirmDeletePage"
-                        type="button"
-                        class="rounded-2xl border border-red-200 bg-red-50 px-5 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100 dark:border-red-900/30 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30"
-                    >
-                        {{ t('Delete Page') }}
-                    </button>
+            <div class="flex items-center gap-3 shrink-0">
+                <button
+                    v-if="page && !page.is_system"
+                    @click="confirmDeletePage"
+                    type="button"
+                    class="grow inline-flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:border-red-300 hover:bg-red-100 dark:border-red-900/20 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/30 dark:hover:border-red-900/30"
+                >
+                    {{ t('Delete') }}
+                </button>
 
-                    <Link
-                        :href="route('admin.pages.index')"
-                        class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700  transition hover:border-primary-300 hover:bg-gray-50 dark:border-surface-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800"
-                    >
-                        <i class="ti ti-arrow-left text-base"></i>
-                        {{ t('Back') }}
-                    </Link>
+                <Link
+                    :href="route('admin.pages.index')"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl transition px-3 py-2 border border-gray-200 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-gray-800 dark:hover:bg-gray-900/20 dark:hover:text-gray-300"
+                >
+                    <i class="ti ti-arrow-left text-base"></i>
+                    {{ t('Back') }}
+                </Link>
 
-                    <div ref="publishMenuRef" class="relative">
-                        <div class="inline-flex overflow-hidden rounded-lg shadow-sm ring-1 ring-primary-600/20">
-                            <button
-                                @click="submit"
-                                :disabled="form.processing"
-                                type="button"
-                                class="bg-primary-500 inline-flex items-center justify-center gap-2 !rounded-l-lg !rounded-r-none px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-                            >
-                                <i class="ti ti-device-floppy text-base"></i>
-                                {{ form.processing ? t('Saving...') : primaryActionLabel }}
-                            </button>
-                            <button
-                                type="button"
-                                class="bg-primary-500 inline-flex items-center justify-center !rounded-r-lg !rounded-l-none px-2 text-white disabled:opacity-60"
-                                :aria-label="t('Change page status')"
-                                @click="publishMenuOpen = !publishMenuOpen"
-                            >
-                                <i class="ti ti-chevron-down text-base"></i>
-                            </button>
-                        </div>
+                <div ref="publishMenuRef" class="relative">
+                    <div class="inline-flex overflow-hidden rounded-xl shadow-sm ring-1 ring-primary-600/20">
+                        <button
+                            @click="submit"
+                            :disabled="form.processing"
+                            type="button"
+                            class="bg-primary-500 inline-flex items-center justify-center gap-2 !rounded-l-xl !rounded-r-none px-3 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                        >
+                            <i class="ti ti-device-floppy text-base"></i>
+                            {{ form.processing ? t('Saving...') : primaryActionLabel }}
+                        </button>
+                        <button
+                            type="button"
+                            class="bg-primary-500 inline-flex items-center justify-center !rounded-r-xl !rounded-l-none px-2 text-white disabled:opacity-60"
+                            :aria-label="t('Change page status')"
+                            @click="publishMenuOpen = !publishMenuOpen"
+                        >
+                            <i class="ti ti-chevron-down text-base"></i>
+                        </button>
+                    </div>
 
-                        <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Save as Draft') }}
-                                </span>
-                                <i v-if="form.status === 'draft'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('scheduled')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-calendar-time text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Schedule Page') }}
-                                </span>
-                                <i v-if="form.status === 'scheduled'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('published')">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="ti ti-rocket text-base text-gray-400 dark:text-gray-500"></i>
-                                    {{ t('Publish Now') }}
-                                </span>
-                                <i v-if="form.status === 'published'" class="ti ti-check text-base text-primary-600"></i>
-                            </button>
-                        </div>
+                    <div v-if="publishMenuOpen" class="absolute right-0 top-full z-20 mt-2 w-52 rounded-xl border border-gray-200 bg-white py-2 shadow-lg dark:border-surface-700 dark:bg-surface-900">
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('draft')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-notebook text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Save as Draft') }}
+                            </span>
+                            <i v-if="form.status === 'draft'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('scheduled')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-calendar-time text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Schedule Page') }}
+                            </span>
+                            <i v-if="form.status === 'scheduled'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
+                        <button type="button" class="flex w-full items-center justify-between px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-surface-800" @click="setStatus('published')">
+                            <span class="inline-flex items-center gap-2">
+                                <i class="ti ti-rocket text-base text-gray-400 dark:text-gray-500"></i>
+                                {{ t('Publish Now') }}
+                            </span>
+                            <i v-if="form.status === 'published'" class="ti ti-check text-base text-primary-600"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -421,7 +419,7 @@ onClickOutside(publishMenuRef, () => {
         <div class="grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
             <!-- Editor Column -->
             <div class="space-y-6">
-                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="space-y-6">
                     <div>
                         <label class="mb-3 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Title') }}</label>
@@ -461,7 +459,7 @@ onClickOutside(publishMenuRef, () => {
                 </div>
 
                 <!-- SEO Card -->
-                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('SEO') }}</h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control how this page appears in search engines and social sharing previews.') }}</p>
@@ -508,7 +506,7 @@ onClickOutside(publishMenuRef, () => {
             <!-- Settings Column -->
             <div class="space-y-6">
                 <!-- Page Attributes -->
-                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Attributes') }}</h3>
                     </div>
@@ -560,7 +558,7 @@ onClickOutside(publishMenuRef, () => {
                 </div>
 
                 <!-- Featured Image -->
-                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-4">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Featured Image') }}</h3>
                     </div>
@@ -581,41 +579,31 @@ onClickOutside(publishMenuRef, () => {
                 </div>
 
                 <!-- Layout Options -->
-                <div class="rounded-xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h3>
                     </div>
                     <div class="space-y-4">
-                        <label class="flex items-center justify-between cursor-pointer group">
+                        <div class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Title') }}</span>
-                            <button @click="form.show_title = !form.show_title" type="button" :class="form.show_title ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
-                                <span :class="form.show_title ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
-                            </button>
-                        </label>
-                        <label v-if="form.show_title" class="flex items-center justify-between cursor-pointer group pl-4 border-l-2 border-gray-100 dark:border-surface-800">
+                            <AppSwitch v-model="form.show_title" />
+                        </div>
+                        <div v-if="form.show_title" class="flex items-center justify-between cursor-pointer group pl-4 border-l-2 border-gray-100 dark:border-surface-800">
                             <span class="text-sm font-medium text-gray-500 group-hover:text-gray-900 dark:text-gray-400 dark:group-hover:text-white">{{ t('Center Align Title') }}</span>
-                            <button @click="form.center_title = !form.center_title" type="button" :class="form.center_title ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
-                                <span :class="form.center_title ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
-                            </button>
-                        </label>
-                        <label class="flex items-center justify-between cursor-pointer group">
+                            <AppSwitch v-model="form.center_title" />
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Breadcrumbs') }}</span>
-                            <button @click="form.show_breadcrumbs = !form.show_breadcrumbs" type="button" :class="form.show_breadcrumbs ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
-                                <span :class="form.show_breadcrumbs ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
-                            </button>
-                        </label>
-                        <label class="flex items-center justify-between cursor-pointer group">
+                            <AppSwitch v-model="form.show_breadcrumbs" />
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Featured Image') }}</span>
-                            <button @click="form.show_featured_image = !form.show_featured_image" type="button" :class="form.show_featured_image ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
-                                <span :class="form.show_featured_image ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
-                            </button>
-                        </label>
-                        <label class="flex items-center justify-between cursor-pointer group">
+                            <AppSwitch v-model="form.show_featured_image" />
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Sidebar') }}</span>
-                            <button @click="form.show_sidebar = !form.show_sidebar" type="button" :class="form.show_sidebar ? 'bg-primary-600' : 'bg-gray-200'" class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full transition-colors">
-                                <span :class="form.show_sidebar ? 'translate-x-5' : 'translate-x-0'" class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition mt-0.5 ml-0.5"></span>
-                            </button>
-                        </label>
+                            <AppSwitch v-model="form.show_sidebar" />
+                        </div>
                         <div v-if="form.show_sidebar" class="pt-2">
                             <AppSelect v-model="form.sidebar_position" :options="sidebarPositionOptions" :placeholder="t('Select sidebar position')" />
                         </div>

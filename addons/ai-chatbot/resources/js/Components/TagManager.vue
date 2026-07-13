@@ -15,6 +15,8 @@ const editingTag = ref<ConversationTag | null>(null)
 const newTagName = ref('')
 const newTagColor = ref('#3B82F6')
 const isCreating = ref(false)
+const isSaving = ref(false)
+const saveError = ref('')
 
 const colorPresets = [
     '#3B82F6', // blue
@@ -46,23 +48,37 @@ function cancelEdit() {
     isCreating.value = false
     newTagName.value = ''
     newTagColor.value = '#3B82F6'
+    saveError.value = ''
 }
 
 async function saveTag() {
-    if (!newTagName.value.trim()) return
+    // Guard against double-submit: an unguarded second click created duplicate tags.
+    if (!newTagName.value.trim() || isSaving.value) return
 
-    if (isCreating.value) {
-        await chat.createTag(newTagName.value.trim(), newTagColor.value)
-    } else if (editingTag.value) {
-        await chat.updateTag(editingTag.value.id, newTagName.value.trim(), newTagColor.value)
+    isSaving.value = true
+    saveError.value = ''
+    try {
+        if (isCreating.value) {
+            await chat.createTag(newTagName.value.trim(), newTagColor.value)
+        } else if (editingTag.value) {
+            await chat.updateTag(editingTag.value.id, newTagName.value.trim(), newTagColor.value)
+        }
+        cancelEdit()
+    } catch (e) {
+        saveError.value = e instanceof Error ? e.message : t('Failed to save tag')
+    } finally {
+        isSaving.value = false
     }
-
-    cancelEdit()
 }
 
 async function deleteTag(tag: ConversationTag) {
     if (!confirm(t('Are you sure you want to delete this tag?'))) return
-    await chat.deleteTag(tag.id)
+    saveError.value = ''
+    try {
+        await chat.deleteTag(tag.id)
+    } catch (e) {
+        saveError.value = e instanceof Error ? e.message : t('Failed to delete tag')
+    }
 }
 </script>
 
@@ -108,18 +124,21 @@ async function deleteTag(tag: ConversationTag) {
                     </div>
                     <div class="flex gap-2">
                         <button
-                            class="px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors"
+                            class="px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors disabled:opacity-60"
+                            :disabled="isSaving || !newTagName.trim()"
                             @click="saveTag"
                         >
-                            {{ isCreating ? t('Create') : t('Save') }}
+                            {{ isSaving ? t('Saving...') : (isCreating ? t('Create') : t('Save')) }}
                         </button>
                         <button
-                            class="px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 text-[#6e6a65] dark:text-white/50 text-sm font-medium hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                            class="px-4 py-2 rounded-lg bg-black/5 dark:bg-white/5 text-[#6e6a65] dark:text-white/50 text-sm font-medium hover:bg-black/10 dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                            :disabled="isSaving"
                             @click="cancelEdit"
                         >
                             {{ t('Cancel') }}
                         </button>
                     </div>
+                    <p v-if="saveError" class="mt-2 text-xs text-red-500">{{ saveError }}</p>
                 </div>
 
                 <!-- Tags List -->

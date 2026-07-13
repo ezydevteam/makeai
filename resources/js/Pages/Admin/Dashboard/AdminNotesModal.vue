@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import AppModal from '@/Components/UI/AppModal.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 const { t } = useTranslate()
@@ -136,48 +137,38 @@ watch(() => props.open, async (isOpen) => {
 </script>
 
 <template>
-    <Teleport to="body">
-        <div v-if="open" class="fixed inset-0 z-50 flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-20" @click.self="emit('close')">
-            <div class="w-full max-w-2xl rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-surface-800 dark:bg-surface-900">
-                <!-- Header -->
-                <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-surface-800">
-                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Admin Notes') }}</h2>
-                    <button @click="emit('close')" class="rounded-full w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-surface-800">
-                        <i class="ti ti-x text-lg"></i>
-                    </button>
+    <AppModal
+        :open="open"
+        max-width="max-w-2xl"
+        :title="t('Admin Notes')"
+        @close="emit('close')"
+    >
+        <!-- Form -->
+        <div class="grid grid-cols-1 gap-3">
+            <input v-model="form.subject" type="text" :placeholder="t('Subject')" maxlength="255"
+                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:placeholder-gray-500" />
+            <textarea v-model="form.description" rows="2" :placeholder="t('Description (optional)')"
+                class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:placeholder-gray-500"></textarea>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ t('Reminder date') }}</label>
+                    <input v-model="form.reminder_date" type="datetime-local"
+                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
                 </div>
-
-                <!-- Form -->
-                <div class="px-6 py-6">
-                    <div class="grid grid-cols-1 gap-3">
-                        <input v-model="form.subject" type="text" :placeholder="t('Subject')" maxlength="255"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:placeholder-gray-500" />
-                        <textarea v-model="form.description" rows="2" :placeholder="t('Description (optional)')"
-                            class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white dark:placeholder-gray-500"></textarea>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ t('Reminder date') }}</label>
-                                <input v-model="form.reminder_date" type="datetime-local"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ t('Auto-delete date') }}</label>
-                                <input v-model="form.auto_delete_date" type="datetime-local"
-                                    class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
-                            </div>
-                        </div>
-                        <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
-                        <div class="flex items-center gap-2 pt-1">
-                            <button @click="save" :disabled="loading"
-                                class="px-5 py-2.5 btn-primary-admin rounded-xl text-sm font-bold transition-all disabled:opacity-50">
-                                {{ editingNote ? t('Update') : t('Add Note') }}
-                            </button>
-                            <button v-if="editingNote" @click="resetForm" class="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">{{ t('Cancel') }}</button>
-                        </div>
-                    </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{{ t('Auto-delete date') }}</label>
+                    <input v-model="form.auto_delete_date" type="datetime-local"
+                        class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-surface-700 dark:bg-surface-900 dark:text-white" />
                 </div>
-
+            </div>
+            <p v-if="error" class="text-xs text-red-600">{{ error }}</p>
+            <div class="flex items-center gap-2 pt-1">
+                <button @click="save" :disabled="loading"
+                    class="px-5 py-2.5 btn-primary-admin rounded-xl text-sm font-bold transition-all disabled:opacity-50">
+                    {{ editingNote ? t('Update') : t('Add Note') }}
+                </button>
+                <button v-if="editingNote" @click="resetForm" class="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">{{ t('Cancel') }}</button>
             </div>
         </div>
-    </Teleport>
+    </AppModal>
 </template>

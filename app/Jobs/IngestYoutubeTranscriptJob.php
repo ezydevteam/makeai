@@ -257,8 +257,15 @@ class IngestYoutubeTranscriptJob implements ShouldQueue
     private function fetchTranscript(string $videoId): ?array
     {
         try {
-            $response = Http::timeout(15)
-                ->get("https://youtube-transcript.ai/transcript/{$videoId}.txt");
+            $endpoint = settings('rag_youtube_transcript_endpoint', 'https://youtube-transcript.ai/transcript/{id}.txt');
+            $endpoint = str_replace(['{id}', '{videoId}'], $videoId, $endpoint);
+
+            $request = Http::timeout(15);
+            if ($apiKey = settings('rag_youtube_transcript_api_key')) {
+                $request = $request->withToken($apiKey);
+            }
+
+            $response = $request->get($endpoint);
 
             if ($response->successful()) {
                 $markdown = $response->body();

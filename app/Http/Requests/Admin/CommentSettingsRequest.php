@@ -27,7 +27,6 @@ class CommentSettingsRequest extends FormRequest
             'comments_require_approval' => ['required', 'boolean'],
             'comments_notify_admin' => ['required', 'boolean'],
             'comments_poll_seconds' => ['required', 'integer', 'min:10', 'max:300'],
-            'comments_akismet_key' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

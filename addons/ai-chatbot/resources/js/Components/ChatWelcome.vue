@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
+import { usePage } from '@inertiajs/vue3'
 import { useTranslate } from '@/Composables/useTranslate'
 import type { useChat } from '../Composables/useChat'
 
 const { t } = useTranslate()
 const chat = inject<ReturnType<typeof useChat>>('chat')!
+
+// Optional brand logo configured in the addon settings (welcome + chat header).
+const chatLogo = computed(() => (usePage().props.chatbot as { chatLogo?: string | null } | undefined)?.chatLogo || null)
 
 const getModeIconClass = (icon?: string | null) => {
     const value = icon?.trim()
@@ -24,7 +28,8 @@ const getModeIconClass = (icon?: string | null) => {
     <div class="flex-1 flex items-center justify-center overflow-y-auto px-6 py-8">
         <div class="max-w-[768px] w-full text-center">
             <div class="mb-6">
-                <div class="w-14 h-14 mx-auto mb-5 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center">
+                <img v-if="chatLogo" :src="chatLogo" alt="" class="mx-auto mb-5 h-16 w-auto max-w-[220px] object-contain" />
+                <div v-else class="w-14 h-14 mx-auto mb-5 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center">
                     <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" class="text-gray-700 dark:text-gray-300">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                     </svg>

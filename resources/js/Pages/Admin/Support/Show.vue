@@ -1,14 +1,14 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { sanitizeHtml } from '@/Composables/useSanitize'
 import { badgeClass } from '@/Composables/useBadge'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useToastr } from '@/Composables/useToastr'
 
-const RichEditor = defineAsyncComponent(() => import('@/Components/RichEditor.vue'))
+const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 
 defineOptions({ layout: AdminLayout })
 
@@ -23,6 +23,7 @@ interface Reply {
     id: number
     author_type: string
     author_name: string
+    author_avatar?: string | null
     content: string
     is_internal_note: boolean
     is_ai_draft: boolean
@@ -48,6 +49,8 @@ const props = defineProps<{
         user?: { ulid?: string; name: string; email: string }
         department?: { id: number; name: string } | null
         assigned_admin?: { id: number; name: string } | null
+        satisfaction_rating?: number | null
+        satisfaction_comment?: string | null
         replies: Reply[]
     }
     departments: Option[]
@@ -146,6 +149,13 @@ const replyTypeLabel = (reply: Reply) => {
     return t(labels[reply.author_type] ?? reply.author_type)
 }
 
+const getAvatarUrl = (avatar: string) => {
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+        return avatar
+    }
+    return `/storage/${avatar}`
+}
+
 const replyTypeClass = (reply: Reply) => {
     if (reply.is_ai_draft) return 'bg-violet-100 text-violet-700 dark:bg-violet-900/20 dark:text-violet-300'
     if (reply.is_internal_note) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
@@ -237,11 +247,11 @@ const suggestReply = async () => {
     <Head :title="ticket.subject" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
+        <section class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ ticket.subject }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-                    {{ ticket.ticket_number }} ·
+                    {{ ticket.ticket_number }} Â·
                     <Link
                         v-if="ticket.user?.ulid"
                         :href="route('admin.users.show', ticket.user.ulid)"
@@ -253,10 +263,10 @@ const suggestReply = async () => {
                 </p>
             </div>
 
-            <div>
+            <div class="shrink-0">
                 <Link
                     :href="route('admin.support.tickets.index')"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
@@ -291,11 +301,24 @@ const suggestReply = async () => {
                             class="rounded-2xl border p-5 shadow-sm"
                             :class="replyCardClass(reply)"
                         >
-                            <div class="mb-3 flex items-start justify-between gap-4">
-                                <div>
-                                    <div class="font-semibold text-gray-900 dark:text-white">{{ reply.author_name }}</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(reply.created_at)) }}
+                            <div class="mb-3 flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-800 flex items-center justify-center border border-gray-100 dark:border-surface-700">
+                                        <img
+                                            v-if="reply.author_avatar"
+                                            :src="getAvatarUrl(reply.author_avatar)"
+                                            :alt="reply.author_name"
+                                            class="h-full w-full object-cover"
+                                        />
+                                        <span v-else class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                                            {{ reply.author_name.charAt(0) }}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-gray-900 dark:text-white">{{ reply.author_name }}</div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(reply.created_at)) }}
+                                        </div>
                                     </div>
                                 </div>
                                 <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium" :class="replyTypeClass(reply)">
@@ -362,26 +385,22 @@ const suggestReply = async () => {
 
                     <form class="space-y-4 p-5" @submit.prevent="sendReply">
                         <RichEditor v-model="form.message" variant="comment" />
-
-                        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div class="flex flex-wrap items-center gap-4">
-                                <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                                    <input v-model="form.is_internal_note" type="checkbox" class="rounded border-gray-300">
-                                    {{ t('Internal note') }}
-                                </label>
-
-                                <input
-                                    type="file"
-                                    multiple
-                                    class="rounded-lg border border-gray-200 bg-gray-50 p-1.5 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary-100 file:px-2 file:py-1 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:file:bg-primary-900/30 dark:file:text-primary-200"
-                                    @change="setFiles"
-                                >
-                            </div>
+                        <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input v-model="form.is_internal_note" type="checkbox" class="rounded border-gray-300">
+                            {{ t('Internal note') }}
+                        </label>
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <input
+                                type="file"
+                                multiple
+                                class="rounded-xl border border-gray-200 bg-gray-50 p-1.5 text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-primary-100 file:px-2 file:py-1 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-200 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:file:bg-primary-900/30 dark:file:text-primary-200"
+                                @change="setFiles"
+                            >
 
                             <button
                                 type="submit"
                                 :disabled="form.processing"
-                                class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                                class="shrink-0 btn-primary-admin inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 <i class="ti ti-send text-base"></i>
                                 {{ form.processing ? t('Sending...') : t('Send Reply') }}
@@ -434,12 +453,37 @@ const suggestReply = async () => {
                         <button
                             type="submit"
                             :disabled="stateForm.processing"
-                            class="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin inline-flex w-full items-center justify-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <i class="ti ti-device-floppy text-base"></i>
                             {{ stateForm.processing ? t('Saving...') : t('Update Ticket') }}
                         </button>
                     </form>
+                </section>
+
+                <section
+                    v-if="ticket.satisfaction_rating"
+                    class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900"
+                >
+                    <div class="border-b border-gray-100 px-5 py-4 dark:border-surface-800">
+                        <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Customer Satisfaction') }}</h2>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Feedback the customer left after this ticket was resolved.') }}</p>
+                    </div>
+                    <div class="space-y-3 p-5">
+                        <div class="flex items-center gap-1">
+                            <i
+                                v-for="star in 5"
+                                :key="star"
+                                class="ti text-lg"
+                                :class="star <= (ticket.satisfaction_rating ?? 0) ? 'ti-star-filled text-amber-400' : 'ti-star text-gray-300 dark:text-surface-600'"
+                            ></i>
+                            <span class="ml-2 text-sm font-medium text-gray-600 dark:text-gray-300">{{ ticket.satisfaction_rating }}/5</span>
+                        </div>
+                        <p v-if="ticket.satisfaction_comment" class="rounded-xl bg-gray-50 p-3 text-sm text-gray-700 dark:bg-surface-800 dark:text-gray-200">
+                            {{ ticket.satisfaction_comment }}
+                        </p>
+                        <p v-else class="text-sm italic text-gray-400 dark:text-gray-500">{{ t('No written feedback provided.') }}</p>
+                    </div>
                 </section>
             </aside>
         </section>

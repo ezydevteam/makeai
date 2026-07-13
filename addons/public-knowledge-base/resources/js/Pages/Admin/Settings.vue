@@ -1,9 +1,9 @@
-<script setup lang="ts">
-import { computed, watch } from 'vue'
+﻿<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
 import { Head, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppSelect, { type SelectOption } from '@/Components/AppSelect.vue'
+import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 
 defineOptions({ layout: AdminLayout })
 
@@ -24,25 +24,74 @@ interface KbSettings {
     public_slug: string
     page_title: string
     page_description: string
+    logo: string | null
+    header_menu: string
+    footer_menu: string
     show_vote_buttons: boolean
     allow_guest_search: boolean
     widget_enabled: boolean
     widget_accent_color: string
     ai_model: string
-    embedding_model: string
     top_k: number
     max_answer_tokens: number
     provider: string
+    system_prompt: string
 }
 
 const props = defineProps<{
     settings: KbSettings
     providers: Record<string, KbProvider>
+    menus: Array<{ name: string; slug: string }>
 }>()
+
+const menuOptions = computed<SelectOption[]>(() => [
+    { value: '', label: t('None') },
+    ...(props.menus ?? []).map((m) => ({ value: m.slug, label: `${m.name} (${m.slug})` })),
+])
+
+// ─── Logo upload (own multipart form via the generic addon file handler) ───────
+// Kept out of the main JSON settings form so a File doesn't switch the whole submit
+// to multipart. Auto-saves on pick / remove — same pattern as the ai-chatbot logo.
+const storedLogoUrl = computed(() => {
+    const p = props.settings.logo
+    if (!p) return null
+    if (/^https?:\/\//.test(p) || p.startsWith('/storage/')) return p
+    return '/storage/' + p.replace(/^\//, '')
+})
+
+const logoForm = useForm<{ logo: string | File | null }>({ logo: props.settings.logo ?? null })
+const logoInput = ref<HTMLInputElement | null>(null)
+const logoPreview = ref<string | null>(null)
+
+const saveLogo = () => {
+    logoForm.post(route('admin.addons.settings.save', { slug: 'public-knowledge-base' }), {
+        preserveScroll: true,
+        forceFormData: true,
+        onSuccess: () => {
+            logoPreview.value = null
+            if (logoInput.value) logoInput.value.value = ''
+        },
+    })
+}
+
+const onLogoSelected = (e: Event) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    logoForm.logo = file
+    logoPreview.value = URL.createObjectURL(file)
+    saveLogo()
+}
+
+const removeLogo = () => {
+    logoForm.logo = null
+    logoPreview.value = null
+    if (logoInput.value) logoInput.value.value = ''
+    saveLogo()
+}
 
 const origin = typeof window === 'undefined' ? '' : window.location.origin
 
-const providerSlugs = computed(() => Object.keys(props.providers))
+const providerSlugs = computed(() => Object.keys(props.providers ?? {}))
 
 const initialProvider = providerSlugs.value.includes(props.settings.provider)
     ? props.settings.provider
@@ -120,7 +169,7 @@ watch(
             <button
                 type="button"
                 :disabled="form.processing"
-                class="rounded-lg btn-primary disabled:opacity-60"
+                class="rounded-lg btn-primary-admin disabled:opacity-60"
                 @click="save"
             >
                 {{ form.processing ? t('Saving...') : t('Save Changes') }}
@@ -188,6 +237,43 @@ watch(
                             :placeholder="t('Describe the help center for search engines and social previews')"
                             class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         ></textarea>
+                    </label>
+
+                    <div class="block lg:col-span-2">
+                        <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Help Center Logo') }}</span>
+                        <div class="flex flex-wrap items-start gap-4">
+                            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50 dark:border-surface-800 dark:bg-surface-800/60">
+                                <img v-if="logoPreview || storedLogoUrl" :src="logoPreview || storedLogoUrl!" alt="Logo" class="h-full w-full object-contain" />
+                                <i v-else class="ti ti-photo text-xl text-gray-300 dark:text-gray-600"></i>
+                            </div>
+                            <div class="flex flex-col items-start gap-2">
+                                <input
+                                    ref="logoInput"
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                    :disabled="logoForm.processing"
+                                    class="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-primary-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-700 disabled:opacity-60 dark:text-gray-300"
+                                    @change="onLogoSelected"
+                                >
+                                <span v-if="logoForm.processing" class="text-xs text-gray-500 dark:text-gray-400">{{ t('Saving...') }}</span>
+                                <button v-else-if="logoPreview || storedLogoUrl" type="button" class="inline-flex items-center gap-1.5 text-xs font-medium text-danger-600 hover:text-danger-700" @click="removeLogo">
+                                    <i class="ti ti-trash text-sm"></i>{{ t('Remove logo') }}
+                                </button>
+                            </div>
+                        </div>
+                        <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Shown in the help center header. Falls back to the site logo. Saved automatically.') }}</span>
+                    </div>
+
+                    <label class="block">
+                        <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Header Menu') }}</span>
+                        <AppSelect v-model="form.header_menu" :options="menuOptions" :placeholder="t('Select a menu')" />
+                        <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Menu shown in the help center header navigation.') }}</span>
+                    </label>
+
+                    <label class="block">
+                        <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Footer Menu') }}</span>
+                        <AppSelect v-model="form.footer_menu" :options="menuOptions" :placeholder="t('Select a menu')" />
+                        <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Menu shown in the help center footer.') }}</span>
                     </label>
 
                     <label class="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-gray-50/70 p-4 dark:border-surface-800 dark:bg-surface-800/60">
@@ -262,20 +348,6 @@ watch(
                     </div>
 
                     <div class="block">
-                        <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Embedding Model') }}</span>
-                        <AppSelect
-                            v-model="form.embedding_model"
-                            :options="[
-                                { value: '', label: t('Default') },
-                                { value: 'text-embedding-3-small', label: 'text-embedding-3-small' },
-                                { value: 'text-embedding-3-large', label: 'text-embedding-3-large' },
-                                { value: 'text-embedding-ada-002', label: 'text-embedding-ada-002' },
-                            ]"
-                            :placeholder="t('Default')"
-                        />
-                    </div>
-
-                    <div class="block">
                         <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Top-K Chunks') }}</span>
                         <input
                             v-model.number="form.top_k"
@@ -300,7 +372,19 @@ watch(
                             :placeholder="t('512')"
                             class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         />
-                        <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Changing the embedding model requires re-indexing all articles.') }}</span>
+                        <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Caps the length of each AI-generated answer.') }}</span>
+                    </div>
+
+                    <div class="block md:col-span-2">
+                        <span class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Answer System Prompt') }}</span>
+                        <textarea
+                            v-model="form.system_prompt"
+                            rows="3"
+                            maxlength="2000"
+                            :placeholder="t('e.g. You are the friendly support assistant for Acme Corp. Keep answers warm and concise.')"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                        ></textarea>
+                        <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">{{ t('Optional persona/tone for AI answers. The grounding rules (use only KB context, cite sources) are always applied on top of this.') }}</span>
                     </div>
                 </div>
             </section>

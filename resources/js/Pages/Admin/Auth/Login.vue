@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AuthCaptchaField from '@/Components/Auth/AuthCaptchaField.vue'
+import AuthCaptchaField from '@/Components/Utility/AuthCaptchaField.vue'
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 import { useFlashToasts } from '@/Composables/useToastr'

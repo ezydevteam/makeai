@@ -13,9 +13,8 @@ class ReportCommentRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
-            'reason' => ['nullable', 'string', 'max:100'],
-            'details' => ['nullable', 'string', 'max:1000'],
-        ];
+        // A report is a simple flag — no fields are stored. Kept as a FormRequest
+        // for the authorize() gate and consistent handling.
+        return [];
     }
 }

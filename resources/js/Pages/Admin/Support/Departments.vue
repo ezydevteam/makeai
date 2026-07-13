@@ -1,11 +1,12 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 
 defineOptions({ layout: AdminLayout })
 declare const route: (name: string, params?: unknown) => string
@@ -128,7 +129,7 @@ const remove = () => {
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Support Departments') }}</h1>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Manage ticket departments and auto-assignment rules.') }}</p>
             </div>
-            <Link :href="route('admin.support.tickets.index')" class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"><i class="ti ti-arrow-left text-base"></i>{{ t('Back to Tickets') }}</Link>
+            <Link :href="route('admin.support.tickets.index')" class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"><i class="ti ti-arrow-left text-base"></i>{{ t('Back to Tickets') }}</Link>
         </div>
 
         <div class="mt-6 grid gap-6 xl:grid-cols-[1fr_420px]">
@@ -163,7 +164,7 @@ const remove = () => {
                     <div v-for="department in filteredDepartments" :key="department.id" class="flex items-center justify-between gap-4 px-4 py-2.5">
                         <div>
                             <div class="font-semibold text-gray-900 dark:text-white">{{ department.name }}</div>
-                            <div class="text-sm text-gray-500">{{ department.slug }} · {{ department.tickets_count }} {{ t('tickets') }}</div>
+                            <div class="text-sm text-gray-500">{{ department.slug }} Â· {{ department.tickets_count }} {{ t('tickets') }}</div>
                             <div class="mt-1 text-xs text-gray-400">{{ department.email || t('No reply email') }}</div>
                         </div>
                         <div class="flex gap-2">
@@ -261,14 +262,12 @@ const remove = () => {
 
                     <div class="flex items-center justify-between rounded-xl border border-gray-100 p-4 dark:border-surface-800">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Active') }}</span>
-                        <button type="button" role="switch" :aria-checked="form.is_active" @click="form.is_active = !form.is_active" class="relative inline-flex h-6 w-11 rounded-full transition" :class="form.is_active ? 'bg-primary-600' : 'bg-gray-300 dark:bg-surface-700'">
-                            <span class="inline-block h-5 w-5 translate-y-0.5 rounded-full bg-white transition" :class="form.is_active ? 'translate-x-5' : 'translate-x-0.5'"></span>
-                        </button>
+                        <AppSwitch v-model="form.is_active" />
                     </div>
                 </div>
                 <div class="mt-5 flex gap-2">
                     <button v-if="editing" type="button" @click="reset" class="flex-1 rounded-lg border border-gray-200 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-surface-700 dark:text-gray-300 dark:hover:bg-surface-800">{{ t('Cancel') }}</button>
-                    <button type="submit" :disabled="form.processing" class="flex-1 rounded-lg btn-primary disabled:cursor-not-allowed disabled:opacity-70">{{ form.processing ? t('Processing...') : (editing ? t('Update') : t('Create')) }}</button>
+                    <button type="submit" :disabled="form.processing" class="flex-1 rounded-lg btn-primary-admin disabled:cursor-not-allowed disabled:opacity-70">{{ form.processing ? t('Processing...') : (editing ? t('Update') : t('Create')) }}</button>
                 </div>
             </form>
         </div>

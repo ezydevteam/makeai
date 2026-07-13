@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3'
-import { computed } from 'vue'
+import { Head, Link, router } from '@inertiajs/vue3'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import Pagination from '@/Components/Pagination.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
 defineOptions({ layout: AdminLayout })
@@ -28,12 +28,73 @@ interface ActivityPagination {
     last_page?: number | null
 }
 
+interface Filters {
+    search?: string | null
+}
+
 const props = defineProps<{
     activity: ActivityPagination
     rangeLabel: string
+    filters?: Filters
 }>()
 
 const { t } = useTranslate()
+
+const search = ref(props.filters?.search ?? '')
+const searchFocused = ref(false)
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
+function applySearch() {
+    router.get(
+        route('admin.activity.user-logs.index'),
+        { search: search.value.trim() || undefined },
+        { preserveScroll: true, preserveState: true, replace: true },
+    )
+}
+
+function clearSearch() {
+    search.value = ''
+    applySearch()
+}
+
+function focusSearchOnSlash(event: KeyboardEvent) {
+    if (event.key !== '/' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) {
+        return
+    }
+
+    const target = event.target as HTMLElement | null
+
+    if (target) {
+        const tagName = target.tagName
+        const isTypingContext = target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(tagName)
+
+        if (isTypingContext) {
+            return
+        }
+    }
+
+    event.preventDefault()
+    searchInputRef.value?.focus()
+    searchInputRef.value?.select()
+}
+
+function handleEscape(event: KeyboardEvent) {
+    if (event.key === 'Escape' && document.activeElement === searchInputRef.value) {
+        event.preventDefault()
+        searchInputRef.value?.blur()
+        clearSearch()
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('keydown', focusSearchOnSlash)
+    document.addEventListener('keydown', handleEscape)
+})
+
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', focusSearchOnSlash)
+    document.removeEventListener('keydown', handleEscape)
+})
 
 const activityIcons: Record<string, string> = {
     user: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z',
@@ -76,7 +137,7 @@ const rangeSummary = computed(() => props.rangeLabel)
     <Head :title="t('User Activity Logs')" />
 
         <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('User Activity Logs') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
@@ -84,10 +145,10 @@ const rangeSummary = computed(() => props.rangeLabel)
                 </p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3">
+            <div class="shrink-0 flex items-center gap-3">
                 <Link
                     :href="route('admin.system.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
@@ -96,13 +157,13 @@ const rangeSummary = computed(() => props.rangeLabel)
                 <div class="inline-flex gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm dark:border-gray-700 dark:bg-gray-800">
                     <Link
                         :href="route('admin.activity.admin-logs.index')"
-                        class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60"
+                        class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/60"
                     >
                         {{ t('Admin') }}
                     </Link>
                     <Link
                         :href="route('admin.activity.user-logs.index')"
-                        class="inline-flex items-center justify-center rounded-lg bg-primary-50 px-4 py-2 text-sm font-medium text-primary-700 transition-colors dark:bg-primary-900/30 dark:text-primary-300"
+                        class="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white transition-colors"
                     >
                         {{ t('User') }}
                     </Link>
@@ -111,11 +172,41 @@ const rangeSummary = computed(() => props.rangeLabel)
         </section>
 
         <section class="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
-            <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ t('Showing :from-:to of :count items from :range.', {
-                        from: String(activity.from ?? 0),
-                        to: String(activity.to ?? 0),
+            <div class="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <form class="w-full min-w-[220px] md:max-w-sm" @submit.prevent="applySearch">
+                    <div class="relative">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
+                            <i class="ti ti-search text-base"></i>
+                        </span>
+                        <input
+                            ref="searchInputRef"
+                            v-model="search"
+                            type="text"
+                            name="search"
+                            :placeholder="t('Search user, email, IP, details...')"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-10 pr-14 text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            @focus="searchFocused = true"
+                            @blur="searchFocused = false"
+                        >
+                        <button
+                            v-if="search"
+                            type="button"
+                            class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                            :aria-label="t('Clear search')"
+                            :title="t('Clear search')"
+                            @click="clearSearch"
+                        >
+                            <i class="ti ti-x text-base"></i>
+                        </button>
+                        <span
+                            v-if="!search && !searchFocused"
+                            class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-500"
+                        >/</span>
+                    </div>
+                </form>
+
+                <p class="text-sm text-gray-500 dark:text-gray-400 hidden md:inline">
+                    {{ t('Showing :count logs from :range.', {
                         count: String(activity.total ?? 0),
                         range: rangeSummary
                     }) }}
@@ -136,7 +227,7 @@ const rangeSummary = computed(() => props.rangeLabel)
                     <tbody>
                         <tr v-if="activity.data.length === 0">
                             <td colspan="5" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                                {{ t('No user activity found.') }}
+                                {{ search ? t('No activity matches your search.') : t('No user activity found.') }}
                             </td>
                         </tr>
 

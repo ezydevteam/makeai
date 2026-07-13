@@ -24,7 +24,7 @@ class PlanPricingRequest extends FormRequest
             'original_price_yearly' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'original_price_lifetime' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'vat_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
-            'currency_code' => ['required', 'string', 'size:3'],
+            // Per-plan currency removed entirely — the store uses one base currency.
             'credits' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
             'features' => ['array'],
             'features.*' => ['nullable', 'string', 'max:255'],
@@ -34,6 +34,8 @@ class PlanPricingRequest extends FormRequest
             'trial_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
             'stripe_price_monthly_id' => ['nullable', 'string', 'max:255', 'starts_with:price_'],
             'stripe_price_yearly_id' => ['nullable', 'string', 'max:255', 'starts_with:price_'],
+            'paypal_plan_monthly_id' => ['nullable', 'string', 'max:255', 'starts_with:P-'],
+            'paypal_plan_yearly_id' => ['nullable', 'string', 'max:255', 'starts_with:P-'],
             'country_prices' => ['array'],
             'country_prices.*.id' => ['nullable', 'integer', 'exists:plan_country_prices,id'],
             'country_prices.*.country_code' => ['required', 'string', 'size:2'],
@@ -59,7 +61,6 @@ class PlanPricingRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'currency_code' => strtoupper((string) $this->input('currency_code')),
             'features' => collect($this->input('features', []))
                 ->filter(fn ($feature) => is_string($feature) && trim($feature) !== '')
                 ->map(fn (string $feature) => trim($feature))

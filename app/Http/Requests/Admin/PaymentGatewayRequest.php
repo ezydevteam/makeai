@@ -18,18 +18,11 @@ class PaymentGatewayRequest extends FormRequest
             'is_enabled' => ['boolean'],
             'is_test_mode' => ['boolean'],
             'processing_fee_type' => ['required', Rule::in(['none', 'percentage', 'fixed'])],
+            // A fixed fee is a flat amount in the store base currency (added to the
+            // charge). There is no separate fee currency — it is always the base.
             'processing_fee_value' => ['required', 'numeric', 'min:0', 'max:99999999.99'],
-            'processing_fee_currency' => ['required', 'string', 'size:3'],
             'credentials' => ['array'],
             'credentials.*' => ['nullable', 'string', 'max:5000'],
-            'settings' => ['array'],
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        $this->merge([
-            'processing_fee_currency' => strtoupper((string) $this->input('processing_fee_currency')),
-        ]);
     }
 }

@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { Head, Link, useForm } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useToastr } from '@/Composables/useToastr'
 
@@ -166,24 +166,19 @@ async function testConnection() {
 <template>
     <Head :title="t('Notification Settings')" />
 
-        <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
-        <section class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <section class="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Notification Settings') }}</h1>
-                    <span :class="driverStatus.className" class="inline-flex rounded-full px-3 py-1 text-xs font-medium">
-                        {{ driverStatus.label }}
-                    </span>
-                </div>
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('Notification Settings') }}</h1>
                 <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
                     {{ t('Control in-app notification delivery for admins and users, choose the realtime driver, and verify whether your current notification transport is ready.') }}
                 </p>
             </div>
 
-            <div class="flex flex-wrap gap-3">
+            <div class="shrink-0 flex flex-wrap gap-3">
                 <Link
                     :href="route('admin.notifications.index')"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
                 >
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
@@ -191,16 +186,16 @@ async function testConnection() {
                 <button
                     type="button"
                     :disabled="testing"
-                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-primary-200 bg-white px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-50 disabled:opacity-60 dark:border-primary-900/40 dark:bg-gray-800 dark:text-primary-300 dark:hover:bg-primary-900/20"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-primary-200 bg-white px-4 py-2 text-sm font-medium text-primary-700 transition hover:bg-primary-50 disabled:opacity-60 dark:border-primary-900/40 dark:bg-gray-800 dark:text-primary-300 dark:hover:bg-primary-900/20"
                     @click="testConnection"
                 >
                     <i class="ti ti-plug-connected text-base"></i>
-                    {{ testing ? t('Testing...') : t('Test Connection') }}
+                    {{ testing ? t('Testing...') : t('Test') }}
                 </button>
                 <button
                     type="button"
                     :disabled="form.processing"
-                    class="btn-primary inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-60"
+                    class="btn-primary-admin inline-flex items-center justify-center gap-2 disabled:opacity-60"
                     @click="submit"
                 >
                     <i class="ti ti-device-floppy text-base"></i>
@@ -209,7 +204,7 @@ async function testConnection() {
             </div>
         </section>
 
-        <section class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900">
+        <section class="rounded-2xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900 shadow-sm">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Delivery Controls') }}</h2>
                 <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose how notifications are delivered and how frequently fallback refresh should run.') }}</p>
@@ -240,7 +235,7 @@ async function testConnection() {
 
         <section
             v-if="form.notifications_driver === 'reverb'"
-            class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900"
+            class="rounded-2xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900 shadow-sm"
         >
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Reverb Configuration') }}</h2>
@@ -250,23 +245,23 @@ async function testConnection() {
             <div class="grid gap-6 p-6 md:grid-cols-2">
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App ID') }}</label>
-                    <input v-model="form.reverb.app_id" type="text" :placeholder="t('Enter Reverb app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.reverb.app_id" type="text" :placeholder="t('Enter Reverb app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App Key') }}</label>
-                    <input v-model="form.reverb.app_key" type="text" :placeholder="t('Enter Reverb app key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.reverb.app_key" type="text" :placeholder="t('Enter Reverb app key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App Secret') }}</label>
-                    <input v-model="form.reverb.app_secret" type="password" :placeholder="props.settings.reverb.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Reverb app secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.reverb.app_secret" type="password" :placeholder="props.settings.reverb.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Reverb app secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Host') }}</label>
-                    <input v-model="form.reverb.host" type="text" :placeholder="t('e.g. 127.0.0.1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.reverb.host" type="text" :placeholder="t('e.g. 127.0.0.1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Port') }}</label>
-                    <input v-model.number="form.reverb.port" type="number" min="1" max="65535" :placeholder="t('e.g. 8080')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model.number="form.reverb.port" type="number" min="1" max="65535" :placeholder="t('e.g. 8080')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Scheme') }}</label>
@@ -281,7 +276,7 @@ async function testConnection() {
 
         <section
             v-if="form.notifications_driver === 'pusher'"
-            class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-surface-800 dark:bg-surface-900"
+            class="rounded-2xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900 shadow-sm"
         >
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Pusher Configuration') }}</h2>
@@ -291,19 +286,19 @@ async function testConnection() {
             <div class="grid gap-6 p-6 md:grid-cols-2">
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('App ID') }}</label>
-                    <input v-model="form.pusher.app_id" type="text" :placeholder="t('Enter Pusher app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.pusher.app_id" type="text" :placeholder="t('Enter Pusher app ID')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div>
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Key') }}</label>
-                    <input v-model="form.pusher.key" type="text" :placeholder="t('Enter Pusher key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.pusher.key" type="text" :placeholder="t('Enter Pusher key')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Secret') }}</label>
-                    <input v-model="form.pusher.secret" type="password" :placeholder="props.settings.pusher.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Pusher secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.pusher.secret" type="password" :placeholder="props.settings.pusher.secret_configured ? t('Stored securely - leave blank to keep') : t('Enter Pusher secret')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Cluster') }}</label>
-                    <input v-model="form.pusher.cluster" type="text" :placeholder="t('e.g. mt1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 shadow-sm placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
+                    <input v-model="form.pusher.cluster" type="text" :placeholder="t('e.g. mt1')" class="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100 dark:border-surface-700 dark:bg-surface-950 dark:text-gray-100 dark:placeholder:text-gray-500 dark:focus:border-primary-500 dark:focus:ring-primary-900/30">
                 </div>
             </div>
         </section>

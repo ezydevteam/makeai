@@ -10,7 +10,9 @@ return new class extends Migration
     {
         Schema::table('affiliate_programs', function (Blueprint $table) {
             if (! Schema::hasColumn('affiliate_programs', 'terms_page_slug')) {
-                $table->string('terms_page_slug')->nullable()->after('terms');
+                // Placed after social_posts — the legacy inline `terms` column it once
+                // followed is no longer part of the base schema.
+                $table->string('terms_page_slug')->nullable()->after('social_posts');
             }
         });
     }

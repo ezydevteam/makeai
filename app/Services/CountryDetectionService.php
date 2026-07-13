@@ -44,29 +44,7 @@ class CountryDetectionService
             return strtoupper($cfCountry);
         }
 
-        // Try IP-based detection via the IpGeolocationService
-        try {
-            $geo = app(IpGeolocationService::class);
-            if ($geo->isConfigured()) {
-                $ip = $request->ip();
-                $response = \Illuminate\Support\Facades\Http::timeout(5)
-                    ->get("https://ipinfo.io/{$ip}?token=" . $this->resolveToken());
-
-                if ($response->successful()) {
-                    $data = $response->json();
-
-                    return $data['country'] ?? null;
-                }
-            }
-        } catch (\Throwable) {
-            // Silently fail — geolocation is best-effort
-        }
-
-        return null;
-    }
-
-    private function resolveToken(): string
-    {
-        return settings('external_ip_geolocation_ipinfo_token', '');
+        // IP-based detection (best-effort) via the configured IP geolocation service.
+        return IpGeolocationService::fromSettings()->lookupCountry((string) $request->ip());
     }
 }

@@ -1,11 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import Pagination from '@/Components/Pagination.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useNumberFormat } from '@/Composables/useNumberFormat'
 import { useDateFormat } from '@/Composables/useDateFormat'
@@ -17,6 +17,7 @@ interface ToolCategory {
     id: number
     name: string
     slug: string
+    color?: string
 }
 
 interface ToolItem {
@@ -87,7 +88,7 @@ const statusOptions = computed(() => [
 
 const bulkActionOptions = computed(() => [
     { value: 'restore', label: t('Restore Selected'), icon: 'ti ti-restore', tone: 'success' as const },
-    // Permanent deletion is irreversible — Super Admins only.
+    // Permanent deletion is irreversible â€” Super Admins only.
     ...(isSuperAdmin.value
         ? [{ value: 'force_delete', label: t('Delete Permanently'), icon: 'ti ti-trash-x', tone: 'danger' as const, dividerBefore: true }]
         : []),
@@ -297,6 +298,10 @@ const handleKeydown = (event: KeyboardEvent) => {
     }
 }
 
+const getToolColor = (tool: ToolItem) => {
+    return tool.color || (typeof tool.category === 'object' ? tool.category?.color : null) || null
+}
+
 onMounted(() => {
     window.addEventListener('keydown', handleKeydown)
 })
@@ -311,7 +316,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <Head :title="t('AI Tool Trash — Admin')" />
+    <Head :title="t('AI Tool Trash â€” Admin')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-6 xl:px-8 2xl:px-10">
         <div class="flex flex-col gap-4 items-start sm:flex-row sm:items-center sm:justify-between">
@@ -324,7 +329,7 @@ onBeforeUnmount(() => {
 
             <Link
                 :href="route('admin.ai.tools.index')"
-                class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 w-full sm:w-auto"
+                class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
                 <i class="ti ti-arrow-left text-base"></i>
                 {{ t('Back to Tools') }}
@@ -402,7 +407,7 @@ onBeforeUnmount(() => {
 
                             <button
                                 type="button"
-                                class="inline-flex w-full sm:w-auto items-center justify-center btn-primary px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                                class="inline-flex w-full sm:w-auto items-center justify-center btn-primary-admin px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                                 :disabled="!bulkAction || selectedIds.length === 0"
                                 @click="applyBulkAction"
                             >
@@ -450,7 +455,15 @@ onBeforeUnmount(() => {
                                 </td>
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
-                                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gray-50 text-xl dark:bg-surface-800" :style="{ color: tool.color || 'var(--color-primary-500)' }">
+                                        <div
+                                            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-xl transition-colors"
+                                            :class="getToolColor(tool) ? '' : 'bg-gray-50 text-gray-500 border-gray-100 dark:bg-surface-800 dark:border-surface-700/50'"
+                                            :style="getToolColor(tool) ? {
+                                                backgroundColor: `color-mix(in srgb, ${getToolColor(tool)} 12%, transparent)`,
+                                                borderColor: `color-mix(in srgb, ${getToolColor(tool)} 20%, transparent)`,
+                                                color: getToolColor(tool) || undefined
+                                            } : {}"
+                                        >
                                             <i :class="tool.icon || 'ti ti-tool'"></i>
                                         </div>
                                         <div>
@@ -462,11 +475,17 @@ onBeforeUnmount(() => {
                                 <td class="px-4 py-4 text-center">
                                     <span
                                         v-if="tool.category"
-                                        class="rounded-lg bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-surface-800 dark:text-gray-400"
+                                        class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+                                        :class="typeof tool.category === 'object' && tool.category.color ? '' : 'bg-gray-100 text-gray-600 border-transparent dark:bg-surface-800 dark:text-gray-400'"
+                                        :style="typeof tool.category === 'object' && tool.category.color ? {
+                                            backgroundColor: `color-mix(in srgb, ${tool.category.color} 10%, transparent)`,
+                                            borderColor: `color-mix(in srgb, ${tool.category.color} 15%, transparent)`,
+                                            color: tool.category.color
+                                        } : {}"
                                     >
                                         {{ typeof tool.category === 'object' ? tool.category.name : tool.category }}
                                     </span>
-                                    <span v-else class="text-xs text-gray-400">{{ t('—') }}</span>
+                                    <span v-else class="text-xs text-gray-400">{{ t('â€”') }}</span>
                                 </td>
                                 <td class="px-4 py-4 text-center">
                                     <span
@@ -480,7 +499,7 @@ onBeforeUnmount(() => {
                                     {{ formatNumber(Number(tool.usage_count || 0)) }}
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-4 text-xs text-gray-500 dark:text-gray-400">
-                                    {{ tool.deleted_at ? formatDate(tool.deleted_at) : t('—') }}
+                                    {{ tool.deleted_at ? formatDate(tool.deleted_at) : t('â€”') }}
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-2">

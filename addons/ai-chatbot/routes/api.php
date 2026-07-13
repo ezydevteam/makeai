@@ -13,8 +13,8 @@ use Addons\AiChatbot\Http\Controllers\ConversationTagController;
 Route::middleware(['api'])->prefix('api/v1')->group(function () {
     Route::get('/chat/modes', [ChatModeController::class, 'index']);
 
-    Route::middleware(['web', \Addons\AiChatbot\Http\Middleware\ChatGuestAccess::class])->prefix('chat')->group(function () {
-        Route::post('/attachments', [ChatAttachmentController::class, 'store']);
+    Route::middleware(['web', 'throttle:public,180,60', \Addons\AiChatbot\Http\Middleware\ChatGuestAccess::class])->prefix('chat')->group(function () {
+        Route::post('/attachments', [ChatAttachmentController::class, 'store'])->middleware('throttle:public,20,60');
         Route::get('/attachments/{id}/preview', [ChatAttachmentController::class, 'preview']);
         Route::post('/feedback', [ChatFeedbackController::class, 'store']);
         Route::get('/{ulid}/feedback', [ChatFeedbackController::class, 'index']);
@@ -32,7 +32,7 @@ Route::middleware(['api'])->prefix('api/v1')->group(function () {
         Route::put('/{ulid}/tags', [ConversationTagController::class, 'tagConversation']);
         Route::get('/{ulid}', [ChatController::class, 'show']);
         Route::get('/{ulid}/export', [ChatController::class, 'export']);
-        Route::post('/{ulid}/message', [ChatController::class, 'sendMessage']);
+        Route::post('/{ulid}/message', [ChatController::class, 'sendMessage'])->middleware('throttle:text_gen,30,60');
         Route::post('/{ulid}/branch', [ChatController::class, 'branch']);
         Route::put('/{ulid}/message/{messageId}', [ChatController::class, 'editMessage']);
         Route::put('/{ulid}/pin', [ChatController::class, 'togglePin']);

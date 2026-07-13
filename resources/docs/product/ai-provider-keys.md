@@ -1,0 +1,48 @@
+---
+title: Adding an AI Provider Key
+slug: ai-provider-keys
+section: AI
+license: regular
+keywords: [openai, anthropic, gemini, api key, provider, byok, credentials, connection]
+---
+
+MakeAI does not ship with AI credentials. Before any tool, chatbot or assistant can
+generate anything, you must add at least one provider API key of your own. Keys are stored
+in the app's central key pool, so you rotate a key in one place and every feature picks up
+the change.
+
+## Adding a key
+
+Go to **Admin → AI → Providers**. Each provider card has an **Add Key** action. Paste the
+key you obtained from that provider's own dashboard and save.
+
+Use **Test Connection** on the provider card immediately after saving. This performs a real
+call against the provider and is the fastest way to tell an invalid key apart from a
+misconfigured model — the two failures look identical from the front end.
+
+## Choosing the default model
+
+The site-wide default is set on the same screen and is what any feature uses when it has no
+model of its own configured. Individual features (the chatbot, the assistant, each AI tool)
+may override it, and will fall back to this default when their own model field is left
+empty.
+
+A model only appears in the list if it is **active** and its provider has a working key. If
+a model you expect is missing, check the key first — an inactive provider hides all of its
+models at once.
+
+## Rotating or removing a key
+
+Deleting a key on the provider card takes effect immediately. Any feature configured to use
+a model from that provider will start failing on the next request, so add the replacement
+key before removing the old one.
+
+## Why generation still fails with a valid key
+
+Three things other than the key can stop generation, in the order worth checking:
+
+- The **daily AI budget** has been reached, which blocks generation site-wide until the
+  budget resets. The AI Assistant's `/health` command reports this directly.
+- The user has run out of **credits** — see the credit modes documentation, because what
+  "out of credits" means depends on which mode the install is running in.
+- The model is **inactive**, or belongs to a provider whose key was removed.

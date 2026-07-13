@@ -1,7 +1,7 @@
 @php
     $appName = settings('app_name', 'Application');
     $primaryColor = settings('primary_color', '#f97316');
-    $logoUrl = settings('app_logo_light') ? Storage::url(settings('app_logo_light')) : null;
+    $logoUrl = media_url(settings('site_logo_light')) ?: null;
     $isAdminError = request()->is('admin') || request()->is('admin/*');
     $pageTitle = translate('Access Denied');
     $primaryActionUrl = $isAdminError ? route('admin.dashboard') : url('/');
@@ -81,7 +81,7 @@
         @if($logoUrl)
             <img src="{{ $logoUrl }}" alt="{{ $appName }}" class="logo-img">
         @else
-            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 2)->upper() }}</div>
+            <div class="logo-fallback">{{ Str::of($appName)->substr(0, 1)->upper() }}</div>
         @endif
     </div>
     <div class="code" aria-label="403">
@@ -93,7 +93,7 @@
     <p>{{ translate("You don't have permission to access this page. If you believe this is a mistake, please reach out to our support team.") }}</p>
     <div class="actions">
         <a href="{{ $primaryActionUrl }}" class="btn btn-primary">⬅️ {{ $primaryActionLabel }}</a>
-        <a href="mailto:{{ settings('contact_email', 'support@example.com') }}" class="btn btn-outline">📧 {{ translate('Contact Support') }}</a>
+        <a href="mailto:{{ settings('site_support_email', 'support@example.com') }}" class="btn btn-outline">📧 {{ translate('Contact Support') }}</a>
     </div>
 </main>
 </div>

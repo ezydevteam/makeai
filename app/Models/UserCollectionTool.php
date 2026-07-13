@@ -11,7 +11,7 @@ class UserCollectionTool extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['collection_id', 'tool_slug', 'sort_order', 'added_at'];
+    protected $fillable = ['collection_id', 'tool_slug', 'sort_order'];
 
     public function collection(): BelongsTo
     {

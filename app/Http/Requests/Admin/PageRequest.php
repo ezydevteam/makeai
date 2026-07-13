@@ -15,7 +15,6 @@ class PageRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'template' => $this->input('template') ?: 'default',
             'parent_id' => $this->input('parent_id') ?: null,
             'published_at' => $this->input('published_at') ?: null,
             'sort_order' => $this->input('sort_order', 0),
@@ -41,7 +40,6 @@ class PageRequest extends FormRequest
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string'],
             'meta_keywords' => ['nullable', 'string', 'max:500'],
-            'template' => ['required', Rule::in(['default', 'full_width', 'blank', 'landing'])],
             'featured_image' => ['nullable', 'image', 'max:2048'],
             'og_image' => ['nullable', 'image', 'max:2048'],
             'status' => ['required', Rule::in(['draft', 'published', 'scheduled'])],

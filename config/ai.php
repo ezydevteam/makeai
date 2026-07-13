@@ -225,6 +225,47 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Media Credit Pricing
+    |--------------------------------------------------------------------------
+    |
+    | Image/audio/transcription are billed PER UNIT (per image, per clip), not
+    | per token — token counts are meaningless for media. These are the default
+    | credits charged per unit when the AiModel row for the media model doesn't
+    | define its own price via meta.credits_per_unit. Used by both the pre-flight
+    | balance check and the post-generation charge so an unconfigured install
+    | never silently gives media away for ~1 credit.
+    |
+    */
+
+    'media_credits' => [
+        'image' => (float) env('AI_CREDITS_PER_IMAGE', 4),
+        'audio' => (float) env('AI_CREDITS_PER_AUDIO', 2),
+        'transcription' => (float) env('AI_CREDITS_PER_TRANSCRIPTION', 2),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Media Provider Cost (USD per unit)
+    |--------------------------------------------------------------------------
+    |
+    | Real provider cost per unit (per image / audio clip / transcription). Like
+    | chat models, media credits are DERIVED from this real USD cost × the global
+    | AI markup ÷ credit_price_per_unit (see CreditPricingService), so buyers set
+    | true cost once and never sell media below cost. A media AiModel's own
+    | meta.cost_per_unit overrides these defaults; meta.credits_per_unit is a hard
+    | manual override. When a type's cost here is 0, the flat media_credits value
+    | above is used as a legacy fallback.
+    |
+    */
+
+    'media_costs' => [
+        'image' => (float) env('AI_COST_PER_IMAGE', 0.04),
+        'audio' => (float) env('AI_COST_PER_AUDIO', 0.05),
+        'transcription' => (float) env('AI_COST_PER_TRANSCRIPTION', 0.02),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | RAG / Knowledge Base
     |--------------------------------------------------------------------------
     |

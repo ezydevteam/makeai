@@ -152,13 +152,10 @@ class RagToolSeeder extends Seeder
             'access_level' => 'inherit',
             'is_active' => true,
             'is_featured' => true,
-            'requires_pro' => false,
             'supports_brand_voice' => false,
             'avg_output_tokens' => 800,
             'sort_order' => $sortOrder,
-            'show_regenerate' => false,
             'show_improve' => false,
-            'show_editor' => false,
             'about_content' => "{$name} lets you interact with documents and external sources through natural conversation powered by AI retrieval.",
             'how_it_works' => [
                 ['step' => 1, 'title' => 'Upload or link', 'description' => 'Upload a file, paste a URL, or select a knowledge base collection.'],

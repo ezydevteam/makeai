@@ -11,12 +11,11 @@ class SyncCurrencyRates extends Command
 
     protected $description = 'Sync exchange rates from external API to the currencies table.';
 
-    public function handle(CurrencyRateService $rateService): int
+    public function handle(): int
     {
         $this->info('Fetching exchange rates...');
 
-        $service = CurrencyRateService::fromSettings();
-        $result = $service->syncRates();
+        $result = CurrencyRateService::fromSettings()->syncRates();
 
         if (! ($result['success'] ?? false)) {
             $this->error('Rate sync failed: '.($result['error'] ?? 'Unknown error'));

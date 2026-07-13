@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -26,7 +27,7 @@ use Addons\AiChatbot\Models\ConversationTag;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, SoftDeletes, Billable;
+    use HasApiTokens, HasFactory, Notifiable, SoftDeletes, Billable;
 
     protected $fillable = [
         'name', 'email', 'password', 'password_changed_at', 'ulid', 'avatar',
@@ -37,9 +38,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at', 'trial_ends_at',
         'referral_code', 'affiliate_custom_slug', 'referred_by', 'affiliate_banned',
         'theme_preference', 'locale', 'timezone',
-        'preferences', 'personal_api_keys', 'brand_voice', 'chat_custom_instructions',
+        'preferences', 'brand_voice', 'chat_custom_instructions',
         'stripe_id', 'pm_type', 'pm_last_four',
-        'is_active', 'has_trialed', 'is_banned', 'ban_reason',
+        'is_active', 'has_trialed', 'is_banned', 'ban_reason', 'banned_at',
         'otp_code', 'otp_expires_at', 'otp_attempts', 'otp_locked_until',
         'two_factor_secret', 'two_factor_enabled', 'two_factor_confirmed_at', 'two_factor_recovery_codes',
         'login_attempts', 'locked_until',
@@ -66,8 +67,13 @@ class User extends Authenticatable implements MustVerifyEmail
             'monthly_limit' => 'decimal:4',
             'referral_earnings' => 'decimal:4',
             'is_active' => 'boolean',
+            // Intentionally NOT in $fillable. This flag exempts an account from credit
+            // limits and makes it undeletable, so it must never be settable by mass
+            // assignment from request data. User::internalAi() sets it explicitly.
+            'is_internal' => 'boolean',
             'has_trialed' => 'boolean',
             'is_banned' => 'boolean',
+            'banned_at' => 'datetime',
             'affiliate_banned' => 'boolean',
             'two_factor_enabled' => 'boolean',
             'two_factor_recovery_codes' => 'array',
@@ -164,11 +170,83 @@ class User extends Authenticatable implements MustVerifyEmail
                 $user->credits = (float) settings('default_credits_new_user', 100);
             }
         });
+
+        static::saving(function (User $user) {
+            // Stamp when a ban is applied and clear it when lifted, so admin
+            // analytics can measure banning activity over time. Covers every
+            // model save path (mass-assignment, fill+save, ticket ban toggle).
+            if ($user->isDirty('is_banned')) {
+                $user->banned_at = $user->is_banned ? now() : null;
+            }
+        });
+
+        // The internal AI system account cannot be deleted, by anyone, ever.
+        //
+        // It is not a person — it is the account every admin AI feature bills against
+        // (assistant, blog/page/FAQ assist, mail templates, ticket replies, translations),
+        // and it owns their whole usage history. Deleting it would orphan every one of those
+        // ai_usage_logs rows and silently break admin AI on the next request.
+        //
+        // Returning false cancels the delete. This covers $user->delete() and
+        // $user->forceDelete() — but NOT a mass-delete query like
+        // User::whereIn(...)->delete(), which bypasses model events entirely. Those paths
+        // must use the excludingInternal() scope; see UserManagementController.
+        static::deleting(function (User $user) {
+            if ($user->isInternalAi()) {
+                return false;
+            }
+        });
+    }
+
+    /**
+     * Hide the internal AI system account from anything a human is meant to look at or act on:
+     * the users table, the trash, user stats, exports, bulk actions.
+     *
+     * Deliberately a local scope rather than a global one. A global scope would also hide the
+     * account from internalAi() itself — whose firstOrCreate would then stop finding the
+     * existing row and mint a duplicate on every admin AI call — and from TokenGuard's own
+     * lookups. It must stay invisible to the admin UI and fully visible to the system.
+     */
+    public function scopeExcludingInternal(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where('is_internal', false);
     }
 
     public function getRouteKeyName(): string
     {
         return 'ulid';
+    }
+
+    /**
+     * Apply the admin-configured "new user gets" choice (Pricing Settings →
+     * registration_default_plan) right after registration.
+     *
+     *  - 'none' / 'custom'  → keep the default signup wallet (default_credits_new_user);
+     *    'custom' means usage is governed by the per-user limits in AI Settings.
+     *  - '<plan id>'        → auto-assign that active plan and grant its credits as the
+     *    starting wallet (free plans then get a reset-style monthly refresh).
+     *
+     * Invalid / inactive plan ids fall back to the default safely.
+     */
+    public function applyRegistrationDefault(): void
+    {
+        $choice = (string) settings('registration_default_plan', 'none');
+
+        if ($choice === '' || $choice === 'none' || $choice === 'custom' || ! ctype_digit($choice)) {
+            return; // default wallet (already set by the creating hook) stands
+        }
+
+        $plan = Plan::query()->whereKey((int) $choice)->where('is_active', true)->first();
+        if (! $plan) {
+            return;
+        }
+
+        $this->forceFill([
+            'plan_id' => $plan->id,
+            'credits' => (float) $plan->credits,
+            'credits_used_today' => 0,
+            'credits_used_month' => 0,
+        ])->save();
     }
 
     /**
@@ -193,28 +271,113 @@ class User extends Authenticatable implements MustVerifyEmail
      * generation). It is not a paying account, so it bypasses per-user credit
      * balances and daily/monthly limits — its usage is still tracked against the
      * global AI budget.
+     *
+     * Identity is the is_internal COLUMN, not the email. The email is derived from
+     * config('app.url'), so the old email-comparison silently stopped recognising the
+     * account the moment a buyer changed APP_URL — at which point the system account
+     * became an ordinary deletable "customer" in the admin users table and a duplicate
+     * was created beside it. A column cannot drift with config.
      */
     public function isInternalAi(): bool
     {
-        return $this->email === self::internalAiEmail();
+        return (bool) $this->is_internal;
     }
 
     /**
-     * Resolve (creating if needed) the internal "system" user used to back
-     * admin AI tasks (translation, page/blog assist). Always use this instead of
-     * User::first() so system AI work isn't billed to a random real account.
+     * Resolve (creating if needed) the internal "system" user that backs every admin AI task
+     * — the assistant's admin chat, blog/page/FAQ/testimonial assist, mail templates, ticket
+     * replies and translations.
+     *
+     * This is the ONLY place the account may be created. Six call sites used to hand-roll the
+     * same firstOrCreate, in two different shapes: some set plan_id/subscription_status, the
+     * others set is_banned. They all resolved the same row, so whichever admin feature the
+     * buyer happened to use first decided what the account looked like — and the fields the
+     * other variant set were simply never applied. The payload below is the union of both, so
+     * the account is identical on every install regardless of what created it.
+     *
+     * subscription_status is 'active' deliberately: model/tool access can be gated on a user's
+     * standing, and a system account must never be refused a model because it looks lapsed.
+     * It is exempt from per-user credits either way (see isInternalAi()).
      */
     public static function internalAi(): self
     {
-        return self::firstOrCreate(
+        // Resolve by FLAG first, so the account survives an APP_URL change: its email would
+        // no longer match internalAiEmail(), but it is still the account that owns every
+        // admin AI usage log, and we must keep using it rather than mint a second one.
+        if ($existing = self::where('is_internal', true)->first()) {
+            return self::realignInternalEmail($existing);
+        }
+
+        // No flagged account. Before creating one, adopt an orphan left behind by an APP_URL
+        // change that happened BEFORE the flag existed — it still owns the whole admin AI
+        // usage history, and creating a fresh account beside it would strand that history and
+        // leave the old row sitting in the admin users table as a deletable "customer".
+        //
+        // It is ADOPTED, never deleted: ai_usage_logs.user_id is cascadeOnDelete, so removing
+        // the account would silently destroy every admin AI usage record with it.
+        $user = self::orphanedInternalAccount() ?? self::firstOrCreate(
             ['email' => self::internalAiEmail()],
             [
                 'name' => self::internalAiName(),
                 'password' => bcrypt(Str::random(32)),
                 'is_active' => true,
                 'is_banned' => false,
+                'plan_id' => null,
+                'subscription_status' => 'active',
             ]
         );
+
+        // is_internal is deliberately not fillable (it must never be mass-assignable from
+        // request data), so it is stamped here rather than passed in the payload above.
+        if (! $user->is_internal) {
+            $user->forceFill(['is_internal' => true])->save();
+        }
+
+        return self::realignInternalEmail($user);
+    }
+
+    /**
+     * A system account stranded by a domain change made before is_internal existed.
+     *
+     * The match is deliberately narrow. This flag exempts an account from credit limits and
+     * makes it undeletable, so a false positive would hand a real person unlimited free AI on
+     * an account an admin could never remove. All three conditions must hold — the reserved
+     * local part, the exact system name, and no login has ever occurred — which no real user
+     * account can satisfy, since nobody signs in as this one.
+     */
+    private static function orphanedInternalAccount(): ?self
+    {
+        return self::withTrashed()
+            ->where('is_internal', false)
+            ->where('email', 'like', 'internalai@%')
+            ->where('name', self::internalAiName())
+            ->whereNull('last_login_at')
+            ->first();
+    }
+
+    /**
+     * Keep the system account's address on the domain the site actually runs on.
+     *
+     * Cosmetic, but it stops the admin users table (and any log export) showing an account at
+     * a domain the install left behind years ago. Skipped when another row already holds the
+     * address, since email is unique — identity is the flag, not the address, so a collision
+     * is harmless and simply leaves the old address in place.
+     */
+    private static function realignInternalEmail(self $user): self
+    {
+        $expected = self::internalAiEmail();
+
+        if ($user->email === $expected) {
+            return $user;
+        }
+
+        if (self::withTrashed()->where('email', $expected)->whereKeyNot($user->getKey())->exists()) {
+            return $user;
+        }
+
+        $user->forceFill(['email' => $expected])->save();
+
+        return $user;
     }
 
     // ─── Relationships ──────────────────────────
@@ -469,10 +632,148 @@ class User extends Authenticatable implements MustVerifyEmail
         });
 
         if ($deducted) {
-            app(NotificationEventService::class)->creditBalanceChanged($this, (float) $this->credits);
+            // The balance already changed in the DB; a realtime/broadcast outage must
+            // never fail a paid deduction.
+            try {
+                app(NotificationEventService::class)->creditBalanceChanged($this, (float) $this->credits);
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return $deducted;
+    }
+
+    /**
+     * Charge credits the mode-correct way. In METERED mode (Extended + billing) this
+     * drains the wallet and can fail on an empty balance. In QUOTA mode (Regular
+     * license) it meters the resetting allowance instead and NEVER fails on balance.
+     *
+     * This is the safe entry point for any per-use charge outside TokenGuard's own
+     * paths (e.g. RAG ingestion/retrieval) so credits behave consistently with the
+     * license mode. Returns whether the charge was applied.
+     */
+    public function chargeCredits(float $amount, string $reason, array $meta = []): bool
+    {
+        if ($amount <= 0) {
+            return true;
+        }
+
+        if (credit_quota_mode()) {
+            $this->trackQuotaUsage($amount, $reason, $meta);
+
+            return true;
+        }
+
+        return $this->deductCredits($amount, $reason, $meta);
+    }
+
+    /**
+     * Meter usage against the resetting daily/monthly allowance WITHOUT draining the
+     * persistent wallet. Used in quota mode (Regular license) where credits are a
+     * refilling quota, not a purchasable balance — so a run never fails on balance and
+     * `credits` is left untouched. The daily/monthly counters (which the allowance is
+     * measured against) still advance and reset on schedule.
+     */
+    public function trackQuotaUsage(float $amount, string $reason, array $meta = []): void
+    {
+        if ($amount <= 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($amount, $reason, $meta): void {
+            $user = self::query()->whereKey($this->id)->lockForUpdate()->first();
+            if (! $user) {
+                return;
+            }
+
+            $user->increment('credits_used_today', $amount);
+            $user->increment('credits_used_month', $amount);
+
+            $fresh = $user->fresh();
+
+            $user->creditTransactions()->create([
+                'amount' => -$amount,
+                'balance_after' => $fresh->credits, // unchanged — quota usage, not a wallet spend
+                'type' => 'usage',
+                'description' => $reason,
+                'meta' => $meta,
+            ]);
+
+            $this->forceFill([
+                'credits_used_today' => $fresh->credits_used_today,
+                'credits_used_month' => $fresh->credits_used_month,
+            ]);
+        });
+    }
+
+    /**
+     * Refund a prior charge the mode-correct way. In METERED mode the wallet was
+     * drained, so credits are returned to it. In QUOTA mode the daily/monthly
+     * allowance was consumed (not the wallet), so the usage counters are wound back
+     * instead — otherwise a failed run would keep eating the user's allowance.
+     */
+    public function refundCredits(float $amount, string $reason, array $meta = []): void
+    {
+        if ($amount <= 0) {
+            return;
+        }
+
+        if (! credit_quota_mode()) {
+            $this->addCredits($amount, 'refund', $reason, $meta);
+
+            return;
+        }
+
+        DB::transaction(function () use ($amount, $reason, $meta): void {
+            $user = self::query()->whereKey($this->id)->lockForUpdate()->first();
+            if (! $user) {
+                return;
+            }
+
+            // Never drive the counters below zero (partial-day / cross-reset refunds).
+            $user->decrement('credits_used_today', min($amount, (float) $user->credits_used_today));
+            $user->decrement('credits_used_month', min($amount, (float) $user->credits_used_month));
+
+            $fresh = $user->fresh();
+
+            $user->creditTransactions()->create([
+                'amount' => $amount,
+                'balance_after' => $fresh->credits, // unchanged — quota refund, not a wallet credit
+                'type' => 'refund',
+                'description' => $reason,
+                'meta' => $meta,
+            ]);
+
+            $this->forceFill([
+                'credits_used_today' => $fresh->credits_used_today,
+                'credits_used_month' => $fresh->credits_used_month,
+            ]);
+        });
+    }
+
+    /**
+     * Grant a plan's credit allowance on activation / renewal (paid or trial).
+     *
+     * Reset-style but safe on a single wallet: tops the balance UP to the plan's
+     * credits when it's below (a spent-down allowance is refreshed), and never
+     * REDUCES a balance boosted by top-ups or admin grants. No-op for unlimited /
+     * zero-credit plans. Logged as a 'purchase' credit transaction.
+     */
+    public function grantPlanAllowance(float $planCredits, string $reason): void
+    {
+        if ($planCredits <= 0) {
+            return;
+        }
+
+        $current = (float) $this->fresh()->credits;
+        $delta = round($planCredits - $current, 4);
+
+        if ($delta <= 0) {
+            return; // already at or above the allowance (top-ups / admin grants)
+        }
+
+        $this->addCredits($delta, 'purchase', $reason, ['plan_credits' => $planCredits]);
     }
 
     public function addCredits(float $amount, string $type, string $reason, array $meta = []): void
@@ -487,7 +788,11 @@ class User extends Authenticatable implements MustVerifyEmail
             'meta' => $meta,
         ]);
 
-        app(NotificationEventService::class)->creditsAdded($this->fresh(), $amount, $reason);
+        try {
+            app(NotificationEventService::class)->creditsAdded($this->fresh(), $amount, $reason);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     // ─── Login ──────────────────────────────────
@@ -496,9 +801,15 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         $this->update(['last_login_at' => now(), 'last_login_ip' => $ip, 'login_attempts' => 0]);
 
+        // Best-effort geo (populates country/city only when an IPInfo token is
+        // configured; instant no-op otherwise, so it never adds login latency).
+        $geo = \App\Services\IpGeolocationService::fromSettings()->lookupLocation($ip);
+
         $this->loginHistory()->create([
             'ip' => $ip,
             'user_agent' => $userAgent,
+            'country' => $geo['country'],
+            'city' => $geo['city'],
             'success' => true,
         ]);
     }
@@ -548,9 +859,9 @@ class User extends Authenticatable implements MustVerifyEmail
         }
     }
 
-    public function apiKeys()
+    public function byok()
     {
-        return $this->hasMany(UserApiKey::class);
+        return $this->hasMany(UserByok::class);
     }
 
     public function documents()

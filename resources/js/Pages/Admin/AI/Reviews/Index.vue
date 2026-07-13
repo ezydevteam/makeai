@@ -1,11 +1,13 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
-import AppSelect from '@/Components/AppSelect.vue'
-import ActionConfirmModal from '@/Components/ActionConfirmModal.vue'
+import AppModal from '@/Components/UI/AppModal.vue'
+import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import Tooltip from '@/Components/UI/Tooltip.vue'
-import Pagination from '@/Components/Pagination.vue'
+import Pagination from '@/Components/UI/Pagination.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 
@@ -73,6 +75,14 @@ const activeReview = ref<ReviewItem | null>(null)
 const adminReplyText = ref('')
 const approveOnReply = ref(false)
 const replySubmitting = ref(false)
+
+// Details Modal State
+const detailsModalOpen = ref(false)
+const reviewDetails = ref<ReviewItem | null>(null)
+const openDetailsModal = (review: ReviewItem) => {
+    reviewDetails.value = review
+    detailsModalOpen.value = true
+}
 
 // Delete Confirm Modal State
 const deleteModalOpen = ref(false)
@@ -273,7 +283,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <Head :title="t('Tool Reviews — Admin')" />
+    <Head :title="t('Tool Reviews â€” Admin')" />
 
     <div class="w-full space-y-6 px-4 sm:px-6 lg:px-8 xl:px-10">
         <!-- Title section -->
@@ -289,7 +299,7 @@ onBeforeUnmount(() => {
             <!-- Filter Bar -->
             <div class="border-b border-gray-100 p-4 dark:border-gray-800 sm:px-6">
                 <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <div class="flex-1 min-w-[240px]">
+                    <div class="flex-1 min-w-[220px] md:max-w-sm">
                         <div class="relative">
                             <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                 <i class="ti ti-search text-base"></i>
@@ -365,7 +375,7 @@ onBeforeUnmount(() => {
                 <button
                     v-if="hasActiveFilters"
                     type="button"
-                    class="btn-primary mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
+                    class="btn-primary-admin mt-6 inline-flex items-center rounded-xl px-5 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5"
                     @click="resetFilters"
                 >
                     {{ t('Clear Filters') }}
@@ -375,14 +385,14 @@ onBeforeUnmount(() => {
             <div v-else class="overflow-hidden rounded-b-2xl">
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
-                        <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
+                        <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                             <tr>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('User') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Tool') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Rating') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Comment & Reply') }}</th>
-                                <th class="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                                <th class="px-6 py-4 text-left">{{ t('User') }}</th>
+                                <th class="px-6 py-4 text-left">{{ t('Tool') }}</th>
+                                <th class="px-6 py-4 text-left">{{ t('Rating') }}</th>
+                                <th class="px-6 py-4 text-left">{{ t('Comment & Reply') }}</th>
+                                <th class="px-6 py-4 text-center">{{ t('Status') }}</th>
+                                <th class="px-6 py-4 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
@@ -401,7 +411,7 @@ onBeforeUnmount(() => {
                                         </div>
                                         <div class="min-w-0">
                                             <div class="font-medium text-gray-900 dark:text-white">{{ review.user?.name || t('Anonymous') }}</div>
-                                            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ review.user?.email || '—' }}</div>
+                                            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ review.user?.email || 'â€”' }}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -460,7 +470,15 @@ onBeforeUnmount(() => {
                                         <template #default="{ close }">
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
+                                                @click="openDetailsModal(review); close()"
+                                            >
+                                                <i class="ti ti-eye text-base"></i>
+                                                {{ t('View Details') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="toggleApprove(review); close()"
                                             >
                                                 <i class="ti text-base" :class="review.is_approved ? 'ti-circle-x' : 'ti-circle-check'"></i>
@@ -468,7 +486,7 @@ onBeforeUnmount(() => {
                                             </button>
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="openReplyModal(review); close()"
                                             >
                                                 <i class="ti ti-arrow-back-up text-base"></i>
@@ -500,91 +518,195 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Reply Modal -->
-    <Teleport to="body">
-        <Transition
-            enter-active-class="transition duration-200 ease-out"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition duration-150 ease-in"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div
-                v-if="replyModalOpen"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
-                role="dialog"
-                aria-modal="true"
-                @click.self="!replySubmitting && (replyModalOpen = false)"
-            >
-                <Transition
-                    appear
-                    enter-active-class="transition duration-200 ease-out"
-                    enter-from-class="translate-y-2 scale-95 opacity-0"
-                    enter-to-class="translate-y-0 scale-100 opacity-100"
-                    leave-active-class="transition duration-150 ease-in"
-                    leave-from-class="translate-y-0 scale-100 opacity-100"
-                    leave-to-class="translate-y-2 scale-95 opacity-0"
-                >
-                    <div v-if="replyModalOpen" class="w-full max-w-md overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg dark:border-surface-800 dark:bg-surface-900">
-                        <form @submit.prevent="submitReply">
-                            <div class="p-5 space-y-4">
-                                <h3 class="text-lg font-bold text-gray-900 dark:text-white">{{ activeReview?.admin_reply ? t('Edit Reply') : t('Reply to Review') }}</h3>
-                                <div class="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-surface-800 dark:text-gray-300">
-                                    <p class="font-bold text-gray-800 dark:text-white mb-1">{{ activeReview?.user?.name || t('Anonymous') }}</p>
-                                    <p class="italic break-words">{{ activeReview?.comment || t('No comment left.') }}</p>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ t('Reply Content') }}</label>
-                                    <textarea
-                                        v-model="adminReplyText"
-                                        rows="4"
-                                        maxlength="2000"
-                                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-955 transition placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-surface-800 dark:bg-surface-800 dark:text-white"
-                                        :placeholder="t('Type your reply here...')"
-                                    ></textarea>
-                                </div>
-                                <!-- Approve Review Switch -->
-                                <div class="flex items-center justify-between py-2 border-t border-gray-100 dark:border-surface-800">
-                                    <span class="flex flex-col">
-                                        <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Approve Review') }}</span>
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('Automatically approve this review upon submitting reply.') }}</span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        :class="approveOnReply ? 'bg-primary-600' : 'bg-gray-200 dark:bg-surface-700'"
-                                        class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                                        @click="approveOnReply = !approveOnReply"
-                                    >
-                                        <span
-                                            :class="approveOnReply ? 'translate-x-5' : 'translate-x-0'"
-                                            class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"
-                                        />
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="flex justify-end gap-2 border-t border-gray-100 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-955">
-                                <button
-                                    type="button"
-                                    class="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-surface-800"
-                                    :disabled="replySubmitting"
-                                    @click="replyModalOpen = false"
-                                >
-                                    {{ t('Cancel') }}
-                                </button>
-                                <button
-                                    type="submit"
-                                    class="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60 transition"
-                                    :disabled="replySubmitting"
-                                >
-                                    {{ replySubmitting ? t('Submitting...') : t('Submit') }}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </Transition>
+    <AppModal
+        :open="replyModalOpen"
+        max-width="max-w-md"
+        :title="activeReview?.admin_reply ? t('Edit Reply') : t('Reply to Review')"
+        has-form
+        @close="!replySubmitting && (replyModalOpen = false)"
+        @submit="submitReply"
+    >
+        <div class="space-y-4">
+            <div class="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-surface-800 dark:text-gray-300">
+                <p class="font-bold text-gray-800 dark:text-white mb-1">{{ activeReview?.user?.name || t('Anonymous') }}</p>
+                <p class="italic break-words">{{ activeReview?.comment || t('No comment left.') }}</p>
             </div>
-        </Transition>
-    </Teleport>
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{{ t('Reply Content') }}</label>
+                <textarea
+                    v-model="adminReplyText"
+                    rows="4"
+                    maxlength="2000"
+                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 transition placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500/40 dark:border-surface-800 dark:bg-surface-800 dark:text-white"
+                    :placeholder="t('Type your reply here...')"
+                ></textarea>
+            </div>
+            <!-- Approve Review Switch -->
+            <div class="flex items-center justify-between py-2 border-t border-gray-100 dark:border-surface-800">
+                <span class="flex flex-col">
+                    <span class="text-sm font-medium text-gray-900 dark:text-white">{{ t('Approve Review') }}</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('Automatically approve this review upon submitting reply.') }}</span>
+                </span>
+                <AppSwitch v-model="approveOnReply" />
+            </div>
+        </div>
+        <template #footer>
+            <div class="flex justify-end gap-2">
+                <button
+                    type="button"
+                    class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 disabled:opacity-60 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                    :disabled="replySubmitting"
+                    @click="replyModalOpen = false"
+                >
+                    {{ t('Cancel') }}
+                </button>
+                <button
+                    type="submit"
+                    class="btn-primary-admin rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-60 transition"
+                    :disabled="replySubmitting"
+                >
+                    {{ replySubmitting ? t('Submitting...') : t('Submit') }}
+                </button>
+            </div>
+        </template>
+    </AppModal>
+
+    <!-- Details Modal -->
+    <AppModal
+        :open="detailsModalOpen"
+        max-width="max-w-lg"
+        :title="t('Review Details')"
+        @close="detailsModalOpen = false"
+    >
+        <div class="space-y-6">
+            <!-- User and Date info -->
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div v-if="reviewDetails?.user?.avatar" class="h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-100 dark:bg-surface-800">
+                        <img :src="reviewDetails.user.avatar.startsWith('http') ? reviewDetails.user.avatar : '/storage/' + reviewDetails.user.avatar" class="h-full w-full object-cover" />
+                    </div>
+                    <div
+                        v-else
+                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-base font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    >
+                        <span>{{ reviewDetails?.user?.name?.charAt(0) || 'U' }}</span>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-900 dark:text-white">{{ reviewDetails?.user?.name || t('Anonymous') }}</h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ reviewDetails?.user?.email || 'â€”' }}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span
+                        class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                        :class="reviewDetails?.is_approved
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400'
+                            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400'"
+                    >
+                        {{ reviewDetails?.is_approved ? t('Approved') : t('Pending') }}
+                    </span>
+                    <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">{{ formatDate(reviewDetails?.created_at || '') }}</p>
+                </div>
+            </div>
+
+            <!-- Rating and Tool info -->
+            <div class="grid grid-cols-2 gap-4 rounded-xl bg-gray-50 dark:bg-surface-800 p-4">
+                <div>
+                    <span class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ t('Rating') }}</span>
+                    <div class="flex items-center gap-0.5 text-warning-400">
+                        <i v-for="star in 5" :key="star" class="ti text-sm" :class="star <= (reviewDetails?.rating || 0) ? 'ti-star-filled' : 'ti-star text-gray-200 dark:text-surface-700'"></i>
+                    </div>
+                </div>
+                <div>
+                    <span class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ t('Tool') }}</span>
+                    <div v-if="reviewDetails?.tool" class="flex items-center gap-2">
+                        <div :style="{ background: reviewDetails.tool.color || '#6366f1' }" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg text-[9px] text-white">
+                            <i v-if="reviewDetails.tool.icon" :class="reviewDetails.tool.icon"></i>
+                            <span v-else>{{ reviewDetails.tool.name.charAt(0) }}</span>
+                        </div>
+                        <a
+                            :href="route('ai.tools.show', reviewDetails.tool.slug)"
+                            target="_blank"
+                            class="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+                        >
+                            <span>{{ reviewDetails.tool.name }}</span>
+                            <i class="ti ti-external-link text-[10px]"></i>
+                        </a>
+                    </div>
+                    <a
+                        v-else
+                        :href="route('ai.tools.show', reviewDetails?.tool_slug || '')"
+                        target="_blank"
+                        class="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+                    >
+                        <span>{{ reviewDetails?.tool_slug }}</span>
+                        <i class="ti ti-external-link text-[10px]"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Comment Details -->
+            <div class="space-y-2">
+                <span class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{{ t('Comment') }}</span>
+                <div class="rounded-xl border border-gray-100 dark:border-surface-800 p-4 bg-white dark:bg-surface-900/50">
+                    <p class="text-sm text-gray-700 dark:text-gray-300 break-words leading-relaxed whitespace-pre-wrap">
+                        {{ reviewDetails?.comment || t('No comment left.') }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Admin Reply Details -->
+            <div class="space-y-2">
+                <span class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{{ t('Admin Reply') }}</span>
+                <div v-if="reviewDetails?.admin_reply" class="rounded-xl border border-primary-100 dark:border-primary-900/20 p-4 bg-primary-50/20 dark:bg-primary-900/5">
+                    <p class="text-sm text-gray-700 dark:text-gray-300 break-words leading-relaxed whitespace-pre-wrap">
+                        {{ reviewDetails.admin_reply }}
+                    </p>
+                </div>
+                <div v-else class="text-sm text-gray-400 dark:text-gray-500 italic">
+                    {{ t('No reply submitted yet.') }}
+                </div>
+            </div>
+
+            <!-- Helpful Count -->
+            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <i class="ti ti-thumb-up text-sm"></i>
+                <span>{{ t(':count users found this review helpful.', { count: String(reviewDetails?.helpful_count || 0) }) }}</span>
+            </div>
+        </div>
+
+        <template #footer>
+            <div class="flex items-center justify-between w-full">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700 transition dark:text-red-400 dark:hover:text-red-300"
+                    @click="detailsModalOpen = false; confirmDelete(reviewDetails!)"
+                >
+                    <i class="ti ti-trash text-base"></i>
+                    {{ t('Delete') }}
+                </button>
+
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:hover:bg-surface-700"
+                        @click="detailsModalOpen = false; toggleApprove(reviewDetails!)"
+                    >
+                        <i class="ti text-base" :class="reviewDetails?.is_approved ? 'ti-circle-x' : 'ti-circle-check'"></i>
+                        {{ reviewDetails?.is_approved ? t('Disapprove') : t('Approve') }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn-primary-admin inline-flex items-center gap-2"
+                        @click="detailsModalOpen = false; openReplyModal(reviewDetails!)"
+                    >
+                        <i class="ti ti-arrow-back-up text-base"></i>
+                        {{ reviewDetails?.admin_reply ? t('Edit Reply') : t('Reply') }}
+                    </button>
+                </div>
+            </div>
+        </template>
+    </AppModal>
 
     <!-- Delete Confirmation Modal -->
     <ActionConfirmModal

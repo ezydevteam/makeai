@@ -67,7 +67,6 @@ class FoundationSeeder extends Seeder
                 'heading_weight' => '700',
                 'line_height' => '1.5',
                 'letter_spacing' => 'normal',
-                'border_radius' => '12px',
                 'container_width' => '1280px',
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
             ['key' => 'frontend_header_settings', 'value' => json_encode([
@@ -112,9 +111,7 @@ class FoundationSeeder extends Seeder
                 'show_payment_icons' => true,
                 'show_back_to_top' => true,
                 'copyright_text' => '',
-                'menu_column_1' => 'footer-company',
-                'menu_column_2' => 'footer-support',
-                'menu_column_3' => 'footer-legal',
+                'menu_column' => 'footer-company',
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 'type' => 'json', 'group' => 'appearance'],
             ['key' => 'frontend_homepage_settings', 'value' => json_encode([
                 'hero_variant' => 'centered-gradient',
