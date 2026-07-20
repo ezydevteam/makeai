@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <testsuite name="Addons">
+            <directory>addons/*/tests/Feature</directory>
+            <directory>addons/*/tests/Unit</directory>
+            <!-- Pest-syntax files: they predate this testsuite and cannot be loaded
+                 by the PHPUnit runner (`it(...)` at top level is a parse error).
+                 Excluded so they don't abort the run; they never executed anyway. -->
+            <exclude>addons/ai-voiceover/tests/Feature/VoiceoverTest.php</exclude>
+            <exclude>addons/ai-knowledge-base/tests/Feature/KbTest.php</exclude>
+            <exclude>addons/social-scheduler/tests/Feature/SocialSchedulerTest.php</exclude>
+            <!-- Deprecated addon, superseded by ai-image-pro. Its suite never actually
+                 ran (the class was fatal on load until the $queue fix), and it lacks the
+                 addon-activation setUp that addon tests need — so its tables and routes
+                 don't exist and all 21 cases error. Excluded rather than repaired, since
+                 the addon itself is on the way out. See image-addon-plan.md §10. -->
+            <exclude>addons/ai-image-editor/tests/Feature/ImageEditorTest.php</exclude>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <!-- Tests exercise the running application, not the install wizard. Without this,
+             config('app.installed') defaults false and InstallationMiddleware 302s every
+             HTTP test to /install. InstallerWizardTest overrides it back to false in setUp. -->
+        <env name="INSTALLED" value="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="DB_URL" value=""/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <!-- Demo mode short-circuits license verification and blocks writes, so a
+             developer who enables it in their own .env to reproduce something would
+             otherwise see ~160 unrelated failures. Tests that need it on turn it on
+             explicitly with config(['demo.enabled' => true]). -->
+        <env name="DEMO_ENABLED" value="false"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

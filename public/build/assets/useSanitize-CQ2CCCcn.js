@@ -1,0 +1,1 @@
+import{t as e}from"./purify.es-DY32g7DN.js";function t(t){return e.sanitize(t||``,{USE_PROFILES:{html:!0},FORBID_TAGS:[`style`,`form`,`input`,`button`],FORBID_ATTR:[`style`]})}export{t};

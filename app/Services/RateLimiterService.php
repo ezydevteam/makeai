@@ -1,0 +1,425 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\BannedIp;
+use App\Models\RateLimitRule;
+use App\Models\User;
+use App\Models\UserRateLimitOverride;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Redis;
+
+class RateLimiterService
+{
+    private const PREFIX = 'rl:';
+
+    private ?bool $redisAvailable = null;
+
+    private array $defaults = [
+        'text_gen' => [
+            'guest' => ['max_attempts' => 5, 'window_seconds' => 3600],
+            'free_user' => ['max_attempts' => 30, 'window_seconds' => 60],
+            'pro_user' => ['max_attempts' => 120, 'window_seconds' => 60],
+        ],
+        'auth' => [
+            'guest' => ['max_attempts' => 5, 'window_seconds' => 900],
+            'free_user' => ['max_attempts' => 10, 'window_seconds' => 900],
+            'pro_user' => ['max_attempts' => 20, 'window_seconds' => 900],
+        ],
+        'otp' => [
+            'guest' => ['max_attempts' => 5, 'window_seconds' => 900],
+            'free_user' => ['max_attempts' => 5, 'window_seconds' => 900],
+            'pro_user' => ['max_attempts' => 5, 'window_seconds' => 900],
+        ],
+        'contact' => [
+            'guest' => ['max_attempts' => 3, 'window_seconds' => 3600],
+            'free_user' => ['max_attempts' => 5, 'window_seconds' => 3600],
+            'pro_user' => ['max_attempts' => 10, 'window_seconds' => 3600],
+        ],
+        'comments' => [
+            'guest' => ['max_attempts' => 5, 'window_seconds' => 60],
+            'free_user' => ['max_attempts' => 10, 'window_seconds' => 60],
+            'pro_user' => ['max_attempts' => 20, 'window_seconds' => 60],
+        ],
+        'newsletter' => [
+            'guest' => ['max_attempts' => 3, 'window_seconds' => 3600],
+            'free_user' => ['max_attempts' => 3, 'window_seconds' => 3600],
+            'pro_user' => ['max_attempts' => 3, 'window_seconds' => 3600],
+        ],
+        'public' => [
+            'guest' => ['max_attempts' => 5, 'window_seconds' => 3600],
+            'free_user' => ['max_attempts' => 15, 'window_seconds' => 3600],
+            'pro_user' => ['max_attempts' => 30, 'window_seconds' => 3600],
+        ],
+        'social_auth' => [
+            'guest' => ['max_attempts' => 10, 'window_seconds' => 300],
+            'free_user' => ['max_attempts' => 10, 'window_seconds' => 300],
+            'pro_user' => ['max_attempts' => 10, 'window_seconds' => 300],
+        ],
+    ];
+
+    public function getDefaults(): array
+    {
+        return $this->defaults;
+    }
+
+    public function attempt(string $category, string $key, ?int $maxAttempts = null, ?int $windowSeconds = null, ?User $user = null): array
+    {
+        $tier = $this->resolveTier($user);
+        $limits = $this->getLimitForTier($category, $tier, $user);
+
+        $maxAttempts = $maxAttempts ?? $limits['max_attempts'];
+        $windowSeconds = $windowSeconds ?? $limits['window_seconds'];
+
+        if ($this->isRedisAvailable()) {
+            $redisKey = $this->buildRedisKey($category, $key);
+
+            return $this->slidingWindowCheck($redisKey, $maxAttempts, $windowSeconds, false);
+        }
+
+        return $this->fixedWindowAttempt($category, $key, $maxAttempts, $windowSeconds);
+    }
+
+    public function hit(string $category, string $key, ?int $windowSeconds = null): void
+    {
+        $windowSeconds = $windowSeconds ?? 900;
+
+        if ($this->isRedisAvailable()) {
+            $redisKey = $this->buildRedisKey($category, $key);
+            $now = microtime(true);
+
+            Redis::pipeline(function ($pipe) use ($redisKey, $now, $windowSeconds) {
+                $pipe->zremrangebyscore($redisKey, '-inf', $now - $windowSeconds);
+                $pipe->zadd($redisKey, $now, $now.uniqid('', true));
+                $pipe->expire($redisKey, $windowSeconds + 1);
+            });
+
+            return;
+        }
+
+        $this->fixedWindowHit($category, $key, $windowSeconds);
+    }
+
+    public function clear(string $category, string $key): void
+    {
+        if ($this->isRedisAvailable()) {
+            $redisKey = $this->buildRedisKey($category, $key);
+            Redis::del($redisKey);
+
+            return;
+        }
+
+        DB::table('rate_limit_hits')->where('key', self::PREFIX."{$category}:{$key}")->delete();
+    }
+
+    public function status(string $category, string $key, ?int $maxAttempts = null, ?int $windowSeconds = null, ?User $user = null): array
+    {
+        $tier = $this->resolveTier($user);
+        $limits = $this->getLimitForTier($category, $tier, $user);
+
+        $maxAttempts = $maxAttempts ?? $limits['max_attempts'];
+        $windowSeconds = $windowSeconds ?? $limits['window_seconds'];
+
+        if ($this->isRedisAvailable()) {
+            $redisKey = $this->buildRedisKey($category, $key);
+
+            return $this->slidingWindowCheck($redisKey, $maxAttempts, $windowSeconds, true);
+        }
+
+        return $this->fixedWindowStatus($category, $key, $maxAttempts, $windowSeconds);
+    }
+
+    public function banIp(string $ip, string $reason, string $category = 'all', ?int $adminId = null, ?int $expiresInSeconds = null): void
+    {
+        $expiresAt = $expiresInSeconds ? now()->addSeconds($expiresInSeconds) : null;
+
+        // Keyed on (ip_address, category) so an IP can hold independent bans per
+        // scope; re-banning the same scope refreshes the existing row.
+        BannedIp::updateOrCreate(
+            ['ip_address' => $ip, 'category' => $category],
+            [
+                'reason' => $reason,
+                'banned_at' => now(),
+                'expires_at' => $expiresAt,
+                'banned_by' => $adminId,
+            ]
+        );
+    }
+
+    public function unbanIp(string $ip, ?string $category = null): void
+    {
+        BannedIp::where('ip_address', $ip)
+            ->when($category !== null, fn ($q) => $q->where('category', $category))
+            ->delete();
+    }
+
+    /**
+     * Whether the IP is banned for the given endpoint category. A global ('all')
+     * ban blocks everything; a scoped ban blocks only its own category. When no
+     * category is supplied, only global bans count.
+     */
+    public function isIpBanned(string $ip, ?string $category = null): bool
+    {
+        return BannedIp::where('ip_address', $ip)
+            ->active()
+            ->forEndpoint($category)
+            ->exists();
+    }
+
+    /**
+     * Whether the IP carries an active "entire site" ban — enforced globally on
+     * every request (not just throttled endpoints) by the BlockBannedIps
+     * middleware.
+     */
+    public function isIpBlockedSiteWide(string $ip): bool
+    {
+        return BannedIp::where('ip_address', $ip)
+            ->active()
+            ->where('category', 'site')
+            ->exists();
+    }
+
+    public function checkAiAbuse(string $ip, string $category): bool
+    {
+        $threshold = (int) settings('rl_ai_abuse_threshold', 100);
+        $windowMinutes = (int) settings('rl_ai_abuse_window', 60);
+        $banDuration = (int) settings('rl_ai_abuse_ban_duration', 86400);
+        $windowSeconds = $windowMinutes * 60;
+
+        if ($threshold <= 0 || $windowSeconds <= 0) {
+            return false;
+        }
+
+        if (! $this->isRedisAvailable()) {
+            return $this->checkAiAbuseDb($ip, $category, $threshold, $windowSeconds, $windowMinutes, $banDuration);
+        }
+
+        $abuseKey = self::PREFIX."abuse:{$category}:ip:{$ip}";
+        $now = microtime(true);
+
+        Redis::zremrangebyscore($abuseKey, '-inf', $now - $windowSeconds);
+        Redis::pipeline(function ($pipe) use ($abuseKey, $now, $windowSeconds) {
+            $pipe->zadd($abuseKey, $now, $now.uniqid('', true));
+            $pipe->expire($abuseKey, $windowSeconds + 1);
+        });
+
+        $count = Redis::zcard($abuseKey);
+
+        if ($count >= $threshold) {
+            $this->banIp($ip, "AI abuse: {$count} rate limit hits in {$windowMinutes} min", $category, null, $banDuration);
+            Redis::del($abuseKey);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * DB-backed abuse tracking for installs without Redis (fixed window).
+     */
+    private function checkAiAbuseDb(string $ip, string $category, int $threshold, int $windowSeconds, int $windowMinutes, int $banDuration): bool
+    {
+        $abuseCategory = "abuse_{$category}";
+        $key = "ip:{$ip}";
+
+        $this->fixedWindowHit($abuseCategory, $key, $windowSeconds);
+
+        $dbKey = self::PREFIX."{$abuseCategory}:{$key}";
+        $windowStart = (int) (time() / $windowSeconds) * $windowSeconds;
+
+        $hits = (int) (DB::table('rate_limit_hits')
+            ->where('key', $dbKey)
+            ->where('window_start', $windowStart)
+            ->value('hits') ?? 0);
+
+        if ($hits >= $threshold) {
+            $this->banIp($ip, "AI abuse: {$hits} rate limit hits in {$windowMinutes} min", $category, null, $banDuration);
+            DB::table('rate_limit_hits')->where('key', $dbKey)->delete();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function resolveTier(?User $user): string
+    {
+        if (! $user) {
+            return 'guest';
+        }
+
+        if (isProAvailable() && $user->isPro()) {
+            return 'pro_user';
+        }
+
+        return 'free_user';
+    }
+
+    private function getLimitForTier(string $category, string $tier, ?User $user): array
+    {
+        $override = $this->getUserOverride($user, $category);
+
+        if ($override) {
+            return $override;
+        }
+
+        $rule = RateLimitRule::map()[$category][$tier] ?? null;
+
+        if ($rule === null || $rule['max_attempts'] <= 0 || $rule['window_seconds'] <= 0) {
+            return $this->defaults[$category][$tier] ?? ['max_attempts' => 10, 'window_seconds' => 60];
+        }
+
+        return $rule;
+    }
+
+    private function getUserOverride(?User $user, string $category): ?array
+    {
+        if (! $user) {
+            return null;
+        }
+
+        $override = UserRateLimitOverride::where('user_id', $user->id)
+            ->where('category', $category)
+            ->active()
+            ->first();
+
+        if (! $override) {
+            return null;
+        }
+
+        return [
+            'max_attempts' => $override->max_attempts,
+            'window_seconds' => $override->window_seconds,
+        ];
+    }
+
+    private function slidingWindowCheck(string $redisKey, int $maxAttempts, int $windowSeconds, bool $readOnly): array
+    {
+        $now = microtime(true);
+
+        Redis::zremrangebyscore($redisKey, '-inf', $now - $windowSeconds);
+        $count = Redis::zcard($redisKey);
+
+        if (! $readOnly && $count < $maxAttempts) {
+            Redis::pipeline(function ($pipe) use ($redisKey, $now, $windowSeconds) {
+                $pipe->zadd($redisKey, $now, $now.uniqid('', true));
+                $pipe->expire($redisKey, $windowSeconds + 1);
+            });
+        }
+
+        $remaining = max(0, $maxAttempts - $count - ($readOnly ? 0 : ($count < $maxAttempts ? 1 : 0)));
+        $allowed = $count < $maxAttempts;
+
+        $retryAfter = 0;
+        $resetAt = (int) ($now + $windowSeconds);
+
+        if (! $allowed) {
+            $oldest = Redis::zrange($redisKey, 0, 0, ['WITHSCORES' => true]);
+            if (! empty($oldest)) {
+                $oldestTime = (float) array_values($oldest)[0];
+                $retryAfter = max(1, (int) ceil($oldestTime + $windowSeconds - $now));
+            }
+        }
+
+        return [
+            'allowed' => $allowed,
+            'limit' => $maxAttempts,
+            'remaining' => $remaining,
+            'reset_at' => $resetAt,
+            'retry_after_seconds' => $retryAfter,
+        ];
+    }
+
+    private function buildRedisKey(string $category, string $key): string
+    {
+        return self::PREFIX."{$category}:{$key}";
+    }
+
+    private function isRedisAvailable(): bool
+    {
+        if ($this->redisAvailable !== null) {
+            return $this->redisAvailable;
+        }
+
+        try {
+            Redis::ping();
+            $this->redisAvailable = true;
+        } catch (\Throwable) {
+            $this->redisAvailable = false;
+        }
+
+        return $this->redisAvailable;
+    }
+
+    private function fixedWindowAttempt(string $category, string $key, int $maxAttempts, int $windowSeconds): array
+    {
+        $dbKey = self::PREFIX."{$category}:{$key}";
+        $now = time();
+        $windowStart = (int) ($now / $windowSeconds) * $windowSeconds;
+
+        $row = DB::table('rate_limit_hits')
+            ->where('key', $dbKey)
+            ->where('window_start', $windowStart)
+            ->first();
+
+        $hits = $row ? (int) $row->hits : 0;
+        $allowed = $hits < $maxAttempts;
+
+        if ($allowed) {
+            $this->fixedWindowHit($category, $key, $windowSeconds);
+        }
+
+        return [
+            'allowed' => $allowed,
+            'limit' => $maxAttempts,
+            'remaining' => max(0, $maxAttempts - $hits - 1),
+            'reset_at' => $windowStart + $windowSeconds,
+            'retry_after_seconds' => $allowed ? 0 : ($windowStart + $windowSeconds - $now),
+        ];
+    }
+
+    private function fixedWindowHit(string $category, string $key, int $windowSeconds): void
+    {
+        $dbKey = self::PREFIX."{$category}:{$key}";
+        $now = time();
+        $windowStart = (int) ($now / $windowSeconds) * $windowSeconds;
+
+        DB::table('rate_limit_hits')->upsert(
+            [
+                'key' => $dbKey,
+                'category' => $category,
+                'hits' => 1,
+                'window_start' => $windowStart,
+                'window_seconds' => $windowSeconds,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            ['key', 'window_start'],
+            ['hits' => DB::raw('hits + 1'), 'updated_at' => now()]
+        );
+    }
+
+    private function fixedWindowStatus(string $category, string $key, int $maxAttempts, int $windowSeconds): array
+    {
+        $dbKey = self::PREFIX."{$category}:{$key}";
+        $now = time();
+        $windowStart = (int) ($now / $windowSeconds) * $windowSeconds;
+
+        $row = DB::table('rate_limit_hits')
+            ->where('key', $dbKey)
+            ->where('window_start', $windowStart)
+            ->first();
+
+        $hits = $row ? (int) $row->hits : 0;
+        $allowed = $hits < $maxAttempts;
+
+        return [
+            'allowed' => $allowed,
+            'limit' => $maxAttempts,
+            'remaining' => max(0, $maxAttempts - $hits),
+            'reset_at' => $windowStart + $windowSeconds,
+            'retry_after_seconds' => 0,
+        ];
+    }
+}

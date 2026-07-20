@@ -1,0 +1,23 @@
+; MakeAI — queue worker (VPS / dedicated server)
+;
+; Copy to /etc/supervisor/conf.d/your-site-worker.conf, adjust the paths and user,
+; then:
+;     supervisorctl reread
+;     supervisorctl update
+;     supervisorctl start your-site-worker:*
+;
+; Without a worker, AI generation and outbound email run inside the web request.
+
+[program:your-site-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/your-site/core/artisan queue:work --queue=otp,emails,mail,default,webhooks,ai,media,embeddings,social,low --sleep=3 --tries=3 --max-time=3600
+directory=/var/www/your-site/core
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=2
+redirect_stderr=true
+stdout_logfile=/var/www/your-site/core/storage/logs/worker.log
+stopwaitsecs=3600

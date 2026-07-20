@@ -1,0 +1,35 @@
+{
+    "name": "Midnight",
+    "description": "Dark, high-contrast UI with violet and cyan accents on deep navy.",
+    "preview": {
+        "mode": "dark",
+        "primary": "#8b5cf6",
+        "secondary": "#6366f1",
+        "accent": "#22d3ee",
+        "bg": "#0b1020",
+        "heading": "#f8fafc",
+        "text": "#cbd5e1"
+    },
+    "settings": {
+        "theme": {
+            "theme_default_mode": "dark",
+            "theme_allow_user_toggle": true,
+            "primary_color": "#8b5cf6",
+            "secondary_color": "#6366f1",
+            "accent_color": "#22d3ee",
+            "bg_color": "#0b1020",
+            "bg_image": "",
+            "bg_image_enabled": false,
+            "heading_color": "#f8fafc",
+            "body_text_color": "#cbd5e1",
+            "muted_text_color": "#94a3b8",
+            "border_color": "#1e293b",
+            "font_body": "DM Sans",
+            "heading_font": "Poppins",
+            "base_font_size": "15px",
+            "heading_weight": "700",
+            "line_height": "1.6",
+            "letter_spacing": "normal"
+        }
+    }
+}

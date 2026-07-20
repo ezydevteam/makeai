@@ -1,0 +1,35 @@
+{
+    "name": "Sunset",
+    "description": "Warm, inviting palette — amber and rose on a soft peach background.",
+    "preview": {
+        "mode": "light",
+        "primary": "#f97316",
+        "secondary": "#ec4899",
+        "accent": "#f59e0b",
+        "bg": "#fff7ed",
+        "heading": "#1c1917",
+        "text": "#44403c"
+    },
+    "settings": {
+        "theme": {
+            "theme_default_mode": "light",
+            "theme_allow_user_toggle": true,
+            "primary_color": "#f97316",
+            "secondary_color": "#ec4899",
+            "accent_color": "#f59e0b",
+            "bg_color": "#fff7ed",
+            "bg_image": "",
+            "bg_image_enabled": false,
+            "heading_color": "#1c1917",
+            "body_text_color": "#44403c",
+            "muted_text_color": "#78716c",
+            "border_color": "#f5d9c0",
+            "font_body": "Nunito",
+            "heading_font": "Poppins",
+            "base_font_size": "15px",
+            "heading_weight": "700",
+            "line_height": "1.5",
+            "letter_spacing": "normal"
+        }
+    }
+}

@@ -1,0 +1,81 @@
+<script setup lang="ts">
+import { reactive } from 'vue'
+import ErrorAlert from './ErrorAlert.vue'
+
+const props = defineProps<{
+    formData: Record<string, any>
+    error?: string | null
+}>()
+
+/**
+ * Detect the URL the application is actually served from, subfolder included.
+ *
+ * Origin alone is wrong whenever the buyer installs into a subdirectory
+ * (example.com/ai): APP_URL would become "https://example.com", and every
+ * absolute URL the app generates afterwards — assets, uploaded media, email
+ * links, password resets — would drop the /ai prefix and 404.
+ *
+ * The wizard is always reached at <base>/install, so stripping that suffix from
+ * the current path yields the base URL in both layouts.
+ */
+const detectSiteUrl = (): string => {
+    if (typeof window === 'undefined') {
+        return 'http://localhost'
+    }
+
+    const base = window.location.pathname.replace(/\/install(?:\/.*)?$/, '')
+
+    return `${window.location.origin}${base}`.replace(/\/+$/, '')
+}
+
+const site = reactive({
+    site_name: props.formData?.step_4?.site_name ?? '',
+    site_tagline: props.formData?.step_4?.site_tagline ?? '',
+    site_url: props.formData?.step_4?.site_url ?? detectSiteUrl(),
+})
+
+defineExpose({ getData: () => ({ ...site }) })
+</script>
+
+<template>
+    <div>
+        <h2 class="text-xl font-bold text-slate-900">Site Setup</h2>
+        <p class="mt-1 text-sm text-slate-500">Configure the basic details of your MakeAI installation.</p>
+
+        <ErrorAlert :message="error" />
+
+        <div class="mt-6 space-y-4">
+            <label class="block">
+                <span class="text-sm font-medium text-slate-700">Site Name</span>
+                <input
+                    v-model="site.site_name"
+                    type="text"
+                    placeholder="My MakeAI Site"
+                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                />
+            </label>
+
+            <label class="block">
+                <span class="text-sm font-medium text-slate-700">Site Tagline</span>
+                <input
+                    v-model="site.site_tagline"
+                    type="text"
+                    placeholder="One platform. Every AI tool."
+                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                />
+                <span class="mt-1 block text-xs text-slate-400">A short slogan shown in the header and browser title.</span>
+            </label>
+
+            <label class="block">
+                <span class="text-sm font-medium text-slate-700">Site URL</span>
+                <input
+                    v-model="site.site_url"
+                    type="text"
+                    placeholder="https://example.com"
+                    class="mt-1.5 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-sm"
+                />
+                <span class="mt-1 block text-xs text-slate-400">Auto-detected from your current URL — change if needed.</span>
+            </label>
+        </div>
+    </div>
+</template>

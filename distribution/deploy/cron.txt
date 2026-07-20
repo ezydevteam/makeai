@@ -1,0 +1,34 @@
+MakeAI — Scheduled Tasks (cron)
+================================
+
+MakeAI needs ONE cron entry. It drives scheduled reports, subscription renewals,
+usage resets, cleanup jobs and queued email.
+
+SHARED HOSTING (cPanel > Cron Jobs)
+-----------------------------------
+Set the interval to "Once Per Minute" (* * * * *) and use:
+
+    /usr/local/bin/php /home/USERNAME/public_html/core/artisan schedule:run >/dev/null 2>&1
+
+Replace USERNAME with your cPanel username. If you installed into a subfolder,
+add it to the path (e.g. .../public_html/your-site/core/artisan).
+
+Not sure of the PHP binary path? cPanel shows it under "Select PHP Version",
+and it is often one of:
+    /usr/local/bin/php        /usr/bin/php        /opt/cpanel/ea-php83/root/usr/bin/php
+
+VPS / DEDICATED SERVER
+----------------------
+Run `crontab -e` as the web server user (usually www-data) and add:
+
+    * * * * * cd /var/www/your-site/core && php artisan schedule:run >> /dev/null 2>&1
+
+QUEUE WORKER (recommended)
+--------------------------
+Without a queue worker, AI generation and email run inside the web request and
+feel slow. On a VPS, use the supervisor config shipped alongside this file.
+
+On shared hosting, supervisor is usually unavailable — add a second cron entry
+instead, which processes the queue for 55 seconds each minute:
+
+    * * * * * /usr/local/bin/php /home/USERNAME/public_html/core/artisan queue:work --stop-when-empty --max-time=55 >/dev/null 2>&1

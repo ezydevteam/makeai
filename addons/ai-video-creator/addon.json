@@ -1,0 +1,63 @@
+{
+    "slug": "ai-video-creator",
+    "name": "AI Video Creator",
+    "version": "1.0.0",
+    "description": "Full video creation suite: text-to-video, image-to-video, AI avatar, slideshow, subtitles, and video library.",
+    "author": "MakeAI",
+    "min_makeai_version": "1.0.0",
+    "envato_item_id": null,
+    "requires_license": 1,
+    "requires_pro": false,
+    "admin_menu": [
+        {
+            "label": "Overview",
+            "route": "addon.video.admin.overview",
+            "route_params": {},
+            "route_pattern": "addon.video.admin.overview",
+            "icon": "ti ti-video",
+            "permission": "addon.video.manage"
+        },
+        {
+            "label": "Settings",
+            "route": "addon.video.admin.settings",
+            "route_params": {},
+            "route_pattern": "addon.video.admin.settings",
+            "icon": "ti ti-settings",
+            "permission": "addon.video.settings"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",                  "type": "boolean",  "label": "Enable Video Creator",             "default": true,             "group": "general" },
+        { "key": "show_to",                  "type": "select",   "label": "Access for",                       "options": ["all","logged_in","pro"], "default": "logged_in", "group": "general" },
+        { "key": "text_video_provider",      "type": "select",   "label": "Text-to-Video Provider",           "options": ["kling","runway","pika","minimax"], "default": "kling",  "group": "providers" },
+        { "key": "image_video_provider",     "type": "select",   "label": "Image-to-Video Provider",          "options": ["kling","runway","pika"],           "default": "kling",  "group": "providers" },
+        { "key": "avatar_provider",          "type": "select",   "label": "Avatar Video Provider",            "options": ["heygen","did"],                    "default": "heygen", "group": "providers" },
+        { "key": "tts_provider",             "type": "select",   "label": "TTS Provider (voiceover)",         "options": ["elevenlabs","openai"],             "default": "openai", "group": "audio" },
+        { "key": "subtitle_provider",        "type": "select",   "label": "Subtitle Provider",                "options": ["whisper"],                         "default": "whisper","group": "audio" },
+        { "key": "kling_api_key",            "type": "encrypted","label": "Kling AI Access Key",              "default": null,             "group": "providers", "secret": true },
+        { "key": "kling_api_secret",         "type": "encrypted","label": "Kling AI Secret Key",              "default": null,             "group": "providers", "secret": true },
+        { "key": "runway_api_key",           "type": "encrypted","label": "Runway ML API Key",                "default": null,             "group": "providers", "secret": true },
+        { "key": "pika_api_key",             "type": "encrypted","label": "Pika Labs API Key",                "default": null,             "group": "providers", "secret": true },
+        { "key": "minimax_api_key",          "type": "encrypted","label": "Minimax Video API Key",            "default": null,             "group": "providers", "secret": true },
+        { "key": "heygen_api_key",           "type": "encrypted","label": "HeyGen API Key",                   "default": null,             "group": "providers", "secret": true },
+        { "key": "did_api_key",              "type": "encrypted","label": "D-ID API Key",                     "default": null,             "group": "providers", "secret": true },
+        { "key": "elevenlabs_api_key",       "type": "encrypted","label": "ElevenLabs API Key",               "default": null,             "group": "audio", "secret": true },
+        { "key": "max_video_duration",       "type": "integer",  "label": "Max video duration (seconds)",     "default": 30,               "group": "limits" },
+        { "key": "max_storage_mb_per_user",  "type": "integer",  "label": "Max storage per user (MB)",        "default": 500,              "group": "limits" },
+        { "key": "credits_text_video",       "type": "integer",  "label": "Credits: text-to-video (5s)",      "default": 50,               "group": "credits" },
+        { "key": "credits_text_video_long",  "type": "integer",  "label": "Credits: text-to-video (10s)",     "default": 100,              "group": "credits" },
+        { "key": "credits_image_video",      "type": "integer",  "label": "Credits: image-to-video (5s)",     "default": 40,               "group": "credits" },
+        { "key": "credits_avatar_video",     "type": "integer",  "label": "Credits: avatar video (per 30s)",  "default": 80,               "group": "credits" },
+        { "key": "credits_slideshow",        "type": "integer",  "label": "Credits: slideshow (per minute)",  "default": 30,               "group": "credits" },
+        { "key": "credits_subtitles",        "type": "integer",  "label": "Credits: subtitle generation",     "default": 10,               "group": "credits" },
+        { "key": "ffmpeg_path",              "type": "string",   "label": "ffmpeg binary path",               "default": "/usr/bin/ffmpeg", "group": "technical" },
+        { "key": "poll_interval_seconds",    "type": "integer",  "label": "Provider poll interval (seconds)", "default": 30,               "group": "technical" },
+        { "key": "max_poll_attempts",        "type": "integer",  "label": "Max poll attempts before timeout", "default": 20,               "group": "technical" },
+        { "key": "auto_delete_days",         "type": "integer",  "label": "Auto-delete renders after N days (0=never)", "default": 30,   "group": "limits" }
+    ],
+    "permissions": [
+        { "slug": "addon.video.manage",   "name": "Use Video Creator",             "group": "Video Creator" },
+        { "slug": "addon.video.settings", "name": "Manage Video Creator Settings",  "group": "Video Creator" }
+    ],
+    "hooks": []
+}

@@ -1,0 +1,75 @@
+{
+    "slug": "ai-assistant",
+    "name": "AI Assistant",
+    "version": "1.0.0",
+    "description": "Floating AI assistant widget for frontend and admin panel with streaming chat, slash commands, knowledge-base grounding, and feedback.",
+    "author": "MakeAI",
+    "requires_license": 1,
+    "envato_item_id": 0,
+    "admin_menu": [
+        {
+            "label": "Feedback",
+            "route": "admin.addons.ai-assistant.feedback",
+            "route_pattern": "admin.addons.ai-assistant.feedback",
+            "icon": "ti ti-robot",
+            "permission": "settings.manage"
+        },
+        {
+            "label": "Settings",
+            "route": "admin.addons.settings",
+            "route_params": { "slug": "ai-assistant" },
+            "route_pattern": "admin.addons.*",
+            "icon": "ti ti-robot",
+            "permission": "settings.manage"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",                    "type": "boolean", "label": "Enable on Frontend",              "default": false,          "group": "general", "description": "Show the assistant widget to visitors on the public site." },
+        { "key": "admin_enabled",              "type": "boolean", "label": "Enable in Admin Panel",           "default": true,           "group": "general", "description": "Show the assistant to staff inside the admin panel." },
+        { "key": "auto_open",                  "type": "boolean", "label": "Auto Open on First Visit",        "default": false,          "group": "general", "description": "Opens the widget by itself once per browser session." },
+        { "key": "greeting_on_first_visit",    "type": "boolean", "label": "Show Greeting & Sound on First Visit", "default": false,      "group": "general", "description": "Pops a greeting bubble with a notification chime once per browser session, without opening the full widget." },
+        { "key": "position",                   "type": "select",  "label": "Widget Position",                 "options": ["bottom-right","bottom-left","header-button"], "default": "bottom-right", "group": "general", "description": "\"Header button\" replaces the floating bubble with a button in the site header. Themes without a header slot fall back to the bubble." },
+        { "key": "accent_color",               "type": "color",   "label": "Accent Color",                    "default": "#1F75FE",      "group": "general", "description": "Used for the chat bubble, buttons and highlights." },
+        { "key": "excluded_pages",             "type": "textarea","label": "Hide on These Pages",             "default": null,           "group": "general", "description": "Shown on every page by default. Add one path per line to hide it, e.g. /pricing or /blog/* (a trailing * matches everything under that path). Sign-in, registration and password pages are always excluded." },
+
+        { "key": "enable_home",                "type": "boolean", "label": "Show Home Tab",                   "default": true,           "group": "panels", "description": "A launcher with quick actions, recent chats and popular articles." },
+        { "key": "enable_help",                "type": "boolean", "label": "Show Help Tab",                   "default": true,           "group": "panels", "description": "In-widget knowledge-base browser. Requires the Knowledge Base addon." },
+        { "key": "enable_message",             "type": "boolean", "label": "Show \"Leave a Message\"",         "default": true,           "group": "panels", "description": "A contact form whose submissions land in the admin messages inbox." },
+        { "key": "enable_slash_commands",      "type": "boolean", "label": "Enable Slash Commands",           "default": true,           "group": "panels", "description": "Lets users type / for shortcuts like /help, /usage and /docs." },
+        { "key": "enable_knowledge_base",      "type": "boolean", "label": "Answer from Knowledge Base",      "default": true,           "group": "panels", "description": "Grounds answers in your published help articles and cites them." },
+        { "key": "enable_csat",                "type": "boolean", "label": "Ask for Experience Rating",       "default": true,           "group": "panels", "description": "Asks the user to rate a finished conversation, once per chat." },
+        { "key": "enable_emoji",               "type": "boolean", "label": "Show Emoji Picker",               "default": true,           "group": "panels" },
+
+        { "key": "allow_file_upload",          "type": "boolean", "label": "Allow File Upload",               "default": false,          "group": "uploads", "description": "Let visitors attach a file for the assistant to read. Admins can always attach." },
+        { "key": "allowed_file_types",         "type": "string",  "label": "Allowed File Types",              "default": "pdf,docx,txt,csv,png,jpg", "group": "uploads", "description": "Comma-separated extensions, e.g. pdf,docx,txt. Reading text from images needs a vision-capable model." },
+        { "key": "max_upload_size_mb",         "type": "integer", "label": "Max Upload Size (MB)",            "default": 10,             "group": "uploads", "description": "Largest file a user may attach, in megabytes." },
+
+        { "key": "assistant_name",             "type": "string",  "label": "Assistant Name",                  "default": "AI Assistant", "group": "persona" },
+        { "key": "designation",                "type": "string",  "label": "Designation",                     "default": "Your AI Helper", "group": "persona", "description": "The subtitle under the name in the widget header." },
+        { "key": "avatar_url",                 "type": "file",    "label": "Assistant Avatar",                "default": null,           "group": "persona", "description": "Shown on the chat bubble, the header, the Home greeting and every reply. Square images work best; falls back to a robot icon." },
+        { "key": "greeting_message",           "type": "string","label": "Greeting Message",                "default": null,           "group": "persona", "description": "Leave empty to greet signed-in users by first name." },
+
+        { "key": "social_whatsapp",            "type": "string",  "label": "WhatsApp Link",                   "default": null,           "group": "channels" },
+        { "key": "social_telegram",            "type": "string",  "label": "Telegram Link",                   "default": null,           "group": "channels" },
+        { "key": "social_facebook",            "type": "string",  "label": "Facebook Link",                   "default": null,           "group": "channels" },
+        { "key": "social_instagram",           "type": "string",  "label": "Instagram Link",                  "default": null,           "group": "channels" },
+        { "key": "social_website",             "type": "string",  "label": "Website Link",                    "default": null,           "group": "channels" },
+
+        { "key": "show_legal_note",            "type": "boolean", "label": "Show Privacy/Terms Note",         "default": true,           "group": "legal", "description": "Hidden automatically unless at least one link below is set." },
+        { "key": "privacy_url",                "type": "string",  "label": "Privacy Policy Link",             "default": null,           "group": "legal", "description": "Page slug or full URL, e.g. /privacy-policy. Leave empty to hide." },
+        { "key": "terms_url",                  "type": "string",  "label": "Terms of Use Link",               "default": null,           "group": "legal", "description": "Page slug or full URL, e.g. /terms. Leave empty to hide." },
+
+        { "key": "provider",                   "type": "string",  "label": "AI Provider",                     "default": null,           "group": "ai" },
+        { "key": "model",                      "type": "string",  "label": "AI Model",                        "default": null,           "group": "ai" },
+        { "key": "max_tokens",                 "type": "integer", "label": "Max Tokens per Reply",            "default": 1024,           "group": "ai", "description": "Caps the length of a single answer." },
+        { "key": "temperature",                "type": "string",  "label": "Temperature",                     "default": "0.7",          "group": "ai", "description": "0 is focused and repeatable; 1 is more creative." },
+
+        { "key": "show_to",                    "type": "select",  "label": "Who Can Use the Assistant",       "options": ["all","logged_in","pro_only"], "default": "all", "group": "access" },
+        { "key": "guest_daily_message_limit",  "type": "integer", "label": "Guest Daily Limit",               "default": 5,              "group": "access" },
+        { "key": "daily_message_limit",        "type": "integer", "label": "Member Daily Limit",              "default": 20,             "group": "access" },
+        { "key": "pro_daily_message_limit",    "type": "integer", "label": "Pro Daily Limit",                 "default": 0,              "group": "access" },
+
+        { "key": "system_prompt_frontend",     "type": "textarea","label": "Frontend System Prompt",          "default": null,           "group": "prompts", "secret": true },
+        { "key": "system_prompt_admin",        "type": "textarea","label": "Admin System Prompt",             "default": null,           "group": "prompts", "secret": true }
+    ]
+}

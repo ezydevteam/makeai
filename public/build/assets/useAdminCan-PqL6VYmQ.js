@@ -1,0 +1,1 @@
+import{o as e}from"./runtime-core.esm-bundler-CRk0TE6t.js";import{a as t}from"./index.esm-CG187Kif.js";function n(){let n=t(),r=e(()=>n.props.admin),i=e(()=>r.value?.isSuperAdmin??!1),a=e(()=>r.value?.permissions??[]);return{isSuperAdmin:i,permissions:a,can:e=>i.value||a.value.includes(e),canAny:e=>i.value||e.some(e=>a.value.includes(e))}}export{n as t};

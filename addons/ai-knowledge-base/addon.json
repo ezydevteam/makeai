@@ -1,0 +1,65 @@
+{
+    "slug": "ai-knowledge-base",
+    "name": "AI Knowledge Base",
+    "version": "1.0.0",
+    "description": "Public help center powered by AI semantic search and RAG-generated cited answers.",
+    "author": "MakeAI",
+    "requires_license": 1,
+    "envato_item_id": null,
+    "admin_menu": [
+        {
+            "label": "Analytics",
+            "route": "addon.kb.admin.analytics",
+            "route_params": {},
+            "route_pattern": "addon.kb.admin.analytics",
+            "icon": "ti ti-help-square-rounded",
+            "permission": "addon.kb.articles.manage"
+        },
+        {
+            "label": "Articles",
+            "route": "addon.kb.admin.articles.index",
+            "route_params": {},
+            "route_pattern": "addon.kb.admin.articles.*",
+            "icon": "ti ti-file-text",
+            "permission": "addon.kb.articles.manage"
+        },
+        {
+            "label": "Categories",
+            "route": "addon.kb.admin.categories.index",
+            "route_params": {},
+            "route_pattern": "addon.kb.admin.categories.*",
+            "icon": "ti ti-folders",
+            "permission": "addon.kb.articles.manage"
+        },
+        {
+            "label": "Settings",
+            "route": "addon.kb.admin.settings",
+            "route_params": {},
+            "route_pattern": "addon.kb.admin.settings",
+            "icon": "ti ti-settings",
+            "permission": "addon.kb.settings.manage"
+        }
+    ],
+    "settings": [
+        { "key": "enabled",             "type": "boolean",  "label": "Enable Public KB",           "default": true,    "group": "general" },
+        { "key": "public_slug",         "type": "string",   "label": "Public URL slug",            "default": "help",  "group": "general" },
+        { "key": "page_title",          "type": "string",   "label": "Page Title",                 "default": "Help Center", "group": "general" },
+        { "key": "page_description",    "type": "string",   "label": "Page Meta Description",      "default": "",      "group": "general" },
+        { "key": "logo",                "type": "file",     "label": "Help Center Logo",           "default": null,    "group": "general" },
+        { "key": "header_menu",         "type": "string",   "label": "Header Menu",                "default": "main",  "group": "general" },
+        { "key": "footer_menu",         "type": "string",   "label": "Footer Menu",                "default": "footer","group": "general" },
+        { "key": "ai_model",            "type": "string",   "label": "AI Model for answers",       "default": null,    "group": "ai" },
+        { "key": "top_k",               "type": "integer",  "label": "Top-K chunks for RAG",       "default": 5,       "group": "ai" },
+        { "key": "max_answer_tokens",   "type": "integer",  "label": "Max answer tokens",          "default": 512,     "group": "ai" },
+        { "key": "show_vote_buttons",   "type": "boolean",  "label": "Show vote buttons",          "default": true,    "group": "general" },
+        { "key": "allow_guest_search",  "type": "boolean",  "label": "Allow guest search",         "default": true,    "group": "access" },
+        { "key": "widget_enabled",      "type": "boolean",  "label": "Enable embeddable widget",   "default": false,   "group": "widget" },
+        { "key": "widget_accent_color", "type": "color",    "label": "Widget accent color",        "default": "#10b981","group": "widget" },
+        { "key": "provider",            "type": "string",   "label": "AI Provider",                "default": null,    "group": "ai" },
+        { "key": "system_prompt",       "type": "textarea", "label": "Answer System Prompt",       "default": null,    "group": "ai" }
+    ],
+    "permissions": [
+        { "slug": "addon.kb.articles.manage", "name": "Manage KB Articles", "group": "Knowledge Base" },
+        { "slug": "addon.kb.settings.manage", "name": "Manage KB Settings",  "group": "Knowledge Base" }
+    ]
+}

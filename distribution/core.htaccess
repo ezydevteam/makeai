@@ -1,0 +1,19 @@
+# Shipped as core/.htaccess — defence in depth.
+#
+# The webroot .htaccess already denies /core, but that file can be ignored
+# entirely (AllowOverride None) or its rewrite rules skipped (mod_rewrite
+# missing). This file sits INSIDE the application directory so Apache denies
+# it even then. Without it, a misconfigured host serves core/.env — which
+# contains the database password, APP_KEY and every API credential.
+#
+# nginx does not read .htaccess at all. VPS installs MUST apply the rules in
+# core/deploy/nginx.conf.example instead.
+
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

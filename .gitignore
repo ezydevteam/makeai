@@ -1,0 +1,71 @@
+# Node.js & NPM
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-clean.log
+pnpm-debug.log
+.lerna
+
+# Laravel & PHP
+/vendor/
+.env
+.env.backup
+.env.production
+.env.testing
+/bootstrap/cache/*
+/public/hot
+/public/storage
+
+# Zero-config distribution structure: Root storage
+/storage/
+!/storage/.gitkeep
+/storage/app/public/
+!/storage/app/public/.gitkeep
+/storage/framework/
+!/storage/framework/.gitkeep
+
+# PHP / IDE Helpers
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# PHPUnit & Testing
+.phpunit.result.cache
+.phpunit.cache/
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# AI Agent Specific Files & Exclusions (Local Environment Only)
+AGENT.md
+CLAUDE.md
+.agent-mem/
+.agent/
+.agents/
+.cursor
+.windsurfrules
+.cursorrules
+.clineRules
+.gemini/
+.cline/
+.mcp-memory/
+
+
+# Auto-generated agent rules (personalized per developer)
+.brainsync/agent-rules.md
+
+# Export files
+storage/app/exports/
+
+# Distribution build output
+/dist/

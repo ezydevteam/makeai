@@ -1,0 +1,582 @@
+{
+    "name": "Default Theme",
+    "slug": "default",
+    "version": "1.0.0",
+    "author": "EzyDev Team",
+    "description": "Simple buyer-friendly frontend theme with per-section customization.",
+    "requires_license": 1,
+    "thumbnail": "thumbnail.png",
+    "supports": {
+        "simple_theme_settings": true,
+        "simple_header_settings": true,
+        "simple_footer_settings": true,
+        "simple_homepage_settings": true,
+        "custom_code": true,
+        "tool_page": true
+    },
+    "defaults": {
+        "theme": {
+            "theme_default_mode": "light",
+            "theme_allow_user_toggle": true,
+            "title_separator": "|",
+            "page_loading_animation": "none",
+            "smooth_scroll": true,
+            "nav_progress_bar": true,
+            "show_back_to_top": true,
+            "hide_scroll_top_mobile": false,
+            "primary_color": "#10b981",
+            "secondary_color": "#3b82f6",
+            "accent_color": "#8b5cf6",
+            "bg_color": "#f0fdf8",
+            "bg_image": "",
+            "bg_image_enabled": false,
+            "heading_color": "#111827",
+            "body_text_color": "#374151",
+            "muted_text_color": "#6b7280",
+            "border_color": "#dbe4ea",
+            "font_body": "Inter",
+            "heading_font": "Plus Jakarta Sans",
+            "base_font_size": "15px",
+            "heading_weight": "700",
+            "line_height": "1.5",
+            "letter_spacing": "normal",
+            "container_width": "1280px"
+        },
+        "header": {
+            "desktop": {
+                "sticky": true,
+                "sticky_behavior": "always",
+                "shadow_style": "border_small",
+                "menu_position": "center",
+                "menu_hover_style": "rounded_soft_bg",
+                "show_notification_bell": true,
+                "notification_button_style": "rounded_soft_bg",
+                "show_social_icons": false,
+                "social_icon_style": "rounded_soft_bg",
+                "social_button_text": "Follow Us",
+                "show_language_switcher": true,
+                "language_switcher_style": "icon_with_label",
+                "show_dark_mode_toggle": true,
+                "dark_mode_toggle_style": "rounded_soft_bg",
+                "command_palette_style": "hidden",
+                "auth_mode": "login_register",
+                "guest_login_text": "Login",
+                "guest_login_icon_class": "ti ti-login-2",
+                "guest_login_style": "primary",
+                "guest_register_text": "Register",
+                "guest_register_icon_class": "ti ti-user-plus",
+                "guest_register_style": "dark",
+                "guest_button_shape": "rounded_xl",
+                "account_avatar_style": "avatar_name_arrow",
+                "show_cta_button": true,
+                "cta_text": "Get Started",
+                "cta_link": "/register",
+                "cta_icon": "ti ti-rocket",
+                "cta_style": "primary",
+                "cta_shape": "rounded_xl",
+                "cta_access_level": "all",
+                "menu_source": "primary",
+                "height": 72,
+                "container_width": "1280px",
+                "bg_color": "",
+                "transparent_on_hero": false,
+                "text_color": "",
+                "menu_hover_color": "",
+                "show_border": true,
+                "show_shadow": false,
+                "menu_transform": "default"
+            },
+            "mobile_top": {
+                "enabled": true,
+                "layout": "compact",
+                "height": 64,
+                "bg_color": "",
+                "text_color": "",
+                "show_shadow": "none",
+                "sticky_behavior": "always",
+                "show_logo": true,
+                "show_hamburger": true,
+                "show_dark_mode_toggle": true,
+                "show_notification_bell": false,
+                "show_search_icon": false,
+                "show_language_switcher": false,
+                "show_login": false,
+                "show_cta_button": false
+            },
+            "mobile_bottom": {
+                "enabled": false,
+                "hide_menu_labels": false,
+                "show_glassmorphism": true,
+                "show_home": true,
+                "show_search_icon": false,
+                "show_tools": true,
+                "show_notification_bell": false,
+                "show_hamburger": false,
+                "show_profile": true
+            }
+        },
+        "footer": {
+            "layout": "default",
+            "style_columns": {
+                "default": {
+                    "col_1": ["about_text"],
+                    "col_2": ["menu"],
+                    "col_3": ["contact_info"],
+                    "col_4": ["custom_text"]
+                },
+                "centered": {
+                    "col_1": ["about_text"],
+                    "col_2": ["menu"],
+                    "col_3": ["contact_info"]
+                },
+                "spotlight": {
+                    "col_1": ["menu"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text"]
+                },
+                "card_grid": {
+                    "col_1": ["menu"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text"]
+                },
+                "split_band": {
+                    "col_1": ["menu"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text"],
+                    "col_4": ["categories"]
+                },
+                "floating_panel": {
+                    "col_1": ["menu"],
+                    "col_2": ["contact_info"],
+                    "col_3": ["custom_text"]
+                }
+            },
+            "brand_title": "",
+            "brand_description": "",
+            "show_newsletter": true,
+            "newsletter_title": "",
+            "newsletter_description": "",
+            "newsletter_placeholder": "",
+            "newsletter_button_label": "",
+            "newsletter_button_style": "primary",
+            "show_social_icons": true,
+            "contact_title": "",
+            "contact_email": "",
+            "contact_phone": "",
+            "contact_address": "",
+            "contact_details": "",
+            "menu_title": "",
+            "menu_column": "footer-company",
+            "custom_title": "",
+            "custom_text": "",
+            "tool_categories_title": "",
+            "tool_categories_items": [],
+            "footer_bg_color": "",
+            "footer_text_color": "",
+            "footer_heading_color": "",
+            "footer_heading_text_case": "capitalize",
+            "logo_mode": "light",
+            "container_width": "1280px",
+            "show_logo_about": true,
+            "enable_card_style": true,
+            "hide_categories_count": false,
+            "footer_vertical_padding": 56,
+            "show_payment_icons": true,
+            "payment_icons": "",
+            "show_bottom_social_icons": false,
+            "show_bottom_language_selector": false,
+            "show_back_to_top": true,
+            "back_to_top_label": "",
+            "back_to_top_icon": "ti ti-arrow-up",
+            "back_to_top_shape": "rounded",
+            "bottom_menu": "",
+            "bottom_bar_show_border": true,
+            "bottom_bar_border_color": "",
+            "bottom_bar_border_width": 1,
+            "bottom_bar_bg_color": "",
+            "bottom_bar_text_color": "",
+            "bottom_bar_padding": 32,
+            "bottom_bar_centered": false,
+            "copyright_text": ""
+        },
+        "homepage": {
+            "hero_variant": "centered-gradient",
+            "show_social_proof": true,
+            "show_features": true,
+            "show_tools": true,
+            "show_steps": true,
+            "show_pricing": false,
+            "show_testimonials": true,
+            "show_faq": true,
+            "show_cta": true,
+            "show_blog": true,
+            "show_newsletter": true,
+            "show_custom_html": false,
+            "show_richtext": false,
+            "show_ad_slot": false,
+            "show_ad_slot_2": false,
+            "show_ad_slot_3": false,
+            "show_image_carousel": false,
+            "show_hero": true
+        },
+        "homepage_config": {
+            "settings": {
+                "seo": {
+                    "meta_title": "MakeAI — The Ultimate AI Platform",
+                    "meta_description": "Create content, images, chat responses, and code with one powerful AI platform."
+                },
+                "scroll_to_top": {
+                    "enabled": true,
+                    "position": "right",
+                    "show_after_px": 400
+                }
+            },
+            "sections": [
+                {
+                    "type": "hero",
+                    "config": {
+                        "layout": "centered-gradient",
+                        "headline": "One Platform. Every AI Tool.",
+                        "subheadline": "Unleash your creativity with the world's most powerful AI models. From high-quality content to stunning images and precise code.",
+                        "show_primary_cta": true,
+                        "primary_cta_text": "Get Started for Free",
+                        "primary_cta_link": "/register",
+                        "primary_cta_style": "primary_filled",
+                        "primary_cta_icon": "",
+                        "primary_cta_icon_position": "left",
+                        "primary_cta_shape": "rounded_xl",
+                        "primary_cta_size": "lg",
+                        "primary_cta_access_level": "all",
+                        "show_secondary_cta": true,
+                        "secondary_cta_text": "View Pricing",
+                        "secondary_cta_link": "/pricing",
+                        "secondary_cta_style": "outline",
+                        "secondary_cta_icon": "",
+                        "secondary_cta_icon_position": "left",
+                        "secondary_cta_shape": "rounded_xl",
+                        "secondary_cta_size": "lg",
+                        "secondary_cta_access_level": "all",
+                        "hero_vertical_padding": "48",
+                        "hero_heading_size": "lg",
+                        "hero_heading_color": "dark",
+                        "show_stats": true,
+                        "hero_gradient_enabled": true,
+                        "hero_gradient_palette": "aurora",
+                        "hero_gradient_direction": "to bottom right",
+                        "show_hero_background": false,
+                        "show_search_box": true,
+                        "trust_badge_text": "Trusted by 50,000+ creators",
+                        "stats": [
+                            {
+                                "number": "50K+",
+                                "label": "Users Trusted"
+                            },
+                            {
+                                "number": "10M+",
+                                "label": "Assets Generated"
+                            },
+                            {
+                                "number": "99.9%",
+                                "label": "Uptime SLA"
+                            },
+                            {
+                                "number": "24/7",
+                                "label": "Expert Support"
+                            }
+                        ],
+                        "sort_order": 0,
+                        "display_categories": [],
+                        "display_tool_slugs": []
+                    }
+                },
+                {
+                    "type": "features",
+                    "config": {
+                        "title": "Supercharge your workflow",
+                        "subtitle": "Everything you need to build the future, powered by AI.",
+                        "layout": "3-column",
+                        "card_style": "bordered",
+                        "enable_card_style": true,
+                        "items": [
+                            {
+                                "icon": "ti ti-pencil",
+                                "title": "AI Writer",
+                                "description": "Generate blogs, ads, and emails in seconds with our advanced copywriting models."
+                            },
+                            {
+                                "icon": "ti ti-photo",
+                                "title": "AI Images",
+                                "description": "Turn text into masterpiece. High-resolution images for any project."
+                            },
+                            {
+                                "icon": "ti ti-message-2",
+                                "title": "AI Chat",
+                                "description": "Smart, contextual assistants ready to help you with research."
+                            },
+                            {
+                                "icon": "ti ti-code",
+                                "title": "AI Code",
+                                "description": "From debugging to writing entire functions. Code faster with AI."
+                            }
+                        ],
+                        "sort_order": 1
+                    }
+                },
+                {
+                    "type": "tools_showcase",
+                    "config": {
+                        "title": "AI Tools Showcase",
+                        "subtitle": "Explore the tools you can launch immediately after signup.",
+                        "layout": "3-column",
+                        "card_style": "bordered",
+                        "source": "all",
+                        "max_items": 6,
+                        "background_style": "gradient-1",
+                        "width": "contained",
+                        "primary_text": "View all tools",
+                        "primary_link": "/ai-tools",
+                        "sort_order": 2
+                    }
+                },
+                {
+                    "type": "how_it_works",
+                    "config": {
+                        "heading": "How It Works",
+                        "subheading": "Get started in three simple steps.",
+                        "icon": "ti ti-route",
+                        "step_card_style": "bordered",
+                        "items": [
+                            {
+                                "icon": "ti ti-user-plus",
+                                "title": "Create your account",
+                                "description": "Sign up in seconds and access your workspace immediately."
+                            },
+                            {
+                                "icon": "ti ti-adjustments-bolt",
+                                "title": "Choose the right AI tool",
+                                "description": "Pick from writing, image, chat, and productivity tools."
+                            },
+                            {
+                                "icon": "ti ti-sparkles",
+                                "title": "Generate and refine results",
+                                "description": "Run the tool, review the output, and keep iterating."
+                            }
+                        ],
+                        "sort_order": 3
+                    }
+                },
+                {
+                    "type": "pricing",
+                    "config": {
+                        "heading": "Simple Pricing",
+                        "subheading": "Choose the plan that fits your needs.",
+                        "icon": "ti ti-credit-card",
+                        "source": "all",
+                        "sort_order": 4
+                    }
+                },
+                {
+                    "type": "testimonials",
+                    "config": {
+                        "heading": "What Our Users Say",
+                        "subheading": "Join thousands of satisfied creators.",
+                        "icon": "ti ti-message-2-heart",
+                        "source": "all",
+                        "card_style": "bordered",
+                        "max_items": 6,
+                        "sort_order": 5
+                    }
+                },
+                {
+                    "type": "faq",
+                    "config": {
+                        "heading": "Frequently Asked Questions",
+                        "subheading": "Everything you need to know about MakeAI.",
+                        "icon": "ti ti-help-circle",
+                        "max_items": 8,
+                        "sort_order": 6
+                    }
+                },
+                {
+                    "type": "stats_bar",
+                    "config": {
+                        "heading": "Trusted by Thousands",
+                        "subheading": "Our numbers speak for themselves.",
+                        "icon": "ti ti-chart-bar",
+                        "show_stats_separator": true,
+                        "show_stats": true,
+                        "show_brands": false,
+                        "stats": [
+                            {
+                                "number": "50K+",
+                                "label": "Users Trusted"
+                            },
+                            {
+                                "number": "10M+",
+                                "label": "Assets Generated"
+                            },
+                            {
+                                "number": "99.9%",
+                                "label": "Uptime SLA"
+                            },
+                            {
+                                "number": "150+",
+                                "label": "Countries"
+                            }
+                        ],
+                        "brands": [],
+                        "sort_order": 7
+                    }
+                },
+                {
+                    "type": "cta_banner",
+                    "config": {
+                        "headline": "Ready to create with AI?",
+                        "subheadline": "Start with the tools your audience needs most and grow from one dashboard.",
+                        "primary_text": "Get Started for Free",
+                        "primary_link": "/register",
+                        "primary_style": "white",
+                        "primary_shape": "rounded_xl",
+                        "primary_icon": "",
+                        "primary_access_level": "all",
+                        "secondary_text": "View Pricing",
+                        "secondary_link": "/pricing",
+                        "secondary_style": "outline",
+                        "secondary_shape": "rounded_xl",
+                        "secondary_icon": "",
+                        "secondary_access_level": "all",
+                        "width": "contained",
+                        "background_style": "gradient-1",
+                        "sort_order": 8
+                    }
+                },
+                {
+                    "type": "latest_posts",
+                    "config": {
+                        "title": "Latest from the Blog",
+                        "subtitle": "Stay updated with the latest AI trends.",
+                        "icon": "ti ti-article",
+                        "source": "recent",
+                        "layout": "grid",
+                        "card_style": "bordered",
+                        "max_items": 3,
+                        "show_button": true,
+                        "show_description": true,
+                        "button_text": "Visit Blog",
+                        "button_link": "/blog",
+                        "button_style": "outline",
+                        "button_icon": "",
+                        "sort_order": 9
+                    }
+                },
+                {
+                    "type": "newsletter",
+                    "config": {
+                        "heading": "Stay in the Loop",
+                        "subheading": "Get the latest AI news and updates delivered to your inbox.",
+                        "icon": "ti ti-mail-star",
+                        "layout": "inline",
+                        "placeholder_text": "Enter your email address",
+                        "button_text": "Subscribe",
+                        "button_style": "primary_filled",
+                        "privacy_text": "No spam. Unsubscribe anytime.",
+                        "sort_order": 10
+                    }
+                },
+                {
+                    "type": "custom_html",
+                    "config": {
+                        "sort_order": 11,
+                        "content": ""
+                    }
+                },
+                {
+                    "type": "richtext",
+                    "config": {
+                        "sort_order": 12,
+                        "title": "",
+                        "subtitle": "",
+                        "content": ""
+                    }
+                },
+                {
+                    "type": "ad_slot",
+                    "config": {
+                        "sort_order": 13,
+                        "title": "",
+                        "subtitle": "",
+                        "zone": ""
+                    }
+                },
+                {
+                    "type": "ad_slot_2",
+                    "config": {
+                        "sort_order": 14,
+                        "title": "",
+                        "subtitle": "",
+                        "zone": ""
+                    }
+                },
+                {
+                    "type": "ad_slot_3",
+                    "config": {
+                        "sort_order": 15,
+                        "title": "",
+                        "subtitle": "",
+                        "zone": ""
+                    }
+                },
+                {
+                    "type": "image_carousel",
+                    "config": {
+                        "sort_order": 16,
+                        "title": "",
+                        "subtitle": "",
+                        "carousel_layout": "3",
+                        "carousel_autoplay": "1",
+                        "carousel_time": "5",
+                        "items": []
+                    }
+                }
+            ]
+        },
+        "tool_page": {
+            "layout": "default",
+            "hide_breadcrumbs": false,
+            "hide_rating": false,
+            "hide_share": false,
+            "hide_favorite": false,
+            "hide_category": false,
+            "hide_labels": false,
+            "hide_usage_count": false,
+            "global_tools_brand_voice_enabled": true,
+            "global_tools_variations_enabled": true,
+            "global_tools_regenerate_enabled": true,
+            "global_tools_improve_enabled": true,
+            "global_tools_editor_enabled": true,
+            "global_tools_show_about_enabled": true,
+            "global_tools_show_how_it_works_enabled": true,
+            "global_tools_show_usage_examples_enabled": true,
+            "global_tools_show_faqs_enabled": true,
+            "global_tools_show_reviews_enabled": true,
+            "global_tools_embeddable_enabled": true,
+            "show_tool_credit_costs": true,
+            "archive_layout": "default",
+            "archive_show_breadcrumbs": true,
+            "archive_show_stats": true,
+            "archive_show_featured": true,
+            "archive_show_grid_list": true,
+            "archive_show_recently_used": true,
+            "archive_show_open_button": true,
+            "archive_pagination": "numbered",
+            "category_show_breadcrumbs": true,
+            "category_enable_gradient": false,
+            "category_pagination": "numbered"
+        },
+        "custom_code": {
+            "custom_css": "",
+            "custom_header_code": "",
+            "custom_footer_code": ""
+        }
+    }
+}

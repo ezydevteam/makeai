@@ -1,0 +1,37 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "jsx": "preserve",
+        "importHelpers": true,
+        "skipLibCheck": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "noEmit": true,
+        "paths": {
+            "@/*": ["./resources/js/*"],
+            "@themes/*": ["./resources/themes/*"]
+        },
+        "types": ["vite/client", "node"]
+    },
+    "include": [
+        "resources/js/**/*.ts",
+        "resources/js/**/*.d.ts",
+        "resources/js/**/*.vue",
+        "resources/themes/**/*.ts",
+        "resources/themes/**/*.d.ts",
+        "resources/themes/**/*.vue",
+        "resources/installer/**/*.ts",
+        "resources/installer/**/*.d.ts",
+        "resources/installer/**/*.vue",
+        "addons/**/*.ts",
+        "addons/**/*.d.ts",
+        "addons/**/*.vue"
+    ],
+    "exclude": ["node_modules"]
+}

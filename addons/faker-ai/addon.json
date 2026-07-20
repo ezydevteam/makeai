@@ -1,0 +1,36 @@
+{
+    "slug": "faker-ai",
+    "name": "FakerAI",
+    "version": "1.0.0",
+    "description": "AI-powered demo-data generator. Populate a fresh install with realistic fake users, testimonials, tool reviews & usage, blog comments, views & shares, and knowledge-base ratings — then delete any batch in one click.",
+    "author": "MakeAI",
+    "requires_license": 1,
+    "requires_pro": false,
+    "php_min": "8.3",
+    "envato_item_id": 0,
+    "admin_menu": [
+        {
+            "label": "Generator",
+            "route": "addon.faker-ai.admin.index",
+            "route_pattern": "addon.faker-ai.admin.index",
+            "icon": "ti ti-wand",
+            "permission": "settings.manage"
+        },
+        {
+            "label": "History",
+            "route": "addon.faker-ai.admin.history",
+            "route_pattern": "addon.faker-ai.admin.history",
+            "icon": "ti ti-history",
+            "permission": "settings.manage"
+        }
+    ],
+    "settings": [
+        { "key": "default_language", "type": "string",  "label": "Default Language",           "default": "English", "group": "general", "description": "Language the AI writes generated content in unless overridden per run." },
+        { "key": "default_tone",     "type": "string",  "label": "Default Style / Tone",       "default": "authentic, varied, conversational", "group": "general", "description": "Steers the voice of AI-written testimonials, reviews and comments." },
+        { "key": "backdate_days",    "type": "integer", "label": "Backdate Window (days)",      "default": 90,        "group": "general", "description": "How far back created dates are randomly spread, so seeded data doesn't all share one timestamp." },
+        { "key": "ai_chunk_size",    "type": "integer", "label": "Items per AI Request",        "default": 20,        "group": "general", "description": "Larger counts are drafted in chunks of this size to stay within the model's reply limit." }
+    ],
+    "permissions": [
+        { "slug": "addon.faker-ai.manage", "name": "Manage FakerAI", "group": "FakerAI Addon" }
+    ]
+}

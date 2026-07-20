@@ -1,0 +1,51 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "laravel-server",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "serve"],
+      "port": 8000
+    },
+    {
+      "name": "vite-dev-server",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "reverb-websockets",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"],
+      "port": 8080
+    },
+    {
+      "name": "queue-worker",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "queue:listen", "--queue=otp,emails,mail,default,webhooks,ai,media,embeddings,social,low", "--tries=1", "--timeout=0"]
+    },
+    {
+      "name": "log-viewer-pail",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["artisan", "pail", "--timeout=0"]
+    },
+    {
+      "name": "makeai-docs-static-site",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8090", "-t", "D:/laragon/www/makeai-docs"],
+      "port": 8090
+    },
+    {
+      "name": "ezydev-landing",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8123", "-t", "D:/laragon/www/ezydev/public", "D:/laragon/www/ezydev/router.php"],
+      "port": 8123
+    },
+    {
+      "name": "makeai-landing",
+      "runtimeExecutable": "php",
+      "runtimeArgs": ["-S", "localhost:8124", "-t", "D:/laragon/www/makeai-landing/public", "D:/laragon/www/makeai-landing/router.php"],
+      "port": 8124
+    }
+  ]
+}
