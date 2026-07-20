@@ -54,10 +54,17 @@ class BulkSmsTest extends TestCase
         Setting::flushCache();
     }
 
+    private int $phoneSeq = 0;
+
     private function optedInUser(array $overrides = []): User
     {
+        // users(phone, phone_country) is unique, so each opted-in user needs a
+        // distinct number; the 202-555-01xx range is reserved for fictitious US
+        // numbers. Callers can still pin an exact number via $overrides.
+        $this->phoneSeq++;
+
         return User::factory()->create(array_merge([
-            'phone' => '2025550173',
+            'phone' => '20255501'.str_pad((string) $this->phoneSeq, 2, '0', STR_PAD_LEFT),
             'phone_country' => 'US',
             'phone_verified_at' => now(),
             'sms_marketing_opt_in' => true,
@@ -198,7 +205,7 @@ class BulkSmsTest extends TestCase
 
         $recipient = $campaign->recipients()->first();
         $this->assertSame('sent', $recipient->status);
-        $this->assertSame('+12025550173', $recipient->phone);
+        $this->assertSame('+1'.$user->phone, $recipient->phone);
         $this->assertStringContainsString('Details: https://x.test/status', (string) $sent[0]['Body']);
     }
 

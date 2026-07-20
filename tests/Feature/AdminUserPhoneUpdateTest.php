@@ -205,4 +205,62 @@ class AdminUserPhoneUpdateTest extends TestCase
         $this->assertSame('2025550100', $user->phone);
         $this->assertNotNull($user->phone_verified_at);
     }
+
+    public function test_phone_already_used_by_another_user_is_rejected(): void
+    {
+        // Seeded with 2025550100/US.
+        User::factory()->create(['phone' => '2025550173', 'phone_country' => 'US']);
+        $user = $this->target();
+
+        // A raw, formatted duplicate must still be caught — it normalizes to the
+        // stored national number before the uniqueness check runs.
+        $this->actingAs($this->admin, 'admin')
+            ->post(route('admin.users.update', $user->ulid), $this->payload($user, [
+                'phone' => '+1 (202) 555-0173',
+                'phone_country' => 'US',
+            ]))
+            ->assertSessionHasErrors('phone');
+
+        $this->assertSame('2025550100', $user->fresh()->phone);
+    }
+
+    public function test_admin_can_keep_the_users_own_phone(): void
+    {
+        $user = $this->target();
+
+        // Re-saving the user's existing number must not collide with itself.
+        $this->actingAs($this->admin, 'admin')
+            ->post(route('admin.users.update', $user->ulid), $this->payload($user, [
+                'phone' => '2025550100',
+                'phone_country' => 'US',
+            ]))
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_db_index_rejects_a_duplicate_number_in_the_same_country(): void
+    {
+        User::factory()->create(['phone' => '2025550100', 'phone_country' => 'US']);
+
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        User::factory()->create(['phone' => '2025550100', 'phone_country' => 'US']);
+    }
+
+    public function test_db_index_allows_the_same_national_number_in_another_country(): void
+    {
+        // Same digits, different country → a different real number: the composite
+        // (phone, phone_country) index scopes uniqueness by country, so both persist.
+        User::factory()->create(['phone' => '2025550100', 'phone_country' => 'US']);
+        User::factory()->create(['phone' => '2025550100', 'phone_country' => 'GB']);
+
+        $this->assertSame(2, User::where('phone', '2025550100')->count());
+    }
+
+    public function test_db_index_allows_many_users_without_a_phone(): void
+    {
+        // Nullable column: a unique index treats NULLs as distinct, so the "phone is
+        // optional / conditionally required" model is preserved.
+        User::factory()->count(3)->create(['phone' => null, 'phone_country' => null]);
+
+        $this->assertSame(3, User::whereNull('phone')->count());
+    }
 }

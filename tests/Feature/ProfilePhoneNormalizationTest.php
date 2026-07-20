@@ -109,4 +109,27 @@ class ProfilePhoneNormalizationTest extends TestCase
         $this->user->refresh();
         $this->assertNull($this->user->phone);
     }
+
+    public function test_rejects_a_number_already_used_by_another_user(): void
+    {
+        User::factory()->create(['phone' => '2025550173', 'phone_country' => 'US']);
+
+        // Raw/formatted input still collides: it normalizes to the stored national
+        // number before the uniqueness rule runs.
+        $this->submit(['phone' => '+1 (202) 555-0173', 'phone_country' => 'US'])
+            ->assertSessionHasErrors('phone');
+
+        $this->assertNull($this->user->fresh()->phone);
+    }
+
+    public function test_saving_your_own_unchanged_number_is_allowed(): void
+    {
+        $this->user->update(['phone' => '2025550173', 'phone_country' => 'US']);
+
+        // Re-submitting the same number must not conflict with the user's own row.
+        $this->submit(['phone' => '2025550173', 'phone_country' => 'US'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('2025550173', $this->user->fresh()->phone);
+    }
 }

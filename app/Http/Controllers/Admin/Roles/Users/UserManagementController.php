@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class UserManagementController extends Controller
@@ -271,6 +272,18 @@ class UserManagementController extends Controller
      */
     public function update(Request $request, User $user)
     {
+        // Normalize the phone to the national number for its region (same rules as
+        // the self-service profile): strips the dial code/formatting, keeps leading
+        // zeros. phone_country is only kept when a phone is actually present. Done
+        // BEFORE validation so the uniqueness rule below checks the exact
+        // (national number, country) pair we persist rather than the raw input.
+        $phoneCountry = filled($request->input('phone_country')) ? strtoupper((string) $request->input('phone_country')) : null;
+        $normalizedPhone = PhoneNumber::nationalNumber($request->input('phone'), $phoneCountry);
+        $request->merge([
+            'phone' => $normalizedPhone,
+            'phone_country' => $normalizedPhone !== null ? $phoneCountry : null,
+        ]);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
@@ -279,11 +292,20 @@ class UserManagementController extends Controller
             'is_active' => 'required|boolean',
             'country' => 'nullable|string|size:2',
             'profession' => 'nullable|string|max:150',
-            'phone' => ['nullable', 'string', 'max:32', function ($attribute, $value, $fail) use ($request) {
-                if (filled($value) && ! PhoneNumber::isValid($value, $request->input('phone_country'))) {
-                    $fail(translate('The phone number is not valid for the selected country.'));
-                }
-            }],
+            'phone' => [
+                'nullable', 'string', 'max:32',
+                function ($attribute, $value, $fail) use ($request) {
+                    if (filled($value) && ! PhoneNumber::isValid($value, $request->input('phone_country'))) {
+                        $fail(translate('The phone number is not valid for the selected country.'));
+                    }
+                },
+                // A given number (national digits + country) may belong to one user
+                // only; scoped to phone_country because the same national digits are
+                // a different real number in another country. Null phones are exempt.
+                Rule::unique('users', 'phone')
+                    ->where(fn ($query) => $query->where('phone_country', $request->input('phone_country')))
+                    ->ignore($user->id),
+            ],
             'phone_country' => 'nullable|required_with:phone|string|size:2',
             'timezone' => 'required|string|timezone',
             'daily_limit' => 'nullable|numeric|min:0',
@@ -292,12 +314,6 @@ class UserManagementController extends Controller
         ]);
 
         $data = $request->only(['name', 'email', 'credits', 'plan_id', 'is_active', 'country', 'profession', 'timezone', 'daily_limit', 'monthly_limit']);
-
-        // Normalize the phone to the national number for its region (same rules as
-        // the self-service profile): strips the dial code/formatting, keeps leading
-        // zeros. phone_country is only kept when a phone is actually present.
-        $phoneCountry = filled($request->input('phone_country')) ? strtoupper((string) $request->input('phone_country')) : null;
-        $normalizedPhone = PhoneNumber::nationalNumber($request->input('phone'), $phoneCountry);
         $data['phone'] = $normalizedPhone;
         $data['phone_country'] = $normalizedPhone !== null ? $phoneCountry : null;
 

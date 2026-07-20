@@ -42,6 +42,13 @@ class UpdateProfileRequest extends FormRequest
                         $fail(__('The phone number is not valid for the selected country.'));
                     }
                 },
+                // One user per number: scoped to phone_country because the stored
+                // value is the national number, so identical digits in a different
+                // country are a different real number. Ignores the current user and,
+                // being nullable, never fires for users who leave the field blank.
+                Rule::unique('users', 'phone')
+                    ->where(fn ($query) => $query->where('phone_country', $this->input('phone_country')))
+                    ->ignore($this->user()?->id),
             ],
             'phone_country' => [
                 'nullable',
