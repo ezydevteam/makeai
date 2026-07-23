@@ -18,6 +18,17 @@ class PaymentGateway extends Model
         'sort_order',
     ];
 
+    /**
+     * Never let the (encrypted) gateway credentials blob ride along when the model is
+     * serialized to JSON/array — e.g. if a raw PaymentGateway is ever handed to an
+     * Inertia/API response. Controllers already expose only curated fields
+     * (publicCredentials()), but this makes a leak impossible at the model layer.
+     * Direct access ($gateway->credentials, getCredential()) is unaffected.
+     */
+    protected $hidden = [
+        'credentials',
+    ];
+
     protected function casts(): array
     {
         return [
