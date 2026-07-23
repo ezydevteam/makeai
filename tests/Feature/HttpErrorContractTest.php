@@ -7,6 +7,7 @@ use App\Exceptions\AI\InsufficientCreditsException;
 use App\Exceptions\AI\IntegrationNotConfiguredException;
 use App\Exceptions\StorageWriteException;
 use App\Models\User;
+use App\Services\RateLimiterService;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\Sanctum;
@@ -27,6 +28,26 @@ class HttpErrorContractTest extends TestCase
         // Let API requests reach their controllers so we observe the real
         // auth/validation/not-found codes rather than a blanket license 403.
         config(['license.require_verified' => false]);
+
+        $this->clearPublicThrottle();
+    }
+
+    /**
+     * The 429 test trips the shared per-IP `public` rate limiter. When Redis is
+     * available the counter lives there — which RefreshDatabase does NOT roll back —
+     * so without an explicit clear it would bleed a 429 into unrelated tests (the
+     * affiliate /ref and checkout coupon-preview tests also use `public`). Clear it
+     * on both ends of every test in this class.
+     */
+    protected function clearPublicThrottle(): void
+    {
+        app(RateLimiterService::class)->clear('public', '127.0.0.1');
+    }
+
+    protected function tearDown(): void
+    {
+        $this->clearPublicThrottle();
+        parent::tearDown();
     }
 
     private function user(): User
