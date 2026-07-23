@@ -671,6 +671,14 @@ class HandleInertiaRequests extends Middleware
             return ['available' => false, 'show_banner' => false];
         }
 
+        // Test mode invents the version by bumping the current one — the License
+        // Server is never asked and the release does not exist. Announcing it on
+        // every admin screen would be telling the operator a plain untruth; the
+        // Updates page explains the simulation instead.
+        if (\App\Support\PurchaseCode::testModeActive()) {
+            return ['available' => false, 'show_banner' => false];
+        }
+
         $dismissed = settings('core_update_dismissed_version') === $version;
         $snoozedUntil = settings('core_update_snoozed_until');
         $snoozed = filled($snoozedUntil) && now()->lt(Carbon::parse($snoozedUntil));

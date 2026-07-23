@@ -61,6 +61,10 @@ class Setting extends Model
         'rag_'           => 'rag',
         'comments_'      => 'comments',
         'contact_'       => 'contact',
+        'maintenance_'   => 'maintenance',
+        // One row per scheduled task, created on demand by SystemController — a
+        // prefix, not a registry entry, because the key set is open-ended.
+        'cron_task_last_run_' => 'system',
         'site_'          => 'branding',
         'frontend_'      => 'appearance',
         'credit_'        => 'billing',
@@ -105,6 +109,16 @@ class Setting extends Model
         'default_credits_new_user'               => 'ai',
         'guest_daily_credit_limit'               => 'ai',
         'max_tokens_per_request'                 => 'ai',
+        // Same group, same read pattern as the seven above — these were simply
+        // never routed, so they stayed flat while the rest of `ai` collapsed.
+        'ai_max_input_chars'                     => 'ai',
+        'default_max_tokens'                     => 'ai',
+        'fallback_ai_model'                      => 'ai',
+        'fallback_ai_provider'                   => 'ai',
+        'global_daily_ai_budget_usd'             => 'ai',
+        'public_tool_max_output_chars'           => 'ai',
+        'user_daily_credit_limit'                => 'ai',
+        'user_monthly_credit_limit'              => 'ai',
 
         // support — ticketing/SLA/attachment config
         'ai_reply_suggestion'                    => 'support',
@@ -147,6 +161,43 @@ class Setting extends Model
         'registration_enabled'                   => 'features',
         'tickets_enabled'                        => 'features',
         'tools_review_approval_enabled'          => 'features',
+        // The rest of the Features admin screen — same writer, same read pattern,
+        // they were simply never registered and so stayed flat beside the blob.
+        'account_deletion_enabled'               => 'features',
+        'byok_enabled'                           => 'features',
+        'chains_enabled'                         => 'features',
+        'cookie_preferences_enabled'             => 'features',
+        'coupons_enabled'                        => 'features',
+        'onboarding_enabled'                     => 'features',
+        'optin_preferences_enabled'              => 'features',
+        'phone_required'                         => 'features',
+        'playground_enabled'                     => 'features',
+        'tool_embeds_enabled'                    => 'features',
+        'two_factor_required'                    => 'features',
+        'two_factor_sms_enabled'                 => 'features',
+
+        // mail — provider credentials that miss the `mail_` prefix.
+        'sendgrid_api_key'                       => 'mail',
+        'ses_key'                                => 'mail',
+        'ses_region'                             => 'mail',
+        'ses_secret'                             => 'mail',
+
+        // reports
+        'export_retention_days'                  => 'reports',
+
+        // system — install/update/scheduler bookkeeping. Written by UpdateService
+        // and SystemController, all read together on the admin shell.
+        'app_version'                            => 'system',
+        'core_update_dismissed_version'          => 'system',
+        'core_update_snoozed_until'              => 'system',
+        'last_rollback_time'                     => 'system',
+        'last_rollback_zip'                      => 'system',
+        'last_scheduler_run'                     => 'system',
+        'update_available'                       => 'system',
+        'update_changelog'                       => 'system',
+        'update_last_checked'                    => 'system',
+        'update_test_latest_version'             => 'system',
+        'update_version'                         => 'system',
 
         // NB: no `security` group — its only keys (login_throttle_*, require_email_verification,
         // two_factor_admin) were dead seeds (0 readers), purged 2026_07_09 and removed from the

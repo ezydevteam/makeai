@@ -49,6 +49,8 @@ class MailTemplateSeeder extends Seeder
         'export_ready',
         'comment_approved',
         'tool_review_approved',
+        'maintenance_scheduled',
+        'maintenance_completed',
     ];
 
     public function run(): void
@@ -401,6 +403,22 @@ class MailTemplateSeeder extends Seeder
                 'subject' => 'Your review of {tool_name} is now live',
                 'content' => '<h1>Your review is live</h1><p>Hi {user_name},</p><p>Thanks for reviewing <strong>{tool_name}</strong>. Your review has been approved and is now visible to everyone.</p><p><a href="{review_url}">View your review</a></p><p>— {site_name}</p>',
                 'category' => 'content',
+                'requires_pro' => false,
+            ],
+            [
+                'slug' => 'maintenance_scheduled',
+                'name' => 'Maintenance — Going Offline',
+                'subject' => '{site_name} is going down for maintenance',
+                'content' => '<h1>{maintenance_title}</h1><p>Hi {user_name},</p><p>{maintenance_message}</p><p>Expected back online: <strong>{restoration_time}</strong></p><p>Sorry for the interruption — we will email you as soon as we are live again.</p><p>— {site_name}</p>',
+                'category' => 'maintenance',
+                'requires_pro' => false,
+            ],
+            [
+                'slug' => 'maintenance_completed',
+                'name' => 'Maintenance — Back Online',
+                'subject' => '{site_name} is back online',
+                'content' => '<h1>We are back</h1><p>Hi {user_name},</p><p>Maintenance is complete and {site_name} is available again. Thanks for your patience.</p><p><a href="{site_url}">Go to your dashboard</a></p><p>— {site_name}</p>',
+                'category' => 'maintenance',
                 'requires_pro' => false,
             ],
         ];

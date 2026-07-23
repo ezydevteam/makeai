@@ -26,10 +26,15 @@ const props = defineProps<{
     status: {
         is_maintenance: boolean
     }
+    notice: {
+        audience_count: number
+        already_sent: boolean
+    }
 }>()
 
 const { t } = useTranslate()
 const confirmOpen = ref(false)
+const notifyOpen = ref(false)
 const selectedBackground = ref<File | null>(null)
 const backgroundPreview = ref<string | null>(props.maintenance.maintenance_background_image_url)
 
@@ -41,6 +46,14 @@ const maintenanceForm = useForm({
     remove_maintenance_background_image: false,
 })
 const toggleForm = useForm({})
+const notifyForm = useForm({})
+
+const notifyUsers = () => {
+    notifyForm.post(route('admin.system.maintenance.notify'), {
+        preserveScroll: true,
+        onFinish: () => { notifyOpen.value = false },
+    })
+}
 
 const saveMaintenance = () => {
     maintenanceForm.maintenance_background_image = selectedBackground.value
@@ -104,7 +117,7 @@ const removeBackground = () => {
             <button
                 type="button"
                 :class="status.is_maintenance
-                    ? 'btn-primary-admin'
+                    ? 'bg-green-600 hover:bg-green-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-300 dark:bg-green-600 dark:hover:bg-green-500'
                     : 'bg-red-600 hover:bg-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:bg-red-600 dark:hover:bg-red-500'"
                 class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all disabled:opacity-60"
                 :disabled="toggleForm.processing"
@@ -168,6 +181,35 @@ const removeBackground = () => {
                 </div>
 
                 <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
+                    <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Announce this window') }}</h3>
+                            <p class="mt-1 max-w-xl text-xs text-gray-500">
+                                {{ t('Emails the saved title, message and restoration time to :count users. Send this before switching maintenance on — queued mail does not send while the platform is down. The all-clear goes out automatically when you go live.', { count: String(notice.audience_count) }) }}
+                            </p>
+                            <p v-if="notice.already_sent" class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                <i class="ti ti-info-circle"></i>
+                                {{ t('This window has already been announced. Users will get the all-clear when you go live.') }}
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            :disabled="status.is_maintenance || notice.audience_count === 0 || notifyForm.processing"
+                            :title="status.is_maintenance ? t('Switch maintenance off to announce a window.') : ''"
+                            class="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-colors hover:border-primary-300 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200"
+                            @click="notifyOpen = true"
+                        >
+                            <i v-if="!notifyForm.processing" class="ti ti-mail-forward text-base"></i>
+                            <svg v-else class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                            {{ notifyForm.processing ? t('Sending...') : t('Notify users now') }}
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800">
                     <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div>
                             <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Background image') }}</h3>
@@ -198,5 +240,16 @@ const removeBackground = () => {
             confirm-variant="admin"
             @close="confirmOpen = false"
             @confirm="toggleMaintenance"
+        />
+
+        <AppModal
+            :open="notifyOpen"
+            :title="t('Email :count users about this window?', { count: String(notice.audience_count) })"
+            :subtitle="t('They receive the saved title, message and restoration time. Save your changes first if you have edited them.')"
+            :confirm-text="t('Send Notice')"
+            :confirm-loading="notifyForm.processing"
+            confirm-variant="admin"
+            @close="notifyOpen = false"
+            @confirm="notifyUsers"
         />
 </template>

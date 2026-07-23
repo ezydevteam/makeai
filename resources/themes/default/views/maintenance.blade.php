@@ -1,9 +1,9 @@
 @php
     use Illuminate\Support\Carbon;
-    use Illuminate\Support\Facades\Storage;
     use Illuminate\Support\Str;
 
     $appName = settings('app_name', translate('Application'));
+    $logoUrl = media_url(settings('site_logo_light')) ?: null;
     $title = settings('maintenance_title', $appName.' '.translate('Maintenance'));
     $message = strip_tags(
         (string) settings('maintenance_message', '<p>'.translate('We are improving the platform. Please check back soon.').'</p>'),
@@ -12,7 +12,19 @@
     $restorationTime = settings('maintenance_estimated_restoration_time');
     $restorationIso = null;
     $backgroundImage = settings('maintenance_background_image');
-    $backgroundUrl = $backgroundImage ? Storage::url($backgroundImage) : null;
+    // media_url(), not Storage::url(): the latter resolves against the DEFAULT
+    // disk and ignores the active cloud driver, so the background 404s on any
+    // install serving media from S3/R2/Spaces.
+    $backgroundUrl = $backgroundImage ? media_url($backgroundImage) : null;
+
+    // Built here and echoed raw. Passing it through {{ }} entity-encoded the
+    // quotes into url(&#039;...&#039;), and because <style> is a raw-text element
+    // those entities are never decoded — the CSS parser threw the whole
+    // background-image declaration away, gradient included. Strip the characters
+    // that could terminate the url() token instead of escaping for HTML.
+    $backgroundCss = $backgroundUrl
+        ? ", url('".preg_replace('/[\'"()\\\\\s]/', '', $backgroundUrl)."')"
+        : '';
 
     try {
         $restorationIso = filled($restorationTime) ? Carbon::parse($restorationTime)->toIso8601String() : null;
@@ -62,7 +74,7 @@
             display: grid;
             place-items: center;
             padding: 24px;
-            background-image: linear-gradient(135deg, rgba(240, 253, 248, 0.92), rgba(239, 246, 255, 0.9)){{ $backgroundUrl ? ", url('".e($backgroundUrl)."')" : '' }};
+            background-image: linear-gradient(135deg, rgba(240, 253, 248, 0.92), rgba(239, 246, 255, 0.9)){!! $backgroundCss !!};
             background-position: center;
             background-size: cover;
         }
@@ -82,6 +94,13 @@
             align-items: center;
             gap: 12px;
             margin-bottom: 24px;
+        }
+
+        .logo-img {
+            display: block;
+            height: 44px;
+            max-width: 200px;
+            object-fit: contain;
         }
 
         .logo {
@@ -157,12 +176,6 @@
             text-transform: uppercase;
         }
 
-        .footer {
-            margin-top: 28px;
-            color: var(--color-gray-500);
-            font-size: 13px;
-        }
-
         @media (max-width: 520px) {
             .panel {
                 padding: 24px;
@@ -178,8 +191,12 @@
     <main class="page">
         <section class="panel" aria-labelledby="maintenance-title">
             <div class="brand">
-                <div class="logo">{{ Str::of($appName)->substr(0, 1)->upper() }}</div>
-                <div class="brand-name">{{ $appName }}</div>
+                @if ($logoUrl)
+                    <img src="{{ $logoUrl }}" alt="{{ $appName }}" class="logo-img">
+                @else
+                    <div class="logo">{{ Str::of($appName)->substr(0, 1)->upper() }}</div>
+                    <div class="brand-name">{{ $appName }}</div>
+                @endif
             </div>
 
             <h1 id="maintenance-title">{{ $title }}</h1>
@@ -193,8 +210,6 @@
                     <div class="time-box"><strong data-seconds>0</strong><span>{{ translate('Seconds') }}</span></div>
                 </div>
             @endif
-
-            <p class="footer">{{ translate('Thank you for your patience.') }}</p>
         </section>
     </main>
 

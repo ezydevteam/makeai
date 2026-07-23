@@ -31,6 +31,10 @@ class MailService
         'admin_notification' => 'admin',
         'newsletter_confirm' => 'updates',
         'newsletter_campaign' => 'updates',
+        // Operational news, not a security alert — a user who has opted out of
+        // product updates has opted out of downtime blasts too.
+        'maintenance_scheduled' => 'updates',
+        'maintenance_completed' => 'updates',
     ];
 
     /**
@@ -207,6 +211,9 @@ class MailService
             'comment_url',
             'tool_name',
             'review_url',
+            'maintenance_title',
+            'maintenance_message',
+            'restoration_time',
         ];
     }
 }

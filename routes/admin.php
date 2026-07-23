@@ -491,6 +491,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::get('system/maintenance', [SystemController::class, 'maintenance'])->name('admin.system.maintenance');
         Route::post('system/maintenance/settings', [SystemController::class, 'updateMaintenanceSettings'])->name('admin.system.maintenance.settings');
         Route::post('system/maintenance/toggle', [SystemController::class, 'toggleMaintenance'])->name('admin.system.maintenance.toggle');
+        Route::post('system/maintenance/notify', [SystemController::class, 'notifyMaintenance'])->name('admin.system.maintenance.notify');
     });
 
     // In-App Notifications (PART 23)

@@ -65,6 +65,9 @@ const variableDescriptions = computed<Record<string, string>>(() => ({
     '{comment_url}': t('Link to the approved comment'),
     '{tool_name}': t('Name of the reviewed AI tool'),
     '{review_url}': t('Link to the approved tool review'),
+    '{maintenance_title}': t('Headline configured on the maintenance screen'),
+    '{maintenance_message}': t('Maintenance notice text, with formatting removed'),
+    '{restoration_time}': t('Estimated time the platform comes back, or "as soon as possible"'),
 }))
 
 // Available in every template, whatever the category.
@@ -82,6 +85,9 @@ const CATEGORY_VARIABLES: Record<string, string[]> = {
     support: ['{ticket_number}', '{ticket_subject}', '{ticket_priority}', '{ticket_department}', '{ticket_url}', '{customer_name}'],
     export: ['{export_name}', '{download_url}', '{expires_at}'],
     content: ['{post_title}', '{comment_url}', '{tool_name}', '{review_url}'],
+    // Only the "going offline" template receives these; the all-clear has no
+    // window details to report, so it falls back to the common set.
+    maintenance: ['{maintenance_title}', '{maintenance_message}', '{restoration_time}'],
 }
 
 const category = computed(() => props.template.category)

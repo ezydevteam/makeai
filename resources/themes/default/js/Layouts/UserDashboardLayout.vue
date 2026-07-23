@@ -17,6 +17,10 @@ const playgroundEnabled = computed(() => page.props.playgroundEnabled !== false)
 const chainsEnabled = computed(() => page.props.chainsEnabled !== false)
 const toolEmbedsEnabled = computed(() => page.props.toolEmbedsEnabled !== false)
 const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+// Broader than isProAvailable, which also requires the subscriptions toggle to be
+// on. Billing follows the licence alone so an existing subscriber can still reach
+// the page to view or cancel after an admin switches subscriptions off.
+const isExtendedLicense = computed(() => Boolean(page.props.isExtendedLicense))
 const referralUser = computed(() => page.props.auth?.user as any)
 const dailyLimit = computed(() => Number(page.props.userDailyCreditLimit ?? 0))
 const monthlyLimit = computed(() => Number(page.props.userMonthlyCreditLimit ?? 0))
@@ -41,13 +45,6 @@ const creditBalance = computed(() => {
 })
 const creditBalanceValue = computed(() => creditBalance.value.value)
 const creditBalanceLabel = computed(() => creditBalance.value.label)
-// True when the user has a subscription/plan to manage — so the Billing menu stays
-// reachable for existing subscribers even on an Extended install with the
-// subscriptions toggle off (they may still need to view or cancel it).
-const hasPremiumAccess = computed(() => {
-    const status = String(referralUser.value?.subscription_status || '').trim().toLowerCase()
-    return Boolean(referralUser.value?.is_pro) || ['active', 'trialing'].includes(status)
-})
 const userAvatarUrl = computed(() => {
     const avatar = referralUser.value?.avatar
     if (!avatar) return null
@@ -234,7 +231,7 @@ const navItems = computed<NavItem[]>(() => {
                 { label: t('Profile'), routeName: 'user.dashboard.profile', active: is('user.dashboard.profile*') },
                 { label: t('Security'), routeName: 'user.dashboard.security', active: is('user.dashboard.security*') },
                 ...(byokEnabled.value ? [{ label: t('BYOK'), routeName: 'user.dashboard.byok', active: is('user.dashboard.byok') || is('user.dashboard.byok.*') }] : []),
-                ...((isProAvailable.value || hasPremiumAccess.value) ? [{ label: t('Billing'), routeName: 'user.dashboard.billing', active: is('user.dashboard.billing*') }] : []),
+                ...(isExtendedLicense.value ? [{ label: t('Billing'), routeName: 'user.dashboard.billing', active: is('user.dashboard.billing*') }] : []),
                 ...(isProAvailable.value ? [{ label: t('Buy Credits'), routeName: 'user.dashboard.credit-topup', active: is('user.dashboard.credit-topup*') }] : []),
                 { label: t('Privacy'), routeName: 'user.dashboard.privacy', active: is('user.dashboard.privacy*') },
             ],

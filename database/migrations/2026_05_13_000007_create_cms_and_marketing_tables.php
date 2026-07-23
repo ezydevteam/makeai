@@ -376,7 +376,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->boolean('is_system')->default(true);
             $table->boolean('requires_pro')->default(false);
-            $table->enum('category', ['auth', 'account', 'subscription', 'newsletter', 'custom', 'affiliate', 'support', 'export', 'content']);
+            $table->enum('category', ['auth', 'account', 'subscription', 'newsletter', 'custom', 'affiliate', 'support', 'export', 'content', 'maintenance']);
             $table->bigInteger('last_edited_by')->unsigned()->nullable();
             $table->timestamps();
 

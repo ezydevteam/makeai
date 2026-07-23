@@ -64,6 +64,20 @@ const driverOptions = computed(() => [
     { value: 'polling', label: t('Polling Only') },
 ])
 
+const isPollingDriver = computed(() => form.notifications_driver === 'polling')
+
+// The bell starts this timer alongside the websocket subscription, so the value
+// applies to every driver — under Reverb/Pusher it is the fallback that keeps
+// notifications arriving if the socket drops. The label says which job it is
+// doing rather than pretending it only exists for one driver.
+const pollingIntervalLabel = computed(() => isPollingDriver.value
+    ? t('Refresh Interval')
+    : t('Fallback Refresh Interval'))
+
+const pollingIntervalHint = computed(() => isPollingDriver.value
+    ? t('Shorter intervals feel faster but increase request frequency.')
+    : t('How often the bell re-checks on its own, in case the websocket drops.'))
+
 const schemeOptions = computed(() => [
     { value: 'http', label: t('HTTP') },
     { value: 'https', label: t('HTTPS') },
@@ -218,7 +232,7 @@ async function testConnection() {
         <section class="rounded-2xl border border-gray-200 bg-white dark:border-surface-800 dark:bg-surface-900 shadow-sm">
             <div class="border-b border-gray-100 px-6 py-4 dark:border-surface-800">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Delivery Controls') }}</h2>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose how notifications are delivered and how frequently fallback refresh should run.') }}</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('Choose how notifications are delivered and how frequently the bell should refresh.') }}</p>
             </div>
 
             <div class="grid gap-6 p-6 md:grid-cols-2">
@@ -232,14 +246,20 @@ async function testConnection() {
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Reverb is preferred for Laravel-native realtime delivery. Polling is the safest fallback.') }}</p>
                 </div>
 
+                <!--
+                    Shown for every driver on purpose: the bell runs this timer
+                    whatever the transport, so hiding it under Reverb/Pusher would
+                    leave a setting in effect with no way to see or change it. Only
+                    the wording changes with the driver.
+                -->
                 <div>
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Polling Interval') }}</label>
+                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ pollingIntervalLabel }}</label>
                     <AppSelect
                         v-model="pollingIntervalValue"
                         :options="pollingIntervalOptions"
                         :placeholder="t('Select interval')"
                     />
-                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ t('Shorter intervals feel faster but increase request frequency.') }}</p>
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ pollingIntervalHint }}</p>
                 </div>
             </div>
         </section>

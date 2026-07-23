@@ -38,8 +38,8 @@ const deactivateForm = useForm({})
 
 const typeBadgeClass = computed(() =>
     props.status.type === 2
-        ? 'bg-purple-100 text-purple-700 border border-purple-200'
-        : 'bg-blue-100 text-blue-700 border border-blue-200',
+        ? 'bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-900/40'
+        : 'bg-blue-100 text-blue-700 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900/40',
 )
 
 const isVerifying = computed(() => activateForm.processing || reverifyForm.processing || deactivateForm.processing)

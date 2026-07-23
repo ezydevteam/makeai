@@ -68,7 +68,6 @@
         .btn { display: inline-flex; align-items: center; gap: 6px; padding: 11px 22px; border-radius: 12px; font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.15s; cursor: pointer; border: none; }
         .btn-primary { background: var(--p); color: #fff; }
         .btn-primary:hover { filter: brightness(0.92); }
-        .footer { margin-top: 28px; font-size: 13px; color: #9ca3af; }
         @media (max-width: 480px) { .panel { padding: 28px 20px; } .code { font-size: 56px; } }
     </style>
 </head>
@@ -92,7 +91,6 @@
     <div class="actions">
         <a href="{{ $primaryActionUrl }}" class="btn btn-primary">🏠 {{ $primaryActionLabel }}</a>
     </div>
-    <p class="footer">{{ translate('Thank you for your patience.') }}</p>
 </main>
 </div>
 </body>

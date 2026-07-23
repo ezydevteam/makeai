@@ -517,11 +517,11 @@ for (const item of addonMenuItems.value) {
             <span class="flex-grow">{{ t('Commissions') }}</span>
             <span v-if="affiliateCommissionsCount > 0" class="rounded-full bg-primary-100 px-1.5 py-0.5 text-[9px] font-bold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">{{ affiliateCommissionsCount }}</span>
           </Link>
+          <Link :href="route('admin.affiliate.affiliates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.affiliates.index') || isActive('admin.affiliate.affiliates.show') }">{{ t('Affiliates') }}</Link>
           <Link :href="route('admin.affiliate.payouts.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.payouts.*') }">
             <span class="flex-grow">{{ t('Payouts') }}</span>
             <span v-if="affiliatePayoutsCount > 0" class="rounded-full bg-primary-100 px-1.5 py-0.5 text-[9px] font-bold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">{{ affiliatePayoutsCount }}</span>
           </Link>
-          <Link :href="route('admin.affiliate.affiliates.index')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.affiliates.index') || isActive('admin.affiliate.affiliates.show') }">{{ t('Affiliates') }}</Link>
           <Link :href="route('admin.affiliate.settings.edit')" class="sidebar-subitem" :class="{ active: isActive('admin.affiliate.settings.*') }">{{ t('Settings') }}</Link>
         </div>
       </div>

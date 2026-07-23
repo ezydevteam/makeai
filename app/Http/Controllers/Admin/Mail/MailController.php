@@ -49,7 +49,14 @@ class MailController extends Controller
                 continue;
             }
 
-            $type = in_array($key, self::SECRET_KEYS, true) ? 'encrypted' : 'string';
+            // mail_port is the one numeric key here; storing it as 'string' (the
+            // old blanket type) flipped its stored type on every save and made it
+            // a string on read.
+            $type = match (true) {
+                in_array($key, self::SECRET_KEYS, true) => 'encrypted',
+                $key === 'mail_port' => 'integer',
+                default => 'string',
+            };
             settings_set($key, $value, $type, 'mail');
         }
 

@@ -64,7 +64,7 @@ return [
             'driver' => 'openai',
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
-            'models' => ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.4', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini'],
+            'models' => ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'text-embedding-3-small', 'text-embedding-3-large'],
         ],
 
         'anthropic' => [
@@ -72,7 +72,7 @@ return [
             'driver' => 'anthropic',
             'key' => env('ANTHROPIC_API_KEY'),
             'url' => env('ANTHROPIC_URL', 'https://api.anthropic.com/v1'),
-            'models' => ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+            'models' => ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
         ],
 
         'google' => [
@@ -80,7 +80,7 @@ return [
             'driver' => 'gemini',
             'key' => env('GEMINI_API_KEY'),
             'url' => env('GEMINI_URL', 'https://generativelanguage.googleapis.com/v1beta'),
-            'models' => ['gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'],
+            'models' => ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite', 'gemini-2.5-pro', 'gemini-2.5-flash', 'text-embedding-004'],
         ],
 
         'xai' => [
@@ -88,7 +88,7 @@ return [
             'driver' => 'xai',
             'key' => env('XAI_API_KEY'),
             'url' => env('XAI_URL', 'https://api.x.ai/v1'),
-            'models' => ['grok-4.3', 'grok-4.1-fast', 'grok-3', 'grok-3-mini'],
+            'models' => ['grok-4.5', 'grok-4.1-fast'],
         ],
 
         'deepseek' => [
@@ -96,7 +96,7 @@ return [
             'driver' => 'deepseek',
             'key' => env('DEEPSEEK_API_KEY'),
             'url' => env('DEEPSEEK_URL', 'https://api.deepseek.com/v1'),
-            'models' => ['deepseek-v4-pro', 'deepseek-v4-flash', 'deepseek-r1', 'deepseek-v3'],
+            'models' => ['deepseek-v4-pro', 'deepseek-v4-flash'],
         ],
 
         'openrouter' => [
@@ -105,11 +105,13 @@ return [
             'key' => env('OPENROUTER_API_KEY'),
             'url' => env('OPENROUTER_URL', 'https://openrouter.ai/api/v1'),
             'models' => [
-                'openai/gpt-5.5', 'openai/gpt-5.4', 'openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o4-mini',
-                'anthropic/claude-opus-4-8', 'anthropic/claude-sonnet-4-6', 'anthropic/claude-haiku-4-5',
-                'google/gemini-3.1-pro', 'google/gemini-3.5-flash', 'google/gemini-2.5-pro', 'google/gemini-2.0-flash',
+                'openai/gpt-5.6-sol', 'openai/gpt-5.6-terra', 'openai/gpt-5.6-luna', 'openai/gpt-5.5', 'openai/gpt-5.4',
+                'anthropic/claude-fable-5', 'anthropic/claude-opus-4-8', 'anthropic/claude-sonnet-5', 'anthropic/claude-sonnet-4-6', 'anthropic/claude-haiku-4-5',
+                'google/gemini-3.6-flash', 'google/gemini-3.1-pro', 'google/gemini-3.5-flash', 'google/gemini-2.5-pro',
+                // Llama 4 was deprecated on Groq's direct API but OpenRouter still
+                // routes it via other providers, so it stays available here.
                 'meta-llama/llama-4-maverick', 'meta-llama/llama-4-scout',
-                'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash', 'deepseek/deepseek-r1',
+                'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash',
             ],
         ],
 
@@ -117,14 +119,14 @@ return [
             'name' => 'Groq',
             'driver' => 'groq',
             'key' => env('GROQ_API_KEY'),
-            'models' => ['llama-4-scout-17b', 'llama-3.3-70b', 'mixtral-8x7b'],
+            'models' => ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
         ],
 
         'mistral' => [
             'name' => 'Mistral AI',
             'driver' => 'mistral',
             'key' => env('MISTRAL_API_KEY'),
-            'models' => ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'],
+            'models' => ['mistral-large-latest', 'mistral-small-latest'],
         ],
 
         'ollama' => [
@@ -146,6 +148,7 @@ return [
             'use_default_credential_provider' => env('AWS_USE_DEFAULT_CREDENTIALS', true),
             'models' => [
                 'anthropic.claude-opus-4-8-v1:0',
+                'anthropic.claude-sonnet-5-v1:0',
                 'anthropic.claude-sonnet-4-6-v1:0',
                 'anthropic.claude-haiku-4-5-v1:0',
                 'meta.llama4-maverick-17b-instruct-v1:0',
@@ -156,14 +159,14 @@ return [
             'name' => 'Cohere',
             'driver' => 'cohere',
             'key' => env('COHERE_API_KEY'),
-            'models' => ['command-r-plus', 'embed-v4.0', 'rerank-v3.5'],
+            'models' => ['command-a-03-2025', 'embed-v4.0', 'rerank-v4.0-fast'],
         ],
 
         'eleven' => [
             'name' => 'ElevenLabs',
             'driver' => 'eleven',
             'key' => env('ELEVENLABS_API_KEY'),
-            'models' => ['eleven_multilingual_v2', 'eleven_turbo_v2_5', 'eleven_flash_v2_5'],
+            'models' => ['eleven_v3', 'eleven_multilingual_v2', 'eleven_turbo_v2_5', 'eleven_flash_v2_5'],
         ],
 
         'jina' => [
@@ -177,7 +180,7 @@ return [
             'name' => 'Voyage AI',
             'driver' => 'voyageai',
             'key' => env('VOYAGEAI_API_KEY'),
-            'models' => ['voyage-3', 'voyage-3-lite'],
+            'models' => ['voyage-4', 'voyage-4-lite'],
         ],
 
         'perplexity' => [
@@ -218,7 +221,10 @@ return [
     */
 
     'image' => [
-        'providers' => ['dall-e-3', 'stable-diffusion-3', 'flux-pro'],
+        // Informational only — the live image catalog is seeded by the ai-image-pro
+        // addon (gpt-image-2, Nano Banana, SD 3.5, FLUX, Ideogram). Nothing reads
+        // this list; kept in sync so the config doesn't advertise retired models.
+        'providers' => ['gpt-image-2', 'stable-diffusion-3.5', 'flux-1.1-pro'],
         'default_size' => '1024x1024',
         'max_per_day' => 50,
     ],
@@ -305,23 +311,18 @@ return [
 
     'model_names' => [
         // OpenAI
-        'gpt-5.5' => 'GPT-5.5 (Most Powerful)',
-        'gpt-5.5-mini' => 'GPT-5.5 Mini (Fast & Affordable)',
+        'gpt-5.6-sol' => 'GPT-5.6 Sol (Most Powerful)',
+        'gpt-5.6-terra' => 'GPT-5.6 Terra (Balanced)',
+        'gpt-5.6-luna' => 'GPT-5.6 Luna (Fast & Affordable)',
+        'gpt-5.5' => 'GPT-5.5 (Powerful)',
         'gpt-5.4' => 'GPT-5.4 (Advanced)',
-        'gpt-4o' => 'GPT-4o (Great All-Rounder)',
-        'gpt-4o-mini' => 'GPT-4o Mini (Budget-Friendly)',
-        'gpt-4-turbo' => 'GPT-4 Turbo',
-        'gpt-4' => 'GPT-4',
-        'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
-        'o3' => 'o3 (Deep Reasoning)',
-        'o3-mini' => 'o3 Mini (Efficient Reasoning)',
-        'o4-mini' => 'o4 Mini (Efficient Reasoning)',
-        'o1' => 'o1 (Deep Reasoning)',
-        'o1-mini' => 'o1 Mini',
+        'gpt-5.4-mini' => 'GPT-5.4 Mini (Efficient)',
+        'gpt-5.4-nano' => 'GPT-5.4 Nano (Cheapest)',
         // Anthropic
-        'claude-opus-4-8' => 'Claude Opus 4.8 (Most Capable)',
-        'claude-sonnet-4-6' => 'Claude Sonnet 4.6 (Best Balance)',
-        'claude-sonnet-4-5' => 'Claude Sonnet 4.5 (Best Balance)',
+        'claude-fable-5' => 'Claude Fable 5 (Most Capable)',
+        'claude-opus-4-8' => 'Claude Opus 4.8 (Highly Capable)',
+        'claude-sonnet-5' => 'Claude Sonnet 5 (Best Balance)',
+        'claude-sonnet-4-6' => 'Claude Sonnet 4.6 (Balanced)',
         'claude-haiku-4-5' => 'Claude Haiku 4.5 (Fast & Lightweight)',
         'claude-3-opus' => 'Claude 3 Opus',
         'claude-3-sonnet' => 'Claude 3.5 Sonnet',
@@ -329,6 +330,7 @@ return [
         'claude-3-5-sonnet' => 'Claude 3.5 Sonnet',
         'claude-3-5-haiku' => 'Claude 3.5 Haiku',
         // Google Gemini
+        'gemini-3.6-flash' => 'Gemini 3.6 Flash (Latest & Fast)',
         'gemini-3.5-flash' => 'Gemini 3.5 Flash (Ultra Fast)',
         'gemini-3.1-pro' => 'Gemini 3.1 Pro (High Performance)',
         'gemini-3.1-flash-lite' => 'Gemini 3.1 Flash Lite (Lightweight)',
@@ -338,10 +340,8 @@ return [
         'gemini-1.5-pro' => 'Gemini 1.5 Pro',
         'gemini-1.5-flash' => 'Gemini 1.5 Flash',
         // xAI Grok
-        'grok-4.3' => 'Grok 4.3 (Latest & Smartest)',
+        'grok-4.5' => 'Grok 4.5 (Latest & Smartest)',
         'grok-4.1-fast' => 'Grok 4.1 Fast (Speedy)',
-        'grok-3' => 'Grok 3 (Previous Gen)',
-        'grok-3-mini' => 'Grok 3 Mini (Compact)',
         // DeepSeek
         'deepseek-v4-pro' => 'DeepSeek V4 Pro (Best Quality)',
         'deepseek-v4-flash' => 'DeepSeek V4 Flash (Fast & Cheap)',
@@ -354,19 +354,30 @@ return [
         'sonar-deep-research' => 'Sonar Deep Research (In-Depth)',
         'perplexity-sonar' => 'Sonar (Web Search)',
         // Groq
-        'llama-4-scout-17b' => 'Llama 4 Scout (Ultra Fast)',
-        'llama-3.3-70b' => 'Llama 3.3 70B (Powerful Open-Source)',
-        'mixtral-8x7b' => 'Mixtral 8x7B (Fast MoE)',
+        'llama-3.3-70b-versatile' => 'Llama 3.3 70B (Powerful Open-Source)',
+        'llama-3.1-8b-instant' => 'Llama 3.1 8B (Ultra Fast)',
+        'openai/gpt-oss-120b' => 'GPT-OSS 120B (Open-Source Top Tier)',
+        'openai/gpt-oss-20b' => 'GPT-OSS 20B (Open-Source Fast)',
         // Mistral
         'mistral-large-latest' => 'Mistral Large (Top Tier)',
-        'mistral-medium-latest' => 'Mistral Medium (Balanced)',
         'mistral-small-latest' => 'Mistral Small (Lightweight)',
         'mistral-large' => 'Mistral Large (Top Tier)',
-        // Image
-        'dall-e-3' => 'DALL-E 3 (Image Gen)',
-        'flux-pro' => 'Flux Pro (Image Gen)',
-        'ideogram' => 'Ideogram (Image Gen)',
-        'stability-sd3' => 'Stable Diffusion 3 (Image Gen)',
+        // Embeddings
+        'text-embedding-3-small' => 'OpenAI Embedding 3 Small (Text Embedding)',
+        'text-embedding-3-large' => 'OpenAI Embedding 3 Large (Text Embedding)',
+        'text-embedding-004' => 'Gemini Text Embedding 004 (Text Embedding)',
+        'voyage-4' => 'Voyage 4 (Text Embedding)',
+        'voyage-4-lite' => 'Voyage 4 Lite (Lightweight Embedding)',
+        // Cohere
+        'command-a-03-2025' => 'Cohere Command A (Enterprise RAG)',
+        'rerank-v4.0-fast' => 'Cohere Rerank v4 Fast (Search Reranking)',
+        // Audio
+        'eleven_v3' => 'ElevenLabs v3 (Most Expressive)',
+        // Image (seeded by the ai-image-pro addon)
+        'gpt-image-2' => 'GPT Image 2 (Image Gen)',
+        'stable-diffusion-3.5' => 'Stable Diffusion 3.5 (Image Gen)',
+        'flux-1.1-pro' => 'FLUX 1.1 Pro (Image Gen)',
+        'ideogram-v2' => 'Ideogram V2 (Image Gen)',
     ],
 
     'provider_names' => [

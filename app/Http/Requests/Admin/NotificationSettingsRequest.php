@@ -26,24 +26,30 @@ class NotificationSettingsRequest extends FormRequest
         $reverbSecretStored = filled(settings('notifications_reverb_app_secret'));
         $pusherSecretStored = filled(settings('notifications_pusher_secret'));
 
+        // Every conditional field is `nullable` as well. requiredIf(false) only
+        // drops the requirement — it does not make the value optional, so `string`
+        // still ran against the null the form posts for the driver you did NOT
+        // pick, and saving Reverb failed on "the pusher.app id field must be a
+        // string" (and vice versa). Where the field IS required, `required` still
+        // rejects null first, so nothing is loosened.
         return [
             'notifications_driver' => ['required', 'string', Rule::in(['reverb', 'pusher', 'polling'])],
             'notifications_polling_interval' => ['required', 'integer', 'min:10000', 'max:300000'],
 
             // Reverb — required only when the Reverb driver is chosen.
-            'reverb.app_id' => [Rule::requiredIf($driver === 'reverb'), 'string', 'max:255'],
-            'reverb.app_key' => [Rule::requiredIf($driver === 'reverb'), 'string', 'max:255'],
-            'reverb.app_secret' => [Rule::requiredIf($driver === 'reverb' && ! $reverbSecretStored), 'string', 'max:2000'],
+            'reverb.app_id' => [Rule::requiredIf($driver === 'reverb'), 'nullable', 'string', 'max:255'],
+            'reverb.app_key' => [Rule::requiredIf($driver === 'reverb'), 'nullable', 'string', 'max:255'],
+            'reverb.app_secret' => [Rule::requiredIf($driver === 'reverb' && ! $reverbSecretStored), 'nullable', 'string', 'max:2000'],
             'reverb.host' => ['nullable', 'string', 'max:255'],
             'reverb.port' => ['nullable', 'integer', 'min:1', 'max:65535'],
             'reverb.scheme' => ['nullable', 'string', Rule::in(['http', 'https'])],
 
             // Pusher — required only when the Pusher driver is chosen. Cluster is
             // required too: pusher-js cannot connect without it.
-            'pusher.app_id' => [Rule::requiredIf($driver === 'pusher'), 'string', 'max:255'],
-            'pusher.key' => [Rule::requiredIf($driver === 'pusher'), 'string', 'max:255'],
-            'pusher.secret' => [Rule::requiredIf($driver === 'pusher' && ! $pusherSecretStored), 'string', 'max:2000'],
-            'pusher.cluster' => [Rule::requiredIf($driver === 'pusher'), 'string', 'max:50'],
+            'pusher.app_id' => [Rule::requiredIf($driver === 'pusher'), 'nullable', 'string', 'max:255'],
+            'pusher.key' => [Rule::requiredIf($driver === 'pusher'), 'nullable', 'string', 'max:255'],
+            'pusher.secret' => [Rule::requiredIf($driver === 'pusher' && ! $pusherSecretStored), 'nullable', 'string', 'max:2000'],
+            'pusher.cluster' => [Rule::requiredIf($driver === 'pusher'), 'nullable', 'string', 'max:50'],
         ];
     }
 
@@ -60,6 +66,28 @@ class NotificationSettingsRequest extends FormRequest
             'pusher.key.required' => translate('The Pusher key is required to use the Pusher driver.'),
             'pusher.secret.required' => translate('The Pusher secret is required to use the Pusher driver.'),
             'pusher.cluster.required' => translate('The Pusher cluster is required to use the Pusher driver.'),
+        ];
+    }
+
+    /**
+     * Without these, any rule other than the ones named above reports the raw
+     * dotted path — "the pusher.app id field must be a string".
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return [
+            'reverb.app_id' => translate('Reverb app ID'),
+            'reverb.app_key' => translate('Reverb app key'),
+            'reverb.app_secret' => translate('Reverb app secret'),
+            'reverb.host' => translate('Reverb host'),
+            'reverb.port' => translate('Reverb port'),
+            'reverb.scheme' => translate('Reverb scheme'),
+            'pusher.app_id' => translate('Pusher app ID'),
+            'pusher.key' => translate('Pusher key'),
+            'pusher.secret' => translate('Pusher secret'),
+            'pusher.cluster' => translate('Pusher cluster'),
         ];
     }
 }

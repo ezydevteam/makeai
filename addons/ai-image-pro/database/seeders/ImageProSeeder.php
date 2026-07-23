@@ -326,11 +326,11 @@ class ImageProSeeder extends Seeder
                 ],
             ],
             [
-                'slug' => 'stable-diffusion-3',
-                'name' => 'Stability SD3',
+                'slug' => 'stable-diffusion-3.5',
+                'name' => 'Stability SD 3.5',
                 'provider' => 'stability',
                 'meta' => [
-                    // Source: Stability AI — SD3 Large costs 6.5 credits/image and
+                    // Source: Stability AI — SD 3.5 Large costs 6.5 credits/image and
                     // credits are US$10 per 1000 → US$0.065 per image.
                     // https://platform.stability.ai/pricing
                     'cost_per_unit' => 0.065,

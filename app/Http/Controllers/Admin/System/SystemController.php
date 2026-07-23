@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\System;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CronTaskRunRequest;
 use App\Http\Requests\Admin\MaintenanceSettingsRequest;
+use App\Jobs\SendMaintenanceNotice;
 use App\Services\BroadcastingService;
 use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
 use Illuminate\Http\Request;
@@ -73,6 +74,10 @@ class SystemController extends Controller
             'maintenance' => $this->maintenanceSettings(),
             'status' => [
                 'is_maintenance' => app()->isDownForMaintenance(),
+            ],
+            'notice' => [
+                'audience_count' => $this->maintenanceAudienceCount(),
+                'already_sent' => (bool) settings('maintenance_notice_sent', false),
             ],
         ]);
     }
@@ -158,7 +163,11 @@ class SystemController extends Controller
             Artisan::call('up');
             settings_set('maintenance_mode', false, 'boolean', 'maintenance');
 
-            return back()->with('success', translate('Platform is now LIVE.'));
+            $notified = $this->notifyMaintenanceBackOnline();
+
+            return back()->with('success', $notified
+                ? translate('Platform is now LIVE. Users are being emailed.')
+                : translate('Platform is now LIVE.'));
         }
 
         $this->ensureMaintenanceDefaults();
@@ -168,6 +177,81 @@ class SystemController extends Controller
         return back()
             ->with('success', translate('Platform is now in MAINTENANCE mode.'))
             ->withCookie(MaintenanceModeBypassCookie::create((string) settings('maintenance_bypass_secret')));
+    }
+
+    /**
+     * Announce an upcoming maintenance window to every user.
+     *
+     * Deliberately a separate action from the toggle rather than a side effect of
+     * it: `queue:work` refuses to run while the application is down, so a notice
+     * dispatched after `artisan down` sits in the queue until maintenance ends and
+     * lands next to the all-clear. Announcing while the site is still live is the
+     * only ordering that delivers on time without a --force worker.
+     */
+    public function notifyMaintenance()
+    {
+        $this->authorizeSystem();
+
+        if (app()->isDownForMaintenance()) {
+            return back()->with('error', translate('Announce the window before switching maintenance on — queued mail does not send while the platform is down.'));
+        }
+
+        if ($this->maintenanceAudienceCount() === 0) {
+            return back()->with('error', translate('There are no active, verified users to notify.'));
+        }
+
+        $this->ensureMaintenanceDefaults();
+
+        $restorationTime = $this->restorationTimeIso();
+
+        SendMaintenanceNotice::dispatch('maintenance_scheduled', [
+            'maintenance_title' => (string) settings('maintenance_title', ''),
+            // The stored message is admin-authored HTML, but every {token} is
+            // HTML-escaped on render — dropped in as-is it would show its own
+            // markup as literal text in the email body.
+            'maintenance_message' => trim(strip_tags((string) settings('maintenance_message', ''))),
+            'restoration_time' => $restorationTime
+                ? Carbon::parse($restorationTime)->toDayDateTimeString().' UTC'
+                : translate('as soon as possible'),
+        ]);
+
+        // Records that this window was announced, so the all-clear only goes to a
+        // user base that was actually warned — going live after a silent
+        // maintenance would otherwise send "we are back" out of nowhere.
+        settings_set('maintenance_notice_sent', true, 'boolean', 'maintenance');
+
+        return back()->with('success', translate('Maintenance notice queued for :count users.', [
+            'count' => $this->maintenanceAudienceCount(),
+        ]));
+    }
+
+    /**
+     * Everyone SendMaintenanceNotice will actually mail.
+     */
+    private function maintenanceAudienceCount(): int
+    {
+        return SendMaintenanceNotice::audience()->count();
+    }
+
+    /**
+     * Announce the end of a maintenance window. Returns whether mail went out.
+     *
+     * Gated purely on whether the window was announced: telling people you are
+     * back only makes sense if you told them you were going. This one is safe to
+     * send from the toggle — by the time it runs the application is already up,
+     * so the queue is running again.
+     */
+    private function notifyMaintenanceBackOnline(): bool
+    {
+        if (! (bool) settings('maintenance_notice_sent', false)) {
+            return false;
+        }
+
+        settings_set('maintenance_notice_sent', false, 'boolean', 'maintenance');
+
+        SendMaintenanceNotice::dispatch('maintenance_completed');
+
+        return true;
     }
 
     protected function getDatabaseVersion()
@@ -410,8 +494,11 @@ class SystemController extends Controller
     {
         $home = getenv('HOME') ?: getenv('USERPROFILE');
 
-        return filled(getenv('CPANEL'))
-            || filled(getenv('cpanel'))
+        // Cast before filled(): getenv() returns boolean false for a missing
+        // variable, and filled(false) is true — so this short-circuited to true
+        // on every install and the cPanel banner always showed, even on Windows.
+        return filled((string) getenv('CPANEL'))
+            || filled((string) getenv('cpanel'))
             || ($home && is_dir($home.DIRECTORY_SEPARATOR.'.cpanel'));
     }
 
@@ -621,6 +708,10 @@ class SystemController extends Controller
             'current_version' => settings('app_version', '1.0.0'),
             'latest_version' => settings('update_version'),
             'update_available' => (bool) settings('update_available'),
+            // In test mode the License Server is never contacted and the manifest
+            // is simulated by bumping the current version, so the screen must not
+            // present that number as a real release it can install.
+            'test_mode' => \App\Support\PurchaseCode::testModeActive(),
             'changelog' => settings('update_changelog'),
             'last_checked' => settings('update_last_checked'),
             'rollback_available' => $rollbackAvailable,
