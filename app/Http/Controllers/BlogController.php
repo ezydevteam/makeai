@@ -260,6 +260,7 @@ class BlogController extends Controller
                         ->orWhere('content', 'like', "%{$search}%");
                 });
             })
+            ->when($request->string('sort')->toString() === 'featured', fn ($query) => $query->where('is_featured', true))
             ->when($request->string('sort')->toString() === 'popular', fn ($query) => $query->orderByDesc('views_count'))
             ->when($request->string('sort')->toString() === 'commented', fn ($query) => $query->orderByDesc('comments_count'))
             ->when(! in_array($request->string('sort')->toString(), ['popular', 'commented'], true), fn ($query) => $query->orderByDesc('is_sticky')->latest('published_at'));

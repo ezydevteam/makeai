@@ -4,7 +4,7 @@ slug: testimonials-and-faqs
 page: testimonials-and-faqs.html
 section: Content
 license: regular
-keywords: [testimonials, reviews, faq, frequently asked questions, homepage content, featured testimonial, faq category]
+keywords: [testimonials, reviews, faq, frequently asked questions, homepage content, featured testimonial, faq category, add testimonial, faq not showing, homepage reviews, star rating, ai generate testimonials]
 ---
 
 **Admin → Content → Testimonials** and **FAQs** manage the trust-building content shown on your homepage and public pages — customer quotes and answers to common questions, entirely separate from the AI Assistant's own documentation search.

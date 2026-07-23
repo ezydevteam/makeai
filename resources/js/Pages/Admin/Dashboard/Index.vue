@@ -1227,9 +1227,13 @@ async function drawAllCharts() {
 
     // Static aggregation charts (drawn once)
     if (props.aiByTool.length) {
+        const toolColors = props.aiByTool.map((_, index) => ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#ec4899','#14b8a6'][index % 8])
         await drawChart('aiByTool', chartRefs.aiByTool, () => ({
             type: 'doughnut',
-            data: { labels: props.aiByTool.map(t => t.label), datasets: [{ data: props.aiByTool.map(t => t.credits || 0), backgroundColor: ['#6366f1','#22c55e','#f59e0b','#ef4444','#06b6d4','#8b5cf6','#ec4899','#14b8a6'] }] },
+            // borderColor defaults to white in Chart.js, which shows as harsh white
+            // separators between arcs (and around the legend swatches) in dark mode.
+            // Match each arc's border to its own fill, like the provider doughnut above.
+            data: { labels: props.aiByTool.map(t => t.label), datasets: [{ data: props.aiByTool.map(t => t.credits || 0), backgroundColor: toolColors, borderColor: toolColors, borderWidth: 1 }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 8, font: { size: 10 } } } } },
         }))
     }
@@ -1301,8 +1305,20 @@ watch(chartPeriod, (period, previous) => {
 onMounted(() => { drawAllCharts(); fetchReminders() })
 onBeforeUnmount(() => Object.keys(chartInstances).forEach(k => destroyChart(k)))
 
-function timeAgo(time: string): string {
-    const diff = Date.now() - new Date(time).getTime()
+function timeAgo(time: string | null | undefined): string {
+    if (!time) return t('Just now')
+
+    // Accept both the ISO form ("…T…Z") and the bare "Y-m-d H:i:s" (UTC) the server
+    // can emit for uncast dates. The bare, space-separated form is rejected by strict
+    // JS engines, so `new Date()` returns Invalid Date → the old code fell through to
+    // "NaNd ago". Normalise it to an ISO UTC instant first.
+    const iso = typeof time === 'string' && time.includes(' ') && !time.includes('T')
+        ? `${time.replace(' ', 'T')}Z`
+        : time
+    const ts = new Date(iso).getTime()
+    if (Number.isNaN(ts)) return t('Just now')
+
+    const diff = Date.now() - ts
     const mins = Math.floor(diff / 60000)
     if (mins < 1) return t('Just now')
     if (mins < 60) return `${mins}m ago`

@@ -223,7 +223,7 @@ watch(realtime, () => {
         >
             <i :class="[notificationIconClass, 'text-[18px] leading-none']" :style="notificationIconStyle" aria-hidden="true" />
             <span v-if="props.label" class="max-w-full truncate text-[11px] leading-none">{{ props.label }}</span>
-            <span v-if="unreadCount > 0" class="absolute flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" :class="props.label ? 'right-2 top-1' : '-right-1 -top-1'">
+            <span v-if="unreadCount > 0" class="absolute flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" :class="props.label ? 'right-2 top-1' : 'right-0 top-0'">
                 {{ unreadCount > 99 ? '99+' : unreadCount }}
             </span>
         </button>

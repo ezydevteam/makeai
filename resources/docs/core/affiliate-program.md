@@ -4,7 +4,7 @@ slug: affiliate-program
 page: affiliate-program.html
 section: Marketing
 license: extended
-keywords: [affiliate, referral, commission, payout, referral link, affiliate program, commission rate, cookie duration]
+keywords: [affiliate, referral, commission, payout, referral link, affiliate program, commission rate, cookie duration, affiliate not tracking, payout request, referral not counted, affiliate dashboard, minimum payout]
 ---
 
 **Admin → Marketing → Affiliate** lets customers earn a commission for referring new signups and purchases — an Extended-license feature that also requires being switched on under **Settings → Features**.

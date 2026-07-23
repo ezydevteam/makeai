@@ -563,7 +563,7 @@ onBeforeUnmount(() => {
                     <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                         <tr>
                             <th class="w-10 px-4 py-3.5">
-                                <input type="checkbox" :checked="allVisibleSelected" :aria-label="t('Select all visible tickets')" @change="toggleAll">
+                                <input type="checkbox" class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600" :checked="allVisibleSelected" :aria-label="t('Select all visible tickets')" @change="toggleAll">
                             </th>
                             <th class="px-4 py-3.5 text-left">{{ t('Ticket') }}</th>
                             <th class="px-4 py-3.5 text-left">{{ t('Customer') }}</th>
@@ -584,6 +584,7 @@ onBeforeUnmount(() => {
                             <td class="px-4 py-4 align-top">
                                 <input
                                     type="checkbox"
+                                    class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                     :checked="selectedIds.includes(ticket.id)"
                                     :aria-label="t('Select ticket')"
                                     @change="toggleTicket(ticket.id)"
@@ -661,7 +662,7 @@ onBeforeUnmount(() => {
             @close="closeSettingsModal"
         >
             <div class="space-y-6">
-                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-5">
                         <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Automation & Notifications') }}</h4>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Control whether tickets are enabled and how support notifications behave.') }}</p>
@@ -684,7 +685,7 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-surface-800 dark:bg-surface-900">
+                <section class="rounded-2xl border border-gray-200 bg-white p-5  dark:border-surface-800 dark:bg-surface-900">
                     <div class="mb-5">
                         <h4 class="text-lg font-bold text-gray-900 dark:text-white">{{ t('Limits & SLA') }}</h4>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Set attachment limits, auto-close timing, and response expectations for your support team.') }}</p>
@@ -724,14 +725,14 @@ onBeforeUnmount(() => {
                     <div class="flex items-center gap-3">
                         <button
                             type="button"
-                            class="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
+                            class="rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-100 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-700"
                             @click="closeSettingsModal"
                         >
                             {{ t('Cancel') }}
                         </button>
                         <button
                             type="button"
-                            class="btn-primary-admin inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                            class="btn-primary-admin !rounded-full inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
                             :disabled="settingsForm.processing"
                             @click="submitSettings"
                         >

@@ -2,11 +2,18 @@
 
 namespace App\Providers;
 
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\ServiceProvider;
 
 class MailConfigServiceProvider extends ServiceProvider
 {
+    /** Fingerprint of the mail config last handed to the mail manager. */
+    protected ?string $appliedSignature = null;
+
     public function register(): void
     {
         //
@@ -14,9 +21,57 @@ class MailConfigServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        if (! $this->app->runningUnitTests()) {
-            $this->applyMailConfig();
+        if ($this->app->runningUnitTests()) {
+            return;
         }
+
+        // Mail config normally lives in the database so buyers can change it from
+        // the admin panel without shell access. That means it travels with the
+        // database: a production dump restored locally would otherwise hand a dev
+        // box live SMTP credentials, and this app mails real users on register,
+        // password reset and email change. Local/staging set this to opt out and
+        // keep whatever .env says (Mailpit, log, ...).
+        if (filter_var(env('MAIL_CONFIG_FROM_ENV', false), FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        $this->applyMailConfig();
+        $this->appliedSignature = $this->currentSignature();
+
+        // A queue worker boots once and runs for days, so the config applied above
+        // is a snapshot: an admin changing SMTP host, credentials or the from-name
+        // would keep seeing queued mail go out under the old settings until someone
+        // remembered to restart the worker. Re-apply before each job instead.
+        Event::listen(JobProcessing::class, function (): void {
+            $this->applyMailConfig();
+
+            $signature = $this->currentSignature();
+
+            if ($signature === $this->appliedSignature) {
+                return;
+            }
+
+            // Only when something actually changed — MailManager caches resolved
+            // mailers, and dropping them unconditionally would rebuild the SMTP
+            // transport for every job and forfeit connection reuse.
+            $this->appliedSignature = $signature;
+            Mail::forgetMailers();
+        });
+    }
+
+    /**
+     * Fingerprint of the mail config currently in effect, used to detect an
+     * admin-side settings change from inside a long-running worker.
+     */
+    protected function currentSignature(): string
+    {
+        $mailer = Config::get('mail.default');
+
+        return md5(serialize([
+            $mailer,
+            Config::get('mail.mailers.'.$mailer),
+            Config::get('mail.from'),
+        ]));
     }
 
     protected function applyMailConfig(): void
@@ -87,12 +142,25 @@ class MailConfigServiceProvider extends ServiceProvider
 
             Config::set('mail.default', $settings['mail_driver']);
 
+            // ?: not ?? — a blank saved value has to fall through too, otherwise an
+            // empty string wins and mail goes out with no sender name. An unset
+            // from-name follows the live site name rather than a build-time brand,
+            // so a rebranded install does not keep signing mail as someone else.
             Config::set('mail.from', [
-                'address' => $settings['mail_from_address'] ?? Config::get('mail.from.address'),
-                'name' => $settings['mail_from_name'] ?? Config::get('mail.from.name'),
+                'address' => $settings['mail_from_address'] ?: Config::get('mail.from.address'),
+                'name' => $settings['mail_from_name'] ?: settings('app_name', Config::get('mail.from.name')),
             ]);
-        } catch (\Exception $e) {
-            // Fail silently to avoid breaking the app if table doesn't exist yet
+        } catch (\Throwable $e) {
+            // Before the installer has run there is no settings table, and booting
+            // must not break — that case stays silent. Afterwards, swallowing this
+            // silently drops the app back to the .env mailer (often 'log'), so
+            // mail vanishes with nothing to point at. Say so.
+            if (filter_var(config('app.installed', false), FILTER_VALIDATE_BOOLEAN)) {
+                Log::warning('MailConfigServiceProvider: could not apply mail settings — falling back to the .env mailer.', [
+                    'mailer' => Config::get('mail.default'),
+                    'exception' => $e->getMessage(),
+                ]);
+            }
         }
     }
 }

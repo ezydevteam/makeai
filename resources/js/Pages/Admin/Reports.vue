@@ -56,6 +56,7 @@ interface ScheduledExport {
 
 const props = defineProps<{
     recentExports: ExportFile[]
+    exportRetentionDays: number
     exportTypes: ExportTypeMeta[]
     isProAvailable: boolean
     plans: { value: string; label: string }[]
@@ -147,6 +148,33 @@ function currentFilters(): Record<string, string | string[]> {
     if (gatewayFilter.value.length) f.gateway = gatewayFilter.value
     if (toolFilter.value.length) f.tool_slug = toolFilter.value
     return f
+}
+
+const retentionDays = ref(props.exportRetentionDays)
+const savingRetention = ref(false)
+const retentionSaved = ref(false)
+
+async function saveRetention() {
+    let days = Math.round(Number(retentionDays.value))
+    if (!Number.isFinite(days) || days < 0) days = 0
+    if (days > 3650) days = 3650
+    retentionDays.value = days
+    if (savingRetention.value) return
+    savingRetention.value = true
+    retentionSaved.value = false
+    try {
+        const res = await fetch(route('admin.reports.export.retention'), {
+            method: 'POST',
+            headers: jsonHeaders(),
+            body: JSON.stringify({ days }),
+        })
+        if (res.ok) {
+            retentionSaved.value = true
+            window.setTimeout(() => { retentionSaved.value = false }, 2000)
+        }
+    } finally {
+        savingRetention.value = false
+    }
 }
 
 async function saveCurrentPreset() {
@@ -761,7 +789,7 @@ onBeforeUnmount(() => {
                 </section>
 
                 <section
-                    v-if="hasFilter('status') || hasFilter('plan_id') || hasFilter('provider') || hasFilter('gateway') || hasFilter('tool_slug')"
+                    v-if="hasFilter('status') || (hasFilter('plan_id') && isProAvailable) || hasFilter('provider') || hasFilter('gateway') || hasFilter('tool_slug')"
                     class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900"
                 >
                     <h3 class="text-sm font-semibold text-gray-700 dark:text-white">{{ t('Filters') }}</h3>
@@ -774,7 +802,7 @@ onBeforeUnmount(() => {
                             :label="t('Status')"
                         />
                         <AppSelect
-                            v-if="hasFilter('plan_id')"
+                            v-if="hasFilter('plan_id') && isProAvailable"
                             v-model="planFilter"
                             :options="planOptions"
                             :placeholder="t('All plans')"
@@ -857,7 +885,7 @@ onBeforeUnmount(() => {
                     </p>
                 </section>
 
-                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                <section v-if="isProAvailable" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
                     <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Recurring Schedule') }}</label>
 
                     <div v-if="localSchedules.length" class="mb-4 space-y-2">
@@ -935,6 +963,25 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                     <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ t('Recurring exports use a rolling date range (e.g. weekly = last 7 days) and notify you in-app when ready.') }}</p>
+                </section>
+
+                <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-surface-800 dark:bg-surface-900">
+                    <label class="mb-3 block text-sm font-semibold text-gray-700 dark:text-gray-400">{{ t('Export Retention') }}</label>
+                    <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                        <span>{{ t('Auto-delete export files older than') }}</span>
+                        <input
+                            v-model.number="retentionDays"
+                            type="number"
+                            min="0"
+                            max="3650"
+                            class="w-20 rounded-xl border border-gray-200 bg-white px-3 py-2 text-center text-sm text-gray-900 focus:border-primary-500 focus:outline-none dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                            @change="saveRetention"
+                            @keyup.enter="saveRetention"
+                        >
+                        <span>{{ t('days') }}</span>
+                        <i v-if="retentionSaved" class="ti ti-check text-base text-emerald-500"></i>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ t('Older files in Recent Exports are pruned daily. Set to 0 to keep them indefinitely.') }}</p>
                 </section>
 
                 <section v-if="estimateMessage || estimatedRows !== null" class="rounded-2xl border border-primary-100 bg-primary-50 p-5 dark:border-primary-900/40 dark:bg-primary-900/20">
@@ -1031,11 +1078,11 @@ onBeforeUnmount(() => {
                 <table class="w-full text-sm">
                     <thead class="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800/80">
                         <tr>
-                            <th class="px-6 py-3">{{ t('Filename') }}</th>
-                            <th class="px-6 py-3">{{ t('Type') }}</th>
-                            <th class="px-6 py-3">{{ t('Format') }}</th>
-                            <th class="px-6 py-3">{{ t('Size') }}</th>
-                            <th class="px-6 py-3">{{ t('Date') }}</th>
+                            <th class="px-6 py-3 text-left">{{ t('Filename') }}</th>
+                            <th class="px-6 py-3 text-center">{{ t('Type') }}</th>
+                            <th class="px-6 py-3 text-center">{{ t('Format') }}</th>
+                            <th class="px-6 py-3 text-center">{{ t('Size') }}</th>
+                            <th class="px-6 py-3 text-center">{{ t('Date') }}</th>
                             <th class="px-6 py-3 text-right">{{ t('Actions') }}</th>
                         </tr>
                     </thead>
@@ -1044,19 +1091,19 @@ onBeforeUnmount(() => {
                             <td class="px-6 py-4">
                                 <div class="font-medium text-gray-900 dark:text-white">{{ file.filename }}</div>
                             </td>
-                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ t(file.type) }}</td>
-                            <td class="px-6 py-4">
-                                <span class="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-semibold uppercase text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ file.format }}</span>
+                            <td class="px-6 py-4 text-center capitalize text-gray-500 dark:text-gray-400">{{ t(file.type) }}</td>
+                            <td class="px-6 py-4 text-center">
+                                <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold uppercase text-gray-600 dark:bg-surface-800 dark:text-gray-300">{{ file.format }}</span>
                             </td>
-                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ formatSize(file.size) }}</td>
-                            <td class="px-6 py-4 text-gray-500 dark:text-gray-400">{{ timeAgo(file.modified) }}</td>
+                            <td class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">{{ formatSize(file.size) }}</td>
+                            <td class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">{{ timeAgo(file.modified) }}</td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center justify-end gap-2">
                                     <Tooltip :content="t('Download export')" placement="top">
                                         <a
                                             :href="route('admin.reports.export.download', { file: file.filename })"
                                             target="_blank"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-primary-200 bg-primary-50 text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100 dark:border-primary-900/50 dark:bg-primary-900/20 dark:text-primary-300"
                                         >
                                             <i class="ti ti-download text-base"></i>
                                         </a>
@@ -1065,7 +1112,7 @@ onBeforeUnmount(() => {
                                         <button
                                             type="button"
                                             :disabled="deletingPath === file.path"
-                                            class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+                                            class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
                                             @click="deleteTarget = file"
                                         >
                                             <i class="ti ti-trash text-base"></i>

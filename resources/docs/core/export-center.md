@@ -4,7 +4,7 @@ slug: export-center
 page: export-center.html
 section: Export Center
 license: regular
-keywords: [export, export center, csv, xlsx, pdf, scheduled export, report, data export, download data]
+keywords: [export, export center, csv, xlsx, pdf, scheduled export, report, data export, download data, export failed, schedule export, export users, export transactions, export not working]
 ---
 
 **Admin → Export Center** exports data out of your site — customers, transactions, AI usage, and more — as a file you can download, without writing a query.

@@ -4,7 +4,7 @@ slug: ai-integrations-and-usage-logs
 page: ai-integrations-and-usage-logs.html
 section: AI
 license: regular
-keywords: [integrations, plagiarism checker, ai detector, grammar checker, translation, usage logs, ai requests, tokens, cost, credits spent]
+keywords: [integrations, plagiarism checker, ai detector, grammar checker, translation, usage logs, ai requests, tokens, cost, credits spent, copyscape, originality.ai, gptzero, sapling, languagetool, deepl, google translate, failed request, fixed credit cost]
 ---
 
 **Admin → AI Management → Integrations** and **Usage & Logs** cover two different things: connecting paid third-party AI utilities, and monitoring what your AI usage actually costs day to day.

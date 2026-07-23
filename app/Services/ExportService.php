@@ -5,6 +5,7 @@ namespace App\Services;
 use Maatwebsite\Excel\Facades\Excel;
 use Mpdf\Mpdf;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\LazyCollection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -53,6 +54,23 @@ class ExportService
     public function storeExcel(object $export, string $path, string $disk = 'local'): void
     {
         Excel::store($export, $path, $disk);
+    }
+
+    /**
+     * Write a CSV export straight to a disk path, streaming rows so memory stays
+     * bounded regardless of row count. Used so synchronous exports are persisted
+     * (and appear in Recent Exports) rather than only streamed to the browser.
+     */
+    public function storeCsv(string $path, array $headers, LazyCollection $rows, callable $mapper, string $disk = 'local'): void
+    {
+        $storage = Storage::disk($disk);
+        $storage->makeDirectory(dirname($path));
+
+        $handle = fopen($storage->path($path), 'w');
+        fprintf($handle, "\xEF\xBB\xBF");
+        fputcsv($handle, $headers);
+        $rows->each(fn ($row) => fputcsv($handle, $mapper($row)));
+        fclose($handle);
     }
 
     /** Build a CSV file as a string (BOM + header + rows) for storage. */

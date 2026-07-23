@@ -26,6 +26,7 @@ class Page extends Model
         'og_image',
         'featured_image',
         'show_title',
+        'show_excerpt',
         'center_title',
         'show_breadcrumbs',
         'show_featured_image',
@@ -43,6 +44,7 @@ class Page extends Model
 
     protected $casts = [
         'show_title' => 'boolean',
+        'show_excerpt' => 'boolean',
         'center_title' => 'boolean',
         'show_breadcrumbs' => 'boolean',
         'show_featured_image' => 'boolean',

@@ -187,28 +187,17 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Show the form for creating a new user.
-     */
-    public function create()
-    {
-        return Inertia::render('Admin/Roles/Users/Create', [
-            // Plans are a subscription (Extended License) feature. On a Regular
-            // license there are no paid plans to assign, so ship an empty list and
-            // a flag the form uses to hide the field entirely.
-            'canAssignPlan' => isProAvailable(),
-            'plans' => isProAvailable() ? Plan::active()->get(['id', 'name']) : [],
-            'countries' => collect(\App\Support\CountryCatalog::countries(app()->getLocale()))->map(fn($c) => [
-                'value' => $c['code'],
-                'label' => $c['name']
-            ])->values()->all(),
-        ]);
-    }
-
-    /**
      * Store a newly created user.
+     *
+     * User creation is served by the modal on the index page (Index.vue); there is no
+     * standalone create page/route anymore.
      */
     public function store(StoreUserRequest $request)
     {
+        // Creation requires the explicit users.create permission — users.manage (the
+        // read/bulk umbrella) does not grant it. Matches the granular delete/edit gates.
+        $this->authorizeAdmin('users.create');
+
         $validated = $request->validated();
 
         $user = User::create([
@@ -473,7 +462,10 @@ class UserManagementController extends Controller
      */
     public function destroy(User $user)
     {
-        $this->authorizeAdmin('users.delete', 'users.manage');
+        // Deletion requires the explicit users.delete permission. The broad users.manage
+        // grant intentionally does NOT cover it — the built-in "manager" role has
+        // users.manage but not users.delete, and must not be able to delete users.
+        $this->authorizeAdmin('users.delete');
 
         // User::booted() already cancels this delete, but that would be a silent no-op with a
         // "moved to trash" success message on top of it. Say what happened instead.
@@ -494,6 +486,8 @@ class UserManagementController extends Controller
      */
     public function restore(User $user)
     {
+        $this->authorizeAdmin('users.delete');
+
         $user->restore();
 
         return back()->with('success', translate('User restored successfully.'));
@@ -530,6 +524,15 @@ class UserManagementController extends Controller
             'value' => 'nullable|numeric|min:0|required_if:action,add_credits',
         ]);
 
+        // Each bulk sub-action requires the same granular permission as its single-user
+        // equivalent — users.manage does not blanket-grant them. activate/deactivate are
+        // edits, add_credits needs users.credits, delete needs users.delete.
+        match ($request->action) {
+            'delete' => $this->authorizeAdmin('users.delete'),
+            'add_credits' => $this->authorizeAdmin('users.credits'),
+            default => $this->authorizeAdmin('users.edit'), // activate, deactivate
+        };
+
         // excludingInternal() is load-bearing here, not belt-and-braces: these are mass-update
         // and mass-delete QUERIES, which do not fire Eloquent model events — so the deleting()
         // guard on the model cannot see them. The system account is filtered out of the set
@@ -562,6 +565,8 @@ class UserManagementController extends Controller
      */
     public function bulkTrashAction(Request $request)
     {
+        $this->authorizeAdmin('users.delete');
+
         $request->validate([
             'ids' => 'required|array',
             'action' => 'required|string|in:restore,force_delete',
@@ -592,7 +597,9 @@ class UserManagementController extends Controller
      */
     public function impersonate(User $user)
     {
-        $this->authorizeAdmin('users.impersonate', 'users.manage');
+        // Impersonation requires the explicit users.impersonate permission — users.manage
+        // does not grant account takeover (the "manager" role has manage but not this).
+        $this->authorizeAdmin('users.impersonate');
 
         // Nobody signs in as the system account. It has a random password, no owner, and a
         // session as it would be a live login to an account that bypasses credit limits.
@@ -653,7 +660,11 @@ class UserManagementController extends Controller
             'Expires' => '0',
         ];
 
-        $columns = [
+        // Plans/billing only exist on the Extended license — drop the Plan column
+        // entirely on a Regular license, where every user is on the Free plan.
+        $includePlan = isProAvailable();
+
+        $columns = array_values(array_filter([
             translate('ULID'),
             translate('Name'),
             translate('Email'),
@@ -663,18 +674,18 @@ class UserManagementController extends Controller
             translate('Credits'),
             translate('Daily Usage'),
             translate('Monthly Usage'),
-            translate('Plan'),
+            $includePlan ? translate('Plan') : null,
             translate('Status'),
             translate('Joined At'),
-        ];
+        ], fn ($column) => $column !== null));
 
-        $callback = function () use ($columns) {
+        $callback = function () use ($columns, $includePlan) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
             // Stream in chunks so exporting a large user base never exhausts memory.
-            User::query()->excludingInternal()->with('plan')->orderBy('id')->lazy(500)->each(function (User $user) use ($file) {
-                fputcsv($file, [
+            User::query()->excludingInternal()->with('plan')->orderBy('id')->lazy(500)->each(function (User $user) use ($file, $includePlan) {
+                $row = [
                     $user->ulid,
                     $user->name,
                     $user->email,
@@ -685,10 +696,16 @@ class UserManagementController extends Controller
                     $user->credits,
                     $user->credits_used_today,
                     $user->credits_used_month,
-                    $user->plan?->name ?? translate('None'),
-                    $user->is_active ? translate('Active') : translate('Inactive'),
-                    $user->created_at->format('Y-m-d H:i:s'),
-                ]);
+                ];
+
+                if ($includePlan) {
+                    $row[] = $user->plan?->name ?? translate('None');
+                }
+
+                $row[] = $user->is_active ? translate('Active') : translate('Inactive');
+                $row[] = $user->created_at->format('Y-m-d H:i:s');
+
+                fputcsv($file, $row);
             });
 
             fclose($file);
@@ -714,7 +731,7 @@ class UserManagementController extends Controller
      */
     public function toggleBan(Request $request, User $user)
     {
-        $this->authorizeAdmin('users.edit', 'users.manage');
+        $this->authorizeAdmin('users.edit');
 
         $validated = $request->validate([
             'ban_reason' => ['nullable', 'string', 'max:500'],

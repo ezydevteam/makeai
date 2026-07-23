@@ -4,7 +4,7 @@ slug: core-site-settings
 page: core-site-settings.html
 section: Settings
 license: regular
-keywords: [site name, tagline, currency, timezone, language, feature toggles, follow counters, social counts, enable blog, enable registration]
+keywords: [site name, tagline, site title, currency, currency symbol, timezone, language, feature toggles, follow counters, social counts, enable blog, enable registration, disable registration, email verification, feature not showing, social counter zero, default currency]
 ---
 
 **Admin → Settings → General**, **Features**, and **Social** cover your site's basic identity, which major features are switched on, and the follow-counter numbers shown on your public pages.

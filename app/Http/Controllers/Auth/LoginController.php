@@ -170,6 +170,13 @@ class LoginController extends Controller
             ]);
         }
 
+        if ($user->is_banned) {
+            Auth::logout();
+            throw ValidationException::withMessages([
+                'email' => [translate('Your account has been suspended. Please contact support.')],
+            ]);
+        }
+
         if ($user->two_factor_enabled) {
             $request->session()->put('user_2fa_id', $user->id);
             $request->session()->put('user_2fa_remember', $request->boolean('remember'));

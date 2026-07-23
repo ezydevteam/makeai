@@ -207,10 +207,10 @@ const runConfirmedAction = () => {
 
 const confirmDelete = (page: PageItem) => {
     openConfirmModal({
-        title: t('Move page to trash?'),
-        message: t('Move page :name to trash?', { name: page.title }),
-        confirmLabel: t('Move to Trash'),
-        processingLabel: t('Moving...'),
+        title: t('Are you sure want to delete?'),
+        message: t('Delete :name? you can not restore it anymore.', { name: page.title }),
+        confirmLabel: t('Yes, Delete'),
+        processingLabel: t('Deleting...'),
         variant: 'danger',
         action: () => {
             router.delete(route('admin.pages.delete', page.id), {
@@ -414,7 +414,7 @@ onBeforeUnmount(() => {
                                                 @click="confirmDelete(page); close()"
                                             >
                                                 <i class="ti ti-trash text-base"></i>
-                                                {{ t('Move to Trash') }}
+                                                {{ t('Delete') }}
                                             </button>
                                         </template>
                                     </TableActionMenu>

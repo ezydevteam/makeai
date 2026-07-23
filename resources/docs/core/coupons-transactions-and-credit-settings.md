@@ -4,7 +4,7 @@ slug: coupons-transactions-and-credit-settings
 page: coupons-transactions-and-credit-settings.html
 section: Payments
 license: extended
-keywords: [coupon, discount code, transactions, payment history, refund, approve payment, bank transfer proof, credit top-up, buy credits, quick amounts, bonus credits]
+keywords: [coupon, discount code, transactions, payment history, refund, approve payment, bank transfer proof, credit top-up, buy credits, quick amounts, bonus credits, coupon not working, invalid coupon, pending payment, approve bank transfer, reject payment, top-up not showing, bonus tier]
 ---
 
 **Admin → Premium** has three more screens beyond Plans and Gateways: **Coupons** for discount codes, **Transactions** for your payment history, and **Credits** for how customers top up their balance.

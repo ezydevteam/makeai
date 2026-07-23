@@ -74,8 +74,9 @@ const isLoading = ref(false)
 
 const sortOptions = computed(() => [
     { value: 'latest', label: t('Latest') },
-    { value: 'popular', label: t('Most Popular') },
-    { value: 'commented', label: t('Most Commented') },
+    { value: 'featured', label: t('Featured') },
+    { value: 'popular', label: t('Popular') },
+    { value: 'commented', label: t('Commented') },
 ])
 
 const applyFilters = () => {
@@ -102,6 +103,13 @@ watch(search, () => {
 const formatDate = (value: string | null) => {
     if (!value) return ''
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
+}
+
+// Compact view counts: 1500 -> 1.5k, 1200000 -> 1.2m
+const formatViews = (value: number): string => {
+    if (value >= 1_000_000) return (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'm'
+    if (value >= 1_000) return (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k'
+    return String(value)
 }
 </script>
 
@@ -157,11 +165,19 @@ const formatDate = (value: string | null) => {
                                 id="blog-search"
                                 v-model="search"
                                 @keyup.enter="applyFilters"
-                                @search="applyFilters"
-                                type="search"
+                                type="text"
                                 :placeholder="t('Search articles...')"
-                                class="w-full rounded-lg border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 pl-9 pr-4 py-2 text-sm text-gray-900 dark:text-white focus:border-primary-400 focus:ring-primary-400"
+                                class="w-full rounded-lg border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-800 pl-9 pr-9 py-2 text-sm text-gray-900 dark:text-white focus:border-primary-400 focus:ring-primary-400"
                             >
+                            <button
+                                v-if="search"
+                                type="button"
+                                class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                                :aria-label="t('Clear search')"
+                                @click="search = ''"
+                            >
+                                <i class="ti ti-x text-base"></i>
+                            </button>
                         </div>
                         <div class="w-full sm:w-48 shrink-0">
                             <label class="sr-only" for="blog-sort">{{ t('Sort') }}</label>
@@ -201,13 +217,15 @@ const formatDate = (value: string | null) => {
                         <div v-if="posts.data.length" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                             <template v-for="(post, index) in posts.data" :key="post.ulid">
                                 <Link :href="route('blog.show', post.slug)" class="group bg-white dark:bg-surface-900 border border-gray-100 dark:border-surface-800 rounded-xl shadow-sm overflow-hidden hover:!border-primary-200 dark:hover:!border-primary-900/60 hover:shadow-md transition-all">
-                                    <div class="aspect-[16/9] bg-gray-100 dark:bg-surface-800 overflow-hidden">
+                                    <div class="relative aspect-[16/9] bg-gray-100 dark:bg-surface-800 overflow-hidden">
                                         <img v-if="post.featured_image" :src="mediaUrl(post.featured_image)" :alt="post.featured_image_alt || post.title" class="h-full w-full object-cover group-hover:scale-[1.02] transition-transform duration-200">
                                         <div v-else class="h-full w-full bg-gradient-to-br from-primary-100 to-accent-400/20 dark:from-primary-900/30 dark:to-surface-800"></div>
+                                        <span v-if="post.is_featured" class="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-violet-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+                                            <i class="ti ti-star-filled text-xs"></i>{{ t('Featured') }}
+                                        </span>
                                     </div>
                                     <div class="p-5">
                                         <div class="flex flex-wrap gap-2 mb-3">
-                                            <span v-if="post.is_featured" class="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">{{ t('Featured') }}</span>
                                             <span
                                                 v-if="post.categories && post.categories.length > 0"
                                                 class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors"
@@ -237,7 +255,7 @@ const formatDate = (value: string | null) => {
                                                 <span v-if="blogSettings.show_reading_time_archive && blogSettings.show_view_count_archive && post.views_count" class="text-gray-300 dark:text-surface-700">•</span>
                                                 <span v-if="blogSettings.show_view_count_archive && post.views_count" class="flex items-center gap-1">
                                                     <i class="ti ti-eye"></i>
-                                                    {{ new Intl.NumberFormat().format(post.views_count) }}
+                                                    {{ formatViews(post.views_count) }}
                                                 </span>
                                             </div>
                                         </div>

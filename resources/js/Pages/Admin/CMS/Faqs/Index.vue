@@ -6,7 +6,6 @@ import AppModal from '@/Components/UI/AppModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
 import AppSwitch from '@/Components/UI/AppSwitch.vue'
-import Tooltip from '@/Components/UI/Tooltip.vue'
 import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useToastr } from '@/Composables/useToastr'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -343,24 +342,26 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
 
                     <div class="flex items-center gap-2">
                         <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-xl border border-primary-200 bg-primary-50 px-3 py-1 text-sm font-semibold text-primary-700 transition hover:bg-primary-100 dark:border-primary-900/30 dark:bg-primary-900/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
+                            @click="openCreateFaq(category.id)"
+                        >
+                            <i class="ti ti-plus"></i>
+                            {{ t('FAQ') }}
+                        </button>
+
+                        <button
                             v-if="category.faqs.length > 0"
                             type="button"
-                            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
+                            class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:bg-surface-800 dark:hover:text-white"
                             :aria-label="isSectionCollapsed(`category-${category.id}`) ? t('Expand section') : t('Collapse section')"
+                            :title="isSectionCollapsed(`category-${category.id}`) ? t('Expand section') : t('Collapse section')"
                             @click="toggleSectionCollapse(`category-${category.id}`)"
                         >
                             <i
                                 class="ti text-base transition-transform"
                                 :class="isSectionCollapsed(`category-${category.id}`) ? 'ti-chevron-down' : 'ti-chevron-up'"
                             ></i>
-                        </button>
-                        <button
-                            type="button"
-                            class="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3.5 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-100 dark:border-primary-900/30 dark:bg-primary-900/20 dark:text-primary-300 dark:hover:bg-primary-900/30"
-                            @click="openCreateFaq(category.id)"
-                        >
-                            <i class="ti ti-plus text-base"></i>
-                            {{ t('FAQ') }}
                         </button>
 
                         <TableActionMenu>
@@ -555,7 +556,7 @@ const isSectionCollapsed = (key: string) => collapsedSections.value[key] === tru
                                 type="number"
                                 min="0"
                                 :placeholder="t('e.g. 1')"
-                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 transition focus:border-emerald-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 dark:border-surface-700 dark:bg-surface-800 dark:text-white"
                             >
                         </div>
                     </div>

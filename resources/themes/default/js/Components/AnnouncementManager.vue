@@ -200,8 +200,21 @@ const scheduleByTrigger = (a: Announcement, show: (a: Announcement) => void) => 
     }
 }
 
+// Publish the total height of the pinned top banners (coupon + topbar) as a CSS
+// variable so the sticky header (and the dashboard's fixed sidebar) can offset
+// below them instead of overlapping. 0 when nothing is active.
+const recomputeTopBannerHeight = () => {
+    if (typeof document === 'undefined') return
+    // Measure the whole pinned stack (impersonation banner + coupon + topbar),
+    // falling back to just this component's container when no wrapper is present.
+    const el = document.getElementById('top-sticky-stack') ?? document.getElementById('top-announcement-container')
+    const height = el ? Math.round(el.getBoundingClientRect().height) : 0
+    document.documentElement.style.setProperty('--top-banners-height', `${height}px`)
+}
+
 const notifyChange = () => {
     nextTick(() => {
+        recomputeTopBannerHeight()
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('announcement:change'))
         }
@@ -240,6 +253,7 @@ onMounted(() => {
 
     window.addEventListener('scroll', scheduleOffsetRecompute, { passive: true })
     window.addEventListener('resize', scheduleOffsetRecompute)
+    window.addEventListener('resize', recomputeTopBannerHeight)
     notifyChange()
 })
 
@@ -250,6 +264,10 @@ onUnmounted(() => {
 
     window.removeEventListener('scroll', scheduleOffsetRecompute)
     window.removeEventListener('resize', scheduleOffsetRecompute)
+    window.removeEventListener('resize', recomputeTopBannerHeight)
+    if (typeof document !== 'undefined') {
+        document.documentElement.style.setProperty('--top-banners-height', '0px')
+    }
     if (offsetRafId !== null) {
         window.cancelAnimationFrame(offsetRafId)
     }

@@ -4,7 +4,7 @@ slug: managing-pricing-plans
 page: managing-pricing-plans.html
 section: Payments
 license: extended
-keywords: [plan, pricing, stripe price id, paypal plan id, trial, credits allowance, featured plan, country pricing, lifetime plan]
+keywords: [plan, pricing, stripe price id, paypal plan id, trial, credits allowance, featured plan, country pricing, lifetime plan, cant create plan, plan not showing, edit plan, monthly yearly lifetime, trial days, plan settings, price per credit]
 ---
 
 **Admin → Premium → Plans** is where you set what each pricing tier gives a subscriber. Plans ship pre-seeded with your install — there is no "Create Plan" button, since plans map to fixed slots the product already understands; you edit the existing plan cards instead of adding new ones from scratch.

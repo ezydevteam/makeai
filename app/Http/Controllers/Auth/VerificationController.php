@@ -15,11 +15,17 @@ class VerificationController extends Controller
 {
     public function notice()
     {
-        if (Auth::user()->hasVerifiedEmail()) {
+        $user = Auth::user();
+
+        if ($user->hasVerifiedEmail()) {
             return redirect()->route('user.dashboard');
         }
 
-        return Inertia::render('Auth/VerifyEmail');
+        // Shown on the screen: after an email change the code goes to the NEW
+        // address, and "check your email" alone is ambiguous about which.
+        return Inertia::render('Auth/VerifyEmail', [
+            'email' => $user->email,
+        ]);
     }
 
     public function verify(Request $request)

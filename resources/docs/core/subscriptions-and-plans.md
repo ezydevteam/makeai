@@ -4,7 +4,7 @@ slug: subscriptions-and-plans
 page: subscriptions-and-plans.html
 section: Payments
 license: extended
-keywords: [subscription, plan, billing, stripe, paddle, checkout, recurring, upgrade, pro]
+keywords: [subscription, plan, billing, stripe, paddle, checkout, recurring, upgrade, pro, subscriber not pro, pro not working, master switch, metered mode, subscription lapsed, grant plan, pro only]
 ---
 
 Selling recurring plans requires an **Extended license**. On a Regular license there is no

@@ -69,6 +69,15 @@ class AppServiceProvider extends ServiceProvider
         if (config('app.license_test_mode') && app()->environment('production')) {
             \Illuminate\Support\Facades\Log::critical('LICENSE_TEST_MODE is enabled in a production environment! This must be disabled immediately.');
         }
+
+        // Demo mode needs the two published account passwords to seed its accounts.
+        // They have no default (see config/demo.php), so if DEMO_ENABLED=true without
+        // them, DemoSeeder throws — the scheduled 6-hourly demo:reset then wipes the
+        // database via migrate:refresh and fails to reseed, leaving the demo with no
+        // admin/showcase login. Surface that at boot instead of only at reset time.
+        if (config('demo.enabled') && (blank(config('demo.admin_password')) || blank(config('demo.user_password')))) {
+            Log::warning('Demo mode is enabled (DEMO_ENABLED=true) but DEMO_ADMIN_PASSWORD and/or DEMO_USER_PASSWORD are not set in .env. DemoSeeder will fail and the scheduled demo:reset cannot recreate the demo accounts until both are set.');
+        }
     }
 
     /**

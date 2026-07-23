@@ -4,7 +4,7 @@ slug: roles-and-permissions
 page: roles-and-permissions.html
 section: Roles
 license: regular
-keywords: [rbac, roles, permissions, custom role, super admin, manager, support role, content manager, access control, staff permissions]
+keywords: [rbac, roles, permissions, custom role, super admin, manager, support role, content manager, access control, staff permissions, cant see menu, missing permission, restore default role, create role, assign role, cant delete role]
 ---
 
 **Admin → Roles → Admins → Manage Roles** controls exactly what each staff account can see and do. Every admin is assigned exactly one role, and that role's permission checklist decides which sidebar sections and actions they have access to.

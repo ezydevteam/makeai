@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\DisableTwoFactorRequest;
 use App\Http\Requests\Auth\EnableTwoFactorRequest;
 use App\Http\Requests\Auth\RegenerateRecoveryCodesRequest;
 use App\Http\Requests\User\UpdateProfileRequest;
+use App\Jobs\SendTemplatedEmail;
 use App\Models\User;
 use App\Models\UserByok;
 use App\Services\MailService;
@@ -141,10 +142,6 @@ class SettingsController extends Controller
         }
 
         if ($emailChanged) {
-            $user->email_verified_at = null;
-            $user->save();
-            $user->sendEmailVerificationNotification();
-
             // Security alert to the previous address so the owner is warned if
             // the change wasn't them. {user_email} is the new address.
             app(MailService::class)->send('email_changed', $previousEmail, [
@@ -152,8 +149,29 @@ class SettingsController extends Controller
                 'user_email' => $user->email,
             ]);
 
-            return redirect()->route('user.dashboard.profile')
-                ->with('success', translate('Profile updated. Please verify your new email address.'));
+            // With verification switched off, verification.notice 404s and the
+            // `verified` gate would lock the account out of the whole dashboard,
+            // so the new address inherits the verified state.
+            if (! (bool) settings('email_verification_enabled', true)) {
+                $user->markEmailAsVerified();
+
+                return redirect()->route('user.dashboard.profile')
+                    ->with('success', translate('Profile updated successfully.'));
+            }
+
+            $user->forceFill(['email_verified_at' => null])->save();
+
+            // This platform verifies by 6-digit code, not by signed link — the
+            // framework's sendEmailVerificationNotification() mailed a link that
+            // no route even answers, while the UI asked for a code.
+            SendTemplatedEmail::dispatch('email_verify_otp', $user->email, [
+                'user_name' => $user->name,
+                'site_name' => settings('app_name', translate('Application')),
+                'otp_code' => $user->generateOtp(),
+            ])->onQueue('otp');
+
+            return redirect()->route('verification.notice')
+                ->with('success', translate('Profile updated. Enter the code we sent to your new email address.'));
         }
 
         return redirect()->route('user.dashboard.profile')
@@ -193,6 +211,13 @@ class SettingsController extends Controller
             'password' => $validated['password'],
             'password_changed_at' => now(),
         ]);
+
+        // Same out-of-band alert the reset flow sends: a password change from
+        // inside a stolen session is exactly the case worth warning about.
+        SendTemplatedEmail::dispatch('password_changed', $user->email, [
+            'user_name' => $user->name,
+            'user_email' => $user->email,
+        ])->onQueue('emails');
 
         return redirect()->route('user.dashboard.profile')
             ->with('success', translate('Password changed successfully.'));

@@ -1051,7 +1051,11 @@ const bottomSectionVisibilityClass = (config: any) => isBottomHeaderVisible(conf
     ? 'translate-y-0 opacity-100'
     : 'translate-y-full opacity-0 pointer-events-none'
 
-const stickyTop = (_section: 'main' | 'mobile' | 'mobile_bottom') => '0px'
+// Top-sticking sections sit below the pinned announcement/coupon banners (whose
+// combined height AnnouncementManager publishes as --top-banners-height), so the
+// header offsets down instead of overlapping them. The bottom nav is unaffected.
+const stickyTop = (section: 'main' | 'mobile' | 'mobile_bottom') =>
+    section === 'mobile_bottom' ? '0px' : 'var(--top-banners-height, 0px)'
 
 const sectionStyle = (config: any, section: 'main' | 'mobile' | 'mobile_bottom', defaultHeight: number): CSSProperties => {
     const resolvedHeight = Number(config?.height ?? defaultHeight)

@@ -139,7 +139,7 @@ const ticketPriorityLabel = (value: string) => {
 }
 
 const replyTypeLabel = (reply: Reply) => {
-    if (reply.is_ai_draft) return t('AI draft')
+    if (reply.is_ai_draft) return t('AI reply')
     if (reply.is_internal_note) return t('Internal note')
 
     const labels: Record<string, string> = {
@@ -322,14 +322,14 @@ const suggestReply = async () => {
                                 </span>
                             </div>
 
-                            <div class="prose prose-sm max-w-none dark:prose-invert" v-html="sanitizeHtml(reply.content)"></div>
+                            <div class="ticket-content prose prose-sm max-w-none dark:prose-invert" v-html="sanitizeHtml(reply.content)"></div>
 
                             <div v-if="reply.attachments?.length" class="mt-4 flex flex-wrap gap-2">
                                 <a
                                     v-for="attachment in reply.attachments"
                                     :key="attachment.url"
                                     :href="attachment.url"
-                                    class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                    class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                                 >
                                     <i class="ti ti-paperclip text-sm"></i>
                                     {{ attachment.name }}
@@ -368,7 +368,7 @@ const suggestReply = async () => {
                                     v-if="settings.ai_reply_suggestion"
                                     type="button"
                                     :disabled="aiLoading"
-                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900/40 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/30"
                                     @click="suggestReply"
                                 >
                                     <i v-if="aiLoading" class="ti ti-loader animate-spin text-base"></i>

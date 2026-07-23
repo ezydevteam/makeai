@@ -17,7 +17,10 @@ class BlogPostPolicy
         return $admin->hasPermission('content.blog');
     }
 
-    public function update(Admin $admin, BlogPost $post): bool
+    // $post is optional so this ability can be checked at the class level too
+    // (e.g. bulk actions authorize 'update' against BlogPost::class, with no
+    // single instance to pass). The permission check doesn't need the model.
+    public function update(Admin $admin, ?BlogPost $post = null): bool
     {
         return $admin->hasPermission('content.blog');
     }

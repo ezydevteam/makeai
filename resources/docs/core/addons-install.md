@@ -4,7 +4,7 @@ slug: addons-install
 page: addons-install.html
 section: Addons
 license: regular
-keywords: [addon, plugin, install, activate, deactivate, extension, module, install a new addon, how do I install an addon, upload addon zip]
+keywords: [addon, plugin, install, activate, deactivate, extension, module, install a new addon, how do I install an addon, upload addon zip, addon won't install, upload failed, zip too large, enter license, addon not showing, activate missing, addon license code]
 ---
 
 Addons extend MakeAI without modifying its core. Each one is self-contained: its own
@@ -45,3 +45,20 @@ disappears from the settings screen, and answers simply come back ungrounded.
 
 If a toggle you expect is missing from an addon's settings, check whether the addon it
 depends on is installed and active. That is nearly always the cause.
+
+## Why an addon won't install or activate
+
+- **The upload is rejected.** The `.zip` is over the 20 MB limit, or it isn't a valid addon
+  package. Re-download it from your account and upload the original file as-is — don't unzip
+  and re-zip it first.
+- **The row shows Enter License instead of Activate.** That addon requires its own Envato
+  purchase code, separate from your MakeAI core code. Paste the addon's code to unlock the
+  Activate action.
+- **The addon's features never appear even though its folder is on the server.** Being
+  present on disk is not the same as being installed — upload it through **Upload Addon** so
+  its migrations run and its tables are created. A folder copied in by hand is treated as
+  absent.
+- **A toggle or feature is missing from an addon's settings.** It almost always depends on
+  another addon that isn't installed and active, as described above. If the dependency is
+  present, check the Addon Manager for an **UPDATE** badge — an addon running behind its
+  packaged version can hide or misbehave on newer features until it is updated.

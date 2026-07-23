@@ -59,6 +59,7 @@ class ExportCenterController extends Controller
 
         return Inertia::render('Admin/Reports', [
             'recentExports' => $files,
+            'exportRetentionDays' => (int) settings('export_retention_days', 30),
             // Registry already filters by availability, so the picker (and its
             // per-dataset column/filter metadata) reflects the current license.
             'exportTypes' => array_values(array_map(
@@ -287,19 +288,46 @@ class ExportCenterController extends Controller
                 new GenericExcelExport($dataset->key(), $filters, $columns),
                 $filename
             ),
-            'csv' => $this->exportService->streamCsv(
-                $filename,
-                $dataset->headings($columns),
-                $dataset->query($filters)->lazy(),
-                fn ($row) => $dataset->row($row, $columns)
-            ),
-            'pdf' => $this->exportService->downloadPdf(
-                'admin.reports.pdf.dataset',
-                $this->pdfData($dataset, $filters, $columns),
-                $filename
-            ),
+            'csv' => $this->persistCsvDownload($dataset, $filters, $columns, $filename),
+            'pdf' => $this->persistPdfDownload($dataset, $filters, $columns, $filename),
             default => response()->json(['message' => translate('Unsupported export type/format')], 422),
         };
+    }
+
+    /**
+     * Storage path for a persisted export, unique per run so repeat exports of
+     * the same dataset/range don't overwrite each other. The `{type}-` prefix
+     * keeps guessExportType() working for the Recent Exports list.
+     */
+    private function exportStoragePath(string $filename, string $format): string
+    {
+        return 'exports/' . auth('admin')->id() . '/' . $filename . '-' . now()->format('Y-m-d-His') . '.' . $format;
+    }
+
+    private function persistCsvDownload(Dataset $dataset, array $filters, ?array $columns, string $filename): BinaryFileResponse
+    {
+        $path = $this->exportStoragePath($filename, 'csv');
+
+        $this->exportService->storeCsv(
+            $path,
+            $dataset->headings($columns),
+            $dataset->query($filters)->lazy(),
+            fn ($row) => $dataset->row($row, $columns)
+        );
+
+        return response()->download(Storage::disk('local')->path($path), $filename . '.csv');
+    }
+
+    private function persistPdfDownload(Dataset $dataset, array $filters, ?array $columns, string $filename): BinaryFileResponse
+    {
+        $path = $this->exportStoragePath($filename, 'pdf');
+
+        Storage::disk('local')->put(
+            $path,
+            $this->exportService->renderPdfString('admin.reports.pdf.dataset', $this->pdfData($dataset, $filters, $columns))
+        );
+
+        return response()->download(Storage::disk('local')->path($path), $filename . '.pdf');
     }
 
     public function estimate(Request $request): JsonResponse
@@ -324,6 +352,28 @@ class ExportCenterController extends Controller
         }
 
         return response()->download(Storage::disk('local')->path($path));
+    }
+
+    /**
+     * Set how long persisted exports are retained before the daily
+     * exports:cleanup command prunes them. 0 = keep indefinitely.
+     */
+    public function updateRetention(Request $request): JsonResponse
+    {
+        $this->authorizeExports();
+
+        $validated = $request->validate([
+            'days' => ['required', 'integer', 'min:0', 'max:3650'],
+        ]);
+
+        settings_set('export_retention_days', $validated['days'], 'integer', 'reports');
+
+        return response()->json([
+            'message' => $validated['days'] < 1
+                ? translate('Exports will be kept indefinitely.')
+                : translate('Exports older than :days days will be auto-deleted.', ['days' => $validated['days']]),
+            'days' => $validated['days'],
+        ]);
     }
 
     public function deleteFile(string $file): JsonResponse
@@ -434,7 +484,12 @@ class ExportCenterController extends Controller
             ]);
         }
 
-        return $this->exportService->downloadExcel($export, $filename);
+        // Persist to the admin's exports dir (so it shows in Recent Exports), then
+        // serve the download from the stored file.
+        $path = $this->exportStoragePath($filename, 'xlsx');
+        $this->exportService->storeExcel($export, $path);
+
+        return response()->download(Storage::disk('local')->path($path), $filename . '.xlsx');
     }
 
     private function guessExportType(string $filename): string

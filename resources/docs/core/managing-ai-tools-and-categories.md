@@ -4,7 +4,7 @@ slug: managing-ai-tools-and-categories
 page: managing-ai-tools-and-categories.html
 section: AI
 license: regular
-keywords: [ai tool, create tool, custom tool, category, enable disable tool, prompt, access level, generator, no code]
+keywords: [ai tool, create tool, custom tool, add tool, category, enable disable tool, deactivate tool, prompt, prompt template, system prompt, access level, generator, no code, tool not visible, tool fields, field key, category access]
 ---
 
 **Admin → AI Management → Tools** is where every AI generator on your site — a blog writer, an image maker, anything customers run — is built and managed. Each tool is its own self-contained page with its own prompt, form fields, and output settings.

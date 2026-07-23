@@ -4,7 +4,7 @@ slug: ai-provider-keys
 page: connecting-your-ai.html
 section: AI
 license: regular
-keywords: [openai, anthropic, gemini, api key, provider, byok, credentials, connection]
+keywords: [openai, anthropic, gemini, api key, provider, byok, credentials, connection, 401, invalid key, test connection, connection failed, nothing generates, generation not working, default model, fallback model, rotate key, no models, model missing]
 ---
 
 MakeAI does not ship with AI credentials. Before any tool, chatbot or assistant can
@@ -48,6 +48,6 @@ Three things other than the key can stop generation, in the order worth checking
 
 - The **daily AI budget** has been reached, which blocks generation site-wide until the
   budget resets. The AI Assistant's `/health` command reports this directly.
-- The user has run out of **credits** — see the credit modes documentation, because what
-  "out of credits" means depends on which mode the install is running in.
+- The user has run out of **credits** — see [Credit Modes — Quota vs Metered](credit-modes),
+  because what "out of credits" means depends on which mode the install is running in.
 - The model is **inactive**, or belongs to a provider whose key was removed.

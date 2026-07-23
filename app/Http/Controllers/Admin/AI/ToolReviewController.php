@@ -111,4 +111,40 @@ class ToolReviewController extends Controller
         $review->delete();
         return back()->with('success', translate('Review deleted successfully.'));
     }
+
+    public function bulk(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer', 'exists:tool_reviews,id'],
+            'action' => ['required', 'in:approve,disapprove,delete'],
+        ]);
+
+        if ($validated['action'] === 'delete') {
+            ToolReview::whereIn('id', $validated['ids'])->delete();
+
+            return back()->with('success', translate('Selected reviews deleted successfully.'));
+        }
+
+        if ($validated['action'] === 'disapprove') {
+            ToolReview::whereIn('id', $validated['ids'])->update(['is_approved' => false]);
+
+            return back()->with('success', translate('Selected reviews disapproved successfully.'));
+        }
+
+        // Approve: notify each review that transitions to approved, mirroring approve().
+        $reviews = ToolReview::whereIn('id', $validated['ids'])->where('is_approved', false)->get();
+
+        foreach ($reviews as $review) {
+            $review->update(['is_approved' => true]);
+
+            try {
+                app(\App\Services\NotificationEventService::class)->toolReviewApproved($review);
+            } catch (\Exception $e) {
+                \Log::error('Failed to send review approval notification: ' . $e->getMessage());
+            }
+        }
+
+        return back()->with('success', translate('Selected reviews approved successfully.'));
+    }
 }

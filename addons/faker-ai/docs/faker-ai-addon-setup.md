@@ -4,7 +4,7 @@ slug: faker-ai-addon-setup
 page: faker-ai-addon-setup.html
 section: Addons
 license: regular
-keywords: [fakerai, demo data, fake users, fake testimonials, fake reviews, fake comments, populate empty site, sample content, seed data]
+keywords: [fakerai, demo data, fake users, fake testimonials, fake reviews, fake comments, populate empty site, sample content, seed data, generate demo data, remove demo data, empty install, blank site, staging data]
 ---
 
 The **FakerAI** addon fills a brand-new, empty-looking install with realistic demo content — fake customer accounts, testimonials, tool reviews, blog comments, and usage counters — so your site doesn't look empty before real customers arrive. Run it from **Appearance → Addons → FakerAI → Generator**.

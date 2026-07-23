@@ -152,26 +152,41 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     // Order preserved: static segments must stay ahead of the {user} wildcard.
     Route::get('roles/users', [UserManagementController::class, 'index'])->middleware('admin.permission:users.view,users.manage')->name('admin.users.index');
     Route::get('roles/users/trash', [UserManagementController::class, 'trash'])->middleware('admin.permission:users.view,users.manage')->name('admin.users.trash');
-    Route::get('roles/users/create', [UserManagementController::class, 'create'])->middleware('admin.permission:users.create,users.manage')->name('admin.users.create');
-    Route::post('roles/users', [UserManagementController::class, 'store'])->middleware('admin.permission:users.create,users.manage')->name('admin.users.store');
+    Route::post('roles/users', [UserManagementController::class, 'store'])->middleware('admin.permission:users.create')->name('admin.users.store');
     Route::get('roles/users/export', [UserManagementController::class, 'export'])->middleware('admin.permission:users.manage')->name('admin.users.export');
-    Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->middleware('admin.permission:users.manage')->name('admin.users.bulk');
-    Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->middleware('admin.permission:users.delete,users.manage')->name('admin.users.trash.bulk');
+    // Any one bulk-capable permission opens the endpoint; the controller then enforces
+    // the specific permission per sub-action (edit / credits / delete).
+    Route::post('roles/users/bulk', [UserManagementController::class, 'bulkAction'])->middleware('admin.permission:users.edit,users.credits,users.delete')->name('admin.users.bulk');
+    Route::post('roles/users/trash/bulk', [UserManagementController::class, 'bulkTrashAction'])->middleware('admin.permission:users.delete')->name('admin.users.trash.bulk');
     // No extra permission: an admin must always be able to end an impersonation session and return to their own account.
     Route::post('roles/users/stop-impersonating', [UserManagementController::class, 'stopImpersonating'])->name('admin.users.stop_impersonating');
-    Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->middleware('admin.permission:users.delete,users.manage')->name('admin.users.restore');
+    Route::post('roles/users/{user}/restore', [UserManagementController::class, 'restore'])->withTrashed()->middleware('admin.permission:users.delete')->name('admin.users.restore');
     Route::delete('roles/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->withTrashed()->middleware('admin.super')->name('admin.users.force-delete');
     Route::get('roles/users/{user}', [UserManagementController::class, 'show'])->middleware('admin.permission:users.view,users.manage')->name('admin.users.show');
-    Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.update');
-    Route::post('roles/users/{user}/toggle-status', [UserManagementController::class, 'toggleStatus'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.toggle-status');
-    Route::post('roles/users/{user}/toggle-ban', [UserManagementController::class, 'toggleBan'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.toggle-ban');
-    Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->middleware('admin.permission:users.delete,users.manage')->name('admin.users.delete');
-    Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.notification');
-    Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.2fa.disable');
-    Route::post('roles/users/{user}/logout-sessions', [UserManagementController::class, 'logoutAllSessions'])->middleware('admin.permission:users.edit,users.manage')->name('admin.users.logout-sessions');
-    Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->middleware('admin.permission:users.impersonate,users.manage')->name('admin.users.impersonate');
+    Route::post('roles/users/{user}', [UserManagementController::class, 'update'])->middleware('admin.permission:users.edit')->name('admin.users.update');
+    Route::post('roles/users/{user}/toggle-status', [UserManagementController::class, 'toggleStatus'])->middleware('admin.permission:users.edit')->name('admin.users.toggle-status');
+    Route::post('roles/users/{user}/toggle-ban', [UserManagementController::class, 'toggleBan'])->middleware('admin.permission:users.edit')->name('admin.users.toggle-ban');
+    Route::delete('roles/users/{user}', [UserManagementController::class, 'destroy'])->middleware('admin.permission:users.delete')->name('admin.users.delete');
+    Route::post('roles/users/{user}/notification', [UserManagementController::class, 'sendNotification'])->middleware('admin.permission:users.edit')->name('admin.users.notification');
+    Route::post('roles/users/{user}/two-factor/disable', [UserManagementController::class, 'disableTwoFactor'])->middleware('admin.permission:users.edit')->name('admin.users.2fa.disable');
+    Route::post('roles/users/{user}/logout-sessions', [UserManagementController::class, 'logoutAllSessions'])->middleware('admin.permission:users.edit')->name('admin.users.logout-sessions');
+    Route::post('roles/users/{user}/impersonate', [UserManagementController::class, 'impersonate'])->middleware('admin.permission:users.impersonate')->name('admin.users.impersonate');
 
     // Administrators & Roles
+    // NOTE: the role/permission routes below use the literal `roles/admins/permissions`
+    // path and MUST be registered before the `roles/admins/{admin}` wildcard routes —
+    // otherwise `{admin}` swallows "permissions" (POST roles/admins/permissions matched
+    // admins.update with {admin}="permissions" → ModelNotFoundException → 404 on
+    // "Create Role"). Literal paths first, wildcards last.
+    Route::middleware('admin.permission:roles.view')->group(function () {
+        Route::get('roles/admins/permissions', [RoleController::class, 'index'])->name('admin.roles.index');
+        Route::post('roles/admins/permissions', [RoleController::class, 'store'])->name('admin.roles.store');
+        Route::get('roles/admins/permissions/{role}/edit', [RoleController::class, 'edit'])->name('admin.roles.edit');
+        Route::post('roles/admins/permissions/{role}/restore-default', [RoleController::class, 'restoreDefault'])->name('admin.roles.restore-default');
+        Route::post('roles/admins/permissions/{role}', [RoleController::class, 'update'])->name('admin.roles.update');
+        Route::delete('roles/admins/permissions/{role}', [RoleController::class, 'destroy'])->name('admin.roles.delete');
+    });
+
     Route::get('roles/admins', [AdminController::class, 'index'])->name('admin.admins.index');
     Route::get('roles/admins/trash', [AdminController::class, 'trash'])->name('admin.admins.trash');
     Route::post('roles/admins', [AdminController::class, 'store'])->name('admin.admins.store');
@@ -195,16 +210,6 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::delete('/ban/{bannedIp}', [RateLimitController::class, 'unbanIp'])->name('unban');
         Route::post('/overrides', [RateLimitController::class, 'storeOverride'])->name('overrides.store');
         Route::delete('/overrides/{override}', [RateLimitController::class, 'deleteOverride'])->name('overrides.delete');
-    });
-
-    Route::middleware('admin.permission:roles.view')->group(function () {
-        Route::get('roles/admins/permissions', [RoleController::class, 'index'])->name('admin.roles.index');
-        Route::get('roles/admins/permissions/create', [RoleController::class, 'create'])->name('admin.roles.create');
-        Route::post('roles/admins/permissions', [RoleController::class, 'store'])->name('admin.roles.store');
-        Route::get('roles/admins/permissions/{role}/edit', [RoleController::class, 'edit'])->name('admin.roles.edit');
-        Route::post('roles/admins/permissions/{role}/restore-default', [RoleController::class, 'restoreDefault'])->name('admin.roles.restore-default');
-        Route::post('roles/admins/permissions/{role}', [RoleController::class, 'update'])->name('admin.roles.update');
-        Route::delete('roles/admins/permissions/{role}', [RoleController::class, 'destroy'])->name('admin.roles.delete');
     });
 
     // Localization
@@ -286,6 +291,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
         Route::post('reports/export/estimate', [ExportCenterController::class, 'estimate'])->name('admin.reports.export.estimate');
         Route::get('reports/exports/{file}', [ExportCenterController::class, 'download'])->name('admin.reports.export.download');
         Route::delete('reports/exports/{file}', [ExportCenterController::class, 'deleteFile'])->name('admin.reports.export.delete');
+        Route::post('reports/export/retention', [ExportCenterController::class, 'updateRetention'])->name('admin.reports.export.retention');
         Route::post('reports/export/presets', [ExportCenterController::class, 'storePreset'])->name('admin.reports.export.presets.store');
         Route::delete('reports/export/presets/{preset}', [ExportCenterController::class, 'destroyPreset'])->name('admin.reports.export.presets.destroy');
         Route::post('reports/export/schedules', [ExportCenterController::class, 'storeSchedule'])->name('admin.reports.export.schedules.store');
@@ -460,7 +466,8 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     // System Tools. Each area is grantable on its own now; `settings.manage` (the broad
     // "all settings" grant) still opens every one of them, so existing roles are unaffected.
     Route::middleware('admin.permission:system.health,settings.manage')->group(function () {
-        Route::get('system', [SystemController::class, 'index'])->name('admin.system.index');
+        // No combined `system` landing page: it was split into dedicated Health / Cron
+        // Jobs / Updates / Maintenance pages. /admin/system now 404s by design.
         Route::get('system/health', [SystemController::class, 'health'])->name('admin.system.health');
         Route::get('system/cron-jobs', [SystemController::class, 'tools'])->name('admin.system.cron-jobs');
         Route::post('system/cron/run', [SystemController::class, 'runCronTask'])->name('admin.system.cron.run');
@@ -632,6 +639,7 @@ Route::middleware(['admin.auth', 'admin.audit'])->group(function () {
     // that already had it keep working.
     Route::prefix('ai')->name('admin.ai.')->middleware('admin.permission:ai.reviews,ai.tools')->group(function () {
         Route::get('/reviews', [ToolReviewController::class, 'index'])->name('reviews.index');
+        Route::post('/reviews/bulk', [ToolReviewController::class, 'bulk'])->name('reviews.bulk');
         Route::post('/reviews/{review}/approve', [ToolReviewController::class, 'approve'])->name('reviews.approve');
         Route::post('/reviews/{review}/disapprove', [ToolReviewController::class, 'disapprove'])->name('reviews.disapprove');
         Route::post('/reviews/{review}/reply', [ToolReviewController::class, 'reply'])->name('reviews.reply');

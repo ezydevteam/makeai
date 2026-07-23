@@ -11,6 +11,7 @@ const props = defineProps<{
     icon?: string
     color?: 'primary' | 'accent' | 'success' | 'warning' | 'danger' | 'pink'
     sparkline?: number[]
+    label?: string
 }>()
 
 const colorMap: Record<string, string> = {
@@ -105,5 +106,6 @@ const { t } = useTranslate()
             <span>{{ comparison }}</span>
             <span v-if="comparisonDetail" class="text-gray-400 dark:text-gray-500">{{ comparisonDetail }}</span>
         </p>
+        <p v-if="label" class="mt-2 text-xs text-gray-400 dark:text-gray-500">{{ label }}</p>
     </div>
 </template>

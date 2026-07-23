@@ -268,7 +268,7 @@ onUnmounted(() => {
             <div v-if="showCronBanner" :class="shellInsetClass" class="border-b border-amber-200 bg-amber-50 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100">
                 <div class="flex flex-col gap-3 text-sm font-medium lg:flex-row lg:items-center lg:justify-between">
                     <span>{{ t('Cron job is not configured. Scheduled tasks, renewals, and automation may not run.') }}</span>
-                    <Link :href="cronStatus?.setup_url || route('admin.system.index')" class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">
+                    <Link :href="cronStatus?.setup_url || route('admin.system.cron-jobs')" class="inline-flex items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-500">
                         {{ t('Set Up Cron Job') }}
                     </Link>
                 </div>

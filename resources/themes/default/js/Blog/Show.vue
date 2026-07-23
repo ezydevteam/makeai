@@ -29,6 +29,7 @@ interface BlogPost {
     reading_time: number
     views_count?: number
     share_count?: number
+    is_featured?: boolean
     show_toc: boolean
     allow_comments: boolean
     favorites_count?: number
@@ -102,6 +103,13 @@ const formatDate = (value: string | null) => {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date(value))
 }
 
+// Compact counts: 1500 -> 1.5k, 1200000 -> 1.2m
+const formatCount = (value: number): string => {
+    if (value >= 1_000_000) return (value / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'm'
+    if (value >= 1_000) return (value / 1_000).toFixed(1).replace(/\.0$/, '') + 'k'
+    return String(value)
+}
+
 const isShareOpen = ref(false)
 const shareDropdownRef = ref<HTMLElement | null>(null)
 
@@ -154,8 +162,11 @@ onClickOutside(shareDropdownRef, () => {
                 <!-- Main Content Column -->
                 <div :class="[blogSettings.sidebar_post_position !== 'none' ? 'w-full' : 'max-w-4xl mx-auto w-full']" class="space-y-6">
                     <header :class="['mb-8', blogSettings.post_layout_centered ? 'text-center flex flex-col items-center justify-center' : '']">
-                        <div v-if="post.categories && post.categories.length > 0" :class="['mb-2 flex flex-wrap gap-2', blogSettings.post_layout_centered ? 'justify-center' : '']">
-                            <Link :href="route('blog.category', post.categories[0].slug)" class="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/40">
+                        <div v-if="post.is_featured || (post.categories && post.categories.length > 0)" :class="['mb-2 flex flex-wrap items-center gap-2', blogSettings.post_layout_centered ? 'justify-center' : '']">
+                            <span v-if="post.is_featured" class="inline-flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                                <i class="ti ti-star-filled text-xs"></i>{{ t('Featured') }}
+                            </span>
+                            <Link v-if="post.categories && post.categories.length > 0" :href="route('blog.category', post.categories[0].slug)" class="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/40">
                                 {{ post.categories[0].name }}
                             </Link>
                         </div>
@@ -176,11 +187,11 @@ onClickOutside(shareDropdownRef, () => {
                             </span>
                             <span v-if="blogSettings.show_view_count_post && post.views_count" class="flex items-center gap-1">
                                 <i class="ti ti-eye"></i>
-                                {{ new Intl.NumberFormat().format(post.views_count) }} {{ t('views') }}
+                                {{ formatCount(post.views_count) }} {{ t('views') }}
                             </span>
                             <span v-if="post.share_count" class="flex items-center gap-1">
                                 <i class="ti ti-share"></i>
-                                {{ new Intl.NumberFormat().format(post.share_count) }} {{ t('shares') }}
+                                {{ formatCount(post.share_count) }} {{ t('shares') }}
                             </span>
                             <div
                                 v-if="share && (blogSettings.post_social_share_position === 'top' || blogSettings.post_social_share_position === 'both')"

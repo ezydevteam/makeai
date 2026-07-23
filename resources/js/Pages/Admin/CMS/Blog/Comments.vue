@@ -425,15 +425,16 @@ onBeforeUnmount(() => {
                                 <th class="w-10 px-4 py-3">
                                     <input
                                         type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                         :checked="isAllVisibleSelected"
                                         :aria-label="t('Select all visible comments')"
                                         @change="toggleSelectAll"
                                     >
                                 </th>
                                 <th class="px-4 py-3">{{ t('Comment') }}</th>
-                                <th class="px-4 py-3">{{ t('Author') }}</th>
-                                <th class="px-4 py-3">{{ t('Content') }}</th>
-                                <th class="px-4 py-3">{{ t('Status') }}</th>
+                                <th class="px-4 py-3">{{ t('Commentor') }}</th>
+                                <th class="px-4 py-3">{{ t('Post Title') }}</th>
+                                <th class="px-4 py-3 text-center">{{ t('Status') }}</th>
                                 <th class="px-4 py-3 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
@@ -446,6 +447,7 @@ onBeforeUnmount(() => {
                                 <td class="px-4 py-4 align-top">
                                     <input
                                         v-model="selectedIds"
+                                        class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                         type="checkbox"
                                         :value="comment.id"
                                         :aria-label="t('Select comment')"
@@ -466,7 +468,7 @@ onBeforeUnmount(() => {
                                     {{ contentTitle(comment) }}
                                 </td>
                                 <td class="px-4 py-4 align-top">
-                                    <div class="flex flex-col items-start gap-1.5">
+                                    <div class="flex flex-col items-center gap-1.5">
                                         <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold" :class="statusBadgeClass(comment.status)">
                                             {{ statusLabel(comment.status) }}
                                         </span>

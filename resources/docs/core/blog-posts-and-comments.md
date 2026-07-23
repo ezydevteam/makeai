@@ -4,7 +4,7 @@ slug: blog-posts-and-comments
 page: blog-posts-and-comments.html
 section: Content
 license: regular
-keywords: [blog, blog post, categories, tags, comments, moderation, spam, approve comment, blog settings, related posts]
+keywords: [blog, blog post, categories, tags, comments, moderation, spam, approve comment, blog settings, related posts, schedule post, draft, publish post, comment not showing, guest comments, table of contents, featured post]
 ---
 
 **Admin → Content → Blog** covers writing posts, organizing them with categories and tags, moderating comments, and the blog's site-wide behavior settings.

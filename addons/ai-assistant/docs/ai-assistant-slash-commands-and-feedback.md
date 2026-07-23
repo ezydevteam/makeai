@@ -4,7 +4,7 @@ slug: ai-assistant-slash-commands-and-feedback
 page: ai-assistant-slash-commands-and-feedback.html
 section: Addons
 license: regular
-keywords: [slash commands, docs command, health command, assistant feedback, thumbs up thumbs down, conversation history, assistant credits]
+keywords: [slash commands, docs command, health command, /docs, /health, /reset, assistant feedback, thumbs up thumbs down, feedback report, conversation history, assistant credits, command not working]
 ---
 
 Beyond ordinary chat, the **AI Assistant** widget supports typed slash commands, and every message can be rated by the person it was shown to — reviewable from **Appearance → Addons → Assistant Feedback**.

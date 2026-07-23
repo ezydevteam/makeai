@@ -406,12 +406,12 @@ const stars = (count: number) => Array.from({ length: 5 }, (_, index) => index <
                     <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
                         <thead class="border-b border-gray-100 bg-gray-50/50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-800/50 dark:text-gray-400">
                             <tr>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Customer') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Review') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Source') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Status') }}</th>
-                                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Order') }}</th>
-                                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">{{ t('Actions') }}</th>
+                                <th class="px-6 py-4 text-left">{{ t('Reviewer') }}</th>
+                                <th class="px-6 py-4 text-center">{{ t('Review') }}</th>
+                                <th class="px-6 py-4 text-center">{{ t('Order') }}</th>
+                                <th class="px-6 py-4 text-center">{{ t('Source') }}</th>
+                                <th class="px-6 py-4 text-center">{{ t('Status') }}</th>
+                                <th class="px-6 py-4 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
@@ -460,16 +460,19 @@ const stars = (count: number) => Array.from({ length: 5 }, (_, index) => index <
                                                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                             </svg>
                                         </div>
-                                        <p class="line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ testimonial.content }}</p>
+                                        <p class="truncate line-clamp-3 text-sm leading-6 text-gray-600 dark:text-gray-300">{{ testimonial.content }}</p>
                                     </div>
                                 </td>
-                                <td class="px-6 py-5 align-top">
+                                <td class="px-6 py-5 text-center align-top text-sm font-medium text-gray-700 dark:text-gray-200">
+                                    {{ testimonial.sort_order }}
+                                </td>
+                                <td class="px-6 py-5 text-center align-top">
                                     <span :class="sourceClasses[testimonial.source]" class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold">
                                         {{ sourceLabel(testimonial.source) }}
                                     </span>
                                 </td>
                                 <td class="px-6 py-5 align-top">
-                                    <div class="flex flex-col items-start gap-2">
+                                    <div class="flex flex-col items-center gap-2">
                                         <span
                                             :class="testimonial.is_active ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'"
                                             class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -484,48 +487,45 @@ const stars = (count: number) => Array.from({ length: 5 }, (_, index) => index <
                                         </span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-5 align-top text-sm font-medium text-gray-700 dark:text-gray-200">
-                                    {{ testimonial.sort_order }}
+                                <td class="overflow-visible px-6 py-5 align-top text-end">
+                                    <TableActionMenu>
+                                        <template #default="{ close }">
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
+                                                @click="openEdit(testimonial); close()"
+                                            >
+                                                <i class="ti ti-edit text-base"></i>
+                                                {{ t('Edit') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-amber-50 hover:text-amber-700 dark:text-gray-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
+                                                @click="toggleFeatured(testimonial.id); close()"
+                                            >
+                                                <i class="ti ti-star text-base"></i>
+                                                {{ testimonial.is_featured ? t('Unfeature') : t('Feature') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                                                @click="toggleActive(testimonial.id); close()"
+                                            >
+                                                <i class="ti ti-toggle-right text-base"></i>
+                                                {{ testimonial.is_active ? t('Deactivate') : t('Activate') }}
+                                            </button>
+                                            <hr class="border-gray-200 dark:border-surface-700">
+                                            <button
+                                                type="button"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                @click="remove(testimonial.id); close()"
+                                            >
+                                                <i class="ti ti-trash text-base"></i>
+                                                {{ t('Delete') }}
+                                            </button>
+                                        </template>
+                                    </TableActionMenu>
                                 </td>
-                                    <td class="overflow-visible px-6 py-5 align-top text-end">
-                                        <TableActionMenu>
-                                            <template #default="{ close }">
-                                                <button
-                                                    type="button"
-                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
-                                                    @click="openEdit(testimonial); close()"
-                                                >
-                                                    <i class="ti ti-edit text-base"></i>
-                                                    {{ t('Edit') }}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-amber-50 hover:text-amber-700 dark:text-gray-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-                                                    @click="toggleFeatured(testimonial.id); close()"
-                                                >
-                                                    <i class="ti ti-star text-base"></i>
-                                                    {{ testimonial.is_featured ? t('Unfeature') : t('Feature') }}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                                                    @click="toggleActive(testimonial.id); close()"
-                                                >
-                                                    <i class="ti ti-toggle-right text-base"></i>
-                                                    {{ testimonial.is_active ? t('Deactivate') : t('Activate') }}
-                                                </button>
-                                                <hr class="border-gray-200 dark:border-surface-700">
-                                                <button
-                                                    type="button"
-                                                    class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
-                                                    @click="remove(testimonial.id); close()"
-                                                >
-                                                    <i class="ti ti-trash text-base"></i>
-                                                    {{ t('Delete') }}
-                                                </button>
-                                            </template>
-                                        </TableActionMenu>
-                                    </td>
                             </tr>
                         </tbody>
                     </table>

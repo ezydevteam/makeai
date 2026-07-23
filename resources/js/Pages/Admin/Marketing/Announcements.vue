@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
@@ -72,6 +72,8 @@ const props = defineProps<{
 
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
+const page = usePage()
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
 const createBlankAnnouncement = (): AnnouncementFormData => ({
     type: 'topbar',
@@ -171,8 +173,11 @@ const audienceOptions = computed(() => [
     { value: 'all', label: t('Everyone') },
     { value: 'guests', label: t('Guests Only') },
     { value: 'auth', label: t('Logged In Users') },
-    { value: 'free', label: t('Free Users') },
-    { value: 'pro', label: t('Pro Users') },
+    // Free/Pro targeting only makes sense when a paid tier exists.
+    ...(isProAvailable.value ? [
+        { value: 'free', label: t('Free Users') },
+        { value: 'pro', label: t('Premium Users') },
+    ] : []),
 ])
 
 const triggerTypeOptions = computed(() => [
@@ -529,10 +534,10 @@ onBeforeUnmount(() => {
                         <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                             <tr>
                                 <th scope="col" class="px-6 py-3 text-left">{{ t('Announcement') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left">{{ t('Type') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left">{{ t('Audience') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left">{{ t('Schedule') }}</th>
-                                <th scope="col" class="px-6 py-3 text-left">{{ t('Status') }}</th>
+                                <th scope="col" class="px-6 py-3 text-center">{{ t('Type') }}</th>
+                                <th scope="col" class="px-6 py-3 text-center">{{ t('Audience') }}</th>
+                                <th scope="col" class="px-6 py-3 text-center">{{ t('Schedule') }}</th>
+                                <th scope="col" class="px-6 py-3 text-center">{{ t('Status') }}</th>
                                 <th scope="col" class="px-6 py-3 text-right">{{ t('Action') }}</th>
                             </tr>
                         </thead>
@@ -555,22 +560,22 @@ onBeforeUnmount(() => {
                                         </p>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-4 text-center">
                                     <span :class="typeColor[announcement.type]" class="inline-flex items-center justify-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em]">
                                         {{ typeLabel[announcement.type] }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4">
+                                <td class="px-6 py-4 text-center">
                                     <span class="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-surface-800 dark:text-gray-200">
                                         {{ audienceLabel[announcement.target_audience] }}
                                     </span>
                                 </td>
-                                <td class="px-6 py-4 text-xs text-gray-500 dark:text-gray-400">
+                                <td class="px-6 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
                                     <div>{{ frequencyLabel[announcement.show_frequency] }}</div>
                                     <div v-if="announcement.starts_at" class="mt-1">{{ t('Starts') }}: {{ formatDate(announcement.starts_at) }}</div>
                                     <div v-if="announcement.ends_at">{{ t('Ends') }}: {{ formatDate(announcement.ends_at) }}</div>
                                 </td>
-                                <td class="px-6 py-4 text-center">
+                                <td class="px-6 py-4 text-center text-center">
                                     <AppSwitch :model-value="announcement.is_active" @update:model-value="toggleActive(announcement.id)" />
                                 </td>
                                 <td class="px-6 py-4 text-right">

@@ -102,7 +102,9 @@ useFlashToasts()
         </div>
 
         <template v-if="!hideHeader">
-            <AnnouncementManager />
+            <div id="top-sticky-stack" class="sticky top-0 z-[60] flex flex-col w-full">
+                <AnnouncementManager />
+            </div>
             <NewsletterPopup />
             <AppHeader />
             <AdSection zone="header_banner" class="mx-auto mt-4 w-full max-w-7xl px-6" />

@@ -4,7 +4,7 @@ slug: daily-ai-budget
 page: daily-ai-budget.html
 section: AI
 license: regular
-keywords: [daily budget, spend limit, kill switch, guest limit, per-user limit, overspend, cost control, budget reached]
+keywords: [daily budget, spend limit, kill switch, guest limit, per-user limit, overspend, cost control, budget reached, AI bill, generation stopped, generation failing for everyone, site-wide outage, guest daily credit limit, per-user daily limit, monthly limit]
 ---
 
 **Admin → AI Management → Providers → Spend Controls** is your safety net against an unexpectedly large AI bill. It sets hard ceilings on usage that apply site-wide, independent of what any individual customer's plan allows.

@@ -664,7 +664,7 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+                <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40">
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <p class="text-sm font-medium text-gray-700 dark:text-gray-200">

@@ -4,7 +4,7 @@ slug: ai-access-control
 page: ai-access-control.html
 section: AI
 license: regular
-keywords: [access level, access control, guest, login required, premium, plan gating, restrict tool, tool visibility]
+keywords: [access level, access control, guest, login required, premium, plan gating, restrict tool, tool visibility, tool locked, tool missing, premium only, plan required, guest tools, inherit access, bulk access]
 ---
 
 **Admin → AI Management → Access Control** lets you decide, tool by tool, who is allowed to use it: anyone, only logged-in users, or only customers on a specific paid plan.

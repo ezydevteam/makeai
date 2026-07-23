@@ -106,9 +106,9 @@ const roleOptions = computed(() => [
 ])
 
 const bulkActionOptions = computed(() => [
-    { value: 'restore', label: t('Restore Administrators') },
+    { value: 'restore', label: t('Restore') },
     // Permanent deletion is irreversible — Super Admins only.
-    ...(isSuperAdmin.value ? [{ value: 'force_delete', label: t('Permanently Delete Administrators') }] : []),
+    ...(isSuperAdmin.value ? [{ value: 'force_delete', label: t('Permanently Delete') }] : []),
 ])
 
 const filteredAdmins = computed(() => {
@@ -384,7 +384,7 @@ const forceDeleteAdmin = (admin: AdminItem) => {
                                         <div class="flex items-center">
                                             <input
                                                 type="checkbox"
-                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                                 :checked="isAllSelected"
                                                 @change="toggleAll"
                                             />
@@ -409,7 +409,7 @@ const forceDeleteAdmin = (admin: AdminItem) => {
                                                 v-model="selectedIds"
                                                 type="checkbox"
                                                 :value="admin.id"
-                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-800 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                             />
                                         </div>
                                     </td>
@@ -440,15 +440,15 @@ const forceDeleteAdmin = (admin: AdminItem) => {
                                             {{ admin.is_active ? t('Active') : t('Inactive') }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                                    <td class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                         {{ formatDate(admin.deleted_at) }}
                                     </td>
                                     <td class="px-6 py-4 text-right">
                                         <div class="inline-flex items-center gap-2">
-                                            <Tooltip :content="t('Restore admin')" placement="top">
+                                            <Tooltip :content="t('Restore')" placement="top">
                                                 <button
                                                     type="button"
-                                                    :aria-label="t('Restore admin')"
+                                                    :aria-label="t('Restore')"
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                                                     @click="restoreAdmin(admin)"
                                                 >
@@ -456,10 +456,10 @@ const forceDeleteAdmin = (admin: AdminItem) => {
                                                 </button>
                                             </Tooltip>
 
-                                            <Tooltip v-if="isSuperAdmin" :content="t('Permanently delete admin')" placement="top">
+                                            <Tooltip v-if="isSuperAdmin" :content="t('Permanently delete')" placement="top">
                                                 <button
                                                     type="button"
-                                                    :aria-label="t('Permanently delete admin')"
+                                                    :aria-label="t('Permanently delete')"
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                                                     @click="forceDeleteAdmin(admin)"
                                                 >

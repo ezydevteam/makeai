@@ -219,9 +219,11 @@ class FoundationSeeder extends Seeder
             ['key' => 'pricing_featured_label_text', 'value' => 'Recommended', 'type' => 'string', 'group' => 'pricing'],
             ['key' => 'pricing_checkout_button_text', 'value' => 'Choose Plan', 'type' => 'string', 'group' => 'pricing'],
 
-            // Mail
-            ['key' => 'mail_from_name', 'value' => 'MakeAI', 'type' => 'string', 'group' => 'mail'],
-            ['key' => 'mail_from_address', 'value' => 'hello@makeai.com', 'type' => 'string', 'group' => 'mail'],
+            // Mail — seeded blank on purpose. A literal brand here signs every
+            // email from a fresh install as this vendor rather than the site the
+            // owner named, and blank makes the from-name follow app_name.
+            ['key' => 'mail_from_name', 'value' => '', 'type' => 'string', 'group' => 'mail'],
+            ['key' => 'mail_from_address', 'value' => '', 'type' => 'string', 'group' => 'mail'],
 
             // Security: intentionally none — login_throttle_*, require_email_verification and
             // two_factor_admin were dead seeds (0 readers), purged 2026_07_09. The live
@@ -283,8 +285,8 @@ class FoundationSeeder extends Seeder
             // Admin panel
             ['scope' => 'admin', 'key' => 'primary_color', 'value' => '#6366f1'],
             ['scope' => 'admin', 'key' => 'secondary_color', 'value' => '#3b82f6'],
-            ['scope' => 'admin', 'key' => 'sidebar_bg', 'value' => '#111111'],
-            ['scope' => 'admin', 'key' => 'sidebar_text_color', 'value' => '#ffffff'],
+            ['scope' => 'admin', 'key' => 'sidebar_bg', 'value' => '#ffffff'],
+            ['scope' => 'admin', 'key' => 'sidebar_text_color', 'value' => '#000000'],
             ['scope' => 'admin', 'key' => 'navbar_bg', 'value' => '#ffffff'],
             ['scope' => 'admin', 'key' => 'navbar_text_color', 'value' => '#111827'],
             ['scope' => 'admin', 'key' => 'accent_color', 'value' => '#a855f7'],

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from 'vue'
-import { Head, useForm } from '@inertiajs/vue3'
+import { Head, useForm, usePage } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
@@ -66,6 +66,8 @@ const props = defineProps<{
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
 const toast = useToastr()
+const page = usePage()
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
 const showCampaignModal = ref(false)
 const editingCampaignId = ref<number | null>(null)
@@ -121,9 +123,18 @@ const audienceOptions = [
     { value: 'users_all', label: t('All opted-in users'), countKey: 'users_all' },
     { value: 'users_active', label: t('Active users'), countKey: 'users_active' },
     { value: 'users_inactive', label: t('Inactive users'), countKey: 'users_inactive' },
-    { value: 'users_pro', label: t('Pro users'), countKey: 'users_pro' },
+    { value: 'users_pro', label: t('Premium users'), countKey: 'users_pro' },
     { value: 'users_free', label: t('Free users'), countKey: 'users_free' },
 ] as const
+
+// Pro/Free audience targeting only makes sense when a paid tier exists. Keep the
+// full audienceOptions above for label resolution of existing campaigns, but hide
+// those two from the create/edit dropdown when Pro isn't available.
+const visibleAudienceOptions = computed(() =>
+    audienceOptions.filter((option) =>
+        isProAvailable.value || !['users_pro', 'users_free'].includes(option.value)
+    )
+)
 
 const modalTitle = computed(() => editingCampaignId.value ? t('Edit Campaign') : t('Create Campaign'))
 const audienceLabel = (audience: string) => audienceOptions.find((option) => option.value === audience)?.label || t('Newsletter subscribers')
@@ -446,7 +457,7 @@ const retryCampaign = (id: number) => {
             <div>
                 <AppSelect
                     v-model="campaignForm.audience"
-                    :options="audienceOptions.map((option) => {
+                    :options="visibleAudienceOptions.map((option) => {
                         const statVal = stats[option.countKey as keyof NewsletterStats];
                         const count = (statVal && typeof statVal === 'object') ? statVal.value : (statVal ?? 0);
                         return { value: option.value, label: `${option.label} (${count})` };

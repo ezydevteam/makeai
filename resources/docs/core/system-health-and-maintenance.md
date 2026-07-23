@@ -4,7 +4,7 @@ slug: system-health-and-maintenance
 page: system-health-and-maintenance.html
 section: System
 license: regular
-keywords: [health check, maintenance mode, rate limits, banned ip, custom style, admin panel appearance, activity log, audit log, horizon, system status]
+keywords: [health check, maintenance mode, rate limits, banned ip, custom style, admin panel appearance, activity log, audit log, horizon, system status, health check failing, queue worker offline, scheduler failed, go live, go maintenance, rate limit exceeded, ban ip, redis, diagnostics]
 ---
 
 **Admin → System** groups the diagnostic and operational screens for your install: Health Check, Maintenance, Rate Limits, Custom Style, Activity Logs, and — for Redis-based installs — Horizon.

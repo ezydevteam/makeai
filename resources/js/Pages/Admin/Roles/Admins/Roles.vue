@@ -464,7 +464,7 @@ onBeforeUnmount(() => {
                                             <button
                                                 type="button"
                                                 :aria-label="t('Delete role')"
-                                                class="inline-flex h-9 w-9 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-900/20"
+                                                class="inline-flex h-9 w-9 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                                                 @click="confirmDelete(role)"
                                             >
                                                 <i class="ti ti-trash text-base"></i>
@@ -584,7 +584,7 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/40 md:flex-row md:items-center md:justify-between mt-6">
+            <div :class="isEditing && currentRole?.slug === 'super-admin' ? 'hidden' : '' " class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-800 dark:bg-surface-800/40 md:flex-row md:items-center md:justify-between mt-6">
                 <div>
                     <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('Permission Actions') }}</h4>
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -646,7 +646,7 @@ onBeforeUnmount(() => {
                         >
                             <input
                                 type="checkbox"
-                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700"
+                                class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700"
                                 :checked="isPermissionSelected(permission.id)"
                                 :disabled="currentRole?.slug === 'super-admin'"
                                 @change="togglePermission(permission.id)"

@@ -4,7 +4,7 @@ slug: managing-languages
 page: managing-languages.html
 section: Languages
 license: regular
-keywords: [language, translation, locale, rtl, multilingual, add language, ai translate, language switcher]
+keywords: [language, translation, locale, rtl, multilingual, add language, ai translate, language switcher, translate strings, language not switching, add locale, rtl language, missing translation]
 ---
 
 **Admin → Languages** manages every language your site can display in, translated string by string rather than through flat locale files.

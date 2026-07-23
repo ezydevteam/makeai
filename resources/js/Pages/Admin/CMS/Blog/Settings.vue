@@ -359,6 +359,7 @@ const submit = () => {
                 <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
                         <AppSelect v-model="form.social_share_blog_style" :options="shareStyleOptions" :label="t('Display style')" :placeholder="t('Select display style')" />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('Only for bottom shares') }}</p>
                     </div>
 
                     <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40">

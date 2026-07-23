@@ -56,7 +56,7 @@ const schemaJson = computed(() => props.seo?.schema ? JSON.stringify(props.seo.s
                     <!-- Main Content -->
                     <div :class="[page.show_sidebar ? 'lg:w-2/3' : 'w-full']" :style="{ order: page.sidebar_position === 'left' ? 2 : 1 }">
                         <article class="prose prose-lg prose-indigo dark:prose-invert max-w-none">
-                            <header v-if="page.show_title || page.show_breadcrumbs" class="mb-12" :class="{ 'text-center flex flex-col items-center': page.center_title }">
+                            <header v-if="page.show_title || page.show_breadcrumbs || (page.show_excerpt && page.excerpt)" class="mb-12" :class="{ 'text-center flex flex-col items-center': page.center_title }">
                                 <div v-if="page.show_breadcrumbs" class="flex items-center gap-2 text-xs text-gray-400 mb-3" :class="{ 'justify-center': page.center_title }">
                                     <Link href="/" class="hover:text-primary-600 transition-colors">{{ t('Home') }}</Link>
                                     <template v-if="page.parent">
@@ -69,6 +69,9 @@ const schemaJson = computed(() => props.seo?.schema ? JSON.stringify(props.seo.s
                                 <h1 v-if="page.show_title" class="text-2xl md:text-4xl font-black text-gray-900 dark:text-white leading-tight">
                                     {{ page.title }}
                                 </h1>
+                                <p v-if="page.show_excerpt && page.excerpt" class="not-prose mt-4 max-w-2xl whitespace-pre-line text-base leading-relaxed text-gray-500 dark:text-gray-400">
+                                    {{ page.excerpt }}
+                                </p>
                             </header>
 
                             <div v-if="page.show_featured_image && page.featured_image" class="mb-12 rounded-3xl overflow-hidden shadow-2xl shadow-gray-200/50">
@@ -100,11 +103,11 @@ const schemaJson = computed(() => props.seo?.schema ? JSON.stringify(props.seo.s
 @reference "../../../css/app.css";
 
 /* Base Styles for CMS Content */
-.cms-content h2 { @apply text-2xl md:text-3xl font-black text-gray-900 dark:text-white mt-12 mb-6; }
-.cms-content h3 { @apply text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-8 mb-4; }
-.cms-content h4 { @apply text-lg md:text-xl font-bold text-gray-900 dark:text-white mt-8 mb-4; }
-.cms-content h5 { @apply text-base md:text-lg font-bold text-gray-900 dark:text-white mt-6 mb-3; }
-.cms-content p { @apply text-base md:text-lg text-gray-700 dark:text-gray-300 leading-relaxed mb-6; }
+.cms-content h2 { @apply text-xl md:text-2xl font-bold text-gray-900 dark:text-white mt-12 mb-6; }
+.cms-content h3 { @apply text-lg md:text-xl font-bold text-gray-900 dark:text-white mt-8 mb-4; }
+.cms-content h4 { @apply text-lg md:text-lg font-bold text-gray-900 dark:text-white mt-8 mb-4; }
+.cms-content h5 { @apply text-sm md:text-base font-bold text-gray-900 dark:text-white mt-6 mb-3; }
+.cms-content p { @apply text-sm md:text-base text-gray-700 dark:text-gray-300 leading-relaxed mb-6; }
 .cms-content ul { @apply list-disc list-inside space-y-3 mb-6 ml-4; }
 .cms-content ol { @apply list-decimal list-inside space-y-3 mb-6 ml-4; }
 .cms-content a { @apply text-primary-600 dark:text-primary-400 font-bold border-b-2 border-primary-100 dark:border-primary-950 hover:border-primary-600 dark:hover:border-primary-400 transition-all; }

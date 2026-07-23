@@ -409,6 +409,54 @@ input[type="checkbox"]:disabled {
     border-color: var(--admin-border) !important;
 }
 
+/* Teleported admin modals (AppModal) mount on <body>, OUTSIDE .admin-layout, so the
+   remap above never reached them — the modal kept the theme's purple-black surface
+   palette while every card behind it used the blue-gray admin surface.
+   `.admin-layout-root` is set on <html> on admin pages, and the teleport target (<body>)
+   IS a descendant of it — but the admin surface tokens live on .admin-layout, a sibling
+   of <body>, so a teleported modal can't inherit them (an unresolved var() made borders
+   fall back to currentColor → a white border in dark mode). Re-declare the dark tokens on
+   .admin-layout-root so teleported content can resolve them, then mirror the surface remap
+   through it, scoped to the dialog. */
+.admin-layout-root.dark {
+    --admin-surface: #111827;
+    --admin-surface-muted: #1a2333;
+    --admin-border: #1f2937;
+    --admin-input-border: #2b3648;
+    --admin-bg-color: #0b0f19;
+}
+
+.admin-layout-root.dark [role="dialog"] .dark\:bg-surface-900 {
+    background-color: var(--admin-surface) !important;
+}
+
+.admin-layout-root.dark [role="dialog"] .dark\:bg-surface-800 {
+    background-color: var(--admin-surface-muted) !important;
+}
+
+/* Footer strip: same surface as the body/header (not the theme's darker purple-black
+   surface-950), so header and footer read as one continuous modal chrome. */
+.admin-layout-root.dark [role="dialog"] .dark\:bg-surface-950 {
+    background-color: var(--admin-surface) !important;
+}
+
+.admin-layout-root.dark [role="dialog"] .dark\:border-surface-700,
+.admin-layout-root.dark [role="dialog"] .dark\:border-surface-800 {
+    border-color: var(--admin-border) !important;
+}
+
+/* Form controls inside teleported admin modals: same reason as above — outside
+   .admin-layout, the admin input remap never reached them, so they kept the theme's
+   purple-black surface-800 fill (set by the global `.dark input` rule) instead of the
+   blue-gray muted surface the on-page inputs use. Mirror the admin input rule here. */
+.admin-layout-root.dark [role="dialog"] input:not([type="checkbox"]):not([type="radio"]),
+.admin-layout-root.dark [role="dialog"] select,
+.admin-layout-root.dark [role="dialog"] textarea:not(.chat-textarea) {
+    background-color: var(--admin-surface-muted) !important;
+    border-color: var(--admin-input-border) !important;
+    color: #f4f4f5 !important;
+}
+
 /* Text */
 .dark .admin-layout .text-gray-900 {
     color: #f4f4f5 !important;
@@ -1367,6 +1415,27 @@ input[type="checkbox"]:disabled {
 .ti-star-filled:before {
     content: "\f6a6" !important;
 }
+
+/* =============================================
+   Support Ticket Message Content (sanitized rich HTML)
+   =============================================
+   `prose` (Tailwind Typography) isn't enabled in this build, and Preflight
+   resets `list-style: none`, so rich replies rendered via v-html would show
+   bullet/numbered lists with no markers. Style them explicitly here (used by
+   both the admin and frontend ticket views). */
+.ticket-content ul { list-style: disc; padding-inline-start: 1.5rem; margin: 0.5rem 0; }
+.ticket-content ol { list-style: decimal; padding-inline-start: 1.5rem; margin: 0.5rem 0; }
+.ticket-content li { margin: 0.25rem 0; }
+.ticket-content li > p { margin: 0; }
+.ticket-content ul[data-type="taskList"] { list-style: none; padding-inline-start: 0; }
+.ticket-content ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.ticket-content p { margin: 0.5rem 0; }
+.ticket-content a { color: var(--color-primary-600); text-decoration: underline; }
+.dark .ticket-content a { color: var(--color-primary-300); }
+.ticket-content blockquote { border-inline-start: 3px solid var(--color-primary-200); padding-inline-start: 0.75rem; color: #6b7280; margin: 0.5rem 0; }
+.ticket-content h1, .ticket-content h2, .ticket-content h3 { font-weight: 700; margin: 0.75rem 0 0.35rem; }
+.ticket-content pre { background: #0f172a; color: #f1f5f9; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.5rem 0; }
+.ticket-content code { font-family: ui-monospace, monospace; }
 
 /* =============================================
    Accessibility — Reduced Motion

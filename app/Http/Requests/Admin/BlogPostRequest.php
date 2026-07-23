@@ -22,7 +22,7 @@ class BlogPostRequest extends FormRequest
             'excerpt' => ['nullable', 'string'],
             'content' => ['required', 'string'],
             'featured_image' => ['nullable', 'string', 'max:500'],
-            'featured_image_file' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:4096'],
+            'featured_image_file' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:10240'],
             'featured_image_alt' => ['nullable', 'string', 'max:255'],
             'status' => ['required', Rule::in(['draft', 'published', 'scheduled', 'private'])],
             'published_at' => ['nullable', 'date'],
@@ -47,6 +47,21 @@ class BlogPostRequest extends FormRequest
             'category_ids.*' => ['integer', 'exists:blog_categories,id'],
             'tags' => ['array'],
             'tags.*' => ['string', 'max:80'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            // Laravel reports file sizes in kilobytes; show it in MB for admins.
+            'featured_image_file.max' => translate('The featured image must not be larger than :size MB.', ['size' => '10']),
+        ];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'featured_image_file' => translate('featured image'),
         ];
     }
 }

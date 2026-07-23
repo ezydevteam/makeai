@@ -29,6 +29,13 @@ class MailController extends Controller
             unset($settings[$key]);
         }
 
+        // Show the name mail actually goes out under. Blank means "follow the site
+        // name", which is the seeded default — leaving the required field empty
+        // would just make the admin invent a value that is already resolved.
+        if (blank($settings['mail_from_name'] ?? null)) {
+            $settings['mail_from_name'] = settings('app_name', config('mail.from.name'));
+        }
+
         return Inertia::render('Admin/Mail/Settings', [
             'settings' => $settings,
             'configuredSecrets' => $configuredSecrets,

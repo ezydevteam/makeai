@@ -21,33 +21,6 @@ use Illuminate\Support\Facades\Log;
 
 class SystemController extends Controller
 {
-    public function index()
-    {
-        $this->authorizeSystem();
-
-        return Inertia::render('Admin/System/Index', [
-            'health' => $this->healthChecks(),
-            'healthSummary' => $this->healthCheckSummary(),
-            'update' => $this->updateStatus(),
-            'stats' => [
-                'php_version' => PHP_VERSION,
-                'laravel_version' => app()->version(),
-                'server_software' => $_SERVER['SERVER_SOFTWARE'] ?? translate('N/A'),
-                'database_version' => $this->getDatabaseVersion(),
-                'disk_free' => $this->getDiskSpace(),
-                'memory_usage' => $this->getMemoryUsage(),
-            ],
-            'status' => [
-                'is_maintenance' => app()->isDownForMaintenance(),
-                'queue_running' => $this->isQueueRunning(),
-                'scheduler_running' => $this->isSchedulerRunning(),
-            ],
-            'cron' => $this->cronStatus(),
-            'maintenance' => $this->maintenanceSettings(),
-            'logs' => $this->getLastLogs(),
-        ]);
-    }
-
     public function health()
     {
         $this->authorizeSystem();

@@ -4,7 +4,7 @@ slug: newsletter-and-announcements
 page: newsletter-and-announcements.html
 section: Marketing
 license: regular
-keywords: [newsletter, email campaign, subscribers, ads, ad zone, adsense, announcement, banner, popup]
+keywords: [newsletter, email campaign, subscribers, ads, ad zone, adsense, announcement, banner, popup, send newsletter, subscriber list, announcement banner, ad not showing, campaign not sending]
 ---
 
 **Admin → Marketing** also covers three broadcast tools: **Newsletter**, **Advertisements**, and **Announcements**.

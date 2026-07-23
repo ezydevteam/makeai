@@ -34,13 +34,14 @@ class MailTemplateController extends Controller
             }
         }
 
+        $proAvailable = isProAvailable();
         $affiliateAvailable = app(\App\Services\AffiliateService::class)->isEnabled();
         $ticketsEnabled = (bool) settings('tickets_enabled', true);
 
         // The visibility gates apply to every read below (list, category filter),
         // so build them once rather than restating them per query.
         $visible = fn () => MailTemplate::query()
-            ->when(! isProAvailable(), fn ($query) => $query->where('requires_pro', false))
+            ->when(! $proAvailable, fn ($query) => $query->where('requires_pro', false))
             // Affiliate is a monetization feature gated by the Extended License +
             // its own toggle — hide its templates when it isn't available.
             ->when(! $affiliateAvailable, fn ($query) => $query
@@ -52,6 +53,13 @@ class MailTemplateController extends Controller
         $search = trim((string) $request->string('search'));
         $category = trim((string) $request->string('category'));
         $type = trim((string) $request->string('type'));
+
+        // Without pro, $visible() has already dropped every requires_pro template,
+        // so honouring type=pro would render an empty table with nothing to explain
+        // it. A stale bookmark or hand-edited URL falls back to no type filter.
+        if ($type === 'pro' && ! $proAvailable) {
+            $type = '';
+        }
 
         $templates = $visible()
             ->with('editor:id,name')
@@ -83,6 +91,7 @@ class MailTemplateController extends Controller
             // Sourced from the full visible set, not the current page — otherwise the
             // dropdown would only offer categories that happen to appear on page 1.
             'categories' => $visible()->distinct()->orderBy('category')->pluck('category'),
+            'proAvailable' => $proAvailable,
         ]);
     }
 
@@ -155,7 +164,17 @@ class MailTemplateController extends Controller
         $content = Str::limit(strip_tags($validated['content'] ?? ''), 12000, '');
         $selectedText = trim(strip_tags($validated['selected_text'] ?? ''));
 
-        if (in_array($action, ['improve_content'], true) && $selectedText === '' && $content === '') {
+        // continue_writing works off the surrounding body, not a highlight, so
+        // it is the one selection-menu action that does not require one.
+        if (in_array($action, $this->selectionAiActions(), true) && $action !== 'continue_writing' && $selectedText === '') {
+            return response()->json([
+                'success' => false,
+                'code' => 'EMPTY_SELECTION',
+                'message' => translate('Select text before using this AI action.'),
+            ], 422);
+        }
+
+        if ($action !== 'generate_content' && $content === '' && $selectedText === '') {
             return response()->json([
                 'success' => false,
                 'code' => 'EMPTY_CONTENT',
@@ -173,11 +192,21 @@ class MailTemplateController extends Controller
             toolSlug: 'admin_mail_template_assist'
         );
 
+        $formatted = $this->formatAiAssistResult($action, trim($result->content ?? ''));
+
+        // An empty completion used to fall through as a success, so the editor
+        // "applied" nothing and still showed the success toast.
+        if (trim($formatted['content']) === '') {
+            return response()->json([
+                'success' => false,
+                'code' => 'EMPTY_RESULT',
+                'message' => translate('The AI returned nothing. Try again.'),
+            ], 422);
+        }
+
         return response()->json([
             'success' => true,
-            'data' => [
-                'content' => \App\Services\TiptapHtmlSanitizer::sanitize(trim($result->content ?? ''), \App\Services\TiptapHtmlSanitizer::BASIC_TAGS),
-            ],
+            'data' => $formatted,
             'message' => translate('AI assist completed.'),
         ]);
     }
@@ -186,9 +215,45 @@ class MailTemplateController extends Controller
     {
         return match ($action) {
             'generate_content' => "Write a professional, engaging SaaS email body in clean HTML. Use the subject as context. Return HTML only.\n\nSubject: {$subject}",
-            'improve_content' => "Improve the selected email text for clarity, flow, and professionalism. Keep the meaning intact. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            // Document-level: rewrites the whole body, so it reads $content.
+            'improve_content' => "Improve this email body for clarity, flow, and professionalism. Keep the meaning and every {placeholder} token intact. Return the full rewritten body as clean HTML only.\n\nSubject: {$subject}\n\nEmail body:\n{$content}",
             'generate_subject' => "Generate one concise, engaging email subject line under 50 characters. Return plain text only.\n\nContext:\n{$content}",
+            'improve_selection' => "Improve the selected email text for clarity, flow, and professionalism. Keep the meaning and every {placeholder} token intact. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'shorten_selection' => "Shorten the selected email text while preserving the main meaning and every {placeholder} token. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'expand_selection' => "Expand the selected email text with useful detail and smoother flow. Keep every {placeholder} token intact. Return clean HTML only.\n\nSubject: {$subject}\n\nSelected text:\n{$selectedText}",
+            'rephrase_selection' => "Rephrase the selected email text while preserving the original meaning and every {placeholder} token. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'translate_selection' => "Translate the selected email text into clear English unless it is already English; if it is already English, translate it into Bengali. Leave every {placeholder} token untranslated. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'change_tone' => "Rewrite the selected email text in a professional, friendly tone. Preserve the meaning and every {placeholder} token. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'summarize_selection' => "Summarize the selected email text into a concise version. Preserve the key points and every {placeholder} token. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'fix_grammar' => "Fix grammar, spelling, punctuation, and awkward phrasing in the selected email text. Preserve the meaning and every {placeholder} token. Return clean HTML only.\n\nSelected text:\n{$selectedText}",
+            'continue_writing' => "Continue writing this email from the cursor with 1 or 2 short, useful paragraphs. Return clean HTML only.\n\nSubject: {$subject}\n\nExisting body:\n{$content}",
         };
+    }
+
+    private function formatAiAssistResult(string $action, string $content): array
+    {
+        // The subject is a plain <input>: sanitizing it as HTML left the model's
+        // wrapping <p> tags in the field as literal markup.
+        if ($action === 'generate_subject') {
+            return ['content' => Str::limit(trim(strip_tags($content), "\"' \n\r\t\v\0"), 255, '')];
+        }
+
+        return ['content' => \App\Services\TiptapHtmlSanitizer::sanitize($content, \App\Services\TiptapHtmlSanitizer::BASIC_TAGS)];
+    }
+
+    private function selectionAiActions(): array
+    {
+        return [
+            'improve_selection',
+            'shorten_selection',
+            'expand_selection',
+            'rephrase_selection',
+            'translate_selection',
+            'change_tone',
+            'summarize_selection',
+            'fix_grammar',
+            'continue_writing',
+        ];
     }
 
     public function destroy(MailTemplate $template): RedirectResponse

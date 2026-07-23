@@ -74,8 +74,7 @@ class MailService
         }
 
         $rendered = $template->render($data);
-        $layout = settings('mail_layout', '{content}');
-        $htmlContent = str_replace('{content}', $rendered['content'], $layout);
+        $htmlContent = MailTemplate::wrapInLayout($rendered['content'], $data);
 
         try {
             Mail::html($htmlContent, function ($message) use ($to, $rendered) {
@@ -176,9 +175,8 @@ class MailService
         }
 
         $rendered = $template->render($data);
-        $layout = settings('mail_layout', '{content}');
 
-        return str_replace('{content}', $rendered['content'], $layout);
+        return MailTemplate::wrapInLayout($rendered['content'], $data);
     }
 
     public function getVariables(): array

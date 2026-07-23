@@ -273,7 +273,6 @@ class SendNewsletterCampaign implements ShouldQueue
         $body = self::replaceVariables($bodyTemplate, array_merge($variables, [
             'campaign_content' => $content,
         ]));
-        $layout = settings('mail_layout', '{content}');
         $pixelUrl = route('newsletter.open', [
             'campaign' => $campaign->id,
             'email' => base64_encode($recipientData['email']),
@@ -282,7 +281,7 @@ class SendNewsletterCampaign implements ShouldQueue
 
         return [
             'subject' => $subject,
-            'html' => str_replace('{content}', $body, $layout).$trackingPixel,
+            'html' => MailTemplate::wrapInLayout($body, $variables).$trackingPixel,
         ];
     }
 

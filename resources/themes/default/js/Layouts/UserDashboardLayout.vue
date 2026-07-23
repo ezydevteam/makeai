@@ -138,12 +138,12 @@ const dashboardShellStyle = computed(() => ({
     paddingBottom: '24px',
 }))
 const mobileSidebarInsetStyle = computed(() => ({
-    top: 'var(--header-height, 64px)',
+    top: 'calc(var(--top-banners-height, 0px) + var(--header-height, 64px))',
     bottom: `${mobileBottomHeaderHeight.value}px`,
-    height: `calc(100dvh - var(--header-height, 64px) - ${mobileBottomHeaderHeight.value}px)`,
+    height: `calc(100dvh - var(--top-banners-height, 0px) - var(--header-height, 64px) - ${mobileBottomHeaderHeight.value}px)`,
 }))
 const mobileSidebarOverlayStyle = computed(() => ({
-    top: 'var(--header-height, 64px)',
+    top: 'calc(var(--top-banners-height, 0px) + var(--header-height, 64px))',
     bottom: `${mobileBottomHeaderHeight.value}px`,
 }))
 const appliedMobileSidebarInsetStyle = computed(() => (isDesktopViewport.value ? undefined : mobileSidebarInsetStyle.value))

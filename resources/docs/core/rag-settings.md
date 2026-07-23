@@ -4,7 +4,7 @@ slug: rag-settings
 page: rag-settings.html
 section: AI
 license: regular
-keywords: [rag, retrieval augmented generation, chat with document, chat with website, chat with youtube, document ai, grounding, chunking, embeddings]
+keywords: [rag, retrieval augmented generation, chat with document, chat with pdf, chat with website, chat with youtube, document ai, grounding, chunking, embeddings, embedding model, top-k chunks, whisper fallback, youtube transcript, empty answer, chunk size, max file size]
 ---
 
 **Admin → AI Management → RAG Settings** configures the "Document AI" tools — the features that let a customer upload a file, point at a website, or link a YouTube video and then chat with an AI that answers only from that content instead of guessing.

@@ -49,6 +49,11 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             InstallationMiddleware::class,
             LicenseMiddleware::class,
+            // Block suspended accounts before any signed-in user gate runs. Applied to
+            // the whole web group (not per-route) so every authenticated route —
+            // including addon routes — is covered; it no-ops for guests and admins
+            // (it only acts on a banned web-guard user).
+            NotBanned::class,
             // Signed-in user gates. Phone first: SMS two-factor needs a verified phone,
             // so collecting it before the 2FA prompt keeps the setup order sensible.
             \App\Http\Middleware\EnsurePhoneProvided::class,

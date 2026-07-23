@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
@@ -73,6 +73,11 @@ const props = defineProps<{
 const { t } = useTranslate()
 const { formatDate } = useDateFormat()
 const { canAny, isSuperAdmin } = useAdminCan()
+
+// Plans are a subscription (Extended License) feature — hide the plan column on a
+// Regular license, matching the users index table and the backend.
+const page = usePage()
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 
 const form = useForm({
     status: props.filters.status !== undefined && props.filters.status !== null ? String(props.filters.status) : '',
@@ -328,8 +333,8 @@ const forceDeleteUser = (user: UserItem) => {
 
             <div class="rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-800">
                 <div class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 sm:px-6">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                        <div class="flex-1 min-w-[240px]">
+                    <div class="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
+                        <div class="flex-1 w-full min-w-[220px] md:max-w-sm">
                             <div class="relative">
                                 <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 dark:text-gray-500">
                                     <i class="ti ti-search text-base"></i>
@@ -362,7 +367,7 @@ const forceDeleteUser = (user: UserItem) => {
                                 />
                             </div>
 
-                            <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-52 lg:flex-none">
+                            <div v-if="isProAvailable" class="w-full sm:flex-grow sm:flex-1 sm:min-w-[180px] lg:w-52 lg:flex-none">
                                 <AppSelect
                                     v-model="form.plan"
                                     :options="planOptions"
@@ -372,7 +377,7 @@ const forceDeleteUser = (user: UserItem) => {
                                 />
                             </div>
 
-                            <template v-if="selectedIds.length > 0 && canAny(['users.delete', 'users.manage'])">
+                            <template v-if="selectedIds.length > 0 && canAny(['users.delete'])">
                                 <span class="text-sm text-gray-500 dark:text-gray-400 sm:whitespace-nowrap">
                                     {{ t(':count selected', { count: selectedIds.length }) }}
                                 </span>
@@ -409,7 +414,7 @@ const forceDeleteUser = (user: UserItem) => {
                                         <div class="flex items-center">
                                             <input
                                                 type="checkbox"
-                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                                 :checked="isAllSelected"
                                                 @change="toggleAll"
                                             />
@@ -417,7 +422,7 @@ const forceDeleteUser = (user: UserItem) => {
                                     </th>
                                     <th scope="col" class="px-6 py-3">{{ t('User') }}</th>
                                     <th scope="col" class="px-6 py-3 text-center">{{ t('Credits') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-center">{{ t('Plan') }}</th>
+                                    <th v-if="isProAvailable" scope="col" class="px-6 py-3 text-center">{{ t('Plan') }}</th>
                                     <th scope="col" class="px-6 py-3 text-center">{{ t('Status') }}</th>
                                     <th scope="col" class="px-6 py-3 text-center">{{ t('Deleted') }}</th>
                                     <th scope="col" class="px-6 py-3 text-right">{{ t('Action') }}</th>
@@ -427,7 +432,7 @@ const forceDeleteUser = (user: UserItem) => {
                                 <tr
                                     v-for="user in filteredUsers"
                                     :key="user.id"
-                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700/40"
+                                    class="border-b border-gray-100 bg-white transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700/40"
                                 >
                                     <td class="w-4 p-4">
                                         <div class="flex items-center">
@@ -435,7 +440,7 @@ const forceDeleteUser = (user: UserItem) => {
                                                 v-model="selectedIds"
                                                 type="checkbox"
                                                 :value="user.id"
-                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                                class="h-4 w-4 rounded border-gray-300 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-800 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                             />
                                         </div>
                                     </td>
@@ -459,7 +464,7 @@ const forceDeleteUser = (user: UserItem) => {
                                     <td class="px-6 py-4 text-center">
                                         <span class="font-mono text-gray-900 dark:text-white">{{ formatCredits(user.credits) }}</span>
                                     </td>
-                                    <td class="px-6 py-4 text-center">
+                                    <td v-if="isProAvailable" class="px-6 py-4 text-center">
                                         <span
                                             v-if="user.plan"
                                             class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
@@ -478,15 +483,15 @@ const forceDeleteUser = (user: UserItem) => {
                                             {{ user.is_active ? t('Active') : t('Inactive') }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                                    <td class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                         {{ formatDate(user.deleted_at) }}
                                     </td>
                                     <td class="px-6 py-4 text-right">
-                                        <div v-if="canAny(['users.delete', 'users.manage'])" class="inline-flex items-center gap-2">
-                                            <Tooltip :content="t('Restore user')" placement="top">
+                                        <div v-if="canAny(['users.delete'])" class="inline-flex items-center gap-2">
+                                            <Tooltip :content="t('Restore')" placement="top">
                                                 <button
                                                     type="button"
-                                                    :aria-label="t('Restore user')"
+                                                    :aria-label="t('Restore')"
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-full text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                                                     @click="restoreUser(user)"
                                                 >
@@ -494,10 +499,10 @@ const forceDeleteUser = (user: UserItem) => {
                                                 </button>
                                             </Tooltip>
 
-                                            <Tooltip v-if="isSuperAdmin" :content="t('Permanently delete user')" placement="top">
+                                            <Tooltip v-if="isSuperAdmin" :content="t('Permanently delete')" placement="top">
                                                 <button
                                                     type="button"
-                                                    :aria-label="t('Permanently delete user')"
+                                                    :aria-label="t('Permanently delete')"
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                                                     @click="forceDeleteUser(user)"
                                                 >

@@ -4,6 +4,7 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch 
 import { onClickOutside } from '@vueuse/core'
 import AppSelect from '@/Components/UI/AppSelect.vue'
 import AppSwitch from '@/Components/UI/AppSwitch.vue'
+import Tooltip from '@/Components/UI/Tooltip.vue'
 import TagsInput from '@/Components/UI/TagsInput.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import { useTranslate } from '@/Composables/useTranslate'
@@ -89,6 +90,7 @@ const isAutosaving = ref(false)
 const lastAutosavedAt = ref<string | null>(null)
 const autosaveError = ref<string | null>(null)
 const aiLoading = ref<string | null>(null)
+const aiError = ref(false)
 let autosaveTimer: number | undefined
 let suppressDirty = false
 
@@ -128,7 +130,7 @@ const toggles = [
     { key: 'is_featured', label: 'Make Featured' },
     { key: 'is_sticky', label: 'Make Pinned' },
     { key: 'show_toc', label: 'Show table of contents' },
-    { key: 'no_index', label: 'No index for search engine' },
+    { key: 'no_index', label: 'Hide from search engine' },
 ] as const
 
 const blogAiAssistActions: AiAssistAction[] = [
@@ -235,9 +237,21 @@ const markSlugTouched = () => {
     form.slug = makeSlug(form.slug)
 }
 
+const featuredPreview = ref<string | null>(props.post?.featured_image ? mediaUrl(props.post.featured_image) : null)
+
 const setFeaturedImage = (event: Event) => {
     const input = event.target as HTMLInputElement
-    form.featured_image_file = input.files?.[0] ?? null
+    const file = input.files?.[0] ?? null
+    form.featured_image_file = file
+    if (file) {
+        featuredPreview.value = URL.createObjectURL(file)
+    }
+}
+
+const removeFeaturedImage = () => {
+    form.featured_image = ''
+    form.featured_image_file = null
+    featuredPreview.value = null
 }
 
 const normalizedTags = () => form.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
@@ -324,6 +338,7 @@ const runAiAssist = async (action: string) => {
     if (aiLoading.value) return
 
     aiLoading.value = action
+    aiError.value = false
     const selectedText = editorRef.value?.getSelectedText() ?? ''
 
     try {
@@ -366,6 +381,7 @@ const runAiAssist = async (action: string) => {
         isDirty.value = true
         toast.success(t('AI assist applied.'))
     } catch (error) {
+        aiError.value = true
         toast.error(error instanceof Error ? error.message : t('AI assist failed.'))
     } finally {
         aiLoading.value = null
@@ -418,10 +434,10 @@ onBeforeUnmount(() => {
             <div class="flex-1">
                 <div class="flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ isEditing ? t('Edit Blog Post') : t('Create Blog Post') }}</h1>
-                    <span v-if="isAutosaving" class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700">{{ t('Auto-saving...') }}</span>
-                    <span v-else-if="autosaveError" class="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">{{ autosaveError }}</span>
-                    <span v-else-if="isDirty" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">{{ t('Unsaved changes') }}</span>
-                    <span v-else-if="lastAutosavedAt" class="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-700">{{ t('Saved') }}</span>
+                    <span v-if="isAutosaving" class="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200">{{ t('Auto-saving...') }}</span>
+                    <span v-else-if="autosaveError" class="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700 dark:bg-red-900/40 dark:text-red-200">{{ autosaveError }}</span>
+                    <span v-else-if="isDirty" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">{{ t('Unsaved changes') }}</span>
+                    <span v-else-if="lastAutosavedAt" class="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/40 dark:text-primary-200">{{ t('Saved') }}</span>
                 </div>
                 <p class="mt-1 text-sm text-gray-500">{{ t('Write content and configure SEO, layout, and publishing details.') }}</p>
             </div>
@@ -430,10 +446,6 @@ onBeforeUnmount(() => {
                     <i class="ti ti-arrow-left text-base"></i>
                     {{ t('Back') }}
                 </Link>
-                <a v-if="currentPostUlid" :href="route('admin.blog.posts.preview', currentPostUlid)" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl transition px-3 py-2 border border-gray-200 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
-                    <i class="ti ti-eye text-base"></i>
-                    {{ t('Preview') }}
-                </a>
                 <div ref="publishMenuRef" class="relative">
                     <div class="inline-flex overflow-hidden rounded-xl shadow-sm ring-1 ring-primary-600/20">
                         <button @click="submit" :disabled="form.processing" type="button" class="bg-primary-500 inline-flex items-center justify-center gap-2 !rounded-l-xl !rounded-r-none px-3 py-2.5 text-sm font-medium text-white disabled:opacity-60">
@@ -493,7 +505,26 @@ onBeforeUnmount(() => {
 
                     <div class="mt-5">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Slug') }}</label>
-                        <input v-model="form.slug" @input="markSlugTouched" :placeholder="t('blog-post-slug')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                        <div class="flex items-center gap-2">
+                            <input v-model="form.slug" @input="markSlugTouched" :placeholder="t('blog-post-slug')" type="text" class="w-full flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                            <Tooltip :content="currentPostUlid ? t('Preview post') : t('Save the post to enable preview')" placement="top">
+                                <a
+                                    :href="currentPostUlid ? route('admin.blog.posts.preview', currentPostUlid) : undefined"
+                                    :target="currentPostUlid ? '_blank' : undefined"
+                                    rel="noopener"
+                                    :aria-disabled="!currentPostUlid"
+                                    :aria-label="t('Preview post')"
+                                    :class="[
+                                        'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition',
+                                        currentPostUlid
+                                            ? 'cursor-pointer border-gray-200 bg-gray-50 text-gray-500 hover:border-primary-500 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-400 dark:hover:text-primary-300'
+                                            : 'pointer-events-none cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300 dark:border-surface-800 dark:bg-surface-800 dark:text-surface-600',
+                                    ]"
+                                >
+                                    <i class="ti ti-eye text-base"></i>
+                                </a>
+                            </Tooltip>
+                        </div>
                         <p class="mt-1 text-xs text-gray-400">{{ t('Generated from title. You can edit it.') }}</p>
                     </div>
 
@@ -505,11 +536,16 @@ onBeforeUnmount(() => {
                         ai-assist
                         :ai-assist-actions="blogAiAssistActions"
                         :ai-assist-loading-key="aiLoading"
+                        :ai-assist-error="aiError"
                         :ai-assist-label="t('AI Assist')"
                         :ai-assist-loading-label="t('Working...')"
                         @ai-assist="runAiAssist"
                     />
                     <p v-if="form.errors.content" class="mt-1 text-sm text-danger-600">{{ form.errors.content }}</p>
+
+                    <label class="mt-5 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Excerpt') }}</label>
+                    <textarea v-model="form.excerpt" :placeholder="t('Write a short excerpt for listing pages and sharing')" rows="4" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
+                    <p v-if="form.errors.excerpt" class="mt-1 text-sm text-danger-600">{{ form.errors.excerpt }}</p>
                 </section>
 
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
@@ -549,48 +585,6 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
-                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h2>
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <div v-for="field in toggles" :key="field.key" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/60">
-                            <div class="flex items-center gap-3">
-                                <AppSwitch
-                                    :model-value="Boolean(form[field.key])"
-                                    @update:model-value="val => form[field.key] = val"
-                                />
-                                <div>
-                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t(field.label) }}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Disable comments override -->
-                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/60">
-                            <div class="flex items-center gap-3">
-                                <AppSwitch
-                                    :model-value="!form.allow_comments"
-                                    @update:model-value="val => form.allow_comments = !val"
-                                />
-                                <div>
-                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Disable comments') }}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Hide related posts override -->
-                        <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-surface-700 dark:bg-surface-800/60">
-                            <div class="flex items-center gap-3">
-                                <AppSwitch
-                                    :model-value="!form.show_related_posts"
-                                    @update:model-value="val => form.show_related_posts = !val"
-                                />
-                                <div>
-                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Hide related posts') }}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
             </main>
 
             <aside class="space-y-5">
@@ -608,23 +602,7 @@ onBeforeUnmount(() => {
                 </section>
 
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
-                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('General') }}</h2>
-                    <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Excerpt') }}</label>
-                    <textarea v-model="form.excerpt" :placeholder="t('Write a short excerpt for listing pages and sharing')" rows="4" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white"></textarea>
-                    <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Featured Image') }}</label>
-                    <div v-if="form.featured_image" class="mb-3 overflow-hidden rounded-lg border border-gray-200 dark:border-surface-700">
-                        <img :src="mediaUrl(form.featured_image)" :alt="form.featured_image_alt || form.title" class="h-32 w-full object-cover">
-                    </div>
-                    <input @change="setFeaturedImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="w-full rounded-lg border border-gray-200 bg-gray-50 ps-3 pe-3 py-2 text-sm text-gray-600 file:me-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-primary-700 file:transition-colors hover:file:bg-primary-100 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-300 dark:file:bg-primary-900/30 dark:file:text-primary-300 dark:hover:file:bg-primary-900/40">
-                    <p v-if="form.errors.featured_image_file" class="mt-1 text-sm text-danger-600">{{ form.errors.featured_image_file }}</p>
-                    <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image Alt Text') }}</label>
-                    <input v-model="form.featured_image_alt" :placeholder="t('Describe the image for accessibility')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                    <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Reading Time') }}</label>
-                    <input v-model="form.reading_time" :placeholder="t('Estimated reading time in minutes')" type="number" min="0" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
-                </section>
-
-                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
-                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Categories and Tags') }}</h2>
+                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Categories & Tags') }}</h2>
                     <AppSelect
                         v-if="categories.length"
                         v-model="form.category_ids"
@@ -644,6 +622,58 @@ onBeforeUnmount(() => {
                     </div>
                 </section>
 
+                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Featured Image') }}</h2>
+                    <div class="relative group">
+                        <div class="aspect-video overflow-hidden rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center dark:border-surface-700 dark:bg-surface-800">
+                            <img v-if="featuredPreview" :src="featuredPreview" :alt="form.featured_image_alt || form.title" class="w-full h-full object-cover">
+                            <svg v-else class="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        </div>
+                        <label class="absolute inset-0 flex items-center justify-center bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg cursor-pointer">
+                            <input @change="setFeaturedImage" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden">
+                            <span class="text-white text-sm font-semibold">{{ t('Update Image') }}</span>
+                        </label>
+                    </div>
+                    <button v-if="featuredPreview" @click="removeFeaturedImage" type="button" class="mt-3 flex items-center gap-1 text-xs font-semibold text-red-500 transition-colors hover:text-red-700">
+                        <i class="ti ti-trash text-sm"></i>
+                        {{ t('Remove Featured Image') }}
+                    </button>
+                    <p v-if="form.errors.featured_image_file" class="mt-1 text-sm text-danger-600">{{ form.errors.featured_image_file }}</p>
+                    <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Image Alt Text') }}</label>
+                    <input v-model="form.featured_image_alt" :placeholder="t('Describe the image for accessibility')" type="text" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                    <label class="mt-4 mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Reading Time') }}</label>
+                    <input v-model="form.reading_time" :placeholder="t('Estimated reading time in minutes')" type="number" min="0" class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:bg-surface-800 dark:border-surface-700 dark:text-white">
+                </section>
+
+                <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
+                    <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h2>
+                    <div class="space-y-4">
+                        <div v-for="field in toggles" :key="field.key" class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t(field.label) }}</p>
+                            <AppSwitch
+                                :model-value="Boolean(form[field.key])"
+                                @update:model-value="val => form[field.key] = val"
+                            />
+                        </div>
+
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Disable comments') }}</p>
+                            <AppSwitch
+                                :model-value="!form.allow_comments"
+                                @update:model-value="val => form.allow_comments = !val"
+                            />
+                        </div>
+
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('Hide related posts') }}</p>
+                            <AppSwitch
+                                :model-value="!form.show_related_posts"
+                                @update:model-value="val => form.show_related_posts = !val"
+                            />
+                        </div>
+                    </div>
+                </section>
+
                 <section v-if="post?.revisions?.length" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:bg-surface-900 dark:border-surface-800">
                     <h2 class="mb-4 text-lg font-bold text-gray-900 dark:text-white">{{ t('Revisions') }}</h2>
                     <div class="space-y-2 text-sm text-gray-600 dark:text-gray-300">
@@ -653,10 +683,6 @@ onBeforeUnmount(() => {
                         </div>
                     </div>
                 </section>
-
-                <div class="rounded-xl border border-primary-100 bg-primary-50/60 p-4 text-sm text-gray-600 shadow-sm dark:border-primary-900/30 dark:bg-primary-900/10 dark:text-gray-300">
-                    {{ t('Use preview to review unpublished changes, then save when the post content, SEO, and layout are ready.') }}
-                </div>
             </aside>
         </div>
     </div>

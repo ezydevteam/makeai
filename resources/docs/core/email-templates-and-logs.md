@@ -4,7 +4,7 @@ slug: email-templates-and-logs
 page: email-templates-and-logs.html
 section: Mail
 license: regular
-keywords: [email templates, email variables, mail logs, resend email, welcome email, otp email, subscription email]
+keywords: [email templates, email variables, mail logs, resend email, welcome email, otp email, subscription email, edit email template, template variables, resend, email not delivered]
 ---
 
 **Admin → Mail → Templates** and **Logs** cover the wording of every automated email your site sends, and a record of every email actually sent.

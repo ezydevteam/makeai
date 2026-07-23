@@ -51,7 +51,7 @@ const replyTypeLabel = (reply: Reply) => {
     }
 
     if (reply.author_type === 'admin') {
-        return t('Support team')
+        return t('Support agent')
     }
 
     return t(reply.author_type)
@@ -118,7 +118,7 @@ const rateTicket = () => ratingForm.post(route('user.dashboard.support.tickets.r
                     </div>
                     <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 shadow-sm dark:bg-surface-200 dark:text-gray-500">{{ replyTypeLabel(replyItem) }}</span>
                 </div>
-                <div class="reply-content prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-a:text-primary-600 prose-blockquote:text-gray-600 prose-hr:border-gray-200 dark:text-gray-200 dark:prose-invert dark:prose-headings:text-white dark:prose-p:text-gray-200 dark:prose-li:text-gray-200 dark:prose-strong:text-white dark:prose-a:text-primary-300 dark:prose-blockquote:text-gray-300 dark:prose-hr:border-surface-700" v-html="sanitizeHtml(replyItem.content)"></div>
+                <div class="ticket-content reply-content prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-a:text-primary-600 prose-blockquote:text-gray-600 prose-hr:border-gray-200 dark:!text-gray-300 dark:prose-invert dark:prose-headings:text-white dark:prose-p:text-gray-200 dark:prose-li:text-gray-200 dark:prose-strong:text-white dark:prose-a:text-primary-300 dark:prose-blockquote:text-gray-300 dark:prose-hr:border-surface-700" v-html="sanitizeHtml(replyItem.content)"></div>
                 <div v-if="replyItem.attachments?.length" class="mt-4 flex flex-wrap gap-2">
                     <a v-for="attachment in replyItem.attachments" :key="attachment.url" :href="attachment.url" class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm transition hover:border-primary-500 hover:bg-primary-50 hover:text-primary-700 dark:border-surface-700 dark:bg-surface-800 dark:text-gray-200 dark:hover:border-primary-800 dark:hover:bg-primary-900/20 dark:hover:text-primary-300">
                         <i class="ti ti-download mr-1"></i>
@@ -137,7 +137,7 @@ const rateTicket = () => ratingForm.post(route('user.dashboard.support.tickets.r
             <div>
                 <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Attachments') }}</label>
                 <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-2 py-1 dark:border-surface-700 dark:bg-surface-800">
-                    <button type="button" @click="openAttachmentPicker" class="inline-flex items-center justify-center rounded-full border border-primary-200 bg-primary-50 px-4 py-1 text-sm font-semibold text-primary-600 transition hover:bg-primary-100 dark:border-primary-500/40 dark:bg-primary-500/40 dark:text-primary-400 dark:hover:bg-primary-500/25">
+                    <button type="button" @click="openAttachmentPicker" class="inline-flex items-center justify-center rounded-full border border-primary-200 bg-primary-50 px-4 py-1 text-sm font-semibold text-primary-600 transition hover:bg-primary-100 dark:border-primary-900/40 dark:bg-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-500/25">
                         {{ t('Choose files') }}
                     </button>
                     <span class="min-w-0 flex-1 truncate text-sm text-gray-500 dark:text-gray-400">

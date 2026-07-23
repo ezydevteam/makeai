@@ -4,7 +4,7 @@ slug: setting-up-email
 page: setting-up-email.html
 section: Mail
 license: regular
-keywords: [smtp, email sending, amazon ses, sendgrid, mail driver, from address, send test email, emails not sending, welcome email not arriving]
+keywords: [smtp, email sending, amazon ses, sendgrid, mailgun, postmark, mail driver, from address, from name, send test email, emails not sending, welcome email not arriving, smtp not working, test email fails, email in spam]
 ---
 
 **Admin → Mail → Settings** connects the service your site uses to send email — welcome messages, login codes, and receipts don't go anywhere without this.

@@ -4,7 +4,7 @@ slug: notification-delivery-settings
 page: notification-delivery-settings.html
 section: Settings
 license: regular
-keywords: [notifications, reverb, pusher, polling, websockets, real time, broadcasting, notifications not working]
+keywords: [notifications, reverb, pusher, polling, websockets, real time, broadcasting, notifications not working, notifications not arriving, reverb not running, reverb:start, websocket, polling fallback, delivery driver]
 ---
 
 **Admin → Settings → Notifications** configures how in-app notifications reach both admins and customers in real time — not just an admin-only feature, this is the actual broadcasting connection used across the whole product.

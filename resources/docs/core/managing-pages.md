@@ -4,7 +4,7 @@ slug: managing-pages
 page: managing-pages.html
 section: Content
 license: regular
-keywords: [pages, custom page, about page, contact page, static page, page editor, publish, draft, scheduled]
+keywords: [pages, custom page, about page, contact page, static page, page editor, publish, draft, scheduled, page not showing, password protect page, schedule page, parent page, layout options, container width, trash page]
 ---
 
 **Admin → Content → Pages** builds standalone pages for your public site — About, legal pages, landing pages, anything that isn't a blog post. Pages support a parent/child hierarchy, and a few system pages (used elsewhere in the product) are protected from deletion.

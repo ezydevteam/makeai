@@ -133,9 +133,13 @@ const submit = () => {
 
 const editorRef = ref<any>(null)
 const aiLoading = ref<string | null>(null)
+const aiError = ref(false)
 const toast = useToastr()
 const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content ?? ''
 
+// Shown only when nothing is highlighted. With a selection, RichEditor swaps to
+// its own built-in list (improve/shorten/expand/...), which is why these are all
+// whole-document actions.
 const mailTemplateAiAssistActions = [
     {
         key: 'generate_content',
@@ -145,7 +149,7 @@ const mailTemplateAiAssistActions = [
     {
         key: 'improve_content',
         label: t('Improve content'),
-        description: t('Rewrite selected text for clarity.'),
+        description: t('Rewrite the whole body for clarity.'),
     },
     {
         key: 'generate_subject',
@@ -154,10 +158,24 @@ const mailTemplateAiAssistActions = [
     },
 ]
 
+// RichEditor's built-in highlighted-text actions. They come back as HTML that
+// replaces the selection.
+const SELECTION_AI_ACTIONS = [
+    'improve_selection',
+    'shorten_selection',
+    'expand_selection',
+    'rephrase_selection',
+    'translate_selection',
+    'change_tone',
+    'summarize_selection',
+    'fix_grammar',
+]
+
 const runAiAssist = async (action: string) => {
     if (aiLoading.value) return
 
     aiLoading.value = action
+    aiError.value = false
     const selectedText = editorRef.value?.getSelectedText() ?? ''
 
     try {
@@ -181,14 +199,26 @@ const runAiAssist = async (action: string) => {
             throw new Error(payload.message || t('AI assist failed.'))
         }
 
+        const generated: string = payload.data?.content ?? ''
+
         if (action === 'generate_subject') {
-            form.subject = payload.data.content
-        } else if (action === 'generate_content') {
-            editorRef.value?.insertAtCursor(payload.data.content)
+            form.subject = generated
         } else if (action === 'improve_content') {
-            editorRef.value?.replaceSelection(payload.data.content)
+            // Whole-body rewrite: RichEditor watches modelValue, so assigning
+            // form.content re-renders the editor.
+            form.content = generated
+        } else if (action === 'generate_content' || action === 'continue_writing') {
+            editorRef.value?.insertAtCursor(generated)
+        } else if (SELECTION_AI_ACTIONS.includes(action)) {
+            editorRef.value?.replaceSelection(generated)
+        } else {
+            // Never claim success for an action nothing here knows how to apply.
+            throw new Error(t('AI assist failed.'))
         }
+
+        toast.success(t('AI assist applied.'))
     } catch (error: any) {
+        aiError.value = true
         toast.error(error.message || t('AI assist failed.'))
     } finally {
         aiLoading.value = null
@@ -324,6 +354,7 @@ const runAiAssist = async (action: string) => {
                                 ai-assist
                                 :ai-assist-actions="mailTemplateAiAssistActions"
                                 :ai-assist-loading-key="aiLoading"
+                                :ai-assist-error="aiError"
                                 :ai-assist-label="t('AI Assist')"
                                 :ai-assist-loading-label="t('Working...')"
                                 @ai-assist="runAiAssist"

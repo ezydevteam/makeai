@@ -11,6 +11,7 @@ useFlashToasts()
 interface PageProps {
     branding?: { site_name?: string; site_logo_light?: string; site_logo_dark?: string }
     captcha?: { enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }
+    email?: string
 }
 
 const { t } = useTranslate()
@@ -24,6 +25,7 @@ const logoLight = computed(() => String(branding.value?.site_logo_light || ''))
 const logoDark = computed(() => String(branding.value?.site_logo_dark || ''))
 const authLogo = computed(() => (isDark.value ? (logoDark.value || logoLight.value) : (logoLight.value || logoDark.value)))
 const captcha = computed<{ enabled: boolean; provider: 'recaptcha' | 'hcaptcha'; site_key: string }>(() => props.captcha ?? { enabled: false, provider: 'recaptcha', site_key: '' })
+const email = computed(() => String(props.email || ''))
 
 const form = useForm({ code: '', captcha_token: '' })
 const digits = ref(['', '', '', '', '', ''])
@@ -80,7 +82,12 @@ onMounted(() => inputs.value[0]?.focus())
                             {{ t('Verify your email') }}
                         </h1>
                         <p class="mt-2 max-w-sm text-sm leading-6 text-gray-500 dark:text-gray-400">
-                            {{ t('A 6-digit verification code has been sent to your email.') }}
+                            <template v-if="email">
+                                {{ t('A 6-digit verification code has been sent to :email', { email }) }}
+                            </template>
+                            <template v-else>
+                                {{ t('A 6-digit verification code has been sent to your email.') }}
+                            </template>
                         </p>
                     </div>
 

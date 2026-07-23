@@ -4,7 +4,7 @@ slug: updating-your-site
 page: updating-your-site.html
 section: System
 license: regular
-keywords: [update, new version, apply update, rollback, changelog, upgrade, update version, backup before update]
+keywords: [update, new version, apply update, rollback, changelog, upgrade, update version, backup before update, update failed, cant update, update stuck, manual update, upload update zip, clear cache after update, rollback window]
 ---
 
 **Admin → System → Update Version** checks for and installs new releases of MakeAI safely, without touching a config file.

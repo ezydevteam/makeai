@@ -248,7 +248,7 @@ const logoutAllSessions = () => {
             <!-- Left: Profile Info -->
             <div class="lg:col-span-2 space-y-6">
                 <form @submit.prevent="submit" class="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden dark:bg-surface-900 dark:border-gray-800">
-                    <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 dark:bg-surface-800/50 dark:border-gray-800">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-white dark:bg-surface-900 dark:border-gray-800">
                         <h3 class="font-bold text-gray-900 dark:text-white">{{ t('Account Details') }}</h3>
                     </div>
                     <div class="p-6 space-y-6">
@@ -321,6 +321,7 @@ const logoutAllSessions = () => {
                                             <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
                                         </button>
                                     </div>
+                                    <p v-if="form.errors.password" class="mt-1 text-xs text-red-500">{{ form.errors.password }}</p>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{{ t('Confirm New Password') }}</label>
@@ -330,15 +331,14 @@ const logoutAllSessions = () => {
                                             <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'" class="text-base"></i>
                                         </button>
                                     </div>
+                                    <p v-if="form.errors.password_confirmation" class="mt-1 text-xs text-red-500">{{ form.errors.password_confirmation }}</p>
                                 </div>
                             </div>
                         </div>
-
-
                     </div>
-                    <div class="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex justify-end gap-3 dark:border-gray-800 dark:bg-surface-800/50">
+                    <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 dark:border-gray-800">
                         <Link :href="route('admin.users.index')" class="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors">{{ t('Cancel') }}</Link>
-                        <button v-if="canAny(['users.edit', 'users.manage'])" type="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary-admin rounded-xl text-sm font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
+                        <button v-if="canAny(['users.edit'])" type="submit" :disabled="form.processing" class="px-6 py-2.5 btn-primary-admin rounded-xl text-sm font-bold transition-colors shadow-lg shadow-primary-500/20 disabled:opacity-50">
                             {{ form.processing ? t('Saving...') : t('Update User') }}
                         </button>
                     </div>
@@ -347,26 +347,26 @@ const logoutAllSessions = () => {
 
             <!-- Right: Activity & Sidebar -->
             <div class="space-y-6">
-                <div v-if="canAny(['users.edit', 'users.delete', 'users.impersonate', 'users.manage'])" class="bg-white border border-gray-200 rounded-2xl shadow-sm dark:bg-surface-900 dark:border-gray-800">
+                <div v-if="canAny(['users.edit', 'users.delete', 'users.impersonate'])" class="bg-white border border-gray-200 rounded-2xl shadow-sm dark:bg-surface-900 dark:border-gray-800">
                     <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50 dark:border-gray-800 dark:bg-surface-800/50">
                         <h3 class="font-bold text-gray-900 dark:text-white">{{ t('Quick Actions') }}</h3>
                     </div>
                     <div class="divide-y divide-gray-100 dark:divide-gray-800 p-5 space-y-3">
-                        <form v-if="canAny(['users.impersonate', 'users.manage'])" :action="route('admin.users.impersonate', user.ulid)" method="POST" target="_blank">
+                        <form v-if="canAny(['users.impersonate'])" :action="route('admin.users.impersonate', user.ulid)" method="POST" target="_blank">
                             <input type="hidden" name="_token" :value="csrfToken" />
                             <button type="submit" class="w-full flex items-center justify-center gap-2 py-3 bg-primary-50 text-primary-600 border border-primary-200 rounded-xl font-bold text-sm hover:bg-primary-100 dark:bg-primary-950/20 dark:border-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/30 transition-colors">
                                 <i class="ti ti-login-2 text-base"></i>
                                 {{ $t('Login as User') }}
                             </button>
                         </form>
-                        <button v-if="canAny(['users.edit', 'users.manage'])" type="button" @click="notificationModalOpen = true" class="w-full py-3 bg-purple-50 border border-purple-200 text-purple-600 font-bold text-sm rounded-xl hover:bg-purple-100 dark:bg-purple-950/20 dark:border-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors">
+                        <button v-if="canAny(['users.edit'])" type="button" @click="notificationModalOpen = true" class="w-full py-3 bg-purple-50 border border-purple-200 text-purple-600 font-bold text-sm rounded-xl hover:bg-purple-100 dark:bg-purple-950/20 dark:border-purple-900/30 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors">
                             <span class="inline-flex items-center justify-center gap-2">
                                 <i class="ti ti-bell text-base"></i>
                                 {{ $t('Send Notification') }}
                             </span>
                         </button>
                         <button
-                            v-if="canAny(['users.edit', 'users.manage'])"
+                            v-if="canAny(['users.edit'])"
                             type="button"
                             :disabled="isTogglingStatus"
                             @click="handleStatusToggle"
@@ -380,7 +380,7 @@ const logoutAllSessions = () => {
                             </span>
                         </button>
                         <button
-                            v-if="canAny(['users.edit', 'users.manage'])"
+                            v-if="canAny(['users.edit'])"
                             type="button"
                             :disabled="isTogglingBan"
                             @click="handleBanToggle"
@@ -394,7 +394,7 @@ const logoutAllSessions = () => {
                             </span>
                         </button>
                         <button
-                            v-if="canAny(['users.delete', 'users.manage'])"
+                            v-if="canAny(['users.delete'])"
                             type="button"
                             @click="deleteModalOpen = true"
                             class="w-full py-3 bg-red-50 border border-red-200 text-red-700 font-bold text-sm rounded-xl hover:bg-danger-100 dark:bg-red-950/20 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
@@ -405,7 +405,7 @@ const logoutAllSessions = () => {
                             </span>
                         </button>
                         <button
-                            v-if="user.two_factor_enabled && canAny(['users.edit', 'users.manage'])"
+                            v-if="user.two_factor_enabled && canAny(['users.edit'])"
                             type="button"
                             :disabled="twoFactorForm.processing"
                             @click="disableTwoFactor"
@@ -432,7 +432,7 @@ const logoutAllSessions = () => {
                             No login history available.
                         </div>
                     </div>
-                    <div v-if="canAny(['users.edit', 'users.manage'])" class="px-6 py-4 border-t border-gray-100 dark:border-gray-800">
+                    <div v-if="canAny(['users.edit'])" class="px-6 py-4 border-t border-gray-100 dark:border-gray-800">
                         <button
                             type="button"
                             :disabled="logoutForm.processing"
@@ -468,7 +468,7 @@ const logoutAllSessions = () => {
         </div>
 
         <div class="mt-8 rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden dark:bg-surface-900 dark:border-gray-800">
-            <div class="border-b border-gray-100 bg-gray-50 px-6 py-3 dark:border-gray-800 dark:bg-surface-900">
+            <div class="border-b border-gray-100 bg-white px-6 py-3 dark:border-gray-800 dark:bg-surface-900">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Usage History') }}</h3>
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('Recent AI usage activity for this user.') }}</p>
             </div>
@@ -531,7 +531,7 @@ const logoutAllSessions = () => {
                             </div>
                             <div class="col-span-2">
                                 <p class="text-gray-400 dark:text-gray-500">{{ t('Date') }}</p>
-                                <p class="mt-1 font-medium text-gray-700 dark:text-gray-200">{{ formatDateTime(item.created_at) }}</p>
+                                <p class="mt-1 text-gray-700 dark:text-gray-200">{{ formatDateTime(item.created_at) }}</p>
                             </div>
                         </div>
                     </div>

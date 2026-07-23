@@ -4,7 +4,7 @@ slug: cron-and-scheduling
 page: cron-and-scheduling.html
 section: System
 license: regular
-keywords: [cron, scheduler, schedule, background jobs, cleanup, renewals, crontab]
+keywords: [cron, scheduler, schedule, background jobs, cleanup, renewals, crontab, schedule:run, cron not running, scheduler not running, tasks not running, allowances not resetting, renewals not processing, shared hosting cron, queue worker]
 ---
 
 MakeAI relies on a scheduler for work that must happen without a user present: resetting

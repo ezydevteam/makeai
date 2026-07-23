@@ -4,7 +4,7 @@ slug: support-ticket-system
 page: support-ticket-system.html
 section: Communications
 license: regular
-keywords: [support tickets, help desk, department, canned response, sla, priority, assign ticket, ticket settings]
+keywords: [support tickets, help desk, department, canned response, sla, priority, assign ticket, ticket settings, ticket not showing, reply to ticket, close ticket, ticket status]
 ---
 
 **Admin → Communications → Support** is a full help-desk system: tickets, departments to route them, saved reply templates, and behavior settings like SLA deadlines.

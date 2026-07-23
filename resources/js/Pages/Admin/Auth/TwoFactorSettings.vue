@@ -88,6 +88,23 @@ const regenerateRecoveryCodes = () => {
         onFinish: () => recoveryForm.reset('password'),
     })
 }
+
+const downloadRecoveryCodes = () => {
+    if (!props.recoveryCodes.length) {
+        return
+    }
+
+    const content = props.recoveryCodes.join('\r\n') + '\r\n'
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'recovery-codes.txt'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+}
 </script>
 
 <template>
@@ -114,6 +131,16 @@ const regenerateRecoveryCodes = () => {
                 <code v-for="code in recoveryCodes" :key="code" class="rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-sm font-bold tracking-wider text-amber-950 dark:border-amber-800 dark:bg-surface-950 dark:text-amber-100">
                     {{ code }}
                 </code>
+            </div>
+            <div class="mt-4">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 dark:border-amber-700 dark:bg-surface-950 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                    @click="downloadRecoveryCodes"
+                >
+                    <i class="ti ti-download text-base"></i>
+                    {{ $t('Download codes (.txt)') }}
+                </button>
             </div>
         </div>
 

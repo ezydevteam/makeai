@@ -4,7 +4,7 @@ slug: gdpr-compliance
 page: gdpr-compliance.html
 section: Settings
 license: regular
-keywords: [gdpr, cookie consent, cookie banner, eu, privacy policy, cookie policy, consent management]
+keywords: [gdpr, cookie consent, cookie banner, eu, eea, privacy policy, cookie policy, consent management, cookie banner not showing, accept cookies, banner position, cookie preferences]
 ---
 
 **Admin → Settings → GDPR** controls the cookie consent banner shown to visitors, without touching any code.

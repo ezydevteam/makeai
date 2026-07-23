@@ -128,6 +128,16 @@ class BuildDocsHtml extends Command
         $nav = '';
         $body = '';
 
+        // Every page in the file, indexed by slug. A cross-link's target IS the slug of the
+        // article it points at, and in this single self-contained file that slug is an
+        // element id — so a link resolves to an in-file anchor only when its target ships here.
+        $knownSlugs = [];
+        foreach ($sections as $pages) {
+            foreach ($pages as $page) {
+                $knownSlugs[$page['slug']] = true;
+            }
+        }
+
         foreach ($sections as $section => $pages) {
             $sectionId = 'section-' . Str::slug($section);
 
@@ -157,7 +167,7 @@ class BuildDocsHtml extends Command
                 $body .= '<article class="doc" id="' . $this->e($page['slug']) . '">'
                     . '<header class="doc-head"><h2>' . $this->e($page['title']) . '</h2>'
                     . $badge . $online . '</header>'
-                    . '<div class="doc-body">' . $this->markdown($page['body']) . '</div>'
+                    . '<div class="doc-body">' . $this->markdown($page['body'], $knownSlugs) . '</div>'
                     . '<a class="top" href="#top">Back to top</a>'
                     . '</article>';
             }
@@ -173,14 +183,50 @@ class BuildDocsHtml extends Command
     /**
      * Markdown bodies start at `##` because the page title comes from front-matter, so
      * headings are demoted one level here to sit correctly under the article's <h2>.
+     *
+     * @param  array<string,bool>  $knownSlugs
      */
-    private function markdown(string $body): string
+    private function markdown(string $body, array $knownSlugs = []): string
     {
         $html = Str::markdown($body);
 
-        return preg_replace_callback(
+        $html = preg_replace_callback(
             '/<(\/?)h([2-5])>/',
             fn (array $m): string => '<' . $m[1] . 'h' . min(6, (int) $m[2] + 1) . '>',
+            $html
+        ) ?? $html;
+
+        return $this->resolveCrossLinks($html, $knownSlugs);
+    }
+
+    /**
+     * Turn in-corpus cross-links into in-file anchors.
+     *
+     * Authors link between pages by bare slug — `[Credit modes](credit-modes)` — which the
+     * docs site rewrites to `credit-modes.html` but CommonMark renders here as a raw
+     * `href="credit-modes"`. In one self-contained file that would navigate to a sibling file
+     * that does not exist, so the link is broken offline unless it is turned into `#credit-modes`,
+     * the id this file already gives that article.
+     *
+     * A slug with no page in this file (a link to something that only lives on the docs site,
+     * or a page not yet written) has no offline target at all. Following articleUrl()'s rule
+     * that a citation which 404s is worse than one that is not a link, its anchor is unwrapped
+     * to plain text rather than shipped as a dead link. The pattern only matches bare slugs
+     * (`[a-z0-9-]+`), so absolute URLs, `#top`, and `.html` links are left untouched.
+     *
+     * @param  array<string,bool>  $knownSlugs
+     */
+    private function resolveCrossLinks(string $html, array $knownSlugs): string
+    {
+        return preg_replace_callback(
+            '/<a href="([a-z0-9-]+)"([^>]*)>(.*?)<\/a>/is',
+            function (array $m) use ($knownSlugs): string {
+                [$slug, $attrs, $text] = [$m[1], $m[2], $m[3]];
+
+                return isset($knownSlugs[$slug])
+                    ? '<a href="#' . $slug . '"' . $attrs . '>' . $text . '</a>'
+                    : $text;
+            },
             $html
         ) ?? $html;
     }
@@ -235,7 +281,12 @@ class BuildDocsHtml extends Command
         </div>
 
         <footer class="footer">
-          <p>MakeAI &copy; {$year} &middot; <a href="{$siteEscaped}" target="_blank" rel="noopener">{$siteEscaped}</a></p>
+          <nav class="footer-menu">
+            <a href="{$siteEscaped}" target="_blank" rel="noopener">Documentation</a>
+            <a href="https://makeai.ezydev.net" target="_blank" rel="noopener">Support</a>
+            <a href="https://codecanyon.net" target="_blank" rel="noopener">Buy more</a>
+          </nav>
+          <p>&copy; {$year} &middot; Developed by <a href="https://ezydev.net" target="_blank" rel="noopener">EzyDev</a></p>
         </footer>
 
         <script>
@@ -261,6 +312,31 @@ class BuildDocsHtml extends Command
               group.hidden = visible === 0;
             });
           });
+
+          // Highlight the sidebar entry for the article currently in view.
+          var docs = Array.prototype.slice.call(document.querySelectorAll('.doc'));
+          var linkFor = {};
+          links.forEach(function (link) {
+            var id = (link.getAttribute('href') || '').slice(1);
+            if (id) linkFor[id] = link;
+          });
+
+          function highlight() {
+            if (!docs.length) return;
+            // The current article is the last one whose top has scrolled past the marker line.
+            var marker = 100;
+            var currentId = docs[0].id;
+            for (var i = 0; i < docs.length; i++) {
+              if (docs[i].getBoundingClientRect().top <= marker) currentId = docs[i].id;
+              else break;
+            }
+            links.forEach(function (link) { link.classList.remove('active'); });
+            if (linkFor[currentId]) linkFor[currentId].classList.add('active');
+          }
+
+          window.addEventListener('scroll', highlight, { passive: true });
+          window.addEventListener('hashchange', highlight);
+          highlight();
         })();
         </script>
         </body>
@@ -305,6 +381,8 @@ class BuildDocsHtml extends Command
         .nav-section a{display:block;padding:5px 9px;font-size:14px;text-decoration:none;
           color:var(--fg);border-radius:6px;border-left:2px solid transparent}
         .nav-section a:hover{background:var(--code-bg);border-left-color:var(--accent)}
+        .nav-section a.active{background:var(--code-bg);border-left-color:var(--accent);
+          color:var(--accent);font-weight:600}
         .content{flex:1;min-width:0}
         .section-heading{margin:44px 0 0;font-size:12px;text-transform:uppercase;
           letter-spacing:.1em;color:var(--muted);font-weight:700}
@@ -337,6 +415,9 @@ class BuildDocsHtml extends Command
         .top:hover{color:var(--accent)}
         .footer{border-top:1px solid var(--line);padding:22px 28px;text-align:center;
           color:var(--muted);font-size:13px}
+        .footer-menu{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+        .footer-menu a{color:var(--muted);text-decoration:none;font-weight:600}
+        .footer-menu a:hover{color:var(--accent)}
         @media (max-width:860px){
           .layout{flex-direction:column;gap:0;padding:20px}
           .sidebar{position:static;flex:1 1 auto;width:100%;max-height:none;

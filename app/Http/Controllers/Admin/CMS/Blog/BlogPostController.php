@@ -42,6 +42,8 @@ class BlogPostController extends Controller
             })
             ->when($request->filled('category'), fn ($query) => $query->whereHas('categories', fn ($q) => $q->where('blog_categories.id', $request->integer('category'))))
             ->when($request->filled('author'), fn ($query) => $query->where('author_id', $request->integer('author')))
+            ->when($request->input('type') === 'featured', fn ($query) => $query->where('is_featured', true))
+            ->when($request->input('type') === 'pinned', fn ($query) => $query->where('is_sticky', true))
             ->latest()
             ->paginate(25)
             ->withQueryString();
@@ -87,9 +89,12 @@ class BlogPostController extends Controller
 
         return Inertia::render('Admin/CMS/Blog/Posts/Index', [
             'posts' => $posts,
-            'categories' => BlogCategory::orderBy('sort_order')->get(['id', 'name']),
-            'authors' => Admin::orderBy('name')->get(['id', 'name']),
-            'filters' => $request->only(['search', 'status', 'category', 'author']),
+            // Only offer filter options that can actually match a post in this
+            // view — otherwise picking an author/category with no posts yields
+            // "nothing found" while the active-filter counter still reads 1.
+            'categories' => BlogCategory::whereHas('posts')->orderBy('sort_order')->get(['id', 'name']),
+            'authors' => Admin::whereIn('id', BlogPost::query()->select('author_id')->distinct())->orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['search', 'status', 'category', 'author', 'type']),
             'hasTrashedPosts' => BlogPost::onlyTrashed()->exists(),
             'trashMode' => false,
             'stats' => $stats,
@@ -108,6 +113,8 @@ class BlogPostController extends Controller
             })
             ->when($request->filled('category'), fn ($query) => $query->whereHas('categories', fn ($q) => $q->where('blog_categories.id', $request->integer('category'))))
             ->when($request->filled('author'), fn ($query) => $query->where('author_id', $request->integer('author')))
+            ->when($request->input('type') === 'featured', fn ($query) => $query->where('is_featured', true))
+            ->when($request->input('type') === 'pinned', fn ($query) => $query->where('is_sticky', true))
             ->latest('deleted_at');
 
         $posts = $query
@@ -116,9 +123,11 @@ class BlogPostController extends Controller
 
         return Inertia::render('Admin/CMS/Blog/Posts/Index', [
             'posts' => $posts,
-            'categories' => BlogCategory::orderBy('sort_order')->get(['id', 'name']),
-            'authors' => Admin::orderBy('name')->get(['id', 'name']),
-            'filters' => $request->only(['search', 'category', 'author']),
+            // Scope the filter options to trashed posts so the trash view only
+            // lists authors/categories that have something to filter here.
+            'categories' => BlogCategory::whereHas('posts', fn ($q) => $q->onlyTrashed())->orderBy('sort_order')->get(['id', 'name']),
+            'authors' => Admin::whereIn('id', BlogPost::onlyTrashed()->select('author_id')->distinct())->orderBy('name')->get(['id', 'name']),
+            'filters' => $request->only(['search', 'category', 'author', 'type']),
             'hasTrashedPosts' => BlogPost::onlyTrashed()->exists(),
             'trashMode' => true,
         ]);

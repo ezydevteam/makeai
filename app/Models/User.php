@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\SendTemplatedEmail;
 use App\Services\NotificationEventService;
 use App\Services\Security\TotpService;
 use Database\Factories\UserFactory;
@@ -326,6 +327,21 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     // ─── OTP ────────────────────────────────────
+
+    /**
+     * Email verification on this platform is a 6-digit code, not a signed link.
+     * The framework default mails a link to a `verification.verify` GET route
+     * that does not exist here, so it is overridden to send the same OTP the
+     * verify screen actually asks for.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        SendTemplatedEmail::dispatch('email_verify_otp', $this->email, [
+            'user_name' => $this->name,
+            'site_name' => settings('app_name', translate('Application')),
+            'otp_code' => $this->generateOtp(),
+        ])->onQueue('otp');
+    }
 
     public function generateOtp(): string
     {

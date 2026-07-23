@@ -45,6 +45,16 @@ const form = useForm({
     attachments: [] as File[],
 })
 
+// Surface attachment validation errors — Laravel reports per-file failures under
+// keys like `attachments.0`, so fall back to the first of those when there is no
+// top-level `attachments` error. Without this, a bad attachment fails silently.
+const attachmentError = computed(() => {
+    const errors = form.errors as Record<string, string>
+    if (errors.attachments) return errors.attachments
+    const perFile = Object.keys(errors).find(key => key.startsWith('attachments.'))
+    return perFile ? errors[perFile] : ''
+})
+
 const departmentOptions = computed(() => props.departments.map(d => ({ value: d.id, label: d.name })))
 const priorityOptions = [{ value: 'low', label: t('Low') }, { value: 'medium', label: t('Medium') }, { value: 'high', label: t('High') }]
 const statusOptions = [
@@ -149,6 +159,7 @@ const submit = () => {
                         </span>
                         <input ref="attachmentInputRef" type="file" multiple @change="setFiles" class="hidden">
                     </div>
+                    <span v-if="attachmentError" class="mt-1 block text-sm text-red-600">{{ attachmentError }}</span>
                     <span class="mt-1 block text-xs text-gray-500">{{ t('Max :count files, :size MB each.', { count: String(settings.max_attachments_per_reply), size: String(settings.max_attachment_size_mb) }) }}</span>
                 </div>
             </div>

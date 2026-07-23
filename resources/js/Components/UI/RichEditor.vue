@@ -162,6 +162,10 @@ const props = withDefaults(defineProps<{
     aiAssist?: boolean
     aiAssistActions?: AiAssistAction[]
     aiAssistLoadingKey?: string | null
+    // Set by the parent when the last AI-assist run failed. The parent clears the
+    // loading key on both success and failure, so without this flag the editor can't
+    // tell them apart and would flash a success indicator on top of the parent's error.
+    aiAssistError?: boolean
     aiAssistLabel?: string
     aiAssistLoadingLabel?: string
     imageUploadUrl?: string | null
@@ -171,6 +175,7 @@ const props = withDefaults(defineProps<{
     aiAssist: false,
     aiAssistActions: () => [],
     aiAssistLoadingKey: null,
+    aiAssistError: false,
     aiAssistLabel: 'AI Assist',
     aiAssistLoadingLabel: 'Working...',
     imageUploadUrl: null,
@@ -183,7 +188,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useTranslate()
-const toast = useToastr()
 const isSourceMode = ref(false)
 const sourceContent = ref(props.modelValue)
 const overflowOpen = ref(false)
@@ -197,8 +201,12 @@ watch(() => props.aiAssistLoadingKey, (newVal) => {
         aiAssistSuccess.value = false
     } else if (wasAiLoading) {
         wasAiLoading = false
+        // Only flash the success check when the run actually succeeded. The parent owns
+        // the success/error toasts; the editor just reflects the outcome on the button.
+        if (props.aiAssistError) {
+            return
+        }
         aiAssistSuccess.value = true
-        toast.success(t('AI assist completed successfully.'))
         setTimeout(() => {
             aiAssistSuccess.value = false
         }, 2000)

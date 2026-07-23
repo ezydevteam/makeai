@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Account\UpdateAccountAvatarRequest;
+use App\Jobs\SendTemplatedEmail;
 use App\Http\Requests\Admin\Account\UpdateAccountPasswordRequest;
 use App\Http\Requests\Admin\Account\UpdateAccountProfileRequest;
 use App\Models\Admin;
+use App\Services\MailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -42,19 +44,25 @@ class AccountSettingsController extends Controller
 
         $validated = $request->validated();
         $emailChanged = $validated['email'] !== $admin->email;
+        $previousEmail = $admin->email;
 
         $admin->update($validated);
 
+        // Admins have no email-verification flow at all — no column on `admins`,
+        // no route, no notification. What they do get is the same out-of-band
+        // alert users get, to the OLD address, so a hijacked session cannot move
+        // the highest-privilege account silently.
         if ($emailChanged) {
-            $admin->forceFill([
-                'email_verified_at' => null,
-            ])->save();
+            app(MailService::class)->send('email_changed', $previousEmail, [
+                'user_name' => $admin->name,
+                'user_email' => $admin->email,
+            ]);
         }
 
         return redirect()
             ->route('admin.account.settings')
             ->with('success', $emailChanged
-                ? translate('Account details updated. Please verify your new email address if verification is enabled.')
+                ? translate('Account details updated. A security alert was sent to your previous email address.')
                 : translate('Account details updated successfully.'));
     }
 
@@ -87,6 +95,13 @@ class AccountSettingsController extends Controller
             'password' => $validated['password'],
             'password_changed_at' => now(),
         ]);
+
+        // Matches AdminLoginController's reset flow — an in-account change is
+        // the one an attacker with a live session would make.
+        SendTemplatedEmail::dispatch('password_changed', $admin->email, [
+            'user_name' => $admin->name,
+            'user_email' => $admin->email,
+        ])->onQueue('emails');
 
         return redirect()
             ->route('admin.account.settings')

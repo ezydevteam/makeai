@@ -213,8 +213,11 @@ onUnmounted(() => gsapCtx?.revert())
                             </div>
                         </div>
                         <div class="flex flex-1 flex-col p-6 text-left">
-                            <div v-if="post.category" class="mb-3 flex flex-wrap items-center gap-2">
-                                <span class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 ring-1 ring-inset ring-primary-700/10 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/20">
+                            <div v-if="post.is_featured || post.category" class="mb-3 flex flex-wrap items-center gap-2">
+                                <span v-if="post.is_featured" class="inline-flex items-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                                    {{ t('Featured') }}
+                                </span>
+                                <span v-if="post.category" class="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 ring-1 ring-inset ring-primary-700/10 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-500/20">
                                     {{ post.category }}
                                 </span>
                             </div>

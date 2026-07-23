@@ -92,7 +92,14 @@ const broadcasting = computed<SidebarBroadcastingConfig>(() => (page.props.broad
 
 const can = (perm: string) => isSuperAdmin.value || permissions.value.includes(perm)
 const canAny = (perms: string[]) => isSuperAdmin.value || perms.some((perm) => permissions.value.includes(perm))
-const isActive = (name: string) => route().current(name)
+const isActive = (name: string) => {
+    // route().current() reads window.location, which Vue cannot track. Touch the
+    // reactive Inertia URL so items using this (Dashboard, Roles, AI, …) re-evaluate
+    // their active state on SPA navigation instead of staying stale until a full reload.
+    void page.url
+
+    return route().current(name)
+}
 const currentPath = computed(() => {
     const url = String(page.url ?? '')
     const [path] = url.split('?')

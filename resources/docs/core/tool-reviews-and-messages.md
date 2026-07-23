@@ -4,7 +4,7 @@ slug: tool-reviews-and-messages
 page: tool-reviews-and-messages.html
 section: Communications
 license: regular
-keywords: [tool review, star rating, moderate review, contact form, contact message, auto reply, reply to customer]
+keywords: [tool review, star rating, moderate review, contact form, contact message, auto reply, reply to customer, approve review, review not showing, contact form not working, spam review]
 ---
 
 **Admin → Communications → Tool Reviews** and **Messages** handle two different customer touchpoints: star ratings customers leave on individual AI tools, and messages submitted through your contact form.

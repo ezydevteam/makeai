@@ -706,7 +706,7 @@ class HandleInertiaRequests extends Middleware
         return [
             'is_configured' => $isConfigured,
             'last_run_at' => $lastRunAt?->toDateTimeString(),
-            'setup_url' => route('admin.system.index').'#cron-jobs',
+            'setup_url' => route('admin.system.cron-jobs'),
         ];
     }
 

@@ -10,6 +10,7 @@ import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue';
 const RichEditor = defineAsyncComponent(() => import('@/Components/UI/RichEditor.vue'))
 import AppSelect from '@/Components/UI/AppSelect.vue';
 import AppSwitch from '@/Components/UI/AppSwitch.vue';
+import Tooltip from '@/Components/UI/Tooltip.vue';
 import { mediaUrl } from '@/lib/media'
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from '@/lib/datetime'
 
@@ -48,6 +49,7 @@ const toast = useToastr();
 const editorRef = ref<RichEditorExpose | null>(null);
 const slugTouched = ref(Boolean(props.page?.slug));
 const aiLoading = ref<string | null>(null);
+const aiError = ref(false);
 const confirmModal = ref<ConfirmModalState>({
     open: false,
     title: '',
@@ -75,6 +77,7 @@ const form = useForm({
     parent_id: props.page?.parent_id ?? null,
     sort_order: props.page?.sort_order ?? 0,
     show_title: props.page?.show_title ?? true,
+    show_excerpt: props.page?.show_excerpt ?? false,
     center_title: props.page?.center_title ?? false,
     show_breadcrumbs: props.page?.show_breadcrumbs ?? true,
     show_featured_image: props.page?.show_featured_image ?? true,
@@ -125,10 +128,26 @@ const containerWidthOptions = computed(() => [
     { value: '1536px', label: t('Stretched') },
 ]);
 
-const sidebarPositionOptions = computed(() => [
+const sidebarLayoutOptions = computed(() => [
+    { value: 'hide', label: t('Hide Sidebar') },
     { value: 'left', label: t('Sidebar Left') },
     { value: 'right', label: t('Sidebar Right') },
 ]);
+
+// Single control backing two form fields: `show_sidebar` toggles visibility and
+// `sidebar_position` keeps a valid left/right value even while hidden, so the
+// server-side validation contract (boolean + enum) stays satisfied untouched.
+const sidebarLayout = computed({
+    get: () => (form.show_sidebar ? form.sidebar_position : 'hide'),
+    set: (value: string) => {
+        if (value === 'hide') {
+            form.show_sidebar = false;
+        } else {
+            form.show_sidebar = true;
+            form.sidebar_position = value as 'left' | 'right';
+        }
+    },
+});
 
 const setStatus = (value: 'draft' | 'published' | 'scheduled') => {
     form.status = value
@@ -192,6 +211,7 @@ const runAiAssist = async (action: string) => {
     if (aiLoading.value) return;
 
     aiLoading.value = action;
+    aiError.value = false;
     const selectedText = editorRef.value?.getSelectedText() ?? '';
 
     try {
@@ -234,6 +254,7 @@ const runAiAssist = async (action: string) => {
 
         toast.success(t('AI assist applied.'));
     } catch (error) {
+        aiError.value = true;
         toast.error(error instanceof Error ? error.message : t('AI assist failed.'));
     } finally {
         aiLoading.value = null;
@@ -432,19 +453,39 @@ onClickOutside(publishMenuRef, () => {
                     <div class="space-y-6">
                     <div>
                         <label class="mb-3 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Title') }}</label>
-                        <input v-model="form.title" @input="syncSlug" type="text" :placeholder="t('Enter page title')" class="w-full border-none bg-transparent p-0 text-4xl font-black text-gray-900 placeholder:text-gray-300 focus:ring-0 dark:text-white dark:placeholder:text-gray-600">
+                        <input v-model="form.title" @input="syncSlug" type="text" :placeholder="t('Enter page title')" class="w-full border-none bg-transparent p-1 text-4xl font-bold text-gray-900 placeholder:text-gray-300 focus:ring-0 dark:text-white dark:placeholder:text-gray-600">
                         <p v-if="form.errors.title" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.title }}</p>
                         <div class="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 dark:border-surface-800 dark:bg-surface-800">
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Slug') }}</label>
                             <div class="flex flex-col gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 md:flex-row md:items-center">
                                 <span class="truncate text-gray-700 dark:text-gray-300">{{ $page.props.app?.url }}/</span>
-                                <input v-model="form.slug" @input="markSlugTouched" type="text" :placeholder="t('page-slug')" class="w-full flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-900 dark:text-white">
+                                <div class="flex flex-1 items-center gap-2">
+                                    <input v-model="form.slug" @input="markSlugTouched" type="text" :placeholder="t('page-slug')" class="w-full flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-900 dark:text-white">
+                                    <Tooltip :content="t('View live page')" placement="top">
+                                        <a
+                                            :href="form.slug ? '/' + form.slug : undefined"
+                                            :target="form.slug ? '_blank' : undefined"
+                                            rel="noopener"
+                                            :aria-disabled="!form.slug"
+                                            :class="[
+                                                'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition',
+                                                form.slug
+                                                    ? 'cursor-pointer border-gray-200 bg-white text-gray-500 hover:border-primary-500 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-400 dark:hover:text-primary-300'
+                                                    : 'pointer-events-none cursor-not-allowed border-gray-100 bg-gray-50 text-gray-300 dark:border-surface-800 dark:bg-surface-800 dark:text-surface-600',
+                                            ]"
+                                            :aria-label="t('View live page')"
+                                        >
+                                            <i class="ti ti-eye text-base"></i>
+                                        </a>
+                                    </Tooltip>
+                                </div>
                             </div>
                             <p v-if="form.errors.slug" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.slug }}</p>
                         </div>
                     </div>
 
                     <div>
+                        <label class="mb-3 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Page Content') }}</label>
                         <RichEditor
                             ref="editorRef"
                             v-model="form.content"
@@ -452,6 +493,7 @@ onClickOutside(publishMenuRef, () => {
                             ai-assist
                             :ai-assist-actions="pageAiAssistActions"
                             :ai-assist-loading-key="aiLoading"
+                            :ai-assist-error="aiError"
                             :ai-assist-label="t('AI Assist')"
                             :ai-assist-loading-label="t('Working...')"
                             @ai-assist="runAiAssist"
@@ -519,17 +561,12 @@ onClickOutside(publishMenuRef, () => {
                     <div class="mb-6">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Attributes') }}</h3>
                     </div>
-                    <div class="space-y-4">
+                    <div class="space-y-6">
 
                         <div>
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Parent Page') }}</label>
                             <AppSelect v-model="form.parent_id" :options="parentOptions" :placeholder="t('Select parent page')" />
                             <p v-if="form.errors.parent_id" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.parent_id }}</p>
-                        </div>
-                        <div>
-                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Display Order') }}</label>
-                            <input v-model="form.sort_order" type="number" :placeholder="t('Enter display order')" class="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-900 focus:border-primary-500 focus:ring-0 dark:border-surface-700 dark:bg-surface-800 dark:text-white">
-                            <p v-if="form.errors.sort_order" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.sort_order }}</p>
                         </div>
                         <div v-if="form.status === 'scheduled'">
                             <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Publish At') }}</label>
@@ -563,36 +600,11 @@ onClickOutside(publishMenuRef, () => {
                             <AppSelect v-model="form.container_width" :options="containerWidthOptions" :placeholder="t('Select container width')" />
                             <p v-if="form.errors.container_width" class="mt-2 text-sm font-medium text-danger-600">{{ form.errors.container_width }}</p>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Featured Image -->
-                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Featured Image') }}</h3>
-                    </div>
-                    <div class="relative group">
-                        <div class="aspect-video overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 flex items-center justify-center dark:border-surface-800 dark:bg-surface-800">
-                            <img v-if="featuredPreview" :src="featuredPreview" class="w-full h-full object-cover">
-                            <svg v-else class="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <div>
+                            <label class="mb-2 block text-sm font-semibold text-gray-600 dark:text-gray-300">{{ t('Sidebar Layout') }}</label>
+                            <AppSelect v-model="sidebarLayout" :options="sidebarLayoutOptions" :placeholder="t('Select sidebar layout')" />
                         </div>
-                        <label class="absolute inset-0 flex items-center justify-center bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
-                            <input type="file" class="hidden" @change="handleFeaturedChange" accept="image/*">
-                            <span class="text-white text-sm font-semibold">{{ t('Update Image') }}</span>
-                        </label>
-                    </div>
-                    <button v-if="featuredPreview" @click="removeFeaturedImage" type="button" class="mt-4 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
-                        <i class="ti ti-trash text-sm"></i>
-                        {{ t('Remove Featured Image') }}
-                    </button>
-                </div>
 
-                <!-- Layout Options -->
-                <div class="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-surface-800 dark:bg-surface-900">
-                    <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('Layout Options') }}</h3>
-                    </div>
-                    <div class="space-y-4">
                         <div class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Title') }}</span>
                             <AppSwitch v-model="form.show_title" />
@@ -602,6 +614,10 @@ onClickOutside(publishMenuRef, () => {
                             <AppSwitch v-model="form.center_title" />
                         </div>
                         <div class="flex items-center justify-between cursor-pointer group">
+                            <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Excerpt') }}</span>
+                            <AppSwitch v-model="form.show_excerpt" />
+                        </div>
+                        <div class="flex items-center justify-between cursor-pointer group">
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Breadcrumbs') }}</span>
                             <AppSwitch v-model="form.show_breadcrumbs" />
                         </div>
@@ -609,12 +625,21 @@ onClickOutside(publishMenuRef, () => {
                             <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Featured Image') }}</span>
                             <AppSwitch v-model="form.show_featured_image" />
                         </div>
-                        <div class="flex items-center justify-between cursor-pointer group">
-                            <span class="text-sm font-semibold text-gray-600 group-hover:text-gray-900 dark:text-gray-300 dark:group-hover:text-white">{{ t('Show Sidebar') }}</span>
-                            <AppSwitch v-model="form.show_sidebar" />
-                        </div>
-                        <div v-if="form.show_sidebar" class="pt-2">
-                            <AppSelect v-model="form.sidebar_position" :options="sidebarPositionOptions" :placeholder="t('Select sidebar position')" />
+                        <div v-if="form.show_featured_image" class="pt-2">
+                            <div class="relative group">
+                                <div class="aspect-video overflow-hidden rounded-2xl border border-gray-100 bg-gray-50 flex items-center justify-center dark:border-surface-800 dark:bg-surface-800">
+                                    <img v-if="featuredPreview" :src="featuredPreview" class="w-full h-full object-cover">
+                                    <svg v-else class="w-8 h-8 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                </div>
+                                <label class="absolute inset-0 flex items-center justify-center bg-gray-900/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl cursor-pointer">
+                                    <input type="file" class="hidden" @change="handleFeaturedChange" accept="image/*">
+                                    <span class="text-white text-sm font-semibold">{{ t('Update Image') }}</span>
+                                </label>
+                            </div>
+                            <button v-if="featuredPreview" @click="removeFeaturedImage" type="button" class="mt-4 text-xs font-semibold text-red-500 hover:text-red-700 transition-colors flex items-center gap-1">
+                                <i class="ti ti-trash text-sm"></i>
+                                {{ t('Remove Featured Image') }}
+                            </button>
                         </div>
                     </div>
                 </div>

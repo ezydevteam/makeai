@@ -260,7 +260,7 @@ const sendTest = () => {
                         <button
                             type="submit"
                             :disabled="testForm.processing"
-                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-surface-700 dark:hover:bg-surface-600"
+                            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-surface-800 dark:hover:bg-surface-700"
                         >
                             <i class="ti ti-send text-base"></i>
                             {{ testForm.processing ? t('Sending...') : t('Send Test Mail') }}

@@ -40,7 +40,7 @@ class UsersDataset extends Dataset
 
     public function columns(): array
     {
-        return [
+        return array_values(array_filter([
             new Column('name', translate('Name'), fn ($u) => $u->name),
             new Column('email', translate('Email'), fn ($u) => $u->email),
             // Dialable E.164 form (falls back to the stored national number).
@@ -48,12 +48,14 @@ class UsersDataset extends Dataset
             new Column('country', translate('Country'), fn ($u) => CountryCatalog::countryName($u->country) ?? $u->country),
             new Column('timezone', translate('Timezone'), fn ($u) => $u->timezone),
             new Column('active', translate('Active'), fn ($u) => $u->is_active ? translate('Yes') : translate('No')),
-            new Column('plan', translate('Plan'), fn ($u) => $u->plan?->name ?? translate('Free')),
+            // Plans/billing only exist on the Extended license — omit the column entirely
+            // on a Regular license, where every user is on the Free plan.
+            is_regular_license() ? null : new Column('plan', translate('Plan'), fn ($u) => $u->plan?->name ?? translate('Free')),
             new Column('credits', translate('Credits'), fn ($u) => number_format((float) $u->credits, 2)),
             new Column('daily_usage', translate('Daily Usage'), fn ($u) => number_format((float) $u->credits_used_today, 2)),
             new Column('monthly_usage', translate('Monthly Usage'), fn ($u) => number_format((float) $u->credits_used_month, 2)),
             new Column('joined', translate('Joined'), fn ($u) => $u->created_at?->format('Y-m-d')),
-        ];
+        ]));
     }
 
     public function stats(array $filters): array

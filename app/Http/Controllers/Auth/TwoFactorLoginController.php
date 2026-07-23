@@ -111,7 +111,7 @@ class TwoFactorLoginController extends Controller
 
         $user = User::find($userId);
 
-        if (! $user || ! $user->is_active) {
+        if (! $user || ! $user->is_active || $user->is_banned) {
             return redirect()->route('login');
         }
 

@@ -4,7 +4,7 @@ slug: verifying-your-license
 page: verifying-your-license.html
 section: System
 license: regular
-keywords: [purchase code, verify license, license activation, regular license, extended license, domain mismatch, grace period, deactivate license]
+keywords: [purchase code, verify license, license activation, regular license, extended license, domain mismatch, grace period, deactivate license, envato, codecanyon, activation failed, license invalid, re-verify, grace period expired, move license, change domain]
 ---
 
 **Admin → System → Verify License** activates your copy against your Envato purchase code and shows exactly what your license unlocks.

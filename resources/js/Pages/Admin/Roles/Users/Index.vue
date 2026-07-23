@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AppModal from '@/Components/UI/AppModal.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
@@ -84,6 +84,12 @@ const { t } = useTranslate()
 const { formatDate } = useDateFormat()
 const { canAny } = useAdminCan()
 
+// Plans are a subscription (Extended License) feature. Hide the assignment on a
+// Regular license, matching the standalone create/edit forms (Create.vue, Show.vue)
+// and the backend, which nulls plan_id server-side regardless of what the form sends.
+const page = usePage()
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
+
 const form = useForm({
     status: props.filters.status !== undefined && props.filters.status !== null ? String(props.filters.status) : '',
     plan: props.filters.plan !== undefined && props.filters.plan !== null ? String(props.filters.plan) : '',
@@ -136,11 +142,15 @@ const createPlanOptions = computed(() => [
     })),
 ])
 
+// Each bulk action is offered only when the admin holds the matching granular
+// permission — mirrors the per-sub-action gate enforced server-side.
 const bulkActionOptions = computed(() => [
-    { value: 'activate', label: t('Activate Users') },
-    { value: 'deactivate', label: t('Deactivate Users') },
-    { value: 'add_credits', label: t('Add Credits') },
-    { value: 'delete', label: t('Delete Users') },
+    ...(canAny(['users.edit']) ? [
+        { value: 'activate', label: t('Activate Users') },
+        { value: 'deactivate', label: t('Deactivate Users') },
+    ] : []),
+    ...(canAny(['users.credits']) ? [{ value: 'add_credits', label: t('Add Credits') }] : []),
+    ...(canAny(['users.delete']) ? [{ value: 'delete', label: t('Delete Users') }] : []),
 ])
 
 const confirmModal = ref<ConfirmModalState>({
@@ -480,13 +490,15 @@ const deleteUser = (user: UserItem) => {
                 </div>
 
                 <div class="shrink-0 flex gap-3">
-                    <Link v-if="canAny(['users.manage'])"
+                    <!-- Native <a>, not Inertia <Link>: the endpoint streams a CSV file
+                         download, which an Inertia XHR visit can't handle. -->
+                    <a v-if="canAny(['users.manage'])"
                         :href="route('admin.users.export')"
                         class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:!border-primary-900/30 dark:hover:!bg-primary-900/30 dark:hover:!text-primary-300"
                     >
                             <i class="ti ti-file-export text-base"></i>
                             {{ t('Export') }}
-                     </Link>
+                     </a>
 
                     <Link
                         v-if="hasTrashedUsers"
@@ -498,7 +510,7 @@ const deleteUser = (user: UserItem) => {
                     </Link>
 
                      <button
-                        v-if="canAny(['users.create', 'users.manage'])"
+                        v-if="canAny(['users.create'])"
                         type="button"
                         class="inline-flex items-center justify-center gap-2 btn-primary-admin"
                         @click="openCreateModal"
@@ -608,7 +620,7 @@ const deleteUser = (user: UserItem) => {
                                 />
                             </div>
 
-                            <div class="sm:w-52">
+                            <div v-if="isProAvailable" class="sm:w-52">
                                 <AppSelect
                                     v-model="form.plan"
                                     :options="planOptions"
@@ -628,7 +640,7 @@ const deleteUser = (user: UserItem) => {
                                 {{ t('Reset') }}
                             </button>
 
-                            <template v-if="selectedIds.length > 0 && canAny(['users.manage'])">
+                            <template v-if="selectedIds.length > 0 && bulkActionOptions.length > 0">
                                 <span class="text-sm text-gray-500 dark:text-gray-400 sm:whitespace-nowrap">
                                     {{ t(':count selected', { count: selectedIds.length }) }}
                                 </span>
@@ -675,7 +687,7 @@ const deleteUser = (user: UserItem) => {
                                         <div class="flex items-center">
                                             <input
                                                 type="checkbox"
-                                                class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                                class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                                 :checked="isAllSelected"
                                                 @change="toggleAll"
                                             />
@@ -683,7 +695,7 @@ const deleteUser = (user: UserItem) => {
                                     </th>
                                     <th scope="col" class="px-6 py-3">{{ t('User') }}</th>
                                     <th scope="col" class="px-6 py-3 text-center">{{ t('Credits') }}</th>
-                                    <th scope="col" class="px-6 py-3 text-center">{{ t('Plan') }}</th>
+                                    <th v-if="isProAvailable" scope="col" class="px-6 py-3 text-center">{{ t('Plan') }}</th>
                                     <th scope="col" class="px-6 py-3 text-center">{{ t('Status') }}</th>
                                     <th scope="col" class="px-6 py-3 text-center">{{ t('Joined') }}</th>
                                     <th scope="col" class="px-6 py-3 text-right">{{ t('Action') }}</th>
@@ -725,7 +737,7 @@ const deleteUser = (user: UserItem) => {
                                     <td class="px-6 py-4 text-center">
                                         <span class="font-mono text-gray-900 dark:text-white">{{ formatCredits(user.credits) }}</span>
                                     </td>
-                                    <td class="px-6 py-4 text-center">
+                                    <td v-if="isProAvailable" class="px-6 py-4 text-center">
                                         <span
                                             v-if="user.plan"
                                             class="inline-flex items-center rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
@@ -744,7 +756,7 @@ const deleteUser = (user: UserItem) => {
                                             {{ user.is_active ? t('Active') : t('Inactive') }}
                                         </span>
                                     </td>
-                                    <td class="px-6 py-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                                    <td class="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
                                         {{ formatDate(user.created_at) }}
                                     </td>
                                     <td class="overflow-visible px-6 py-4 text-right">
@@ -760,7 +772,7 @@ const deleteUser = (user: UserItem) => {
                                                 </Link>
 
                                                 <button
-                                                    v-if="canAny(['users.impersonate', 'users.manage'])"
+                                                    v-if="canAny(['users.impersonate'])"
                                                     type="button"
                                                     class="flex w-full items-center gap-3 px-3 py-2.5 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-primary-300"
                                                     @click="impersonateUser(user); close()"
@@ -769,7 +781,7 @@ const deleteUser = (user: UserItem) => {
                                                     <span>{{ t('Login as User') }}</span>
                                                 </button>
 
-                                                <template v-if="canAny(['users.delete', 'users.manage'])">
+                                                <template v-if="canAny(['users.delete'])">
                                                     <hr class="my-1 border-gray-200 dark:border-surface-700" />
                                                     <button
                                                         type="button"
@@ -786,7 +798,7 @@ const deleteUser = (user: UserItem) => {
                                 </tr>
 
                                 <tr v-if="filteredUsers.length === 0">
-                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <td :colspan="isProAvailable ? 7 : 6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                         {{ t('No users found.') }}
                                     </td>
                                 </tr>
@@ -917,7 +929,7 @@ const deleteUser = (user: UserItem) => {
                     <p v-if="createForm.errors.credits" class="mt-1 text-xs text-danger-600">{{ createForm.errors.credits }}</p>
                 </label>
 
-                <div class="block">
+                <div v-if="isProAvailable" class="block">
                     <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">
                         {{ t('Choose Plan') }}
                     </span>
@@ -930,20 +942,21 @@ const deleteUser = (user: UserItem) => {
                     />
                     <p v-if="createForm.errors.plan_id" class="mt-1 text-xs text-danger-600">{{ createForm.errors.plan_id }}</p>
                 </div>
-            </div>
 
-            <div class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/40 mt-6">
-                <div class="flex items-center justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
-                            {{ createForm.is_active ? t('User account is active') : t('User account is disabled') }}
-                        </p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ t('Inactive users cannot sign in until you enable their account.') }}
-                        </p>
+                <div :class="isProAvailable ? 'md:col-span-2' : ''" class="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900/40 mt-6">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                                {{ t('Status') }}
+                            </p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ createForm.is_active ? t('User account is active') : t('User account is disabled') }}
+
+                            </p>
+                        </div>
+
+                        <AppSwitch v-model="createForm.is_active" />
                     </div>
-
-                    <AppSwitch v-model="createForm.is_active" />
                 </div>
             </div>
         </AppModal>

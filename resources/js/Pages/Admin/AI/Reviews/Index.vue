@@ -117,6 +117,52 @@ const approveModalVariant = computed(() => {
     return reviewToApprove.value.is_approved ? 'danger' : 'primary'
 })
 
+// Bulk selection state
+const selected = ref<number[]>([])
+const bulkAction = ref('')
+const bulkProcessing = ref(false)
+const bulkDeleteModalOpen = ref(false)
+
+const bulkActionOptions = computed(() => [
+    { value: '', label: t('Bulk Actions') },
+    { value: 'approve', label: t('Approve Selected') },
+    { value: 'disapprove', label: t('Disapprove Selected') },
+    { value: 'delete', label: t('Delete Selected') },
+])
+
+const allSelected = computed(() => props.reviews.data.length > 0 && selected.value.length === props.reviews.data.length)
+
+const toggleSelectAll = (event: Event) => {
+    const checked = (event.target as HTMLInputElement).checked
+    selected.value = checked ? props.reviews.data.map((review) => review.id) : []
+}
+
+const submitBulkAction = (action: string) => {
+    bulkProcessing.value = true
+    router.post(route('admin.ai.reviews.bulk'), { ids: selected.value, action }, {
+        preserveScroll: true,
+        onSuccess: () => {
+            selected.value = []
+            bulkAction.value = ''
+            bulkDeleteModalOpen.value = false
+        },
+        onFinish: () => {
+            bulkProcessing.value = false
+        },
+    })
+}
+
+const runBulkAction = () => {
+    if (!selected.value.length || !bulkAction.value) return
+    if (bulkAction.value === 'delete') {
+        bulkDeleteModalOpen.value = true
+        return
+    }
+    submitBulkAction(bulkAction.value)
+}
+
+const handleBulkDelete = () => submitBulkAction('delete')
+
 const statusOptions = computed(() => [
     { value: '', label: t('All Status') },
     { value: 'approved', label: t('Approved') },
@@ -135,6 +181,7 @@ const ratingOptions = computed(() => [
 const hasActiveFilters = computed(() => Boolean(search.value || selectedStatus.value || selectedRating.value))
 
 const applyFilters = () => {
+    selected.value = []
     router.get(route('admin.ai.reviews.index'), {
         search: search.value || undefined,
         status: selectedStatus.value || undefined,
@@ -356,6 +403,25 @@ onBeforeUnmount(() => {
                             <i class="ti ti-rotate-clockwise text-base"></i>
                             {{ t('Reset') }}
                         </button>
+
+                        <div v-if="selected.length" class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">{{ t(':count selected', { count: String(selected.length) }) }}</span>
+                            <div class="w-full sm:w-44">
+                                <AppSelect
+                                    v-model="bulkAction"
+                                    :options="bulkActionOptions"
+                                    :placeholder="t('Bulk Actions')"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                :disabled="!bulkAction || bulkProcessing"
+                                class="btn-primary-admin inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto"
+                                @click="runBulkAction"
+                            >
+                                {{ t('Apply') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -388,6 +454,14 @@ onBeforeUnmount(() => {
                     <table class="w-full text-left text-sm text-gray-500 dark:text-gray-400">
                         <thead class="border-b border-gray-100 bg-gray-50 text-xs uppercase text-gray-700 dark:border-gray-800 dark:bg-gray-700/60 dark:text-gray-400">
                             <tr>
+                                <th class="w-12 px-6 py-4">
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                        :checked="allSelected"
+                                        @change="toggleSelectAll"
+                                    >
+                                </th>
                                 <th class="px-6 py-4 text-left">{{ t('User') }}</th>
                                 <th class="px-6 py-4 text-left">{{ t('Tool') }}</th>
                                 <th class="px-6 py-4 text-left">{{ t('Rating') }}</th>
@@ -398,6 +472,16 @@ onBeforeUnmount(() => {
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-surface-800">
                             <tr v-for="review in reviews.data" :key="review.id" class="transition hover:bg-primary-50/60 dark:hover:bg-primary-900/10">
+                                <!-- Select checkbox -->
+                                <td class="px-6 py-5 align-top">
+                                    <input
+                                        v-model="selected"
+                                        :value="review.id"
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
+                                    >
+                                </td>
+
                                 <!-- User column -->
                                 <td class="px-6 py-5 align-top">
                                     <div class="flex items-start gap-3">
@@ -420,7 +504,7 @@ onBeforeUnmount(() => {
                                 <!-- Tool column -->
                                 <td class="px-6 py-5 align-top">
                                     <div v-if="review.tool" class="flex items-center gap-2">
-                                        <div :style="{ background: review.tool.color || '#6366f1' }" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px] text-white">
+                                        <div :style="{ backgroundColor: (review.tool.color || '#6366f1') + '1a', color: review.tool.color || '#6366f1' }" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[10px]">
                                             <i v-if="review.tool.icon" :class="review.tool.icon"></i>
                                             <span v-else>{{ review.tool.name.charAt(0) }}</span>
                                         </div>
@@ -621,7 +705,7 @@ onBeforeUnmount(() => {
                 <div>
                     <span class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">{{ t('Tool') }}</span>
                     <div v-if="reviewDetails?.tool" class="flex items-center gap-2">
-                        <div :style="{ background: reviewDetails.tool.color || '#6366f1' }" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg text-[9px] text-white">
+                        <div :style="{ backgroundColor: (reviewDetails.tool.color || '#6366f1') + '1a', color: reviewDetails.tool.color || '#6366f1' }" class="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg text-[9px]">
                             <i v-if="reviewDetails.tool.icon" :class="reviewDetails.tool.icon"></i>
                             <span v-else>{{ reviewDetails.tool.name.charAt(0) }}</span>
                         </div>
@@ -731,5 +815,17 @@ onBeforeUnmount(() => {
         :variant="approveModalVariant"
         @cancel="approveModalOpen = false"
         @confirm="handleToggleApprove"
+    />
+
+    <!-- Bulk Delete Confirmation Modal -->
+    <ActionConfirmModal
+        :open="bulkDeleteModalOpen"
+        :title="t('Delete Selected Reviews')"
+        :message="t('Are you sure you want to permanently delete :count selected reviews? This action cannot be undone.', { count: String(selected.length) })"
+        :confirm-label="t('Delete Reviews')"
+        :processing="bulkProcessing"
+        variant="danger"
+        @cancel="bulkDeleteModalOpen = false"
+        @confirm="handleBulkDelete"
     />
 </template>

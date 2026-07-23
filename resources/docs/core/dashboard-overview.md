@@ -4,7 +4,7 @@ slug: dashboard-overview
 page: dashboard-overview.html
 section: Dashboard
 license: regular
-keywords: [dashboard, home screen, stats, charts, overview, revenue, signups, analytics, homepage admin]
+keywords: [dashboard, home screen, stats, charts, overview, revenue, signups, analytics, homepage admin, no data, empty chart, revenue card missing, cant see dashboard, dashboard.view permission, time period, stat cards]
 ---
 
 The Dashboard is the first screen you see after logging in (**Admin → Dashboard**). It gives you an at-a-glance summary of signups, AI usage, and — if billing is available on your license — revenue, without opening any other page.
@@ -30,7 +30,7 @@ A **Quick Actions** panel and a personal **My Notes** widget also sit near the t
 
 ## Why a chart or card looks empty
 
-- A **Revenue** card or subscription charts that don't appear at all usually mean billing isn't available on your current license — see [Regular vs Extended license](regular-vs-extended-license) once that page exists, or check **Admin → Settings → License**.
+- A **Revenue** card or subscription charts that don't appear at all usually mean billing isn't available on your current license — see [Verifying Your License](verifying-your-license), or check **Admin → Settings → License**.
 - **Affiliate Performance** and **Popular Blog Posts** only appear once those features are switched on in **Admin → Settings → Features**.
 - If a chart shows no data at all for a period where you know activity happened, try switching to **All Time** — a short period like "Today" can legitimately be empty outside business hours.
 - If you can't see the Dashboard at all, your admin account is missing the `dashboard.view` permission — ask a Super Admin to check your role under **Admin → Roles → Admins → Manage Roles**.

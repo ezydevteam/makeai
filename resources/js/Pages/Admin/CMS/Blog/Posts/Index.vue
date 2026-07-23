@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
+import AppFilterDropdown from '@/Components/Admin/AppFilterDropdown.vue'
 import Pagination from '@/Components/UI/Pagination.vue'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import StatsCard from '@/Components/UI/StatsCard.vue'
@@ -35,6 +36,8 @@ interface BlogPost {
     published_at: string | null
     deleted_at: string | null
     updated_at: string
+    is_featured: boolean
+    is_sticky: boolean
     author: Author | null
     categories: Category[]
 }
@@ -69,7 +72,7 @@ const props = defineProps<{
     posts: Paginated<BlogPost>
     categories: Category[]
     authors: Author[]
-    filters: { search?: string; status?: string; category?: string; author?: string }
+    filters: { search?: string; status?: string; category?: string; author?: string; type?: string }
     hasTrashedPosts: boolean
     trashMode?: boolean
     stats?: {
@@ -88,6 +91,7 @@ const search = ref(props.filters.search ?? '')
 const status = ref(props.filters.status ?? '')
 const category = ref(props.filters.category ?? '')
 const author = ref(props.filters.author ?? '')
+const type = ref(props.filters.type ?? '')
 const bulkAction = ref('')
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchFocused = ref(false)
@@ -104,7 +108,13 @@ const confirmModal = ref<ConfirmModalState>({
 })
 
 const isTrashed = computed(() => props.trashMode === true)
-const hasActiveFilters = computed(() => Boolean(search.value.trim() || status.value || category.value || author.value))
+const hasActiveFilters = computed(() => Boolean(search.value.trim() || status.value || category.value || author.value || type.value))
+const activeFiltersCount = computed(() => [
+    isTrashed.value ? '' : status.value,
+    category.value,
+    author.value,
+    type.value,
+].filter(Boolean).length)
 
 const statusOptions = computed<SelectOption[]>(() => [
     { value: '', label: t('All Statuses') },
@@ -120,6 +130,12 @@ const categoryOptions = computed<SelectOption[]>(() => [
         value: String(item.id),
         label: item.name,
     })),
+])
+
+const typeOptions = computed<SelectOption[]>(() => [
+    { value: '', label: t('All Posts') },
+    { value: 'featured', label: t('Featured') },
+    { value: 'pinned', label: t('Pinned') },
 ])
 
 const authorOptions = computed<SelectOption[]>(() => [
@@ -162,6 +178,7 @@ const applyFilters = () => {
         status: isTrashed.value ? undefined : (status.value || undefined),
         category: category.value || undefined,
         author: author.value || undefined,
+        type: type.value || undefined,
     }, {
         preserveState: true,
         preserveScroll: true,
@@ -178,6 +195,7 @@ const resetFilters = () => {
     status.value = ''
     category.value = ''
     author.value = ''
+    type.value = ''
     selected.value = []
     bulkAction.value = ''
 
@@ -465,6 +483,7 @@ onBeforeUnmount(() => {
             <StatsCard
                 :title="t('Total Views')"
                 :value="stats.views.value"
+                :label="t('Lifetime views')"
                 color="accent"
             >
                 <template #icon>
@@ -510,43 +529,63 @@ onBeforeUnmount(() => {
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
-                        <div v-if="!isTrashed" class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect
-                                v-model="status"
-                                :options="statusOptions"
-                                :placeholder="t('All Statuses')"
-                                @update:model-value="applyFilters"
-                            />
-                        </div>
+                        <div class="w-full sm:w-auto shrink-0">
+                            <AppFilterDropdown :active-filters-count="activeFiltersCount">
+                                <div class="space-y-4">
+                                    <div v-if="!isTrashed">
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Status') }}</label>
+                                        <AppSelect
+                                            v-model="status"
+                                            :options="statusOptions"
+                                            :placeholder="t('All Statuses')"
+                                            @update:model-value="applyFilters"
+                                        />
+                                    </div>
 
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect
-                                v-model="category"
-                                :options="categoryOptions"
-                                :placeholder="t('All Categories')"
-                                live-search
-                                @update:model-value="applyFilters"
-                            />
-                        </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Category') }}</label>
+                                        <AppSelect
+                                            v-model="category"
+                                            :options="categoryOptions"
+                                            :placeholder="t('All Categories')"
+                                            live-search
+                                            @update:model-value="applyFilters"
+                                        />
+                                    </div>
 
-                        <div class="w-full sm:flex-grow sm:flex-1 sm:min-w-[150px] lg:w-44 lg:flex-none">
-                            <AppSelect
-                                v-model="author"
-                                :options="authorOptions"
-                                :placeholder="t('All Authors')"
-                                live-search
-                                @update:model-value="applyFilters"
-                            />
-                        </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Author') }}</label>
+                                        <AppSelect
+                                            v-model="author"
+                                            :options="authorOptions"
+                                            :placeholder="t('All Authors')"
+                                            live-search
+                                            @update:model-value="applyFilters"
+                                        />
+                                    </div>
 
-                        <button
-                            v-if="hasActiveFilters"
-                            type="button"
-                            class="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800/80 w-full sm:w-auto"
-                            @click="resetFilters"
-                        >
-                            {{ t('Clear filters') }}
-                        </button>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ t('Type') }}</label>
+                                        <AppSelect
+                                            v-model="type"
+                                            :options="typeOptions"
+                                            :placeholder="t('All Posts')"
+                                            @update:model-value="applyFilters"
+                                        />
+                                    </div>
+
+                                    <div v-if="activeFiltersCount > 0" class="flex justify-end border-t border-gray-100 pt-3 dark:border-surface-800">
+                                        <button
+                                            type="button"
+                                            class="text-xs font-semibold text-red-600 transition-colors hover:text-red-500"
+                                            @click="resetFilters"
+                                        >
+                                            {{ t('Clear Filters') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </AppFilterDropdown>
+                        </div>
 
                         <div v-if="selected.length" class="flex flex-wrap items-center gap-3 w-full sm:flex-grow sm:w-auto sm:justify-end lg:flex-grow-0">
                             <span class="text-sm text-gray-500 dark:text-gray-400">
@@ -580,16 +619,16 @@ onBeforeUnmount(() => {
                                 <th scope="col" class="w-12 px-4 py-3">
                                     <input
                                         type="checkbox"
-                                        class="rounded border-gray-300 text-primary-600"
+                                        class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:!border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600"
                                         :checked="posts.data.length > 0 && selected.length === posts.data.length"
                                         @change="toggleSelectAll"
                                     >
                                 </th>
                                 <th scope="col" class="px-4 py-3">{{ t('Post') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ t('Status') }}</th>
                                 <th scope="col" class="px-4 py-3">{{ t('Author') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ t('Views') }}</th>
-                                <th scope="col" class="px-4 py-3">{{ t('Date') }}</th>
+                                <th scope="col" class="px-4 py-3 text-center">{{ t('Status') }}</th>
+                                <th scope="col" class="px-4 py-3 text-center">{{ t('Views') }}</th>
+                                <th scope="col" class="px-4 py-3 text-center">{{ t('Date') }}</th>
                                 <th scope="col" class="px-4 py-3 text-right">{{ t('Actions') }}</th>
                             </tr>
                         </thead>
@@ -600,11 +639,19 @@ onBeforeUnmount(() => {
                                 class="transition-colors hover:bg-primary-50/40 dark:hover:bg-gray-900/30"
                             >
                                 <td class="px-4 py-4">
-                                    <input v-model="selected" :value="post.ulid" type="checkbox" class="rounded border-gray-300 text-primary-600">
+                                    <input v-model="selected" :value="post.ulid" type="checkbox" class="h-4 w-4 rounded border-gray-200 bg-gray-50 text-primary-600 focus:ring-2 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-700 dark:ring-offset-gray-800 dark:focus:ring-primary-600">
                                 </td>
                                 <td class="px-4 py-4">
                                     <div class="min-w-0">
-                                        <p class="truncate font-semibold text-gray-900 dark:text-white">{{ post.title }}</p>
+                                        <div class="flex items-center gap-1.5">
+                                            <Tooltip v-if="post.is_sticky" :content="t('Pinned')">
+                                                <i class="ti ti-pin text-sm text-amber-500"></i>
+                                            </Tooltip>
+                                            <Tooltip v-if="post.is_featured" :content="t('Featured')">
+                                                <i class="ti ti-star-filled text-sm text-violet-500"></i>
+                                            </Tooltip>
+                                            <p class="truncate font-semibold text-gray-900 dark:text-white">{{ post.title }}</p>
+                                        </div>
                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">/blog/{{ post.slug }}</p>
                                         <div class="mt-2 flex flex-wrap gap-1">
                                             <span
@@ -617,21 +664,21 @@ onBeforeUnmount(() => {
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-4">
+                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ post.author?.name ?? t('Unknown') }}</td>
+                                <td class="px-4 py-4 text-center">
                                     <span :class="badgeClass(isTrashed ? 'trashed' : post.status)" class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize">
                                         {{ t(isTrashed ? 'trashed' : post.status) }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ post.author?.name ?? t('Unknown') }}</td>
-                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ new Intl.NumberFormat().format(post.views_count) }}</td>
-                                <td class="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">{{ isTrashed ? formatDate(post.deleted_at) : formatDate(post.published_at) }}</td>
+                                <td class="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300">{{ new Intl.NumberFormat().format(post.views_count) }}</td>
+                                <td class="px-4 py-4 text-center text-sm text-gray-600 dark:text-gray-300">{{ isTrashed ? formatDate(post.deleted_at) : formatDate(post.published_at) }}</td>
                                 <td class="px-4 py-4 text-end">
                                     <TableActionMenu v-if="!isTrashed">
                                         <template #default="{ close }">
                                             <a
                                                 :href="postViewHref(post)"
                                                 target="_blank"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="close"
                                             >
                                                 <i :class="post.status === 'published' ? 'ti ti-external-link' : 'ti ti-eye'" class="text-base"></i>
@@ -639,7 +686,7 @@ onBeforeUnmount(() => {
                                             </a>
                                             <button
                                                 type="button"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="duplicatePost(post); close()"
                                             >
                                                 <i class="ti ti-copy text-base"></i>
@@ -647,7 +694,7 @@ onBeforeUnmount(() => {
                                             </button>
                                             <Link
                                                 :href="route('admin.blog.posts.edit', post.ulid)"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="close"
                                             >
                                                 <i class="ti ti-edit text-base"></i>
@@ -676,7 +723,7 @@ onBeforeUnmount(() => {
                                             </button>
                                         </Tooltip>
 
-                                        <Tooltip v-if="isSuperAdmin" :content="t('Delete Forever')">
+                                        <Tooltip v-if="isSuperAdmin" :content="t('Delete Permanently')">
                                             <button
                                                 type="button"
                                                 class="flex h-8 w-8 items-center justify-center rounded-full text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"

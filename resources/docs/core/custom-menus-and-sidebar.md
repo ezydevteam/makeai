@@ -4,7 +4,7 @@ slug: custom-menus-and-sidebar
 page: custom-menus-and-sidebar.html
 section: Appearance
 license: regular
-keywords: [menu builder, navigation menu, header menu, footer menu, sidebar widgets, blog sidebar, mega menu, menu items]
+keywords: [menu builder, navigation menu, header menu, footer menu, sidebar widgets, blog sidebar, mega menu, menu items, add menu item, menu not showing, footer widget, custom link]
 ---
 
 **Admin → Appearance → Menus** and **Sidebar** build the navigation and widget areas shown across your public site — separate from the admin panel's own left-hand navigation.

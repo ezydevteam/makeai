@@ -36,6 +36,17 @@ class PageController extends Controller
         // OG/Twitter reuse below.
         $documentTitle = document_title($title);
 
+        // Mirror the visible breadcrumb (Page.vue): Home › [Parent] › Page. The
+        // parent hop is only present when a parent page is set, so build the
+        // list dynamically and renumber positions to keep the schema valid.
+        $breadcrumbItems = [
+            ['name' => $siteName, 'item' => route('home')],
+        ];
+        if ($page->parent) {
+            $breadcrumbItems[] = ['name' => $page->parent->title, 'item' => route('page.show', $page->parent->slug)];
+        }
+        $breadcrumbItems[] = ['name' => $page->title, 'item' => $canonical];
+
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'WebPage',
@@ -44,10 +55,12 @@ class PageController extends Controller
             'url' => $canonical,
             'breadcrumb' => [
                 '@type' => 'BreadcrumbList',
-                'itemListElement' => [
-                    ['@type' => 'ListItem', 'position' => 1, 'name' => $siteName, 'item' => route('home')],
-                    ['@type' => 'ListItem', 'position' => 2, 'name' => $page->title, 'item' => $canonical],
-                ],
+                'itemListElement' => collect($breadcrumbItems)->map(fn (array $item, int $index): array => [
+                    '@type' => 'ListItem',
+                    'position' => $index + 1,
+                    'name' => $item['name'],
+                    'item' => $item['item'],
+                ])->all(),
             ],
         ];
 

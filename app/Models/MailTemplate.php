@@ -12,6 +12,12 @@ class MailTemplate extends Model
         'is_system', 'requires_pro', 'category', 'last_edited_by',
     ];
 
+    protected $casts = [
+        'is_active' => 'boolean',
+        'is_system' => 'boolean',
+        'requires_pro' => 'boolean',
+    ];
+
     /**
      * The admin who last saved this template (for the "Edited by" label).
      */
@@ -21,9 +27,13 @@ class MailTemplate extends Model
     }
 
     /**
-     * Render the template with provided variables.
+     * The {token} => escaped-value map every template and the surrounding layout
+     * are substituted with. Caller-supplied variables win over the defaults.
+     *
+     * Values are HTML-escaped; the templates themselves are trusted
+     * (admin-authored) HTML.
      */
-    public function render(array $variables = []): array
+    public static function replacements(array $variables = []): array
     {
         $vars = array_merge([
             'site_name' => settings('app_name', config('app.name')),
@@ -37,14 +47,41 @@ class MailTemplate extends Model
             'unsubscribe_url' => $variables['unsubscribe_url'] ?? '#',
         ], $variables);
 
-        // Build all replacements first, then substitute simultaneously with strtr
-        // so a value that happens to contain "{another_key}" is never re-processed
-        // as a placeholder on a later pass. Values are HTML-escaped; the template
-        // itself is trusted (admin-authored) HTML.
         $replacements = [];
         foreach ($vars as $key => $value) {
             $replacements['{'.$key.'}'] = e((string) $value);
         }
+
+        return $replacements;
+    }
+
+    /**
+     * Wrap already-rendered body HTML in the configured mail layout.
+     *
+     * The layout carries its own {site_name}/{year} tokens, so it needs the same
+     * substitution the body got — replacing only {content} shipped those tokens
+     * to recipients verbatim in every email the platform sent.
+     */
+    public static function wrapInLayout(string $content, array $variables = []): string
+    {
+        $layout = settings('mail_layout', '{content}');
+
+        // {content} is added last so it wins over any caller variable of the same
+        // name, and is inserted raw — it is rendered HTML, not a value to escape.
+        return strtr($layout, array_merge(
+            self::replacements($variables),
+            ['{content}' => $content],
+        ));
+    }
+
+    /**
+     * Render the template with provided variables.
+     */
+    public function render(array $variables = []): array
+    {
+        // Substitute simultaneously with strtr so a value that happens to contain
+        // "{another_key}" is never re-processed as a placeholder on a later pass.
+        $replacements = self::replacements($variables);
 
         return [
             'subject' => strtr($this->subject, $replacements),

@@ -4,6 +4,7 @@ import { Head, Link } from '@inertiajs/vue3'
 import AdminLayout from '@/Layouts/AdminLayout.vue'
 import Pagination from '@/Components/UI/Pagination.vue'
 import AppSelect from '@/Components/UI/AppSelect.vue'
+import TableActionMenu from '@/Components/UI/TableActionMenu.vue'
 import { useTranslate } from '@/Composables/useTranslate'
 import { useDateFormat } from '@/Composables/useDateFormat'
 
@@ -44,7 +45,6 @@ const filterForm = ref({
     status: props.filters.status || '',
 })
 
-const openActionMenuId = ref<number | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 
 const statusOptions = computed(() => [
@@ -79,12 +79,10 @@ const filteredLogs = computed(() => {
     })
 })
 
-function toggleActionMenu(id: number) {
-    openActionMenuId.value = openActionMenuId.value === id ? null : id
-}
-
-function closeActionMenu() {
-    openActionMenuId.value = null
+// TableActionMenu owns its own open state and teleports the panel to <body>, so
+// the page's shortcut guards read the DOM rather than tracking a row id here.
+function isActionMenuOpen() {
+    return Boolean(document.querySelector('.table-action-menu-panel'))
 }
 
 function clearFilters() {
@@ -96,36 +94,26 @@ function handleKeydown(event: KeyboardEvent) {
     const target = event.target as HTMLElement | null
     const isTypingTarget = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT' || target?.isContentEditable
 
-    if (event.key === '/' && !openActionMenuId.value && !isTypingTarget) {
+    if (event.key === '/' && !isActionMenuOpen() && !isTypingTarget) {
         event.preventDefault()
         searchInput.value?.focus()
         searchInput.value?.select()
         return
     }
 
-    if (event.key === 'Escape' && !openActionMenuId.value && (filterForm.value.search || filterForm.value.status)) {
+    // Escape closes an open action menu first — clearing the filters underneath
+    // it at the same time would be two undos for one keypress.
+    if (event.key === 'Escape' && !isActionMenuOpen() && (filterForm.value.search || filterForm.value.status)) {
         event.preventDefault()
         clearFilters()
     }
 }
 
-function handleDocumentClick(event: MouseEvent) {
-    const target = event.target as HTMLElement | null
-
-    if (target?.closest('[data-mail-log-actions]')) {
-        return
-    }
-
-    closeActionMenu()
-}
-
 onMounted(() => {
-    document.addEventListener('click', handleDocumentClick)
     document.addEventListener('keydown', handleKeydown)
 })
 
 onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick)
     document.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -256,39 +244,28 @@ onBeforeUnmount(() => {
                                 {{ log.sent_at ? formatDateTime(log.sent_at) : t('Not recorded') }}
                             </td>
                             <td class="border-b border-gray-100 px-6 py-4 align-top text-right dark:border-surface-800">
-                                <div class="relative inline-flex" data-mail-log-actions>
-                                    <button
-                                        type="button"
-                                        class="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-primary-200 hover:text-primary-600 dark:border-surface-700 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-primary-700 dark:hover:text-primary-300"
-                                        @click.stop="toggleActionMenu(log.id)"
-                                    >
-                                        <i class="ti ti-dots-vertical text-base" />
-                                    </button>
-
-                                    <div
-                                        v-if="openActionMenuId === log.id"
-                                        class="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-gray-200 bg-white p-2 text-left shadow-lg dark:border-surface-700 dark:bg-surface-900"
-                                    >
+                                <TableActionMenu>
+                                    <template #default="{ close }">
                                         <Link
                                             v-if="log.template_slug"
                                             :href="route('admin.mail.logs.resend', log.id)"
                                             method="post"
                                             as="button"
                                             preserve-scroll
-                                            class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-gray-700 transition hover:bg-primary-50 hover:text-primary-700 dark:text-gray-200 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                                            @click="closeActionMenu"
+                                            class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
+                                            @click="close"
                                         >
                                             <i class="ti ti-refresh text-base" />
                                             {{ t('Resend Email') }}
                                         </Link>
                                         <div
                                             v-else
-                                            class="rounded-xl px-3 py-2 text-sm text-gray-400 dark:text-gray-500"
+                                            class="px-4 py-2.5 text-left text-sm text-gray-400 dark:text-gray-500"
                                         >
                                             {{ t('Manual emails cannot be resent') }}
                                         </div>
-                                    </div>
-                                </div>
+                                    </template>
+                                </TableActionMenu>
                             </td>
                         </tr>
 
@@ -309,7 +286,9 @@ onBeforeUnmount(() => {
                 </table>
             </div>
 
-            <div class="border-t border-gray-100 px-6 py-4 dark:border-surface-800">
+            <!-- Pagination renders nothing on a single page, so gate the bordered
+                 footer on the same condition or it shows as an empty band. -->
+            <div v-if="logs.links.length > 3" class="border-t border-gray-100 px-6 py-4 dark:border-surface-800">
                 <Pagination :links="logs.links" />
             </div>
         </section>

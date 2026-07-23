@@ -4,7 +4,7 @@ slug: payment-gateways
 page: payment-gateways.html
 section: Payments
 license: extended
-keywords: [stripe, paypal, paddle, razorpay, paystack, sslcommerz, coingate, 2checkout, bank transfer, webhook, payment gateway, checkout not working, connect stripe, set up stripe, accept payments, enable a payment method]
+keywords: [stripe, paypal, paddle, razorpay, paystack, sslcommerz, coingate, 2checkout, bank transfer, webhook, payment gateway, checkout not working, connect stripe, set up stripe, accept payments, enable a payment method, recurring not working, subscription not activating, webhook not configured, sandbox, test mode, can't enable gateway, payment failed]
 ---
 
 **Admin → Premium → Gateways** connects the payment processors your store can charge customers through. You can enable more than one at once — customers pick from whichever gateways you've turned on at checkout.

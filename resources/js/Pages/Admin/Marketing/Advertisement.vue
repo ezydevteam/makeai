@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Head, router, useForm } from '@inertiajs/vue3'
+import { Head, router, useForm, usePage } from '@inertiajs/vue3'
 import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 import AppSwitch from '@/Components/UI/AppSwitch.vue'
 import ActionConfirmModal from '@/Components/UI/ActionConfirmModal.vue'
@@ -60,6 +60,8 @@ const props = defineProps<{
 
 const { t } = useTranslate()
 const { formatNumber } = useNumberFormat()
+const page = usePage()
+const isProAvailable = computed(() => Boolean(page.props.isProAvailable))
 const searchInput = ref<HTMLInputElement | null>(null)
 const searchFocused = ref(false)
 const deleteTarget = ref<AdItem | null>(null)
@@ -87,8 +89,11 @@ const audienceOptions = computed<SelectOption[]>(() => [
     { value: 'all', label: t('All visitors') },
     { value: 'guests', label: t('Guests only') },
     { value: 'logged_in', label: t('Logged in users') },
-    { value: 'free_users', label: t('Free users') },
-    { value: 'paid_users', label: t('Paid users') },
+    // Free/Paid targeting only makes sense when a paid tier exists.
+    ...(isProAvailable.value ? [
+        { value: 'free_users', label: t('Free users') },
+        { value: 'paid_users', label: t('Premium users') },
+    ] : []),
 ])
 const linkTargetOptions = computed<SelectOption[]>(() => [
     { value: '_blank', label: t('New tab') },
@@ -626,7 +631,7 @@ onBeforeUnmount(() => {
                     </div>
                     <AppSwitch v-model="settingsForm.ads_auto_ads_enabled" />
                 </div>
-                <div class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800 md:col-span-2">
+                <div v-if="isProAvailable" class="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800 md:col-span-2">
                     <div>
                         <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Disable ads for subscribed users') }}</div>
                         <div class="text-xs text-gray-500 dark:text-gray-400">{{ settingsForm.ads_disable_for_subscribed_users ? t('Subscribed users will not see ads') : t('Subscribed users can still see ads') }}</div>
@@ -635,7 +640,7 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
-            <div>
+            <div v-if="isProAvailable && plans.length">
                 <span class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('Disable ads for plans') }}</span>
                 <div class="flex flex-wrap gap-2">
                     <button v-for="plan in plans" :key="plan.id" type="button" :class="settingsForm.ads_disabled_plan_ids.includes(plan.id) ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300' : 'bg-gray-100 text-gray-600 dark:bg-surface-800 dark:text-gray-300'" class="rounded-full px-3 py-1 text-xs font-bold" @click="togglePlan(plan.id)">

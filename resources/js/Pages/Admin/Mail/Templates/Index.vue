@@ -53,6 +53,7 @@ const props = defineProps<{
         type?: string
     }
     categories: string[]
+    proAvailable: boolean
 }>()
 
 const { t } = useTranslate()
@@ -76,7 +77,10 @@ const typeOptions = computed<SelectOption[]>(() => [
     { value: 'custom', label: t('Custom') },
     { value: 'active', label: t('Active') },
     { value: 'disabled', label: t('Disabled') },
-    { value: 'pro', label: t('Pro') },
+    // Pro templates are filtered out of the list entirely without an Extended
+    // License + subscriptions on, so offering the filter would only ever return
+    // an empty table. The server ignores type=pro in that state too.
+    ...(props.proAvailable ? [{ value: 'pro', label: t('Pro') }] : []),
 ])
 
 const hasActiveFilters = computed(() => Boolean(search.value || category.value || type.value))
@@ -312,7 +316,7 @@ onBeforeUnmount(() => {
                                         <template #default="{ close }">
                                             <Link
                                                 :href="route('admin.mail.templates.edit', template.id)"
-                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800"
+                                                class="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-50 hover:text-gray-900 dark:text-gray-200 dark:hover:bg-surface-800 dark:hover:text-white"
                                                 @click="close"
                                             >
                                                 <i class="ti ti-edit text-base"></i>
@@ -348,7 +352,7 @@ onBeforeUnmount(() => {
                     </table>
                 </div>
 
-                <div v-if="templates.total > 0" class="border-t border-gray-100 px-6 py-4 dark:border-surface-800">
+                <div v-if="templates.links.length > 3" class="border-t border-gray-100 px-6 py-4 dark:border-surface-800">
                     <Pagination
                         :links="templates.links"
                         :from="templates.from"

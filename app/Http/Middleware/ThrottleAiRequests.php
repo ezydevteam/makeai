@@ -50,12 +50,11 @@ class ThrottleAiRequests
         $ip = $request->ip();
 
         if ($this->rateLimiter->isIpBanned($ip, $category)) {
-            return response()->json([
-                'success' => false,
-                'message' => translate('Your IP has been temporarily blocked due to abuse.'),
-            ], 429)->withHeaders([
-                'Retry-After' => '3600',
-            ]);
+            return $this->tooManyRequests(
+                $request,
+                translate('Your IP has been temporarily blocked due to abuse.'),
+                ['Retry-After' => '3600'],
+            );
         }
 
         $key = $this->buildKey($request, $category);
@@ -70,14 +69,11 @@ class ThrottleAiRequests
 
         if (! $result['allowed']) {
             $seconds = $result['retry_after_seconds'];
-            return response()->json([
-                'success' => false,
-                'code' => 'RATE_LIMITED',
-                'message' => $seconds < 60
-                    ? translate('Too many requests. Please try again in :seconds seconds.', ['seconds' => $seconds])
-                    : translate('Too many requests. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)]),
-                'retry_after' => $seconds,
-            ], 429)->withHeaders($this->rateLimitHeaders($result));
+            $message = $seconds < 60
+                ? translate('Too many requests. Please try again in :seconds seconds.', ['seconds' => $seconds])
+                : translate('Too many requests. Please try again in :minutes minutes.', ['minutes' => ceil($seconds / 60)]);
+
+            return $this->tooManyRequests($request, $message, $this->rateLimitHeaders($result), $seconds);
         }
 
         if ($category === 'text_gen') {
@@ -87,6 +83,30 @@ class ThrottleAiRequests
         $response = $next($request);
 
         return $this->attachHeaders($response, $result);
+    }
+
+    /**
+     * Build a 429 response that works for both API/AJAX and Inertia callers.
+     *
+     * Inertia form submits (router.post / form.post) require a valid Inertia
+     * response or a redirect — a plain JSON body throws "All Inertia requests
+     * must receive a valid Inertia response". So for Inertia requests we flash
+     * the message and redirect back (the shared `flash.error` drives the toast);
+     * everything else keeps the JSON contract.
+     */
+    private function tooManyRequests(Request $request, string $message, array $headers = [], ?int $retryAfter = null): mixed
+    {
+        if ($request->header('X-Inertia')) {
+            return back()->with('error', $message);
+        }
+
+        $payload = ['success' => false, 'message' => $message];
+        if ($retryAfter !== null) {
+            $payload['code'] = 'RATE_LIMITED';
+            $payload['retry_after'] = $retryAfter;
+        }
+
+        return response()->json($payload, 429)->withHeaders($headers);
     }
 
     private function buildKey(Request $request, string $category): string
