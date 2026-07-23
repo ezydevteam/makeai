@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
@@ -91,7 +92,23 @@ class InstallerExportData extends Command
                 return self::FAILURE;
             }
 
+            // Developer-only license flags (LICENSE_TEST_MODE / LICENSE_DEV_BYPASS)
+            // make the app self-activate a fake "test-buyer" license as it boots and
+            // seeds. Force them off for THIS process so the reseed produces an
+            // un-activated license by construction — $this->call() runs in the same
+            // already-booted process, so the override sticks through the seed.
+            config([
+                'app.license_test_mode' => false,
+                'license.dev_bypass' => false,
+            ]);
+
             $this->call('migrate:fresh', ['--seed' => true, '--force' => true]);
+
+            // The reseed still replays the collapse-migration snapshot, which carries
+            // the developer's mail credentials, branding and dev domain. Scrub every
+            // distribution-sensitive setting back to clean install defaults so the
+            // shipped data.sql can never leak dev state — no hand-sanitizing per release.
+            $this->sanitizeSettingsForDistribution();
         } elseif (! $this->guardAgainstDirtyData($connection)) {
             return self::FAILURE;
         }
@@ -189,6 +206,56 @@ class InstallerExportData extends Command
         } finally {
             @unlink($cnf);
         }
+    }
+
+    /**
+     * Reset every distribution-sensitive setting to a clean install default just
+     * before the dump, so the shipped data.sql can never carry developer or live
+     * values — regardless of what the dev database, the collapse-migration snapshot
+     * or the dev-only license flags left behind.
+     *
+     * Runs in the --fresh path only, where the database has just been reseeded and
+     * is disposable, so mutating it further is safe and expected. Setting a key to
+     * null removes it from its group blob (matching a never-configured install).
+     */
+    private function sanitizeSettingsForDistribution(): void
+    {
+        // License: ship un-activated. The buyer activates with their own purchase
+        // code; a shipped "valid" state would bypass licensing entirely.
+        settings_set('license_purchase_code', '', 'encrypted', 'license');
+        settings_set('license_buyer', '', 'string', 'license');
+        settings_set('license_purchased_at', '', 'string', 'license');
+        settings_set('license_supported_until', '', 'string', 'license');
+        settings_set('license_verified_at', '', 'string', 'license');
+        settings_set('license_domain', '', 'string', 'license');
+        settings_set('license_status', 'invalid', 'string', 'license');
+        settings_set('license_grace_started_at', null, 'string', 'license');
+        // Test-mode-only keys buildTestResult() writes — remove them entirely.
+        settings_set('license_signed_payload', null, 'string', 'license');
+        settings_set('license_signature', null, 'string', 'license');
+        settings_set('license_is_test_mode', null, 'boolean', 'license');
+        Cache::forget('license.status');
+
+        // Mail: blank all credentials and the dev transport identity. Buyers
+        // configure their own SMTP / SendGrid / SES during or after install.
+        settings_set('mail_from_address', '', 'string', 'mail');
+        settings_set('mail_host', '', 'string', 'mail');
+        settings_set('mail_username', '', 'string', 'mail');
+        settings_set('mail_password', null, 'encrypted', 'mail');
+        settings_set('sendgrid_api_key', null, 'encrypted', 'mail');
+        settings_set('ses_key', null, 'encrypted', 'mail');
+
+        // Branding / general: neutral product identity, no dev logo uploads (whose
+        // files never ship) and no dev domain. The installer sets the real site URL.
+        settings_set('site_name', 'MakeAI', 'string', 'branding');
+        settings_set('site_logo_light', null, 'string', 'branding');
+        settings_set('site_logo_dark', null, 'string', 'branding');
+        settings_set('site_favicon_ico', null, 'string', 'branding');
+        settings_set('site_favicon_png', null, 'string', 'branding');
+        settings_set('site_og_image', null, 'string', 'branding');
+        settings_set('site_url', '', 'string', 'general');
+
+        $this->info('✔ Sanitized license, mail, branding and site settings for distribution.');
     }
 
     /**
