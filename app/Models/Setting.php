@@ -28,6 +28,19 @@ class Setting extends Model
      * Legacy aliases for renamed keys (PART 02 branding normalization).
      * Canonical keys use site_* prefix. app_* is backward-compat.
      */
+    /**
+     * In-memory, request-scoped setting overrides.
+     *
+     * Populated by DemoSelection middleware so a demo visitor can preview a theme
+     * preset or an addon-owned homepage without persisting anything — demo mode
+     * blocks all writes, so the selection can never be saved. Checked before the
+     * cache/DB read in getValue(), so it neither pollutes the settings cache nor
+     * survives the request. Empty (and thus a complete no-op) in normal operation.
+     *
+     * @var array<string, mixed>
+     */
+    protected static array $overrides = [];
+
     private const ALIASES = [
         'app_name'          => 'site_name',
         'app_url'           => 'site_url',
@@ -262,6 +275,12 @@ class Setting extends Model
         // Resolve legacy alias
         $resolvedKey = self::ALIASES[$key] ?? $key;
 
+        // Request-scoped demo override wins over everything and short-circuits before
+        // the cache/DB read, so a preview value never leaks into the settings cache.
+        if (self::$overrides !== [] && array_key_exists($resolvedKey, self::$overrides)) {
+            return self::$overrides[$resolvedKey];
+        }
+
         if ($group = self::blobGroupFor($resolvedKey)) {
             $blob = self::loadBlob($group);
             if (array_key_exists($resolvedKey, $blob)) {
@@ -278,6 +297,27 @@ class Setting extends Model
         });
 
         return $cached === self::MISSING ? $default : $cached;
+    }
+
+    /**
+     * Install request-scoped setting overrides (demo preview). Replaces any previously
+     * set overrides. These are never written to the DB or the settings cache — they
+     * live only for the current request. Pass [] to clear.
+     *
+     * @param  array<string, mixed>  $overrides  Keyed by canonical setting key.
+     */
+    public static function overrideForRequest(array $overrides): void
+    {
+        self::$overrides = $overrides;
+    }
+
+    /**
+     * Drop any request-scoped overrides. Primarily for test isolation, where a single
+     * process serves many requests.
+     */
+    public static function clearOverrides(): void
+    {
+        self::$overrides = [];
     }
 
     /**

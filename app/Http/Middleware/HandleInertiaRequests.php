@@ -102,6 +102,24 @@ class HandleInertiaRequests extends Middleware
         $frontendCustomCodeSettings = $frontendPresetService->getStoredCustomCodeSettings();
         $frontendToolPageSettings = $frontendPresetService->getResolvedFrontendToolPage();
 
+        // Demo bar nav: a ?demo_home / ?demo_tool query param picks a page-level layout
+        // variant only (never the preset — that is the modal's job). Gated on demo mode
+        // so a production query string can never reshuffle the homepage or tool page.
+        if (config('demo.enabled')) {
+            if ($homeKey = $request->query('demo_home')) {
+                $item = collect(config('demo.nav.home.items', []))->firstWhere('key', (string) $homeKey);
+                if ($item && ! empty($item['hero_variant'])) {
+                    $frontendHomepageSettings['hero_variant'] = $item['hero_variant'];
+                }
+            }
+            if ($toolKey = $request->query('demo_tool')) {
+                $item = collect(config('demo.nav.tools.items', []))->firstWhere('key', (string) $toolKey);
+                if ($item && ! empty($item['layout'])) {
+                    $frontendToolPageSettings['layout'] = $item['layout'];
+                }
+            }
+        }
+
         // Driver-aware media resolver: root-relative /storage/... on the local disk
         // (mixed-content safe), fully-qualified bucket/CDN URL on any cloud driver.
         $resolveImageUrl = fn (?string $path) => media_url($path);
@@ -220,6 +238,15 @@ class HandleInertiaRequests extends Middleware
                     : null,
                 'name' => $siteName,
             ],
+
+            // Demo style-selector payload — null (and thus absent) unless demo mode is on,
+            // so the floating brush picker never renders on a real install. The nav itself
+            // rides in globalMenus (see above); this is just the preset/addon catalog and
+            // which one is currently active.
+            'demoBar' => fn () => config('demo.enabled') ? [
+                'selectable' => app(\App\Services\DemoSelectionResolver::class)->catalog(),
+                'active' => (string) ($request->cookie('demo_selection') ?? ''),
+            ] : null,
 
             'gdpr' => fn (Request $request) => [
                 'enabled' => (bool) settings('gdpr_enabled', false),
@@ -384,13 +411,21 @@ class HandleInertiaRequests extends Middleware
             // instead of an array `[]`, breaking `globalMenus.find(...)` on the client).
             // toArray() yields the exact same JSON the Collection would have and
             // serializes cleanly.
-            'globalMenus' => fn () => \Illuminate\Support\Facades\Cache::remember(
-                'makeai:menus:' . (Menu::max('updated_at') ?? '0') . ':' . (\App\Models\MenuItem::max('updated_at') ?? '0'),
-                3600,
-                fn () => Menu::with(['items' => function ($q) {
-                    $q->orderBy('sort_order');
-                }, 'items.page'])->get()->toArray()
-            ),
+            'globalMenus' => function () {
+                $menus = \Illuminate\Support\Facades\Cache::remember(
+                    'makeai:menus:' . (Menu::max('updated_at') ?? '0') . ':' . (\App\Models\MenuItem::max('updated_at') ?? '0'),
+                    3600,
+                    fn () => Menu::with(['items' => function ($q) {
+                        $q->orderBy('sort_order');
+                    }, 'items.page'])->get()->toArray()
+                );
+
+                // In demo mode, fold the demo nav (Home ▸ Home 1/2/3, Tool Page ▸ Page 1–4)
+                // into the header's own menu so it renders through the normal menu-builder
+                // markup — same dropdowns, same styling — rather than a separate bar. Done
+                // outside the cache so it never persists into a buyer's real menu.
+                return config('demo.enabled') ? $this->injectDemoNavMenu($menus) : $menus;
+            },
 
             'affiliateEnabled' => fn () => is_extended_license() && (bool) settings('affiliate_enabled', false),
             'couponsEnabled' => fn () => coupons_enabled(),
@@ -456,6 +491,101 @@ class HandleInertiaRequests extends Middleware
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Fold the demo nav groups into the header's menu (slug 'main'). If a real 'main'
+     * menu exists the demo parents are appended to it; otherwise a synthetic 'main'
+     * menu is added so the header has something to render. Never cached / persisted.
+     *
+     * @param  array<int, array<string, mixed>>  $menus
+     * @return array<int, array<string, mixed>>
+     */
+    private function injectDemoNavMenu(array $menus): array
+    {
+        $items = $this->buildDemoMenuItems();
+
+        if ($items === []) {
+            return $menus;
+        }
+
+        foreach ($menus as &$menu) {
+            if (($menu['slug'] ?? null) === 'main') {
+                $menu['items'] = array_merge($menu['items'] ?? [], $items);
+
+                return $menus;
+            }
+        }
+        unset($menu);
+
+        // No 'main' menu configured yet — supply one so the demo nav still shows.
+        $menus[] = [
+            'id' => 'demo-main',
+            'slug' => 'main',
+            'name' => 'Main',
+            'location' => 'main',
+            'items' => $items,
+        ];
+
+        return $menus;
+    }
+
+    /**
+     * The demo nav as menu-builder-shaped items: two parents (Home, Tool Page) each with
+     * child links carrying ?demo_home / ?demo_tool. Tool children target a real sample
+     * tool so "Page 2" opens an actual tool page in the chosen layout.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDemoMenuItems(): array
+    {
+        $sampleSlug = \App\Models\AiTool::active()->orderBy('name')->value('slug');
+        $toolBase = $sampleSlug ? "/ai-tools/{$sampleSlug}" : '/ai-tools';
+
+        $groups = [
+            ['id' => 'demo-home', 'label' => (string) config('demo.nav.home.label', 'Home'), 'icon' => 'ti ti-home', 'items' => collect(config('demo.nav.home.items', []))->map(fn (array $i) => ['key' => $i['key'], 'label' => $i['label'], 'url' => '/?demo_home=' . $i['key']])->all()],
+            ['id' => 'demo-tools', 'label' => (string) config('demo.nav.tools.label', 'Tool Page'), 'icon' => 'ti ti-adjustments', 'items' => collect(config('demo.nav.tools.items', []))->map(fn (array $i) => ['key' => $i['key'], 'label' => $i['label'], 'url' => $toolBase . '?demo_tool=' . $i['key']])->all()],
+        ];
+
+        $items = [];
+        $sort = 9000;
+
+        foreach ($groups as $group) {
+            if ($group['items'] === []) {
+                continue;
+            }
+
+            $items[] = $this->demoMenuItem($group['id'], $group['label'], '#', null, $sort++, $group['icon']);
+
+            foreach ($group['items'] as $child) {
+                $items[] = $this->demoMenuItem('demo-' . $child['key'], $child['label'], $child['url'], $group['id'], $sort++);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * One demo menu item shaped exactly like a MenuItem row the header renders.
+     *
+     * @return array<string, mixed>
+     */
+    private function demoMenuItem(string $id, string $label, string $url, ?string $parentId, int $sort, string $icon = ''): array
+    {
+        return [
+            'id' => $id,
+            'parent_id' => $parentId,
+            'title' => $label,
+            'label' => $label,
+            'url' => $url,
+            'final_url' => $url,
+            'icon' => $icon,
+            'target' => '_self',
+            'is_active' => true,
+            'requires_auth' => 'none',
+            'sort_order' => $sort,
+            'mega_menu' => false,
+        ];
     }
 
     /**

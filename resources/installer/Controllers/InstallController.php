@@ -48,6 +48,13 @@ class InstallController extends Controller
             $props['allPass'] = app(SystemCheckService::class)->allPass();
         }
 
+        if ($step === 3) {
+            // Flashed by storeStep() when it refuses a populated database, so the
+            // Database step can reveal the reset checkbox even if the buyer never
+            // clicked "Test Connection". Null on a normal visit.
+            $props['dbState'] = $request->session()->get('db_state');
+        }
+
         if ($step === self::TOTAL_STEPS) {
             // Scheduled tasks (subscription renewals, usage resets, queued mail)
             // never run without this, and the buyer is redirected straight to the
@@ -77,6 +84,20 @@ class InstallController extends Controller
                 $this->testDatabaseConnection($validated);
             } catch (\Throwable $e) {
                 return back()->with('error', $this->friendlyDbError($e->getMessage()));
+            }
+
+            // A populated target database cannot be safely migrated over: a plain
+            // re-install skips already-run migrations and then collides on the
+            // seed data / stale admin, leaving a half-overwritten install. Require
+            // the buyer to explicitly confirm a destructive reset (the checkbox on
+            // the Database step) before we let them continue. Re-flash the detected
+            // state so the step can reveal that checkbox even when the buyer never
+            // clicked "Test Connection".
+            $state = $this->probeDatabaseState($validated);
+            if ($state !== 'empty' && empty($validated['db_reset'])) {
+                return back()
+                    ->with('error', $this->populatedDbMessage($state))
+                    ->with('db_state', $state);
             }
         }
 
@@ -241,10 +262,39 @@ class InstallController extends Controller
             DB::purge($dbDriver);
             DB::reconnect($dbDriver);
 
-            Artisan::call('migrate', [
-                '--database' => $dbDriver,
-                '--force' => true,
-            ]);
+            // Decide migrate vs migrate:fresh from the target DB's ACTUAL state,
+            // not just the checkbox — the buyer could have pointed at a different
+            // database since the Database step.
+            $resetRequested = (bool) ($data['step_3']['db_reset'] ?? false);
+            $dbState = $this->probeDatabaseState($data['step_3']);
+
+            if ($dbState !== 'empty' && ! $resetRequested) {
+                // Populated database, no reset confirmation. Refuse rather than run
+                // a plain migrate that would skip migrations and half-overwrite the
+                // install. INSTALLED is still false at this point, so the buyer can
+                // go back, tick the reset option (or use an empty DB), and retry.
+                $message = $this->populatedDbMessage($dbState);
+
+                return $request->wantsJson()
+                    ? response()->json(['success' => false, 'message' => $message], 200)
+                    : redirect()->route('install')->with('error', $message);
+            }
+
+            if ($dbState !== 'empty') {
+                // Buyer confirmed a destructive reset: drop every table (and view)
+                // then re-run all migrations, so data.sql imports into a clean
+                // schema and the admin reconciliation in Phase 4 matches the
+                // freshly-seeded default account instead of a renamed stale one.
+                Artisan::call('migrate:fresh', [
+                    '--database' => $dbDriver,
+                    '--force' => true,
+                ]);
+            } else {
+                Artisan::call('migrate', [
+                    '--database' => $dbDriver,
+                    '--force' => true,
+                ]);
+            }
 
             $dbReady = true;
         } catch (\Throwable $e) {
@@ -485,9 +535,21 @@ class InstallController extends Controller
             ]);
         }
 
+        // Connection proved — also report whether the database is empty, a prior
+        // install of this app, or populated by something else, so the step can
+        // reveal the reset confirmation before the buyer advances. Non-fatal: a
+        // probe failure never turns a good connection into a failed one.
+        $dbState = 'unknown';
+        try {
+            $dbState = $this->probeDatabaseState($validated);
+        } catch (\Throwable) {
+            // leave as 'unknown'
+        }
+
         return response()->json([
             'pass' => true,
             'message' => 'Connection successful!',
+            'dbState' => $dbState,
         ]);
     }
 
@@ -525,6 +587,9 @@ class InstallController extends Controller
                 'db_database' => ['required', 'string', 'max:255'],
                 'db_username' => ['required', 'string', 'max:255'],
                 'db_password' => ['nullable', 'string', 'max:255'],
+                // Buyer's explicit consent to wipe a non-empty target database
+                // before installing. Only honoured when the DB actually has data.
+                'db_reset' => ['sometimes', 'boolean'],
             ], [
                 'db_host.required' => 'The database host is required (most shared hosts use "localhost").',
                 'db_port.required' => 'The database port is required (MySQL/MariaDB default is 3306).',
@@ -577,6 +642,57 @@ class InstallController extends Controller
         } finally {
             DB::purge('_install_test');
         }
+    }
+
+    /**
+     * Classify the target database so the installer never silently overwrites
+     * real data. Returns one of:
+     *   'empty'   — no tables; safe to migrate straight in.
+     *   'app'     — has a `migrations` table, i.e. a prior install of this app.
+     *   'foreign' — has tables but no `migrations` table (another application).
+     *
+     * MySQL/MariaDB are the only offered drivers, so `SHOW TABLES` is a reliable
+     * table census. Uses a throwaway `_install_probe` connection built from the
+     * buyer's credentials and purges it afterwards, exactly like the connection
+     * test, so it never disturbs the app's default connection.
+     */
+    private function probeDatabaseState(array $db): string
+    {
+        $driver = $db['db_driver'] ?? 'mysql';
+        $original = config("database.connections.{$driver}");
+
+        config([
+            'database.connections._install_probe' => array_merge((array) $original, [
+                'host' => $db['db_host'] ?? '127.0.0.1',
+                'port' => $db['db_port'] ?? '3306',
+                'database' => $db['db_database'] ?? '',
+                'username' => $db['db_username'] ?? '',
+                'password' => $db['db_password'] ?? '',
+            ]),
+        ]);
+
+        try {
+            $connection = DB::connection('_install_probe');
+
+            if (count($connection->select('SHOW TABLES')) === 0) {
+                return 'empty';
+            }
+
+            return $connection->getSchemaBuilder()->hasTable('migrations') ? 'app' : 'foreign';
+        } finally {
+            DB::purge('_install_probe');
+        }
+    }
+
+    /**
+     * Buyer-facing explanation of why a non-empty database was refused, tailored
+     * to whether it looks like a prior install of this app or a foreign database.
+     */
+    private function populatedDbMessage(string $state): string
+    {
+        return $state === 'app'
+            ? 'A previous installation was found in this database. Tick "Reset the database and reinstall" on the Database step to erase it and continue — or point the installer at a new, empty database.'
+            : 'This database already contains tables from another application. Use a new, empty database, or tick "Reset the database and reinstall" on the Database step to erase everything it contains.';
     }
 
     /**

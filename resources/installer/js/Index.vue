@@ -24,6 +24,9 @@ interface InstallProps {
     systemCheck?: Record<string, any[]>
     allPass?: boolean
     cronCommand?: string
+    // Flashed by the controller when it refuses a populated database on submit,
+    // so the Database step can reveal the reset card on the Next click alone.
+    dbState?: string | null
 }
 
 const props = defineProps<InstallProps>()
@@ -191,6 +194,7 @@ async function finalizeInstall() {
                     :system-check="systemCheck"
                     :all-pass="allPass"
                     :cron-command="cronCommand"
+                    :db-state="dbState"
                     :error="errorMessage"
                 />
             </div>

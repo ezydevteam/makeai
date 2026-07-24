@@ -10,6 +10,7 @@ import NewsletterPopup from '@themes/default/js/Components/NewsletterPopup.vue'
 import AdSection from '@themes/default/js/Components/AdSection.vue'
 import CookieConsentBanner from '@/Components/Utility/CookieConsentBanner.vue'
 import AiAssistantLoader from '../../../../../addons/ai-assistant/resources/js/Components/AiAssistantLoader.vue'
+import DemoStyleFab from '@themes/default/js/Components/DemoStyleFab.vue'
 
 const page = usePage()
 const { t } = useTranslate()
@@ -100,6 +101,10 @@ useFlashToasts()
                 </button>
             </div>
         </div>
+
+        <!-- Demo style selector (demo mode only): floating brush FAB → preset/addon modal.
+             The demo nav variants live in the normal header menu (globalMenus). -->
+        <DemoStyleFab v-if="isDemo" />
 
         <template v-if="!hideHeader">
             <div id="top-sticky-stack" class="sticky top-0 z-[60] flex flex-col w-full">

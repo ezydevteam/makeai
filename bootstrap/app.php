@@ -59,6 +59,10 @@ $appConfigurator = Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnsurePhoneProvided::class,
             \App\Http\Middleware\EnsureTwoFactorEnabled::class,
             DemoMode::class,
+            // Applies the demo bar's preset/addon selection (from the demo_selection
+            // cookie) as in-memory setting overrides. Must precede HandleInertiaRequests,
+            // which eagerly resolves theme/homepage settings. No-op unless demo.enabled.
+            \App\Http\Middleware\DemoSelection::class,
             LocaleMiddleware::class,
             DetectPricingCountry::class,
             ToolSlugRedirect::class,

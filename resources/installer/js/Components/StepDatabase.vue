@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import axios from 'axios'
 import ErrorAlert from './ErrorAlert.vue'
 import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
@@ -7,6 +7,9 @@ import AppSelect, { type SelectOption } from '@/Components/UI/AppSelect.vue'
 const props = defineProps<{
     formData: Record<string, any>
     error?: string | null
+    // Server-detected DB state ('empty' | 'app' | 'foreign'), flashed by the
+    // controller when it refuses a populated database on submit.
+    dbState?: string | null
 }>()
 
 const db = reactive({
@@ -16,10 +19,37 @@ const db = reactive({
     db_database: props.formData?.step_3?.db_database ?? '',
     db_username: props.formData?.step_3?.db_username ?? '',
     db_password: props.formData?.step_3?.db_password ?? '',
+    // Buyer consent to wipe a non-empty database before installing.
+    db_reset: props.formData?.step_3?.db_reset ?? false,
 })
 
 const testing = ref(false)
 const testResult = ref<{ pass: boolean; message: string } | null>(null)
+
+// The most recent state we know about: a fresh "Test Connection" wins over the
+// state the server flashed on the last refused submit. Once the buyer edits any
+// connection field, both verdicts describe different credentials and must be
+// ignored — otherwise a stale "empty" could hide the card for a populated DB (a
+// dead-end where the reset checkbox never appears), or vice-versa.
+const probedState = ref<string | null>(null)
+const dirtied = ref(false)
+const existingState = computed(() => {
+    if (probedState.value) return probedState.value
+    if (dirtied.value) return null
+    return props.dbState ?? null
+})
+const showReset = computed(
+    () => existingState.value === 'app' || existingState.value === 'foreign',
+)
+
+watch(
+    () => [db.db_driver, db.db_host, db.db_port, db.db_database, db.db_username, db.db_password],
+    () => {
+        probedState.value = null
+        testResult.value = null
+        dirtied.value = true
+    },
+)
 
 // SQLite is intentionally absent: a fresh install is bootstrapped from
 // database/data/data.sql (a mysqldump), and the seeder classes that once covered
@@ -44,6 +74,9 @@ async function testConnection() {
         // domain root and 404'd there.
         const { data } = await axios.post(route('install.test-database'), { ...db })
         testResult.value = { pass: !!data.pass, message: data.message ?? '' }
+        if (data.pass) {
+            probedState.value = data.dbState ?? null
+        }
     } catch (e: any) {
         const errors = e?.response?.data?.errors
         testResult.value = {
@@ -155,6 +188,48 @@ defineExpose({
                     >
                         {{ testResult.message }}
                     </span>
+                </div>
+
+                <!-- Existing-data warning + destructive reset confirmation -->
+                <div
+                    v-if="showReset"
+                    class="rounded-lg border p-4"
+                    :class="existingState === 'app' ? 'border-amber-300 bg-amber-50' : 'border-red-300 bg-red-50'"
+                >
+                    <div class="flex items-start gap-3">
+                        <i
+                            class="ti ti-alert-triangle mt-0.5 text-lg"
+                            :class="existingState === 'app' ? 'text-amber-600' : 'text-red-600'"
+                        />
+                        <div class="flex-1">
+                            <p
+                                class="text-sm font-semibold"
+                                :class="existingState === 'app' ? 'text-amber-800' : 'text-red-800'"
+                            >
+                                {{ existingState === 'app'
+                                    ? 'A previous installation was found in this database'
+                                    : 'This database already contains data from another application' }}
+                            </p>
+                            <p
+                                class="mt-1 text-xs"
+                                :class="existingState === 'app' ? 'text-amber-700' : 'text-red-700'"
+                            >
+                                The installer will not overwrite it unless you reset. Resetting permanently
+                                erases every table in this database before installing — there is no undo.
+                            </p>
+                            <label
+                                class="mt-3 flex items-start gap-2 text-sm font-medium"
+                                :class="existingState === 'app' ? 'text-amber-900' : 'text-red-900'"
+                            >
+                                <input
+                                    v-model="db.db_reset"
+                                    type="checkbox"
+                                    class="mt-0.5 h-4 w-4 rounded border-slate-300"
+                                />
+                                <span>Reset the database and reinstall (permanently erases all existing data)</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -21,6 +21,9 @@ return new class extends Migration
             // phone_country — the ISO alpha-2 whose dial code the PhoneInput prefixes.
             $table->string('phone', 32)->nullable();
             $table->string('phone_country', 2)->nullable();
+            // Set once the user confirms an SMS OTP sent to `phone`; reset to null
+            // whenever phone/phone_country changes so re-verification is required.
+            $table->timestamp('phone_verified_at')->nullable();
             // Consent to receive non-essential/bulk SMS. Defaults on (opt-out model,
             // matching email_marketing); users can turn it off in Privacy settings.
             // Bulk campaigns still additionally require a verified phone.
@@ -90,6 +93,11 @@ return new class extends Migration
             $table->text('chat_custom_instructions')->nullable();
 
             $table->unique(['oauth_provider', 'oauth_id']);
+            // Composite so the same national number can recur across countries; the pair
+            // (national number + phone_country dial code) identifies one real subscriber.
+            // NULL is treated as distinct, so phone stays optional at the DB layer — the
+            // "Require Phone Number" rule is enforced in the app (phone_requirement_met()).
+            $table->unique(['phone', 'phone_country'], 'users_phone_phone_country_unique');
             $table->index('is_active');
             $table->index('referral_code');
             $table->index('stripe_id');

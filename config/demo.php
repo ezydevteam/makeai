@@ -74,4 +74,44 @@ return [
 
     'user_password' => env('DEMO_USER_PASSWORD'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Demo Switcher — Nav Menu
+    |--------------------------------------------------------------------------
+    |
+    | The demo bar's nav menu (visible only in demo mode) lets a buyer preview
+    | different TARGET-PAGE styles WITHOUT changing the theme preset — that is
+    | the right-side selector modal's job (presets + addon homepages, both
+    | discovered automatically).
+    |
+    | Each item maps a stable `key` (used in the ?demo_home / ?demo_tool query
+    | param) to a page-level layout the theme already ships:
+    |   - home items → a hero `hero_variant` (Home.vue renders it)
+    |   - tool items → a ToolPage `layout` (default | modern | minimalist | creative)
+    |
+    | Selection is carried in the URL (GET only) so it never trips demo mode's
+    | write-block and stays deep-linkable.
+    |
+    */
+
+    'nav' => [
+        'home' => [
+            'label' => 'Home',
+            'items' => [
+                ['key' => 'home-1', 'label' => 'Home 1 — Gradient',   'hero_variant' => 'centered-gradient'],
+                ['key' => 'home-2', 'label' => 'Home 2 — Tools Grid', 'hero_variant' => 'tools-grid'],
+                ['key' => 'home-3', 'label' => 'Home 3 — Featured',   'hero_variant' => 'featured'],
+            ],
+        ],
+        'tools' => [
+            'label' => 'Tool Page',
+            'items' => [
+                ['key' => 'tool-1', 'label' => 'Page 1 — Default',     'layout' => 'default'],
+                ['key' => 'tool-2', 'label' => 'Page 2 — Modern',      'layout' => 'modern'],
+                ['key' => 'tool-3', 'label' => 'Page 3 — Minimalist',  'layout' => 'minimalist'],
+                ['key' => 'tool-4', 'label' => 'Page 4 — Creative',    'layout' => 'creative'],
+            ],
+        ],
+    ],
+
 ];

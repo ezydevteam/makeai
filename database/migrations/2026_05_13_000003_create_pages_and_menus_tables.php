@@ -23,6 +23,9 @@ return new class extends Migration
             $table->string('og_image', 500)->nullable();
             $table->string('featured_image', 500)->nullable();
             $table->boolean('show_title')->default(true);
+            // Opt-in lead/standfirst: render the excerpt under the title on the public
+            // page. Defaults to false so existing pages keep their look.
+            $table->boolean('show_excerpt')->default(false);
             $table->boolean('center_title')->default(false);
             $table->boolean('show_breadcrumbs')->default(true);
             $table->boolean('show_featured_image')->default(true);

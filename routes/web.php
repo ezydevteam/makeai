@@ -78,6 +78,10 @@ Route::post('/locale', [LocaleController::class, 'switch'])->name('locale.switch
 Route::get('/live-search', LiveSearchController::class)->middleware('throttle:public,60,60')->name('live-search');
 Route::get('/css/theme-variables.css', [HomeController::class, 'themeCss'])->name('theme-variables.css');
 
+// Demo bar preset/addon selector. GET only (demo mode blocks writes) and 404s when
+// demo mode is off, so it never exists on a real install.
+Route::get('/__demo/select', [\App\Http\Controllers\DemoController::class, 'select'])->name('demo.select');
+
 // ─── Guest Auth ─────────────────────────────
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'showLoginForm'])->name('login');

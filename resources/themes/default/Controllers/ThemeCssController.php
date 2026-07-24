@@ -368,9 +368,17 @@ class ThemeCssController extends Controller
             $lines[] = '/* Custom CSS end */';
         }
 
+        // In demo mode the palette follows the visitor's chosen preset (a per-request,
+        // cookie-driven override). The stylesheet URL never changes, so a shared 1-hour
+        // cache would pin one preset's colours for everyone — send no-store instead so
+        // each demo selection re-fetches fresh CSS. Production keeps the long cache.
+        $cacheControl = config('demo.enabled')
+            ? 'no-store, private'
+            : 'public, max-age=3600, must-revalidate';
+
         return response(implode("\n", $lines), 200)
             ->header('Content-Type', 'text/css; charset=utf-8')
-            ->header('Cache-Control', 'public, max-age=3600, must-revalidate');
+            ->header('Cache-Control', $cacheControl);
     }
 
     private function buildPalette(string $base): array

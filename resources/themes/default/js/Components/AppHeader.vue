@@ -6,7 +6,7 @@ import { useTheme } from '@/Composables/useTheme'
 import { useTranslate } from '@/Composables/useTranslate'
 import LanguageSwitcher from '@/Components/Utility/LanguageSwitcher.vue'
 import CommandPalette from '@/Components/Utility/CommandPalette.vue'
-import NotificationBell from '@themes/default/js/Components/NotificationBell.vue'
+import NotificationBell from '@/Components/Utility/NotificationBell.vue'
 import SocialFollow from '@themes/default/js/Components/SocialFollow.vue'
 import { mediaUrl } from '@/lib/media'
 
